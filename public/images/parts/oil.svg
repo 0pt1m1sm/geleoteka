@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <rect width="200" height="200" rx="8" fill="#141414"/>
+  <circle cx="100" cy="85" r="35" stroke="#d4af37" stroke-width="2" fill="none"/>
+  <path d="M85 85 L115 85 M100 70 L100 100" stroke="#d4af37" stroke-width="2" stroke-linecap="round"/>
+  <rect x="80" y="120" width="40" height="30" rx="4" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+  <text x="100" y="170" text-anchor="middle" font-family="system-ui" font-size="11" fill="#7a7a74">Масла</text>
+</svg>

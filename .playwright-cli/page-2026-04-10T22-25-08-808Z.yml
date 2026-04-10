@@ -1,0 +1,249 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "Geleoteka" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Услуги" [ref=e6] [cursor=pointer]:
+          - /url: /services
+        - link "Запчасти" [ref=e7] [cursor=pointer]:
+          - /url: /parts
+        - link "Аренда" [ref=e8] [cursor=pointer]:
+          - /url: /rentals
+        - link "О нас" [ref=e9] [cursor=pointer]:
+          - /url: /about
+        - link "Контакты" [ref=e10] [cursor=pointer]:
+          - /url: /contacts
+        - link "Кабинет" [ref=e11] [cursor=pointer]:
+          - /url: /cabinet
+        - link "Записаться" [ref=e12] [cursor=pointer]:
+          - /url: /booking
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e20]:
+        - generic [ref=e21]: G-Class Specialist
+        - heading "Geleoteka" [level=1] [ref=e22]
+        - paragraph [ref=e23]: Специализированный сервис Mercedes-Benz G-Class
+        - paragraph [ref=e24]: Онлайн-запись · Отслеживание статуса · Личный кабинет
+        - generic [ref=e25]:
+          - link "Записаться на сервис" [ref=e26] [cursor=pointer]:
+            - /url: /booking
+          - link "Наши услуги" [ref=e27] [cursor=pointer]:
+            - /url: /services
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]: 15+
+          - generic [ref=e33]: Лет опыта
+        - generic [ref=e34]:
+          - generic [ref=e35]: 2 400+
+          - generic [ref=e36]: Авто в год
+        - generic [ref=e37]:
+          - generic [ref=e38]: 98%
+          - generic [ref=e39]: Довольных клиентов
+        - generic [ref=e40]:
+          - generic [ref=e41]: 3 500+
+          - generic [ref=e42]: Запчастей в наличии
+      - generic [ref=e43]:
+        - generic [ref=e44]:
+          - heading "Наши услуги" [level=2] [ref=e45]
+          - paragraph [ref=e46]: Полный спектр услуг по обслуживанию и ремонту автомобилей Mercedes-Benz
+        - generic [ref=e47]:
+          - link "Техобслуживание ТО по регламенту Mercedes от 8 000 ₽" [ref=e48] [cursor=pointer]:
+            - /url: /services/to
+            - heading "Техобслуживание" [level=3] [ref=e49]
+            - paragraph [ref=e50]: ТО по регламенту Mercedes
+            - generic [ref=e51]: от 8 000 ₽
+          - link "Диагностика STAR Diagnostics, полная проверка от 5 000 ₽" [ref=e52] [cursor=pointer]:
+            - /url: /services/diagnostic
+            - heading "Диагностика" [level=3] [ref=e53]
+            - paragraph [ref=e54]: STAR Diagnostics, полная проверка
+            - generic [ref=e55]: от 5 000 ₽
+          - link "Ремонт двигателя Любой вид ремонта узлов и агрегатов от 15 000 ₽" [ref=e56] [cursor=pointer]:
+            - /url: /services/repair
+            - heading "Ремонт двигателя" [level=3] [ref=e57]
+            - paragraph [ref=e58]: Любой вид ремонта узлов и агрегатов
+            - generic [ref=e59]: от 15 000 ₽
+          - link "Тормозная система Замена колодок, дисков, суппортов от 4 500 ₽" [ref=e60] [cursor=pointer]:
+            - /url: /services/brakes
+            - heading "Тормозная система" [level=3] [ref=e61]
+            - paragraph [ref=e62]: Замена колодок, дисков, суппортов
+            - generic [ref=e63]: от 4 500 ₽
+          - link "Подвеска Диагностика и ремонт ходовой части от 5 500 ₽" [ref=e64] [cursor=pointer]:
+            - /url: /services/suspension
+            - heading "Подвеска" [level=3] [ref=e65]
+            - paragraph [ref=e66]: Диагностика и ремонт ходовой части
+            - generic [ref=e67]: от 5 500 ₽
+          - link "Кондиционер Заправка, диагностика, ремонт от 3 500 ₽" [ref=e68] [cursor=pointer]:
+            - /url: /services/conditioner
+            - heading "Кондиционер" [level=3] [ref=e69]
+            - paragraph [ref=e70]: Заправка, диагностика, ремонт
+            - generic [ref=e71]: от 3 500 ₽
+        - link "Все услуги →" [ref=e73] [cursor=pointer]:
+          - /url: /services
+      - generic [ref=e75]:
+        - generic [ref=e76]:
+          - heading "Популярные модели" [level=2] [ref=e77]
+          - paragraph [ref=e78]: Обслуживаем весь модельный ряд Mercedes-Benz
+        - generic [ref=e79]:
+          - link "C-Class W205, W206" [ref=e80] [cursor=pointer]:
+            - /url: /models/c-class
+            - generic [ref=e81]: C-Class
+            - generic [ref=e82]: W205, W206
+          - link "E-Class W213, W214" [ref=e83] [cursor=pointer]:
+            - /url: /models/e-class
+            - generic [ref=e84]: E-Class
+            - generic [ref=e85]: W213, W214
+          - link "S-Class W222, W223" [ref=e86] [cursor=pointer]:
+            - /url: /models/s-class
+            - generic [ref=e87]: S-Class
+            - generic [ref=e88]: W222, W223
+          - link "GLE W166, V167" [ref=e89] [cursor=pointer]:
+            - /url: /models/gle
+            - generic [ref=e90]: GLE
+            - generic [ref=e91]: W166, V167
+          - link "GLS X166, X167" [ref=e92] [cursor=pointer]:
+            - /url: /models/gls
+            - generic [ref=e93]: GLS
+            - generic [ref=e94]: X166, X167
+          - link "G-Class W463, W464" [ref=e95] [cursor=pointer]:
+            - /url: /models/g-class
+            - generic [ref=e96]: G-Class
+            - generic [ref=e97]: W463, W464
+          - link "AMG C63, E63, GT, G63, GLE 63" [ref=e98] [cursor=pointer]:
+            - /url: /models/amg
+            - generic [ref=e99]: AMG
+            - generic [ref=e100]: C63, E63, GT, G63, GLE 63
+          - link "EQ EQA, EQB, EQC, EQE, EQS" [ref=e101] [cursor=pointer]:
+            - /url: /models/eq
+            - generic [ref=e102]: EQ
+            - generic [ref=e103]: EQA, EQB, EQC, EQE, EQS
+      - generic [ref=e104]:
+        - heading "Почему мы" [level=2] [ref=e106]
+        - generic [ref=e107]:
+          - generic [ref=e108]:
+            - heading "Только Mercedes-Benz" [level=3] [ref=e109]
+            - paragraph [ref=e110]: Узкая специализация — глубокое знание каждой модели, каждого двигателя, каждой системы.
+          - generic [ref=e111]:
+            - heading "STAR Diagnostics" [level=3] [ref=e112]
+            - paragraph [ref=e113]: Оригинальное диагностическое оборудование Mercedes-Benz. Считываем то, что другие не видят.
+          - generic [ref=e114]:
+            - heading "Оригинальные запчасти" [level=3] [ref=e115]
+            - paragraph [ref=e116]: Используем только OEM-запчасти. Качественные аналоги — по согласованию с клиентом.
+          - generic [ref=e117]:
+            - heading "Прозрачные цены" [level=3] [ref=e118]
+            - paragraph [ref=e119]: Смета до начала работ. Никаких сюрпризов в счёте. Согласование каждой позиции.
+          - generic [ref=e120]:
+            - heading "Личный кабинет" [level=3] [ref=e121]
+            - paragraph [ref=e122]: Отслеживайте статус ремонта онлайн. SMS при каждой смене статуса.
+          - generic [ref=e123]:
+            - heading "Гарантия 12 месяцев" [level=3] [ref=e124]
+            - paragraph [ref=e125]: На все работы и запчасти. 20 000 км пробега. Без мелкого шрифта.
+      - generic [ref=e127]:
+        - generic [ref=e128]:
+          - heading "Отзывы клиентов" [level=2] [ref=e129]
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - img [ref=e132]
+              - img [ref=e134]
+              - img [ref=e136]
+              - img [ref=e138]
+              - img [ref=e140]
+            - generic [ref=e142]: "4.9"
+            - generic [ref=e143]: — 230+ отзывов
+        - generic [ref=e144]:
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - img [ref=e147]
+              - img [ref=e149]
+              - img [ref=e151]
+              - img [ref=e153]
+              - img [ref=e155]
+            - paragraph [ref=e157]: «Отличный сервис. Сделали ТО за 2 часа, всё по регламенту. Удобно следить за статусом через личный кабинет.»
+            - generic [ref=e158]:
+              - paragraph [ref=e159]: Андрей К.
+              - paragraph [ref=e160]: GLE 350d
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - img [ref=e163]
+              - img [ref=e165]
+              - img [ref=e167]
+              - img [ref=e169]
+              - img [ref=e171]
+            - paragraph [ref=e173]: «Нашли и устранили причину стука в подвеске, которую два других сервиса не смогли диагностировать. Рекомендую!»
+            - generic [ref=e174]:
+              - paragraph [ref=e175]: Мария С.
+              - paragraph [ref=e176]: C 200
+          - generic [ref=e177]:
+            - generic [ref=e178]:
+              - img [ref=e179]
+              - img [ref=e181]
+              - img [ref=e183]
+              - img [ref=e185]
+              - img [ref=e187]
+            - paragraph [ref=e189]: «Единственное место, куда доверяю свой G-Class. Знают все нюансы AMG. Честные цены, никаких навязываний.»
+            - generic [ref=e190]:
+              - paragraph [ref=e191]: Дмитрий В.
+              - paragraph [ref=e192]: G 63 AMG
+      - generic [ref=e193]:
+        - heading "Частые вопросы" [level=2] [ref=e195]
+        - generic [ref=e196]:
+          - button "Какие модели Mercedes-Benz вы обслуживаете?" [ref=e198]:
+            - generic [ref=e199]: Какие модели Mercedes-Benz вы обслуживаете?
+            - img [ref=e200]
+          - button "Используете ли вы оригинальные запчасти?" [ref=e203]:
+            - generic [ref=e204]: Используете ли вы оригинальные запчасти?
+            - img [ref=e205]
+          - button "Сколько времени занимает ТО?" [ref=e208]:
+            - generic [ref=e209]: Сколько времени занимает ТО?
+            - img [ref=e210]
+          - button "Есть ли гарантия на работы?" [ref=e213]:
+            - generic [ref=e214]: Есть ли гарантия на работы?
+            - img [ref=e215]
+          - button "Можно ли отслеживать статус ремонта?" [ref=e218]:
+            - generic [ref=e219]: Можно ли отслеживать статус ремонта?
+            - img [ref=e220]
+          - button "Как записаться на сервис?" [ref=e223]:
+            - generic [ref=e224]: Как записаться на сервис?
+            - img [ref=e225]
+      - generic [ref=e228]:
+        - heading "Готовы записаться?" [level=2] [ref=e229]
+        - paragraph [ref=e230]: Заполните форму онлайн — это займёт 2 минуты. Мы перезвоним для подтверждения.
+        - link "Онлайн-запись" [ref=e231] [cursor=pointer]:
+          - /url: /booking
+  - contentinfo [ref=e232]:
+    - generic [ref=e233]:
+      - generic [ref=e234]:
+        - generic [ref=e235]:
+          - generic [ref=e236]: Geleoteka
+          - paragraph [ref=e237]: Специализированный сервис Mercedes-Benz. Опыт работы более 15 лет, сертифицированные мастера, оригинальные запчасти.
+        - generic [ref=e238]:
+          - heading "Услуги" [level=4] [ref=e239]
+          - list [ref=e240]:
+            - listitem [ref=e241]:
+              - link "Техобслуживание" [ref=e242] [cursor=pointer]:
+                - /url: /services/to
+            - listitem [ref=e243]:
+              - link "Диагностика" [ref=e244] [cursor=pointer]:
+                - /url: /services/diagnostic
+            - listitem [ref=e245]:
+              - link "Ремонт" [ref=e246] [cursor=pointer]:
+                - /url: /services/repair
+            - listitem [ref=e247]:
+              - link "Все услуги →" [ref=e248] [cursor=pointer]:
+                - /url: /services
+        - generic [ref=e249]:
+          - heading "Контакты" [level=4] [ref=e250]
+          - list [ref=e251]:
+            - listitem [ref=e252]: +7 (495) 123-45-67
+            - listitem [ref=e253]: info@geleoteka.ru
+            - listitem [ref=e254]: Москва, ул. Примерная, 15
+      - generic [ref=e255]: © 2026 Geleoteka. Все права защищены.
+  - generic [ref=e256]:
+    - link "Telegram" [ref=e257] [cursor=pointer]:
+      - /url: https://t.me/geleoteka
+      - img [ref=e258]
+    - link "WhatsApp" [ref=e260] [cursor=pointer]:
+      - /url: https://wa.me/74951234567
+      - img [ref=e261]
+  - button "Open Next.js Dev Tools" [ref=e268] [cursor=pointer]:
+    - img [ref=e269]

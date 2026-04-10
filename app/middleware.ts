@@ -1,0 +1,44 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { verifyToken } from "@/lib/auth";
+
+const publicPaths = ["/", "/services", "/models", "/about", "/contacts", "/blog", "/booking", "/login", "/register", "/reset-password", "/api/auth", "/api/slots", "/parts", "/rentals", "/vacancies"];
+
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Allow public paths
+  if (publicPaths.some((path) => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+
+  // Check session
+  const token = request.cookies.get("session")?.value;
+
+  if (!token) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const payload = verifyToken(token);
+
+  if (!payload) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("from", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Admin routes — require MANAGER or ADMIN role
+  if (pathname.startsWith("/admin")) {
+    if (payload.role !== "MANAGER" && payload.role !== "ADMIN") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/cabinet/:path*", "/admin/:path*"],
+};

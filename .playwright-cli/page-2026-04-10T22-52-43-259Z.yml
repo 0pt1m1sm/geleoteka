@@ -1,0 +1,251 @@
+- generic [active] [ref=e1]:
+  - banner [ref=e2]:
+    - generic [ref=e3]:
+      - link "Geleoteka" [ref=e4] [cursor=pointer]:
+        - /url: /
+      - navigation [ref=e5]:
+        - link "Услуги" [ref=e6] [cursor=pointer]:
+          - /url: /services
+        - link "Запчасти" [ref=e7] [cursor=pointer]:
+          - /url: /parts
+        - link "Аренда" [ref=e8] [cursor=pointer]:
+          - /url: /rentals
+        - link "О нас" [ref=e9] [cursor=pointer]:
+          - /url: /about
+        - link "Контакты" [ref=e10] [cursor=pointer]:
+          - /url: /contacts
+        - 'button "Theme: dark" [ref=e11]':
+          - img [ref=e12]
+        - link "Кабинет" [ref=e14] [cursor=pointer]:
+          - /url: /cabinet
+        - link "Записаться" [ref=e15] [cursor=pointer]:
+          - /url: /booking
+  - main [ref=e16]:
+    - generic [ref=e17]:
+      - generic [ref=e23]:
+        - generic [ref=e24]: G-Class Specialist
+        - heading "Geleoteka" [level=1] [ref=e25]
+        - paragraph [ref=e26]: Специализированный сервис Mercedes-Benz G-Class
+        - paragraph [ref=e27]: Онлайн-запись · Отслеживание статуса · Личный кабинет
+        - generic [ref=e28]:
+          - link "Записаться на сервис" [ref=e29] [cursor=pointer]:
+            - /url: /booking
+          - link "Наши услуги" [ref=e30] [cursor=pointer]:
+            - /url: /services
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - generic [ref=e35]: 15+
+          - generic [ref=e36]: Лет опыта
+        - generic [ref=e37]:
+          - generic [ref=e38]: 2 400+
+          - generic [ref=e39]: Авто в год
+        - generic [ref=e40]:
+          - generic [ref=e41]: 98%
+          - generic [ref=e42]: Довольных клиентов
+        - generic [ref=e43]:
+          - generic [ref=e44]: 3 500+
+          - generic [ref=e45]: Запчастей в наличии
+      - generic [ref=e46]:
+        - generic [ref=e47]:
+          - heading "Наши услуги" [level=2] [ref=e48]
+          - paragraph [ref=e49]: Полный спектр услуг по обслуживанию и ремонту автомобилей Mercedes-Benz
+        - generic [ref=e50]:
+          - link "Техобслуживание ТО по регламенту Mercedes от 8 000 ₽" [ref=e51] [cursor=pointer]:
+            - /url: /services/to
+            - heading "Техобслуживание" [level=3] [ref=e52]
+            - paragraph [ref=e53]: ТО по регламенту Mercedes
+            - generic [ref=e54]: от 8 000 ₽
+          - link "Диагностика STAR Diagnostics, полная проверка от 5 000 ₽" [ref=e55] [cursor=pointer]:
+            - /url: /services/diagnostic
+            - heading "Диагностика" [level=3] [ref=e56]
+            - paragraph [ref=e57]: STAR Diagnostics, полная проверка
+            - generic [ref=e58]: от 5 000 ₽
+          - link "Ремонт двигателя Любой вид ремонта узлов и агрегатов от 15 000 ₽" [ref=e59] [cursor=pointer]:
+            - /url: /services/repair
+            - heading "Ремонт двигателя" [level=3] [ref=e60]
+            - paragraph [ref=e61]: Любой вид ремонта узлов и агрегатов
+            - generic [ref=e62]: от 15 000 ₽
+          - link "Тормозная система Замена колодок, дисков, суппортов от 4 500 ₽" [ref=e63] [cursor=pointer]:
+            - /url: /services/brakes
+            - heading "Тормозная система" [level=3] [ref=e64]
+            - paragraph [ref=e65]: Замена колодок, дисков, суппортов
+            - generic [ref=e66]: от 4 500 ₽
+          - link "Подвеска Диагностика и ремонт ходовой части от 5 500 ₽" [ref=e67] [cursor=pointer]:
+            - /url: /services/suspension
+            - heading "Подвеска" [level=3] [ref=e68]
+            - paragraph [ref=e69]: Диагностика и ремонт ходовой части
+            - generic [ref=e70]: от 5 500 ₽
+          - link "Кондиционер Заправка, диагностика, ремонт от 3 500 ₽" [ref=e71] [cursor=pointer]:
+            - /url: /services/conditioner
+            - heading "Кондиционер" [level=3] [ref=e72]
+            - paragraph [ref=e73]: Заправка, диагностика, ремонт
+            - generic [ref=e74]: от 3 500 ₽
+        - link "Все услуги →" [ref=e76] [cursor=pointer]:
+          - /url: /services
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - heading "Популярные модели" [level=2] [ref=e80]
+          - paragraph [ref=e81]: Обслуживаем весь модельный ряд Mercedes-Benz
+        - generic [ref=e82]:
+          - link "C-Class W205, W206" [ref=e83] [cursor=pointer]:
+            - /url: /models/c-class
+            - generic [ref=e84]: C-Class
+            - generic [ref=e85]: W205, W206
+          - link "E-Class W213, W214" [ref=e86] [cursor=pointer]:
+            - /url: /models/e-class
+            - generic [ref=e87]: E-Class
+            - generic [ref=e88]: W213, W214
+          - link "S-Class W222, W223" [ref=e89] [cursor=pointer]:
+            - /url: /models/s-class
+            - generic [ref=e90]: S-Class
+            - generic [ref=e91]: W222, W223
+          - link "GLE W166, V167" [ref=e92] [cursor=pointer]:
+            - /url: /models/gle
+            - generic [ref=e93]: GLE
+            - generic [ref=e94]: W166, V167
+          - link "GLS X166, X167" [ref=e95] [cursor=pointer]:
+            - /url: /models/gls
+            - generic [ref=e96]: GLS
+            - generic [ref=e97]: X166, X167
+          - link "G-Class W463, W464" [ref=e98] [cursor=pointer]:
+            - /url: /models/g-class
+            - generic [ref=e99]: G-Class
+            - generic [ref=e100]: W463, W464
+          - link "AMG C63, E63, GT, G63, GLE 63" [ref=e101] [cursor=pointer]:
+            - /url: /models/amg
+            - generic [ref=e102]: AMG
+            - generic [ref=e103]: C63, E63, GT, G63, GLE 63
+          - link "EQ EQA, EQB, EQC, EQE, EQS" [ref=e104] [cursor=pointer]:
+            - /url: /models/eq
+            - generic [ref=e105]: EQ
+            - generic [ref=e106]: EQA, EQB, EQC, EQE, EQS
+      - generic [ref=e107]:
+        - heading "Почему мы" [level=2] [ref=e109]
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - heading "Только Mercedes-Benz" [level=3] [ref=e112]
+            - paragraph [ref=e113]: Узкая специализация — глубокое знание каждой модели, каждого двигателя, каждой системы.
+          - generic [ref=e114]:
+            - heading "STAR Diagnostics" [level=3] [ref=e115]
+            - paragraph [ref=e116]: Оригинальное диагностическое оборудование Mercedes-Benz. Считываем то, что другие не видят.
+          - generic [ref=e117]:
+            - heading "Оригинальные запчасти" [level=3] [ref=e118]
+            - paragraph [ref=e119]: Используем только OEM-запчасти. Качественные аналоги — по согласованию с клиентом.
+          - generic [ref=e120]:
+            - heading "Прозрачные цены" [level=3] [ref=e121]
+            - paragraph [ref=e122]: Смета до начала работ. Никаких сюрпризов в счёте. Согласование каждой позиции.
+          - generic [ref=e123]:
+            - heading "Личный кабинет" [level=3] [ref=e124]
+            - paragraph [ref=e125]: Отслеживайте статус ремонта онлайн. SMS при каждой смене статуса.
+          - generic [ref=e126]:
+            - heading "Гарантия 12 месяцев" [level=3] [ref=e127]
+            - paragraph [ref=e128]: На все работы и запчасти. 20 000 км пробега. Без мелкого шрифта.
+      - generic [ref=e130]:
+        - generic [ref=e131]:
+          - heading "Отзывы клиентов" [level=2] [ref=e132]
+          - generic [ref=e133]:
+            - generic [ref=e134]:
+              - img [ref=e135]
+              - img [ref=e137]
+              - img [ref=e139]
+              - img [ref=e141]
+              - img [ref=e143]
+            - generic [ref=e145]: "4.9"
+            - generic [ref=e146]: — 230+ отзывов
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - generic [ref=e149]:
+              - img [ref=e150]
+              - img [ref=e152]
+              - img [ref=e154]
+              - img [ref=e156]
+              - img [ref=e158]
+            - paragraph [ref=e160]: «Отличный сервис. Сделали ТО за 2 часа, всё по регламенту. Удобно следить за статусом через личный кабинет.»
+            - generic [ref=e161]:
+              - paragraph [ref=e162]: Андрей К.
+              - paragraph [ref=e163]: GLE 350d
+          - generic [ref=e164]:
+            - generic [ref=e165]:
+              - img [ref=e166]
+              - img [ref=e168]
+              - img [ref=e170]
+              - img [ref=e172]
+              - img [ref=e174]
+            - paragraph [ref=e176]: «Нашли и устранили причину стука в подвеске, которую два других сервиса не смогли диагностировать. Рекомендую!»
+            - generic [ref=e177]:
+              - paragraph [ref=e178]: Мария С.
+              - paragraph [ref=e179]: C 200
+          - generic [ref=e180]:
+            - generic [ref=e181]:
+              - img [ref=e182]
+              - img [ref=e184]
+              - img [ref=e186]
+              - img [ref=e188]
+              - img [ref=e190]
+            - paragraph [ref=e192]: «Единственное место, куда доверяю свой G-Class. Знают все нюансы AMG. Честные цены, никаких навязываний.»
+            - generic [ref=e193]:
+              - paragraph [ref=e194]: Дмитрий В.
+              - paragraph [ref=e195]: G 63 AMG
+      - generic [ref=e196]:
+        - heading "Частые вопросы" [level=2] [ref=e198]
+        - generic [ref=e199]:
+          - button "Какие модели Mercedes-Benz вы обслуживаете?" [ref=e201]:
+            - generic [ref=e202]: Какие модели Mercedes-Benz вы обслуживаете?
+            - img [ref=e203]
+          - button "Используете ли вы оригинальные запчасти?" [ref=e206]:
+            - generic [ref=e207]: Используете ли вы оригинальные запчасти?
+            - img [ref=e208]
+          - button "Сколько времени занимает ТО?" [ref=e211]:
+            - generic [ref=e212]: Сколько времени занимает ТО?
+            - img [ref=e213]
+          - button "Есть ли гарантия на работы?" [ref=e216]:
+            - generic [ref=e217]: Есть ли гарантия на работы?
+            - img [ref=e218]
+          - button "Можно ли отслеживать статус ремонта?" [ref=e221]:
+            - generic [ref=e222]: Можно ли отслеживать статус ремонта?
+            - img [ref=e223]
+          - button "Как записаться на сервис?" [ref=e226]:
+            - generic [ref=e227]: Как записаться на сервис?
+            - img [ref=e228]
+      - generic [ref=e231]:
+        - heading "Готовы записаться?" [level=2] [ref=e232]
+        - paragraph [ref=e233]: Заполните форму онлайн — это займёт 2 минуты. Мы перезвоним для подтверждения.
+        - link "Онлайн-запись" [ref=e234] [cursor=pointer]:
+          - /url: /booking
+  - contentinfo [ref=e235]:
+    - generic [ref=e236]:
+      - generic [ref=e237]:
+        - generic [ref=e238]:
+          - generic [ref=e239]: Geleoteka
+          - paragraph [ref=e240]: Специализированный сервис Mercedes-Benz. Опыт работы более 15 лет, сертифицированные мастера, оригинальные запчасти.
+        - generic [ref=e241]:
+          - heading "Услуги" [level=4] [ref=e242]
+          - list [ref=e243]:
+            - listitem [ref=e244]:
+              - link "Техобслуживание" [ref=e245] [cursor=pointer]:
+                - /url: /services/to
+            - listitem [ref=e246]:
+              - link "Диагностика" [ref=e247] [cursor=pointer]:
+                - /url: /services/diagnostic
+            - listitem [ref=e248]:
+              - link "Ремонт" [ref=e249] [cursor=pointer]:
+                - /url: /services/repair
+            - listitem [ref=e250]:
+              - link "Все услуги →" [ref=e251] [cursor=pointer]:
+                - /url: /services
+        - generic [ref=e252]:
+          - heading "Контакты" [level=4] [ref=e253]
+          - list [ref=e254]:
+            - listitem [ref=e255]: +7 (495) 123-45-67
+            - listitem [ref=e256]: info@geleoteka.ru
+            - listitem [ref=e257]: Москва, ул. Примерная, 15
+      - generic [ref=e258]: © 2026 Geleoteka. Все права защищены.
+  - generic [ref=e259]:
+    - link "Telegram" [ref=e260] [cursor=pointer]:
+      - /url: https://t.me/geleoteka
+      - img [ref=e261]
+    - link "WhatsApp" [ref=e263] [cursor=pointer]:
+      - /url: https://wa.me/74951234567
+      - img [ref=e264]
+  - button "Open Next.js Dev Tools" [ref=e271] [cursor=pointer]:
+    - img [ref=e272]

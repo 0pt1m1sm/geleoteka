@@ -1,0 +1,114 @@
+[     152ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     192ms] [LOG] [HMR] connected @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     247ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[     273ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+      <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+        <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+          <LoadingBoundary name="/" loading={null}>
+            <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+              <HTTPAccessFallbackErrorBoundary pathname="/" notFound={{...}} forbidden={undefined} ...>
+                <RedirectBoundary>
+                  <RedirectErrorBoundary router={{...}}>
+                    <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+                      <SegmentViewNode type="layout" pagePath="(public)/l...">
+                        <SegmentTrieNode>
+                        <script>
+                        <script>
+                        <PublicLayout>
+                          <header>
+                          <main>
+                          <footer>
+                          <FloatingButtons>
+                          <CookieConsent>
++                           <div
++                             className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-[var(--card)] border-t border-[var(..."
++                           >
+-                           <script id="_R_">
+                    ...
+        ...
+
+    at throwOnHydrationMismatch (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:3318:56)
+    at beginWork (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:6758:918)
+    at runWithFiberInDEV (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:74)
+    at performUnitOfWork (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9555:97)
+    at workLoopConcurrentByScheduler (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9551:58)
+    at renderRootConcurrent (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9534:71)
+    at performWorkOnRoot (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js:2647:64)
+[     311ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[     313ms] [LOG] [Fast Refresh] done in 102ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   24881ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   25143ms] [LOG] [Fast Refresh] done in 190ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   25429ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   25463ms] [LOG] [Fast Refresh] done in 135ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   32537ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   33791ms] [LOG] [Fast Refresh] done in 1353ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   33915ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   33917ms] [LOG] [Fast Refresh] done in 103ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   34302ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   34318ms] [LOG] [HMR] connected @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   34395ms] [ERROR] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:3272
+[   34438ms] Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ScrollAndMaybeFocusHandler cacheNode={{...}}>
+      <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{...}}>
+        <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+          <LoadingBoundary name="/" loading={null}>
+            <HTTPAccessFallbackBoundary notFound={<SegmentViewNode>} forbidden={undefined} unauthorized={undefined}>
+              <HTTPAccessFallbackErrorBoundary pathname="/" notFound={<SegmentViewNode>} forbidden={undefined} ...>
+                <RedirectBoundary>
+                  <RedirectErrorBoundary router={{...}}>
+                    <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{...}} segmentPath={[...]} ...>
+                      <SegmentViewNode type="layout" pagePath="(public)/l...">
+                        <SegmentTrieNode>
+                        <script>
+                        <script>
+                        <PublicLayout>
+                          <header>
+                          <main>
+                          <footer>
+                          <FloatingButtons>
+                          <CookieConsent>
++                           <div
++                             className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-[var(--card)] border-t border-[var(..."
++                           >
+-                           <script id="_R_">
+                    ...
+        ...
+
+    at throwOnHydrationMismatch (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:3318:56)
+    at beginWork (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:6758:918)
+    at runWithFiberInDEV (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:74)
+    at performUnitOfWork (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9555:97)
+    at workLoopConcurrentByScheduler (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9551:58)
+    at renderRootConcurrent (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9534:71)
+    at performWorkOnRoot (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (https://localhost/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js:2647:64)
+[   56432ms] [LOG] [Fast Refresh] rebuilding @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431
+[   56498ms] [LOG] [Fast Refresh] done in 132ms @ https://localhost/_next/static/chunks/node_modules_next_dist_115brz8._.js:2431

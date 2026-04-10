@@ -1,0 +1,111 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { createRentalBooking } from "@/app/actions/rentals";
+import { formatPrice } from "@/lib/utils";
+
+interface Props {
+  carId: string;
+  dailyRate: number;
+}
+
+export function RentalBookingForm({ carId, dailyRate }: Props) {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [minDate] = useState(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return tomorrow.toISOString().split("T")[0];
+  });
+
+  const days = startDate && endDate
+    ? Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
+  const total = days * dailyRate;
+
+  async function handleSubmit(formData: FormData) {
+    setSubmitting(true);
+    const res = await createRentalBooking({
+      carId,
+      startDate,
+      endDate,
+      contactName: formData.get("name") as string,
+      contactPhone: formData.get("phone") as string,
+      contactEmail: formData.get("email") as string,
+      notes: (formData.get("notes") as string) || "",
+    });
+    setResult(res);
+    setSubmitting(false);
+  }
+
+  if (result?.success) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-12 h-12 rounded-full bg-[var(--color-success-bg)] mx-auto mb-4 flex items-center justify-center">
+          <svg className="w-6 h-6 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h3 className="font-bold text-lg mb-2">Заявка отправлена!</h3>
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">
+          Мы свяжемся для подтверждения бронирования.
+        </p>
+        <Link href="/rentals" className="btn btn-secondary text-sm">
+          К каталогу
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <form action={handleSubmit} className="space-y-4">
+      {result?.error && (
+        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
+          {result.error}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="startDate" className="block text-sm font-medium mb-2">С *</label>
+          <input id="startDate" type="date" required min={minDate} value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input" />
+        </div>
+        <div>
+          <label htmlFor="endDate" className="block text-sm font-medium mb-2">По *</label>
+          <input id="endDate" type="date" required min={startDate || minDate} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input" />
+        </div>
+      </div>
+
+      {days > 0 && (
+        <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
+          <span className="text-sm text-[var(--foreground-muted)]">{days} дн. × {formatPrice(dailyRate)} = </span>
+          <span className="text-lg font-bold text-[var(--color-accent)]">{formatPrice(total)}</span>
+        </div>
+      )}
+
+      <div>
+        <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
+        <input id="name" name="name" required className="input" placeholder="Иван Иванов" />
+      </div>
+      <div>
+        <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
+        <input id="phone" name="phone" type="tel" required className="input" placeholder="+7 (999) 123-45-67" />
+      </div>
+      <div>
+        <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
+        <input id="email" name="email" type="email" required className="input" placeholder="your@email.com" />
+      </div>
+      <div>
+        <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>
+        <textarea id="notes" name="notes" className="input min-h-[60px] resize-y" placeholder="Пожелания..." />
+      </div>
+
+      <button type="submit" disabled={submitting || days === 0} className="btn btn-primary w-full">
+        {submitting ? "Отправка..." : days > 0 ? `Забронировать — ${formatPrice(total)}` : "Выберите даты"}
+      </button>
+    </form>
+  );
+}

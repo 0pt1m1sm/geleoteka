@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 250" fill="none">
+  <rect width="400" height="250" rx="8" fill="#141414"/>
+  <!-- G-Class silhouette -->
+  <rect x="80" y="100" width="240" height="80" rx="4" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+  <rect x="120" y="70" width="160" height="35" rx="3" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+  <circle cx="140" cy="185" r="20" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+  <circle cx="140" cy="185" r="8" fill="#d4af37" opacity="0.3"/>
+  <circle cx="260" cy="185" r="20" stroke="#d4af37" stroke-width="1.5" fill="none"/>
+  <circle cx="260" cy="185" r="8" fill="#d4af37" opacity="0.3"/>
+  <rect x="90" y="110" width="40" height="20" rx="2" stroke="#d4af37" stroke-width="1" fill="none" opacity="0.5"/>
+  <rect x="270" y="110" width="40" height="20" rx="2" stroke="#d4af37" stroke-width="1" fill="none" opacity="0.5"/>
+  <text x="200" y="40" text-anchor="middle" font-family="system-ui" font-weight="700" font-size="16" fill="#d4af37" opacity="0.6">G 500</text>
+</svg>

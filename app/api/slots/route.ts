@@ -1,0 +1,53 @@
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { db } from "@/lib/db";
+import { startOfDay, endOfDay, parseISO } from "date-fns";
+
+const WORK_HOURS = [
+  "09:00", "10:00", "11:00", "12:00",
+  "13:00", "14:00", "15:00", "16:00",
+  "17:00", "18:00", "19:00",
+];
+
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const dateParam = request.nextUrl.searchParams.get("date");
+  if (!dateParam) {
+    return NextResponse.json({ error: "date parameter required" }, { status: 400 });
+  }
+
+  const date = parseISO(dateParam);
+  if (isNaN(date.getTime())) {
+    return NextResponse.json({ error: "invalid date" }, { status: 400 });
+  }
+
+  const dayStart = startOfDay(date);
+  const dayEnd = endOfDay(date);
+
+  const bookedAppointments = await db.appointment.findMany({
+    where: {
+      dateTime: { gte: dayStart, lte: dayEnd },
+      status: { notIn: ["CANCELLED"] },
+    },
+    select: { dateTime: true },
+  });
+
+  const bookedTimes = new Set(
+    bookedAppointments.map((a: { dateTime: Date }) => {
+      const h = a.dateTime.getHours().toString().padStart(2, "0");
+      const m = a.dateTime.getMinutes().toString().padStart(2, "0");
+      return `${h}:${m}`;
+    })
+  );
+
+  const now = new Date();
+  const isToday = dayStart.getTime() === startOfDay(now).getTime();
+
+  const slots = WORK_HOURS.map((time) => ({
+    time,
+    available:
+      !bookedTimes.has(time) &&
+      (!isToday || parseInt(time.split(":")[0]) > now.getHours()),
+  }));
+
+  return NextResponse.json({ slots });
+}
