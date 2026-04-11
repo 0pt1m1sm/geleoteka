@@ -4,20 +4,20 @@ import { useCallback, useSyncExternalStore } from "react";
 
 type Theme = "dark" | "light";
 
-function getTheme(): Theme {
+function getEffectiveTheme(): Theme {
   if (typeof window === "undefined") return "dark";
-  const saved = localStorage.getItem("theme");
-  if (saved === "light") return "light";
+  // Check explicit class first
+  if (document.documentElement.classList.contains("light")) return "light";
+  if (document.documentElement.classList.contains("dark")) return "dark";
+  // No explicit class — check system preference (matches @media prefers-color-scheme in CSS)
+  if (window.matchMedia("(prefers-color-scheme: light)").matches) return "light";
   return "dark";
 }
 
 function applyToDOM(theme: Theme) {
   document.documentElement.classList.remove("dark", "light");
-  if (theme === "dark") document.documentElement.classList.add("dark");
-  else if (theme === "light") document.documentElement.classList.add("light");
+  document.documentElement.classList.add(theme);
 }
-
-// Theme is initialized by /public/theme-init.js (loaded via beforeInteractive script)
 
 let listeners: Array<() => void> = [];
 function subscribe(cb: () => void) {
@@ -32,7 +32,7 @@ function setTheme(theme: Theme) {
 }
 
 export function ThemeToggle() {
-  const theme = useSyncExternalStore(subscribe, getTheme, () => "dark" as Theme);
+  const theme = useSyncExternalStore(subscribe, getEffectiveTheme, () => "dark" as Theme);
 
   const toggle = useCallback(() => {
     setTheme(theme === "dark" ? "light" : "dark");
@@ -52,7 +52,8 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      className="p-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+      className="p-2 transition-colors"
+      style={{ color: "var(--foreground-muted)" }}
       aria-label={`Theme: ${theme}`}
       title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
     >
