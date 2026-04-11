@@ -507,28 +507,31 @@ input[type="file"].input::file-selector-button:hover {
   transform: scale(1.05);
 }
 
-/* Scrollbar — blends with page background, no white gutter */
+/* Scrollbar — transparent track so it doesn't clash with dark hero sections */
 * {
-  scrollbar-color: var(--border-hover) var(--background);
+  scrollbar-color: var(--border-hover) transparent;
   scrollbar-width: thin;
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 html::-webkit-scrollbar,
 body::-webkit-scrollbar {
   width: 8px;
-  background-color: var(--background);
+  background-color: transparent;
 }
 
 html::-webkit-scrollbar-track,
 body::-webkit-scrollbar-track {
-  background-color: var(--background);
+  background-color: transparent;
 }
 
 html::-webkit-scrollbar-thumb,
 body::-webkit-scrollbar-thumb {
   background-color: var(--border-hover);
   border-radius: 4px;
-  border: 2px solid var(--background);
 }
 
 html::-webkit-scrollbar-thumb:hover,
@@ -538,7 +541,7 @@ body::-webkit-scrollbar-thumb:hover {
 
 html::-webkit-scrollbar-corner,
 body::-webkit-scrollbar-corner {
-  background-color: var(--background);
+  background-color: transparent;
 }
 
 /* Animations */
