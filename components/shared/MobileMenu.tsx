@@ -1,8 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
+
+function getTheme() {
+  if (typeof window === "undefined") return "dark";
+  return document.documentElement.classList.contains("light") ? "light" : "dark";
+}
+
+function subscribeTheme(cb: () => void) {
+  const observer = new MutationObserver(cb);
+  if (typeof document !== "undefined") {
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+  }
+  return () => observer.disconnect();
+}
 
 const NAV_ITEMS = [
   { href: "/services", label: "Услуги" },
@@ -16,6 +29,8 @@ const NAV_ITEMS = [
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "dark");
+  const panelBg = theme === "light" ? "#ffffff" : "#141414";
 
   return (
     <div className="md:hidden">
@@ -38,7 +53,7 @@ export function MobileMenu() {
             onClick={() => setOpen(false)}
           />
           {/* Panel */}
-          <div className="fixed top-0 right-0 z-[60] h-full w-72 border-l border-[var(--border)] animate-slide-in flex flex-col shadow-2xl" style={{ background: 'var(--card)' }}>
+          <div className="fixed top-0 right-0 z-[60] h-full w-72 border-l border-[var(--border)] animate-slide-in flex flex-col shadow-2xl" style={{ backgroundColor: panelBg }}>
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <span className="text-display font-black uppercase tracking-[0.1em] text-[var(--color-accent)]">
                 Geleoteka
