@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/shared/LogoutButton";
+import { PanelMobileNav } from "@/components/shared/PanelMobileNav";
 
 const navItems = [
   { href: "/cabinet", label: "Главная" },
@@ -20,7 +21,7 @@ export default function PortalLayout({
 }) {
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
-      {/* Sidebar */}
+      {/* Sidebar — desktop only */}
       <aside className="w-64 border-r border-[var(--border)] bg-[var(--card)] hidden md:flex flex-col">
         <div className="p-6 border-b border-[var(--border)]">
           <Link href="/" className="text-display text-lg font-bold">
@@ -45,16 +46,9 @@ export default function PortalLayout({
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col">
-        {/* Mobile top bar */}
-        <header className="md:hidden sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--card)] px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="text-display text-lg font-bold">
-            <span className="text-[var(--color-accent)]">AMG</span>
-          </Link>
-          <span className="text-sm text-[var(--foreground-muted)]">Кабинет</span>
-        </header>
-
-        <main className="flex-1 p-6">{children}</main>
+      <div className="flex-1 flex flex-col min-w-0">
+        <PanelMobileNav title="Личный кабинет" navItems={navItems} basePath="/cabinet" />
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
   );

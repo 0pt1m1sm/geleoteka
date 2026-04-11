@@ -6,19 +6,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shared/LogoutButton";
 
-const navItems = [
-  { href: "/admin", label: "Дашборд" },
-  { href: "/admin/appointments", label: "Записи" },
-  { href: "/admin/calendar", label: "Календарь" },
-  { href: "/admin/customers", label: "Клиенты" },
-  { href: "/admin/estimates", label: "Сметы" },
-  { href: "/admin/parts", label: "Запчасти" },
-  { href: "/admin/rentals", label: "Аренда" },
-  { href: "/admin/cms", label: "Контент" },
-  { href: "/admin/team", label: "Команда" },
-];
+interface NavItem {
+  href: string;
+  label: string;
+}
 
-export function AdminMobileNav() {
+interface PanelMobileNavProps {
+  title: string;
+  navItems: NavItem[];
+  basePath: string;
+  showSiteLink?: boolean;
+}
+
+export function PanelMobileNav({ title, navItems, basePath, showSiteLink = true }: PanelMobileNavProps) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -46,7 +46,7 @@ export function AdminMobileNav() {
             <span className="text-display text-lg font-bold" style={{ color: "var(--color-accent)" }}>
               Geleoteka
             </span>
-            <p className="text-xs" style={{ color: "var(--color-gold)" }}>Админ-панель</p>
+            <p className="text-xs" style={{ color: "var(--foreground-muted)" }}>{title}</p>
           </div>
           <button
             type="button"
@@ -63,7 +63,7 @@ export function AdminMobileNav() {
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== basePath && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
@@ -82,14 +82,16 @@ export function AdminMobileNav() {
         </nav>
 
         <div className="p-4 space-y-1" style={{ borderTop: "1px solid var(--border)" }}>
-          <Link
-            href="/"
-            onClick={() => setOpen(false)}
-            className="block px-3 py-2 rounded-lg text-sm transition-colors"
-            style={{ color: "var(--foreground-muted)" }}
-          >
-            ← На сайт
-          </Link>
+          {showSiteLink && (
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2 rounded-lg text-sm transition-colors"
+              style={{ color: "var(--foreground-muted)" }}
+            >
+              ← На сайт
+            </Link>
+          )}
           <LogoutButton className="block px-3 py-2 rounded-lg text-sm transition-colors w-full text-left" />
         </div>
       </div>
@@ -117,7 +119,7 @@ export function AdminMobileNav() {
           </svg>
         </button>
         <span className="text-sm font-semibold" style={{ color: "var(--color-accent)" }}>
-          Админ-панель
+          {title}
         </span>
         <div className="w-10" />
       </header>

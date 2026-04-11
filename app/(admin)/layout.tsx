@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { LogoutButton } from "@/components/shared/LogoutButton";
-import { AdminMobileNav } from "@/components/admin/AdminMobileNav";
+import { PanelMobileNav } from "@/components/shared/PanelMobileNav";
 
 const navItems = [
   { href: "/admin", label: "Дашборд" },
@@ -21,7 +21,7 @@ export default function AdminLayout({
 }) {
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
-      {/* Sidebar */}
+      {/* Sidebar — desktop only */}
       <aside className="w-64 border-r border-[var(--border)] bg-[var(--card)] hidden md:flex flex-col">
         <div className="p-6 border-b border-[var(--border)]">
           <Link href="/" className="text-display text-lg font-bold">
@@ -53,7 +53,7 @@ export default function AdminLayout({
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminMobileNav />
+        <PanelMobileNav title="Админ-панель" navItems={navItems} basePath="/admin" />
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
     </div>
