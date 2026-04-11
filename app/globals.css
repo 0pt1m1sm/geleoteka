@@ -185,7 +185,7 @@ html.light {
 
 html {
   overflow-x: hidden;
-  overflow-y: overlay;
+  overflow-y: scroll;
   background: var(--background);
 }
 
@@ -507,29 +507,38 @@ input[type="file"].input::file-selector-button:hover {
   transform: scale(1.05);
 }
 
-/* Scrollbar — matches page background in both themes */
+/* Scrollbar — blends with page background, no white gutter */
 * {
-  scrollbar-color: var(--border) var(--background);
+  scrollbar-color: var(--border-hover) var(--background);
   scrollbar-width: thin;
 }
 
-::-webkit-scrollbar {
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
   width: 8px;
-  height: 8px;
-  background: var(--background);
+  background-color: var(--background);
 }
 
-::-webkit-scrollbar-track {
-  background: var(--background);
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background-color: var(--background);
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--border-hover);
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background-color: var(--border-hover);
   border-radius: 4px;
+  border: 2px solid var(--background);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--foreground-muted);
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground-muted);
+}
+
+html::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner {
+  background-color: var(--background);
 }
 
 /* Animations */
@@ -539,7 +548,7 @@ input[type="file"].input::file-selector-button:hover {
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-10px); }
+  from { opacity: 0; transform: translateX(100%); }
   to { opacity: 1; transform: translateX(0); }
 }
 
