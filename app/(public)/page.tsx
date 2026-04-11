@@ -43,7 +43,7 @@ export default function HomePage() {
         {/* Background photo */}
         <div className="absolute inset-0">
           <img
-            src="/images/hero/g-class-hero.jpg"
+            src="/images/hero/g-class-4k.jpg"
             alt=""
             className="w-full h-full object-cover"
           />
