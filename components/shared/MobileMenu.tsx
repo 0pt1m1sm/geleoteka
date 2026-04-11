@@ -38,7 +38,7 @@ export function MobileMenu() {
             onClick={() => setOpen(false)}
           />
           {/* Panel */}
-          <div className="fixed top-0 right-0 z-[60] h-full w-72 bg-[var(--card)] border-l border-[var(--border)] animate-slide-in flex flex-col">
+          <div className="fixed top-0 right-0 z-[60] h-full w-72 border-l border-[var(--border)] animate-slide-in flex flex-col shadow-2xl" style={{ background: 'var(--card)' }}>
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
               <span className="text-display font-black uppercase tracking-[0.1em] text-[var(--color-accent)]">
                 Geleoteka
