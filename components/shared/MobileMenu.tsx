@@ -1,22 +1,9 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ThemeToggle } from "./ThemeToggle";
-
-function getTheme() {
-  if (typeof window === "undefined") return "dark";
-  return document.documentElement.classList.contains("light") ? "light" : "dark";
-}
-
-function subscribeTheme(cb: () => void) {
-  const observer = new MutationObserver(cb);
-  if (typeof document !== "undefined") {
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
-  }
-  return () => observer.disconnect();
-}
 
 const NAV_ITEMS = [
   { href: "/services", label: "Услуги" },
@@ -30,29 +17,40 @@ const NAV_ITEMS = [
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
-  const theme = useSyncExternalStore(subscribeTheme, getTheme, () => "dark");
-  const panelBg = theme === "light" ? "#ffffff" : "#141414";
 
   const overlay = open ? (
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/60"
+        className="fixed inset-0 z-50"
+        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
         onClick={() => setOpen(false)}
       />
-      {/* Panel */}
+      {/* Panel — uses inline styles for background and text to guarantee
+          they match the current theme regardless of Tailwind processing.
+          var(--card) and var(--card-foreground) are defined in globals.css
+          for both dark and light themes. */}
       <div
-        className="fixed top-0 right-0 z-[60] h-full w-72 border-l border-[var(--border)] flex flex-col shadow-2xl"
-        style={{ backgroundColor: panelBg }}
+        className="fixed top-0 right-0 z-[60] h-full w-72 flex flex-col"
+        style={{
+          backgroundColor: "var(--card)",
+          color: "var(--card-foreground)",
+          borderLeft: "1px solid var(--border)",
+          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        }}
       >
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-          <span className="text-display font-black uppercase tracking-[0.1em] text-[var(--color-accent)]">
+        <div
+          className="flex items-center justify-between p-4"
+          style={{ borderBottom: "1px solid var(--border)" }}
+        >
+          <span className="text-display font-black uppercase tracking-[0.1em]" style={{ color: "var(--color-accent)" }}>
             Geleoteka
           </span>
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="p-2 text-[var(--foreground-muted)]"
+            className="p-2"
+            style={{ color: "var(--foreground-muted)" }}
             aria-label="Закрыть меню"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -67,14 +65,17 @@ export function MobileMenu() {
               key={item.href}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="block px-3 py-3 rounded-lg text-sm hover:bg-[var(--card-hover)] transition-colors"
+              className="block px-3 py-3 rounded-lg text-sm transition-colors"
+              style={{ color: "inherit" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "var(--card-hover)")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "transparent")}
             >
               {item.label}
             </Link>
           ))}
         </nav>
 
-        <div className="p-4 border-t border-[var(--border)] space-y-2">
+        <div className="p-4 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
           <Link
             href="/cabinet"
             onClick={() => setOpen(false)}
@@ -102,7 +103,8 @@ export function MobileMenu() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="p-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+        className="p-2"
+        style={{ color: "var(--foreground-muted)" }}
         aria-label="Открыть меню"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
