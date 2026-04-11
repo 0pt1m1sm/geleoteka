@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ThemeToggle } from "./ThemeToggle";
 
 const NAV_ITEMS = [
   { href: "/services", label: "Услуги" },
@@ -82,6 +83,9 @@ export function MobileMenu() {
               >
                 Записаться
               </Link>
+              <div className="flex items-center justify-center pt-2">
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </>
