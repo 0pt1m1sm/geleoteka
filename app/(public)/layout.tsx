@@ -4,12 +4,18 @@ import { FloatingButtons } from "@/components/shared/FloatingButtons";
 import { MobileMenu } from "@/components/shared/MobileMenu";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { getSession } from "@/lib/auth";
 
-export default function PublicLayout({
+export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await getSession();
+  const isStaff = session?.role === "ADMIN" || session?.role === "MANAGER";
+  const cabinetHref = isStaff ? "/admin" : "/cabinet";
+  const cabinetLabel = isStaff ? "Админ-панель" : "Кабинет";
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-[var(--color-accent)]/20 bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
@@ -42,8 +48,8 @@ export default function PublicLayout({
               </svg>
             </Link>
             <ThemeToggle />
-            <Link href="/cabinet" className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors">
-              Кабинет
+            <Link href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors">
+              {cabinetLabel}
             </Link>
             <Link
               href="/booking"
@@ -52,7 +58,7 @@ export default function PublicLayout({
               Записаться
             </Link>
           </nav>
-          <MobileMenu />
+          <MobileMenu cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
         </div>
       </header>
       <main className="flex-1">{children}</main>

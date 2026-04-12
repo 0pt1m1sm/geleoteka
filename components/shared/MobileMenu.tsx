@@ -15,7 +15,13 @@ const NAV_ITEMS = [
   { href: "/vacancies", label: "Вакансии" },
 ];
 
-export function MobileMenu() {
+export function MobileMenu({
+  cabinetHref = "/cabinet",
+  cabinetLabel = "Личный кабинет",
+}: {
+  cabinetHref?: string;
+  cabinetLabel?: string;
+}) {
   const [open, setOpen] = useState(false);
 
   const overlay = open ? (
@@ -77,11 +83,11 @@ export function MobileMenu() {
 
         <div className="p-4 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
           <Link
-            href="/cabinet"
+            href={cabinetHref}
             onClick={() => setOpen(false)}
             className="block w-full text-center btn btn-secondary text-sm"
           >
-            Личный кабинет
+            {cabinetLabel}
           </Link>
           <Link
             href="/booking"
