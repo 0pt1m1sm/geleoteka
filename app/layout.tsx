@@ -30,6 +30,8 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
       <head>
+        {/* Synchronous blocking script to prevent theme flicker — must run before hydration */}
+        {/* eslint-disable-next-line @next/next/no-sync-scripts */}
         <script src="/theme-init.js" />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
