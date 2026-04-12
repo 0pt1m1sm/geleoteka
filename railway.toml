@@ -1,2 +1,2 @@
 [deploy]
-releaseCommand = "npx prisma migrate deploy"
+preDeployCommand = ["npx prisma migrate deploy"]
