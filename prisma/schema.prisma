@@ -448,18 +448,23 @@ enum RentalBookingStatus {
 }
 
 model RentalCar {
-  id          String   @id @default(cuid())
-  model       String   // e.g., "G 500"
-  year        Int
-  dailyRate   Int      // Price per day in rubles
-  photos      String[]
-  description String?
-  isAvailable Boolean  @default(true)
-  plate       String?
-  color       String?
-  mileage     Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  model        String   // e.g., "G 500"
+  year         Int
+  dailyRate    Int      // Price per day in rubles
+  photos       String[]
+  description  String?
+  isAvailable  Boolean  @default(true)
+  plate        String?
+  color        String?
+  mileage      Int      @default(0)
+  engine       String?  // e.g., "4.0 V8 Biturbo"
+  horsepower   Int?     // e.g., 422
+  transmission String?  // e.g., "9G-TRONIC"
+  features     String[] // e.g., ["Кожаный салон", "Панорамная крыша"]
+  seats        Int      @default(5)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   bookings RentalBooking[]
 

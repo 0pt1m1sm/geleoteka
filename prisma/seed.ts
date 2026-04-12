@@ -351,17 +351,86 @@ async function main() {
   }
   console.log(`Seeded ${sampleParts.length} sample parts`);
 
-  // Sample rental cars
+  // Sample rental cars with full specs
   const rentalCars = [
-    { model: "G 500", year: 2024, dailyRate: 35000, description: "Mercedes-Benz G 500 — легенда бездорожья. Идеален для поездок за город.", color: "Чёрный", mileage: 12000, photos: ["/images/rentals/g-black.jpg"] },
-    { model: "G 63 AMG", year: 2023, dailyRate: 55000, description: "Mercedes-AMG G 63 — 585 л.с., адреналин в каждом повороте.", color: "Белый", mileage: 18000, photos: ["/images/rentals/g-white.jpg"] },
-    { model: "G 400d", year: 2024, dailyRate: 28000, description: "Mercedes-Benz G 400d — экономичный дизель для длинных маршрутов.", color: "Серый", mileage: 8000, photos: ["/images/rentals/g-grey.jpg"] },
+    {
+      model: "G 500",
+      year: 2024,
+      dailyRate: 35000,
+      description: "Mercedes-Benz G 500 — легенда бездорожья. 4.0-литровый битурбо V8 в сочетании с полным приводом 4MATIC обеспечивает уверенное движение по любым дорогам. Идеальный выбор для поездок за город и дальних путешествий.",
+      color: "Чёрный",
+      mileage: 12000,
+      photos: ["/images/rentals/g-black.jpg"],
+      engine: "4.0 V8 Biturbo",
+      horsepower: 422,
+      transmission: "9G-TRONIC",
+      features: [
+        "Полный привод 4MATIC",
+        "Кожаный салон Nappa",
+        "Электрорегулировка сидений с памятью",
+        "Климат-контроль 3-зонный",
+        "Панорамная крыша",
+        "Мультимедиа MBUX",
+        "Камера 360°",
+        "Адаптивный круиз-контроль",
+      ],
+      seats: 5,
+    },
+    {
+      model: "G 63 AMG",
+      year: 2023,
+      dailyRate: 55000,
+      description: "Mercedes-AMG G 63 — ультимативная версия легенды. 585 лошадиных сил, разгон до 100 км/ч за 4.5 секунды и характерный звук AMG — эмоции в каждом повороте, без компромиссов в комфорте.",
+      color: "Белый",
+      mileage: 18000,
+      photos: ["/images/rentals/g-white.jpg"],
+      engine: "4.0 V8 Biturbo AMG",
+      horsepower: 585,
+      transmission: "AMG SPEEDSHIFT TCT 9G",
+      features: [
+        "AMG RIDE CONTROL",
+        "Спортивные сиденья AMG",
+        "Выхлопная система Performance",
+        "Керамические тормоза (опция)",
+        "AMG Track Pace",
+        "Burmester аудио 3D",
+        "Подогрев/вентиляция сидений",
+        "Массаж сидений",
+      ],
+      seats: 5,
+    },
+    {
+      model: "G 400d",
+      year: 2024,
+      dailyRate: 28000,
+      description: "Mercedes-Benz G 400d — рациональный выбор для длинных маршрутов. Экономичный 3.0-литровый рядный шестицилиндровый дизель сочетает мощь с низким расходом топлива.",
+      color: "Серый",
+      mileage: 8000,
+      photos: ["/images/rentals/g-grey.jpg"],
+      engine: "3.0 I6 Diesel",
+      horsepower: 330,
+      transmission: "9G-TRONIC",
+      features: [
+        "Полный привод 4MATIC",
+        "Экономичный дизель",
+        "Кожаный салон",
+        "Навигация с пробками",
+        "Парктроники 360°",
+        "Активный круиз-контроль",
+        "LED MULTIBEAM фары",
+        "Память настроек водителя",
+      ],
+      seats: 5,
+    },
   ];
 
   for (const car of rentalCars) {
     const existing = await prisma.rentalCar.findFirst({ where: { model: car.model, year: car.year } });
-    if (!existing) {
-      await prisma.rentalCar.create({ data: { ...car } });
+    if (existing) {
+      // Update existing with new spec fields
+      await prisma.rentalCar.update({ where: { id: existing.id }, data: car });
+    } else {
+      await prisma.rentalCar.create({ data: car });
     }
   }
   console.log(`Seeded ${rentalCars.length} rental cars`);
