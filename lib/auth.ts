@@ -1,5 +1,6 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { db } from "./db";
 
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
@@ -68,20 +69,23 @@ export async function getSession(): Promise<SessionUser | null> {
   return user;
 }
 
-/** Require authentication — throws if not authenticated */
+/** Require authentication — redirects to /login if not authenticated */
 export async function requireAuth(): Promise<SessionUser> {
   const session = await getSession();
   if (!session) {
-    throw new Error("Unauthorized");
+    redirect("/login");
   }
   return session;
 }
 
-/** Require specific role */
+/** Require specific role — redirects to /login if unauthorized */
 export async function requireRole(roles: string[]): Promise<SessionUser> {
-  const session = await requireAuth();
+  const session = await getSession();
+  if (!session) {
+    redirect("/login");
+  }
   if (!roles.includes(session.role)) {
-    throw new Error("Forbidden");
+    redirect("/");
   }
   return session;
 }

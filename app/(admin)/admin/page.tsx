@@ -1,13 +1,17 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate, APPOINTMENT_STATUS_LABELS } from "@/lib/utils";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 
 export default async function AdminDashboard() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+    redirect("/login");
+  }
 
   const today = new Date();
   const dayStart = startOfDay(today);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Script from "next/script";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ThemeInit } from "@/components/shared/ThemeInit";
 
 export const metadata: Metadata = {
   title: {
@@ -31,9 +31,7 @@ export default function RootLayout({
   return (
     <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {`(function(){try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.add('light');}catch(e){}})();`}
-        </Script>
+        <ThemeInit />
         <Providers>{children}</Providers>
       </body>
     </html>
