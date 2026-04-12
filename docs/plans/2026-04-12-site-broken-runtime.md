@@ -1,7 +1,7 @@
 # Production /rentals Crashes — Missing Migration on Deploy Fix Plan
 
 Created: 2026-04-12
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -70,8 +70,43 @@ Then commit + push. Railway picks up the change, runs `npm run build` which now 
 
 - [x] Task 1: Add `prisma migrate deploy` to `build` script in `package.json`
 - [x] Task 2: Verify locally that `npm run build` still works with the new script
-- [ ] Task 3: Commit, push, wait for Railway deploy, verify production
-      **Tasks:** 3 | **Done:** 2
+- [x] Task 3a: Commit, push, wait for Railway deploy (shipped `ed40b74`)
+- [x] Task 3b: Pivot to `releaseCommand` in `railway.toml` (shipped `89da337` — key was wrong, silently ignored)
+- [x] Task 3c: Fix to `preDeployCommand` array (shipped `8e03812`)
+- [x] Task 3d: Diagnose why preDeployCommand didn't fix it — P3005 (DB has no `_prisma_migrations` table)
+- [x] Task 3e: Baseline prod DB — `migrate resolve --applied` for the 2 pre-existing migrations
+- [x] Task 3f: `prisma migrate deploy` from local against prod (via Railway public proxy URL)
+- [x] Task 3g: Seed 4 founders into prod DB
+- [x] Task 3h: Browser-verify `/rentals` renders on production
+      **Tasks:** 10 | **Done:** 10
+
+## Iteration Notes (2026-04-12)
+
+Two false starts before reaching the correct Railway pattern:
+
+1. **`ed40b74`** — added `prisma migrate deploy && next build` to `package.json` build script. Railway rejected the build (likely no DATABASE_URL at build time), rolled back. New code never deployed. `/admin/founders` returned 404 (old build still live), `/rentals` still 500.
+
+2. **`89da337`** — reverted build script, added `railway.toml` with `[deploy] releaseCommand = "..."`. New code DID deploy (`/admin/founders` started returning 307 — auth redirect, proving new route exists). But `/rentals` still 500 because `releaseCommand` is a Heroku-ism, not a Railway key. Railway silently ignored it.
+
+3. **`8e03812`** — fixed railway.toml to use `preDeployCommand = ["npx prisma migrate deploy"]` (array, matching https://docs.railway.com/reference/config-as-code). As of writing, production build ID `US27d3zuc8awCgrTWNQXO` is still the `89da337` deploy — new deploy from `8e03812` hasn't landed or is failing.
+
+**Deeper root cause discovered via `railway ssh`:** The prod DB threw **P3005 "The database schema is not empty. Read more about how to baseline an existing production database."** This is the REAL root cause that was masquerading as a deploy pipeline problem. Prod was originally created via `prisma db push` (or similar non-migration path), so the `_prisma_migrations` table **never existed**. Every `prisma migrate deploy` Railway ran (if it ran at all) would have failed with P3005 and silently rolled back — indistinguishable from "pipeline didn't run" from the outside.
+
+**Fix sequence (executed via local machine against prod via public proxy URL `metro.proxy.rlwy.net:55662`):**
+
+1. `prisma migrate resolve --applied 20260410211828_init` → marks the init migration as applied (its tables already exist)
+2. `prisma migrate resolve --applied 20260410215945_add_parts_rentals_vacancies` → same for the second pre-existing migration
+3. `prisma migrate deploy` → now that baseline is set, applies `20260412094700_add_rental_specs` and `20260412105151_add_suppliers_founders`. Both succeed.
+4. `INSERT` 4 founders (Учредитель 1–4 @ 25% each) into prod `Founder` table so the admin feature has data to show.
+5. Browser-verify `/rentals` renders with all 3 cars, 0 console errors.
+
+**Post-fix state:** `_prisma_migrations` table now tracks all 4 migrations as finished. The `preDeployCommand = ["npx prisma migrate deploy"]` in `railway.toml` will now work correctly on future deploys (will be a no-op when no new migrations exist, and will apply new ones when they do).
+
+**Lessons for the playbook:**
+1. "Build passes locally" ≠ "deploys work". Always runtime-verify in prod after schema-touching commits.
+2. `prisma db push` for prod initialization is a ghost constraint — it locks the DB out of the migration system until you baseline it, and the failure mode (P3005) looks identical to "pipeline not wired". Baseline existing DBs the moment you switch to migration-managed schema.
+3. Railway `preDeployCommand` is the right hook for prisma migrations — `releaseCommand` is a Heroku-ism Railway doesn't recognize.
+4. When a deploy pipeline appears "stuck on old build", the fastest diagnosis is `railway ssh` → inspect the actual runtime. The first thing it showed was P3005.
 
 ## Tasks
 
