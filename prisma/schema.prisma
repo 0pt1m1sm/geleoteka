@@ -393,8 +393,9 @@ model Part {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  category   PartCategory?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  orderItems PartOrderItem[]
+  category           PartCategory?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems         PartOrderItem[]
+  supplierOrderItems SupplierOrderItem[]
 
   @@index([slug])
   @@index([article])
@@ -510,4 +511,123 @@ model Vacancy {
   updatedAt   DateTime @updatedAt
 
   @@index([isActive])
+}
+
+// ============================================
+// FOUNDERS & SUPPLIERS
+// ============================================
+
+enum SupplierOrderStatus {
+  DRAFT
+  ORDERED
+  IN_TRANSIT
+  CUSTOMS
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
+enum SupplierOrderItemType {
+  PART
+  CUSTOM
+  FEE
+  SERVICE
+}
+
+model Founder {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?
+  phone        String?
+  sharePercent Int      @default(25) // 25 = 25%
+  isActive     Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  contributions FounderContribution[]
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model Supplier {
+  id          String   @id @default(cuid())
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  country     String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders SupplierOrder[]
+
+  @@index([isActive])
+}
+
+model SupplierOrder {
+  id               String              @id @default(cuid())
+  supplierId       String
+  orderNumber      String?
+  orderDate        DateTime
+  status           SupplierOrderStatus @default(DRAFT)
+  itemsCost        Int                 @default(0)
+  shippingCost     Int                 @default(0)
+  customsCost      Int                 @default(0)
+  totalCost        Int                 @default(0)
+  sellingPrice     Int                 @default(0)
+  estimatedProfit  Int                 @default(0)
+  trackingNumber   String?
+  estimatedArrival DateTime?
+  receivedAt       DateTime?
+  notes            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  supplier      Supplier              @relation(fields: [supplierId], references: [id])
+  items         SupplierOrderItem[]
+  contributions FounderContribution[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderDate])
+}
+
+model SupplierOrderItem {
+  id          String                @id @default(cuid())
+  orderId     String
+  type        SupplierOrderItemType @default(PART)
+  partId      String?
+  description String
+  quantity    Int                   @default(1)
+  unitCost    Int
+  totalCost   Int
+
+  order SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part  Part?         @relation(fields: [partId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([partId])
+}
+
+model FounderContribution {
+  id           String    @id @default(cuid())
+  orderId      String
+  founderId    String
+  amount       Int
+  sharePercent Int
+  isPaid       Boolean   @default(false)
+  paidAt       DateTime?
+  notes        String?
+  createdAt    DateTime  @default(now())
+
+  order   SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  founder Founder       @relation(fields: [founderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([founderId])
+  @@index([isPaid])
 }

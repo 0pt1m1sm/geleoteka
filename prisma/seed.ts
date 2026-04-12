@@ -435,6 +435,29 @@ async function main() {
   }
   console.log(`Seeded ${rentalCars.length} rental cars`);
 
+  // ============================================
+  // FOUNDERS (4 @ 25% each)
+  // ============================================
+  const founders = [
+    { name: "Учредитель 1", sharePercent: 25, sortOrder: 1 },
+    { name: "Учредитель 2", sharePercent: 25, sortOrder: 2 },
+    { name: "Учредитель 3", sharePercent: 25, sortOrder: 3 },
+    { name: "Учредитель 4", sharePercent: 25, sortOrder: 4 },
+  ];
+
+  for (const f of founders) {
+    const existing = await prisma.founder.findFirst({ where: { name: f.name } });
+    if (existing) {
+      await prisma.founder.update({
+        where: { id: existing.id },
+        data: { sharePercent: f.sharePercent, sortOrder: f.sortOrder, isActive: true },
+      });
+    } else {
+      await prisma.founder.create({ data: { ...f, isActive: true } });
+    }
+  }
+  console.log(`Seeded ${founders.length} founders`);
+
   console.log("Seeding complete!");
 }
 

@@ -5,12 +5,7 @@ import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/utils";
 
-export async function createRentalCar(
-  _prevState: { error: string | null } | null,
-  formData: FormData
-): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
-
+function parseCarFormData(formData: FormData) {
   const model = (formData.get("model") as string)?.trim();
   const year = parseInt(formData.get("year") as string);
   const dailyRate = parseInt(formData.get("dailyRate") as string);
@@ -18,16 +13,63 @@ export async function createRentalCar(
   const color = (formData.get("color") as string)?.trim() || null;
   const plate = (formData.get("plate") as string)?.trim().toUpperCase() || null;
   const mileage = parseInt(formData.get("mileage") as string) || 0;
+  const engine = (formData.get("engine") as string)?.trim() || null;
+  const horsepower = parseInt(formData.get("horsepower") as string) || null;
+  const transmission = (formData.get("transmission") as string)?.trim() || null;
+  const seats = parseInt(formData.get("seats") as string) || 5;
+  const isAvailable = formData.get("isAvailable") !== "off";
+  const featuresRaw = (formData.get("features") as string) || "";
+  const features = featuresRaw
+    .split("\n")
+    .map((f) => f.trim())
+    .filter(Boolean);
 
-  if (!model || isNaN(year) || isNaN(dailyRate)) {
+  return { model, year, dailyRate, description, color, plate, mileage, engine, horsepower, transmission, seats, isAvailable, features };
+}
+
+export async function createRentalCar(
+  _prevState: { error: string | null } | null,
+  formData: FormData
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const data = parseCarFormData(formData);
+
+  if (!data.model || isNaN(data.year) || isNaN(data.dailyRate)) {
     return { error: "Модель, год и стоимость обязательны" };
   }
 
   await db.rentalCar.create({
-    data: { model, year, dailyRate, description, color, plate, mileage, photos: [] },
+    data: { ...data, photos: [] },
   });
 
   redirect("/admin/rentals");
+}
+
+export async function updateRentalCar(
+  carId: string,
+  _prevState: { error: string | null } | null,
+  formData: FormData
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const data = parseCarFormData(formData);
+
+  if (!data.model || isNaN(data.year) || isNaN(data.dailyRate)) {
+    return { error: "Модель, год и стоимость обязательны" };
+  }
+
+  await db.rentalCar.update({
+    where: { id: carId },
+    data,
+  });
+
+  redirect("/admin/rentals");
+}
+
+export async function deleteRentalCar(carId: string): Promise<void> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  await db.rentalCar.delete({ where: { id: carId } });
 }
 
 export async function updateRentalBookingStatus(

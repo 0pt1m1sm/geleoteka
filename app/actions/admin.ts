@@ -67,6 +67,14 @@ export async function assignMaster(
   });
 }
 
+export async function deleteAppointment(appointmentId: string): Promise<void> {
+  await requireRole(["ADMIN"]);
+
+  await db.appointment.delete({
+    where: { id: appointmentId },
+  });
+}
+
 export async function createEstimate(
   _prevState: { error: string | null; success?: boolean } | null,
   formData: FormData
