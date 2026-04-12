@@ -48,6 +48,12 @@ export default async function SupplierOrdersListPage() {
 
   return (
     <div>
+      <Link
+        href="/admin/suppliers"
+        className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] inline-block mb-2"
+      >
+        ← Поставщики
+      </Link>
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-display text-2xl font-bold">Заказы поставщикам</h1>

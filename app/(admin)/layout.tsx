@@ -9,7 +9,7 @@ const navItems = [
   { href: "/admin/customers", label: "Клиенты" },
   { href: "/admin/estimates", label: "Сметы" },
   { href: "/admin/parts", label: "Запчасти" },
-  { href: "/admin/suppliers/orders", label: "Поставки" },
+  { href: "/admin/suppliers", label: "Поставки" },
   { href: "/admin/orders", label: "Заказы" },
   { href: "/admin/rentals", label: "Аренда" },
   { href: "/admin/founders", label: "Учредители" },
