@@ -39,84 +39,67 @@ export default function HomePage() {
   return (
     <div className="flex flex-col">
       {/* Hero */}
-      <section className="relative min-h-[600px] max-h-[90vh] h-screen flex items-center justify-center overflow-hidden">
-        {/* Background photo */}
+      <section className="relative min-h-[600px] max-h-[90vh] h-screen overflow-hidden">
+        {/* Background photo spans full hero. Both halves are transparent — photo shows through. */}
         <div className="absolute inset-0">
           <img
             src="/images/hero/g-class-4k.jpg"
             alt=""
-            className="w-full h-full object-cover"
+            className="size-full object-cover"
           />
-          {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-black/65 hero-overlay" />
-          {/* Gold gradient accent from bottom */}
-          <div className="absolute bottom-0 left-0 w-full h-1/3 bg-gradient-to-t from-[var(--color-accent)]/10 to-transparent" />
-          {/* Bottom gold line */}
-          <div className="absolute bottom-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[var(--color-accent)]/40 to-transparent" />
+          <div className="absolute inset-0 bg-black/55 hero-overlay" />
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
         </div>
 
-        {/* Force light text on hero regardless of theme */}
-        <div className="relative z-10 mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8 text-white">
-          <div className="animate-fade-in">
-            <div className="inline-block border border-[#d4af37]/40 px-4 py-1.5 mb-8 text-xs uppercase tracking-[0.3em] text-[#d4af37]">
-              G-Class Specialist
+        {/* Vertical gold hairline divider — desktop only, middle 70% of height */}
+        <div className="absolute inset-y-[15%] left-1/2 z-10 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
+
+        {/* Two halves spanning full hero height. Each is transparent, lets the photo through.
+            Mobile: stacks to two rows (service first). Desktop: 50/50 split. */}
+        <div className="relative z-10 grid h-full animate-fade-in grid-cols-1 text-white md:grid-cols-2">
+          {/* Left half — Сервис */}
+          <Link
+            href="/booking"
+            className="group flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center transition-colors hover:bg-black/20 focus:bg-black/20 focus:outline-hidden sm:px-10 md:border-b-0"
+          >
+            <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
+              Сервис
             </div>
-            <h1 className="text-display font-black tracking-tight mb-6 uppercase leading-none" style={{ fontSize: "clamp(2.5rem, 10vw, 9rem)" }}>
-              Geleoteka
-            </h1>
-            <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto mb-4 font-light">
-              Специализированный сервис Mercedes-Benz G-Class
+            <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+              Сервис в&nbsp;Москве
+            </h2>
+            <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+              ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;12 месяцев.
             </p>
-            <p className="text-sm text-white/40 max-w-xl mx-auto mb-8 tracking-wide">
-              Онлайн-запись · Отслеживание статуса · Личный кабинет
-            </p>
+            <span className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors group-hover:bg-accent-hover">
+              Записаться на&nbsp;сервис
+            </span>
+            <span className="mt-4 text-sm text-accent/80 transition-colors group-hover:text-accent-hover">
+              Прайс на&nbsp;работы →
+            </span>
+          </Link>
 
-            {/* Hairline divider between brand pillar and dual CTA */}
-            <div className="w-32 h-px bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent mx-auto mb-8" />
-
-            {/* Dual-purpose split: Сервис (left) | Запчасти (right). Mobile stacks service-first. */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
-              {/* Left card — Сервис */}
-              <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-6 rounded-[var(--radius-lg)] flex flex-col">
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">Сервис в Москве</h2>
-                <p className="text-sm text-white/60 mb-6 flex-1">
-                  ТО, диагностика, ремонт. Прозрачные цены, гарантия 12 месяцев.
-                </p>
-                <Link
-                  href="/booking"
-                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium bg-[#d4af37] text-black rounded-[var(--radius-lg)] hover:bg-[#e0c04a] transition-colors"
-                >
-                  Записаться на сервис
-                </Link>
-                <Link
-                  href="/services"
-                  className="text-sm text-[#d4af37] hover:text-[#e0c04a] mt-3 transition-colors"
-                >
-                  Прайс на работы →
-                </Link>
-              </div>
-
-              {/* Right card — Запчасти */}
-              <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-6 rounded-[var(--radius-lg)] flex flex-col">
-                <h2 className="text-xl sm:text-2xl font-bold mb-2">Запчасти для G-Class</h2>
-                <p className="text-sm text-white/60 mb-6 flex-1">
-                  Оригинал и качественные аналоги. Подбор по вашему автомобилю.
-                </p>
-                <Link
-                  href="/parts"
-                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium bg-[#d4af37] text-black rounded-[var(--radius-lg)] hover:bg-[#e0c04a] transition-colors"
-                >
-                  В каталог запчастей
-                </Link>
-                <Link
-                  href="/parts?category=oils"
-                  className="text-sm text-[#d4af37] hover:text-[#e0c04a] mt-3 transition-colors"
-                >
-                  Масла и фильтры →
-                </Link>
-              </div>
+          {/* Right half — Запчасти */}
+          <Link
+            href="/parts"
+            className="group flex flex-col items-center justify-center px-6 py-12 text-center transition-colors hover:bg-black/20 focus:bg-black/20 focus:outline-hidden sm:px-10"
+          >
+            <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
+              Запчасти
             </div>
-          </div>
+            <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+              Запчасти для&nbsp;G-Class
+            </h2>
+            <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+              Оригинал и&nbsp;качественные аналоги. Подбор по&nbsp;вашему автомобилю.
+            </p>
+            <span className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors group-hover:bg-accent-hover">
+              В&nbsp;каталог запчастей
+            </span>
+            <span className="mt-4 text-sm text-accent/80 transition-colors group-hover:text-accent-hover">
+              Масла и&nbsp;фильтры →
+            </span>
+          </Link>
         </div>
       </section>
 

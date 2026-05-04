@@ -162,14 +162,17 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
         </div>
       </aside>
 
-      {/* Mobile button */}
-      <button
-        type="button"
-        onClick={() => setDrawerOpen(true)}
-        className="lg:hidden btn btn-secondary mb-4 w-full"
-      >
-        Фильтры{activeCount > 0 ? ` (${activeCount})` : ""}
-      </button>
+      {/* Mobile button — wrapped in a div with lg:hidden because `.btn` from globals.css
+          sets display:inline-flex which beats Tailwind v4's lg:hidden specificity. */}
+      <div className="lg:hidden mb-4">
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(true)}
+          className="btn btn-secondary w-full"
+        >
+          Фильтры{activeCount > 0 ? ` (${activeCount})` : ""}
+        </button>
+      </div>
 
       {/* Mobile drawer */}
       {drawerOpen && (
