@@ -64,7 +64,6 @@ export default function HomePage() {
             <div aria-hidden className="absolute inset-y-[15%] right-0 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
 
             {/* Mobile-only editorial accents */}
-            <span aria-hidden className="hero-numeral md:hidden">01</span>
             <span aria-hidden className="hero-corner hero-corner-tl md:hidden" />
             <span aria-hidden className="hero-corner hero-corner-br md:hidden" />
 
@@ -76,7 +75,7 @@ export default function HomePage() {
                 Сервис в&nbsp;Москве
               </h2>
               <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
-                ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;12 месяцев.
+                ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;на&nbsp;работы&nbsp;12&nbsp;месяцев.<sup className="ml-0.5 text-[10px] text-accent/80">*</sup>
               </p>
               <Link
                 href="/booking"
@@ -90,6 +89,10 @@ export default function HomePage() {
               >
                 Прайс на&nbsp;работы →
               </Link>
+              <p className="mt-3 text-[10px] text-white/40">
+                <span className="text-accent/70">*</span> Подробнее в&nbsp;
+                <Link href="/about#warranty" className="underline decoration-accent/40 underline-offset-2 hover:text-white/60">условиях договора</Link>.
+              </p>
             </div>
           </div>
 
@@ -102,7 +105,6 @@ export default function HomePage() {
           {/* Right half — Запчасти */}
           <div data-half="right" className="relative flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
             {/* Mobile-only editorial accents */}
-            <span aria-hidden className="hero-numeral md:hidden">02</span>
             <span aria-hidden className="hero-corner hero-corner-tl md:hidden" />
             <span aria-hidden className="hero-corner hero-corner-br md:hidden" />
 
@@ -111,22 +113,16 @@ export default function HomePage() {
                 Запчасти
               </div>
               <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
-                Запчасти для&nbsp;G-Class
+                Запчасти Mercedes-Benz
               </h2>
               <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
-                Оригинал и&nbsp;качественные аналоги. Подбор по&nbsp;вашему автомобилю.
+                Оригинал. Подбор по&nbsp;вашему автомобилю.
               </p>
               <Link
                 href="/parts"
                 className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
               >
                 В&nbsp;каталог запчастей
-              </Link>
-              <Link
-                href="/parts?category=oils"
-                className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
-              >
-                Масла и&nbsp;фильтры →
               </Link>
             </div>
           </div>
@@ -187,7 +183,7 @@ export default function HomePage() {
             },
             {
               href: "/services/repair",
-              title: "Ремонт двигателя",
+              title: "Двигатель",
               desc: "Любой вид ремонта узлов и агрегатов",
               price: "от 15 000 ₽",
             },

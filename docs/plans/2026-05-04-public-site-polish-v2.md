@@ -573,6 +573,18 @@ Type: Feature
 - `curl -s https://geleoteka-production.up.railway.app/booking | grep -c "Двигатель"` returns ≥1
 - `curl -s https://geleoteka-production.up.railway.app/booking | grep -c "Другое"` returns ≥1
 
+## E2E Results
+
+Verified against prod (`https://geleoteka-production.up.railway.app/`) at commit `7886936` after prod seed applied via `DATABASE_PUBLIC_URL`.
+
+| Scenario | Priority | Result | Fix Attempts | Notes |
+|----------|----------|--------|--------------|-------|
+| TS-001   | High     | PASS   | 0            | Native cards on prod: 5 live Yandex reviews (Антон Бахтин, Zahar Alekseevich, Alexnorton, Виталий Носов, Кристина Белокопытова), 2col md+, 1col mobile, gold initial avatars + 5★ each, no horizontal scroll, no blue Yandex CTA. `5,0` aggregate + `28 отзывов · 58 оценок` rendered server-side. |
+| TS-002   | High     | PASS   | 0            | **Pivoted from grid-resize to spotlight** during implementation per user feedback ("button running away"). All `:has()` rules confirmed loaded on prod stylesheet (`background-color 500ms cubic-bezier`). Mobile editorial accents visible: outline numerals 01/02, gold corner brackets, hairline divider with diamond pip, staggered reveal. |
+| TS-003   | Critical | PASS   | 0            | 10 service tiles on `/booking` (was 9 + Другое). Renames live: Двигатель/АКПП/Электрика. Click "Двигатель" → selection state engages; pick model G-Class + year 2022 → chassis helper "Кузов: W463 / W464" appears, Далее button enables with href `/booking/step-2`. |
+| TS-004   | Critical | PARTIAL | 0          | Step 3 component code-reviewed and confirmed structurally correct (Step3ContactConfirm.tsx folds Contact form + Summary + Submit). Live submission against prod intentionally skipped to avoid creating a junk RepairOrder + Customer record. The underlying server actions were not modified by this plan — only the UI was restructured. |
+| TS-008   | Medium   | PASS   | 0            | Step indicator on `/booking` shows 3 steps: "Услуги и авто" / "Дата и время" / "Контакты". Subtitle "Услуги и автомобиль — шаг 1 из 3". |
+
 ## Open Questions
 
 - **Login redirect-back via `?return=` query param**: needs verification that `app/actions/login.ts` already honors this. If not, add to Task 5. Will check during implementation; defer the question.

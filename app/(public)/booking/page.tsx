@@ -14,7 +14,7 @@ interface ServiceItem {
 }
 
 export default async function BookingStep1() {
-  const services: ServiceItem[] = await db.service.findMany({
+  const rawServices: ServiceItem[] = await db.service.findMany({
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -25,6 +25,12 @@ export default async function BookingStep1() {
       durationMinutes: true,
     },
   });
+  // Pin "Другое" (slug: other) to the bottom — it's the diagnostic catch-all,
+  // belongs after the named services regardless of alphabetical position.
+  const services: ServiceItem[] = [
+    ...rawServices.filter((s) => s.slug !== "other"),
+    ...rawServices.filter((s) => s.slug === "other"),
+  ];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">

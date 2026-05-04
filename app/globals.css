@@ -594,24 +594,6 @@ html::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
 }
 
-/* Outline numeral watermark — large ghost number anchoring each section
-   like a chapter header in a spec sheet. Mobile only. */
-.hero-numeral {
-  position: absolute;
-  top: 1rem;
-  right: 1.25rem;
-  font-family: var(--font-display);
-  font-weight: 900;
-  font-size: clamp(3.25rem, 16vw, 5rem);
-  letter-spacing: -0.05em;
-  line-height: 0.85;
-  color: transparent;
-  -webkit-text-stroke: 1px rgba(212, 175, 55, 0.4);
-  user-select: none;
-  pointer-events: none;
-  animation: fadeIn 700ms 250ms cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
 /* Corner ticks — small L-shaped gold brackets that frame the content block
    without enclosing it. Reads as automotive/spec marker. Mobile only. */
 .hero-corner {
@@ -666,6 +648,5 @@ html::-webkit-scrollbar-thumb:hover {
 /* Reduced-motion: kill staggered/decorative animations, keep elements visible. */
 @media (prefers-reduced-motion: reduce) {
   .hero-stagger > *,
-  .hero-numeral,
   .hero-corner { animation: none; }
 }

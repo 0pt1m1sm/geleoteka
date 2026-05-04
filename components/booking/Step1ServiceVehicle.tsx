@@ -78,13 +78,6 @@ export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): 
                         от {formatPrice(service.priceMin)}
                       </p>
                     )}
-                    {service.durationMinutes && (
-                      <p className="text-xs text-foreground-muted mt-1">
-                        ~{service.durationMinutes >= 60
-                          ? `${Math.floor(service.durationMinutes / 60)} ч`
-                          : `${service.durationMinutes} мин`}
-                      </p>
-                    )}
                   </div>
                   <div
                     className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-colors ${
