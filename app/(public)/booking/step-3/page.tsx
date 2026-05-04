@@ -1,7 +1,15 @@
+import { getSession } from "@/lib/auth";
 import { StepIndicator } from "@/components/booking/StepIndicator";
 import { Step3ContactConfirm } from "@/components/booking/Step3ContactConfirm";
 
-export default function BookingStep3() {
+export const dynamic = "force-dynamic";
+
+export default async function BookingStep3() {
+  const session = await getSession();
+  const defaultContact = session
+    ? { name: session.name, phone: session.phone, email: session.email }
+    : undefined;
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-12 sm:px-6">
       <StepIndicator current={3} />
@@ -11,7 +19,7 @@ export default function BookingStep3() {
       <p className="text-foreground-muted text-center mb-8">
         Шаг 3 из 3
       </p>
-      <Step3ContactConfirm />
+      <Step3ContactConfirm defaultContact={defaultContact} />
     </div>
   );
 }

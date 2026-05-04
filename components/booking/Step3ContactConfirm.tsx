@@ -1,11 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
+
+interface DefaultContact {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
 
 /**
  * Step 3 of the booking wizard — combined Contact form + Summary card + Submit.
@@ -14,8 +20,14 @@ import { ru } from "date-fns/locale";
  * - Top: Contact form (Name + Phone + Email all required, Notes + checkboxes optional)
  * - Bottom: Summary card with services + vehicle + datetime, each row links back to the relevant step
  * - Single "Записаться" primary button. On success: confirmation state with "На главную" / "Личный кабинет" links
+ *
+ * `defaultContact` is provided by the page server-side from getSession() for
+ * logged-in users. We seed BookingProvider's name/phone/email ONCE on mount,
+ * and only when all three are still empty — never overwrite user input.
  */
-export function Step3ContactConfirm(): React.ReactElement {
+export function Step3ContactConfirm({
+  defaultContact,
+}: { defaultContact?: DefaultContact } = {}): React.ReactElement {
   const { data, update, reset } = useBooking();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
@@ -23,6 +35,19 @@ export function Step3ContactConfirm(): React.ReactElement {
     repairOrderId?: string;
     error?: string;
   } | null>(null);
+
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current) return;
+    if (!defaultContact) return;
+    if (data.name.trim() || data.phone.trim() || data.email.trim()) return;
+    prefilledRef.current = true;
+    update({
+      name: defaultContact.name ?? "",
+      phone: defaultContact.phone ?? "",
+      email: defaultContact.email ?? "",
+    });
+  }, [defaultContact, data.name, data.phone, data.email, update]);
 
   const canSubmit =
     data.name.trim() !== "" &&
@@ -69,7 +94,12 @@ export function Step3ContactConfirm(): React.ReactElement {
     <div className="space-y-6">
       {/* Contact form */}
       <div className="card space-y-4">
-        <h2 className="text-lg font-semibold">Ваши контакты</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-lg font-semibold">Ваши контакты</h2>
+          {defaultContact?.email && (
+            <p className="text-xs text-foreground-muted">Заполнено из профиля</p>
+          )}
+        </div>
 
         <div>
           <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
