@@ -48,7 +48,13 @@ function getCartServerSnapshot(): CartItem[] {
   return EMPTY_CART;
 }
 
-export function PartsCart() {
+interface DefaultContact {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
+
+export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact } = {}) {
   const items = useSyncExternalStore(subscribeCart, getCartSnapshot, getCartServerSnapshot);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; orderId?: string; error?: string } | null>(null);
@@ -117,20 +123,29 @@ export function PartsCart() {
     <div>
       <div className="space-y-3 mb-8">
         {items.map((item) => (
-          <div key={item.partId} className="card flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{item.name}</p>
-              <p className="text-xs text-[var(--foreground-muted)] font-mono">{item.article}</p>
+          <div key={item.partId} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">{item.name}</p>
+              <p className="mt-0.5 text-xs text-[var(--foreground-muted)] font-mono">{item.article}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={() => updateQty(item.partId, item.qty - 1)} className="btn btn-secondary text-xs px-2 py-1">−</button>
-              <span className="w-8 text-center text-sm">{item.qty}</span>
-              <button type="button" onClick={() => updateQty(item.partId, item.qty + 1)} className="btn btn-secondary text-xs px-2 py-1">+</button>
+            <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
+              <div className="flex items-center gap-2">
+                <button type="button" aria-label="Уменьшить" onClick={() => updateQty(item.partId, item.qty - 1)} className="btn btn-secondary text-sm px-3 py-1">−</button>
+                <span className="w-6 text-center text-sm tabular-nums">{item.qty}</span>
+                <button type="button" aria-label="Увеличить" onClick={() => updateQty(item.partId, item.qty + 1)} className="btn btn-secondary text-sm px-3 py-1">+</button>
+              </div>
+              <p className="font-bold text-[var(--color-accent)] tabular-nums sm:w-28 sm:text-right">
+                {formatPrice(item.price * item.qty)}
+              </p>
+              <button
+                type="button"
+                aria-label="Удалить"
+                onClick={() => removeItem(item.partId)}
+                className="text-[var(--color-error)] text-lg px-1 hover:opacity-70"
+              >
+                ×
+              </button>
             </div>
-            <p className="font-bold text-[var(--color-accent)] w-24 text-right">
-              {formatPrice(item.price * item.qty)}
-            </p>
-            <button type="button" onClick={() => removeItem(item.partId)} className="text-[var(--color-error)] text-xs">×</button>
           </div>
         ))}
       </div>
@@ -149,18 +164,25 @@ export function PartsCart() {
       )}
 
       <form action={handleCheckout} className="card space-y-4">
-        <h2 className="font-semibold">Контактные данные</h2>
+        <div className="flex items-baseline justify-between">
+          <h2 className="font-semibold">Контактные данные</h2>
+          {defaultContact?.email && (
+            <p className="text-xs text-[var(--foreground-muted)]">
+              Заполнено из профиля
+            </p>
+          )}
+        </div>
         <div>
           <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-          <input id="name" name="name" required className="input" placeholder="Иван Иванов" />
+          <input id="name" name="name" required className="input" placeholder="Иван Иванов" defaultValue={defaultContact?.name ?? ""} />
         </div>
         <div>
           <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-          <input id="phone" name="phone" type="tel" required className="input" placeholder="+7 (999) 123-45-67" />
+          <input id="phone" name="phone" type="tel" required className="input" placeholder="+7 (999) 123-45-67" defaultValue={defaultContact?.phone ?? ""} />
         </div>
         <div>
           <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-          <input id="email" name="email" type="email" required className="input" placeholder="your@email.com" />
+          <input id="email" name="email" type="email" required className="input" placeholder="your@email.com" defaultValue={defaultContact?.email ?? ""} />
         </div>
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>

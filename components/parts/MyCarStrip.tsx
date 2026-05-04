@@ -8,10 +8,10 @@ import { setMyCar } from "@/lib/my-car-store";
  * `generation` searchParams are present) so it appears on first paint for
  * bookmark/share-link visits as well as picker-driven flows.
  *
- * "Сменить" — drops URL params only, keeps localStorage. The picker reappears;
- *             user can pick a new car (which overwrites localStorage) or
- *             navigate away and have their saved car still restored next time.
- * "✕"       — clears localStorage AND drops URL params. Full reset.
+ * "✕" — clears localStorage AND drops URL params. The picker reappears with
+ *       fresh state, ready to pick a different vehicle. Single action — the
+ *       previous "Сменить" button (which kept localStorage) was removed
+ *       because it consistently failed to surface the picker on mobile.
  */
 export function MyCarStrip(): React.ReactElement | null {
   const router = useRouter();
@@ -30,15 +30,6 @@ export function MyCarStrip(): React.ReactElement | null {
     return qs ? `/parts?${qs}` : "/parts";
   }
 
-  function handleChange(): void {
-    // Keep localStorage; just drop URL params so picker re-appears.
-    // Use replace (not push) so the back button doesn't bounce the user
-    // between filtered/unfiltered states. Scroll to top so the picker
-    // (which mounts above where the strip used to be) is in view.
-    router.replace(urlWithoutCar(), { scroll: false });
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
   function handleClear(): void {
     setMyCar(null);
     router.replace(urlWithoutCar(), { scroll: false });
@@ -51,23 +42,14 @@ export function MyCarStrip(): React.ReactElement | null {
       <span className="font-medium text-accent">
         {model} · {generation}
       </span>
-      <span className="ml-auto flex items-center gap-2">
-        <button
-          type="button"
-          onClick={handleChange}
-          className="text-xs text-foreground-muted hover:text-foreground transition-colors"
-        >
-          Сменить
-        </button>
-        <button
-          type="button"
-          onClick={handleClear}
-          aria-label="Очистить выбранный автомобиль"
-          className="text-foreground-muted hover:text-[var(--color-error)] transition-colors"
-        >
-          ✕
-        </button>
-      </span>
+      <button
+        type="button"
+        onClick={handleClear}
+        aria-label="Сбросить выбранный автомобиль"
+        className="ml-auto text-foreground-muted hover:text-[var(--color-error)] transition-colors text-base leading-none"
+      >
+        ✕
+      </button>
     </div>
   );
 }

@@ -585,6 +585,15 @@ Verified against prod (`https://geleoteka-production.up.railway.app/`) at commit
 > 5. Hero service warranty: "гарантия 12 месяцев" → "гарантия на работы 12 месяцев*" with footnote linking to `/about#warranty`.
 > 6. Homepage Services hardcoded promo tile "Ремонт двигателя" → "Двигатель" (mirrors the seed-level rename).
 > 7. Booking Step 1: "Другое" tile pinned to the bottom regardless of alpha sort (post-fetch JS sort in `app/(public)/booking/page.tsx`); "~Nч" duration display removed from all tiles.
+>
+> **Iter-4 follow-up (commit f69f4eb)** — four more refinements after the user reviewed Iter-3 prod:
+> 1. `/parts` mobile layout — outer flex container was `flex gap-6` on all breakpoints, squeezing `<main>` against the (visible-on-mobile) filter button. Switched to `flex flex-col gap-6 lg:flex-row` so cards now stretch full-width on mobile.
+> 2. MyCarStrip "Сменить" / "✕" — switched `router.push` → `router.replace` and added `scrollTo(0)` so the picker (which mounts above where the strip was) is in view immediately on mobile. Mitigates the user's "list opens and closes" report.
+> 3. Why-Us warranty card: "На все работы и запчасти. 20 000 км пробега. Без мелкого шрифта." → "Только на работы — 12 месяцев или 20 000 км пробега. Условия в договоре." Mirrored on the FAQ answer (parts warranty correctly attributed to manufacturer).
+> 4. Floating contact buttons: Telegram + WhatsApp duo collapsed into a single accent-coloured "Связаться с нами" FAB. Tap expands a vertical menu of three branded channels: Telegram, WhatsApp, **Max** (new VK-Tech messenger). Click-outside / Escape to close.
+>
+> **Deferred to a follow-up PRD (out of scope here):**
+> - Refactor `Part.compatibleModels: string[]` (denormalized strings) → proper Part-Model relation table, surface in admin panel for manual edits. The cascading Model→Generation picker already exists in MyCarPicker — only the schema + admin CRUD piece is outstanding.
 
 | Scenario | Priority | Result | Fix Attempts | Notes |
 |----------|----------|--------|--------------|-------|
