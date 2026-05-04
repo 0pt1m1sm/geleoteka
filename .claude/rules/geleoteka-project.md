@@ -1,6 +1,6 @@
 # Project: Geleoteka
 
-**Last Updated:** 2026-04-11
+**Last Updated:** 2026-05-04
 
 ## Overview
 
@@ -25,13 +25,15 @@ app/
   (admin)/     # Manager panel — ADMIN/MANAGER role
   (cabinet)/   # Alternative portal layout
   actions/     # Server Actions (all mutations)
-  api/         # API routes (slots, status polling, CSV import)
+  api/         # API routes (auth, parts, repair-orders, slots, upload)
 components/
   admin/       # Admin-specific components
   booking/     # Booking wizard (5-step)
   parts/       # Parts shop components
+  portal/      # Client portal components (EstimateReview, StatusBoard)
   rentals/     # Rental car components
   shared/      # Cross-cutting (Header, Footer, ThemeToggle, etc.)
+  ui/          # Reserved for shared UI primitives (currently empty)
 lib/           # Shared utilities (auth, db, sms, splus, utils)
 prisma/        # Schema, migrations, seed
 public/images/ # Static images (hero, parts, rentals, logo)
@@ -43,7 +45,7 @@ public/images/ # Static images (hero, parts, rentals, logo)
 |------|---------|
 | Dev server | `npm run dev` (port 443, HTTPS) |
 | Build | `npm run build` |
-| Production | `npm start` (binds to `$PORT` or 8080) |
+| Production | `npm start` (binds to `$PORT` or 443) |
 | Lint | `npm run lint` |
 | DB migrate | `npx prisma migrate dev --name <name>` |
 | DB generate | `npx prisma generate` |
@@ -70,4 +72,4 @@ public/images/ # Static images (hero, parts, rentals, logo)
 
 - **Hosting:** Railway (auto-deploy from GitHub `main`)
 - **Repo:** `github.com/0pt1m1sm/geleoteka`
-- **Start:** `next start -H 0.0.0.0 -p ${PORT:-8080}`
+- **Start:** `next start -H 0.0.0.0 -p ${PORT:-443}`

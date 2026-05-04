@@ -21,11 +21,11 @@ interface BookingInput {
 
 interface BookingResult {
   success: boolean;
-  appointmentId?: string;
+  repairOrderId?: string;
   error?: string;
 }
 
-export async function createAppointment(input: BookingInput): Promise<BookingResult> {
+export async function createRepairOrder(input: BookingInput): Promise<BookingResult> {
   const { serviceIds, vin, model, year, mileage, dateTime, name, phone, email, notes } = input;
 
   if (!serviceIds.length || !model || !year || !dateTime || !name || !phone || !email) {
@@ -44,7 +44,6 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
   }
 
   try {
-    // Use session user if logged in, otherwise find/create by email
     const session = await getSession();
     let user = session
       ? await db.user.findUnique({ where: { id: session.id } })
@@ -59,7 +58,6 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
     }
 
     if (!user) {
-      // Create guest user (no password — can register later)
       const bcrypt = await import("bcryptjs");
       const tempPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
       user = await db.user.create({
@@ -68,24 +66,25 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
           phone: normalizedPhone,
           name,
           passwordHash: tempPasswordHash,
+          permissionRole: "CLIENT",
+          isCustomer: true,
         },
       });
 
-      // Create loyalty account
       await db.loyaltyAccount.create({
         data: { userId: user.id },
       });
     }
 
-    // Find or create car
-    let car = vin
-      ? await db.car.findUnique({ where: { vin } })
+    let vehicle = vin
+      ? await db.vehicle.findUnique({ where: { vin } })
       : null;
 
-    if (!car) {
-      car = await db.car.create({
+    if (!vehicle) {
+      vehicle = await db.vehicle.create({
         data: {
-          userId: user.id,
+          ownershipType: "CUSTOMER",
+          ownerUserId: user.id,
           vin: vin || null,
           model,
           year: parseInt(year),
@@ -94,30 +93,46 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
       });
     }
 
-    // Create appointment with slot locking via unique constraint
-    const appointment = await db.appointment.create({
-      data: {
-        userId: user.id,
-        carId: car.id,
-        dateTime: appointmentDate,
-        notes: notes || null,
-        services: {
-          create: serviceIds.map((serviceId) => ({ serviceId })),
-        },
-      },
+    const services = await db.service.findMany({
+      where: { id: { in: serviceIds } },
+      select: { id: true, name: true, priceMin: true },
     });
 
-    // Create booking confirmation notification
+    // Slot reservation + RO creation in one transaction. The unique constraint on
+    // Slot.dateTime is what actually prevents concurrent double-booking; if two
+    // requests race, only one slot.create succeeds — the other rolls back its RO.
+    const repairOrder = await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+      const ro = await tx.repairOrder.create({
+        data: {
+          userId: user!.id,
+          vehicleId: vehicle!.id,
+          dateTime: appointmentDate,
+          status: "ESTIMATE",
+          notes: notes || null,
+          jobLines: {
+            create: services.map((s: { id: string; name: string; priceMin: number | null }, idx: number) => ({
+              sortOrder: idx,
+              description: s.name,
+              status: "PROPOSED" as const,
+            })),
+          },
+        },
+      });
+      await tx.slot.create({
+        data: { dateTime: appointmentDate, repairOrderId: ro.id },
+      });
+      return ro;
+    });
+
     await db.notification.create({
       data: {
         userId: user.id,
         type: "BOOKING_CONFIRMATION",
         message: `Запись подтверждена на ${appointmentDate.toLocaleDateString("ru-RU")} в ${appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`,
-        metadata: { appointmentId: appointment.id },
+        metadata: { repairOrderId: repairOrder.id },
       },
     });
 
-    // Send SMS confirmation
     const { sendBookingConfirmation } = await import("@/lib/sms");
     await sendBookingConfirmation(
       normalizedPhone,
@@ -125,7 +140,6 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
       appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     );
 
-    // Push to SPlus
     const { pushAppointment: splusPush } = await import("@/lib/splus");
     await splusPush({
       clientName: name,
@@ -139,9 +153,8 @@ export async function createAppointment(input: BookingInput): Promise<BookingRes
       notes: notes || undefined,
     });
 
-    return { success: true, appointmentId: appointment.id };
+    return { success: true, repairOrderId: repairOrder.id };
   } catch (err) {
-    // Check for unique constraint violation (slot already taken)
     if (err instanceof Error && err.message.includes("Unique constraint")) {
       return { success: false, error: "Этот слот уже занят. Выберите другое время." };
     }

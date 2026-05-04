@@ -12,32 +12,63 @@ datasource db {
 // ENUMS
 // ============================================
 
-enum UserRole {
-  CLIENT
-  MANAGER
-  ADMIN
+enum UserPermissionRole {
+  NONE // Cannot log in (suppliers and other non-login entities)
+  CLIENT // Customer portal only
+  MANAGER // Admin panel, day-to-day operations
+  ADMIN // Full admin access including settings
 }
 
-enum AppointmentStatus {
-  BOOKED
-  ACCEPTED
-  DIAGNOSIS
-  IN_REPAIR
-  QC
-  READY
+enum VehicleOwnershipType {
+  CUSTOMER // Owned by a customer, brought in for service
+  RENTAL // Fleet vehicle available for rent
+  LOANER // Courtesy car given during service
+}
+
+enum RepairOrderStatus {
+  ESTIMATE // Initial quote, awaiting customer approval
+  APPROVED // Customer approved, ready to start
+  IN_PROGRESS // Work underway
+  AWAITING_PARTS // Blocked on parts delivery
+  QC // Quality check
+  READY // Done, ready for pickup
+  INVOICED // Invoice issued
+  PAID // Payment received
+  CLOSED // Fully completed
+  CANCELLED // Cancelled by customer or shop
+}
+
+enum JobLineStatus {
+  PROPOSED // Part of the estimate, awaiting approval
+  APPROVED // Customer approved this job
+  DECLINED // Customer declined this job (kept for history)
+  DEFERRED // Postponed to next visit (upsell list)
+  IN_PROGRESS // Work underway on this specific job
+  DONE // Job completed
+}
+
+enum PartLineStatus {
+  NEEDED // Part required but not yet ordered
+  ORDERED // Purchase order placed with supplier
+  RECEIVED // Part arrived at shop
+  INSTALLED // Part installed on the vehicle
+}
+
+enum SupplierOrderStatus {
+  DRAFT
+  ORDERED
+  IN_TRANSIT
+  CUSTOMS
+  RECEIVED
   COMPLETED
   CANCELLED
 }
 
-enum EstimateStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
-
-enum EstimateItemType {
-  WORK
+enum SupplierOrderItemType {
   PART
+  CUSTOM
+  FEE
+  SERVICE
 }
 
 enum LoyaltyTransactionType {
@@ -60,44 +91,121 @@ enum LoyaltyTier {
   AMG_CLUB
 }
 
+enum PartOrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum RentalBookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  RETURNED
+  CANCELLED
+}
+
 // ============================================
-// USER & AUTH
+// USER & AUTH (unified person model)
 // ============================================
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  phone        String   @unique
-  passwordHash String
-  name         String
-  role         UserRole @default(CLIENT)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id             String             @id @default(cuid())
+  email          String             @unique
+  phone          String             @unique
+  passwordHash   String? // NULL for non-login entities (permissionRole=NONE)
+  name           String
+  permissionRole UserPermissionRole @default(CLIENT)
 
-  // Relations
-  cars              Car[]
-  appointments      Appointment[]
-  loyaltyAccount    LoyaltyAccount?
-  notifications     Notification[]
-  referredBy        User?  @relation("Referral", fields: [referredById], references: [id])
-  referredUsers     User[] @relation("Referral")
-  referredById      String?
-  passwordResets    PasswordReset[]
-  blogPosts        BlogPost[]
-  partOrders       PartOrder[]
-  rentalBookings   RentalBooking[]
+  // Identity flags — a single user can play multiple roles
+  isCustomer Boolean @default(true)
+  isMaster   Boolean @default(false)
+  isSupplier Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Optional 1:1 profile extensions (only present when corresponding flag = true)
+  customerProfile CustomerProfile?
+  masterProfile   MasterProfile?
+  supplierProfile SupplierProfile?
+
+  // Relations — as customer
+  vehicles       Vehicle[]       @relation("VehicleOwner")
+  repairOrders   RepairOrder[]   @relation("RepairOrderCustomer")
+  loyaltyAccount LoyaltyAccount?
+  notifications  Notification[]
+  passwordResets PasswordReset[]
+  blogPosts      BlogPost[]
+  partOrders     PartOrder[]
+  rentalBookings RentalBooking[]
+
+  // Relations — as master/technician
+  assignedRepairOrders RepairOrder[] @relation("RepairOrderMaster")
+  assignedLaborLines   LaborLine[]   @relation("LaborLineTechnician")
+
+  // Relations — as supplier
+  supplierOrders SupplierOrder[]
+
+  // Self-referential — referrals
+  referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
+  referredUsers User[]  @relation("Referral")
+  referredById  String?
 
   @@index([email])
   @@index([phone])
+  @@index([isCustomer])
+  @@index([isMaster])
+  @@index([isSupplier])
+  @@index([permissionRole])
+}
+
+model CustomerProfile {
+  userId                String  @id @unique
+  preferredMasterUserId String?
+  blacklisted           Boolean @default(false)
+  notes                 String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model MasterProfile {
+  userId          String   @id @unique
+  specialty       String?
+  yearsExperience Int?
+  bio             String?
+  photoUrl        String?
+  certifications  String[]
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model SupplierProfile {
+  userId      String  @id @unique
+  contactName String?
+  country     String?
+  notes       String?
+  isActive    Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
 }
 
 model PasswordReset {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  code      String   @db.VarChar(6)
+  code      String    @db.VarChar(6)
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -106,140 +214,190 @@ model PasswordReset {
 }
 
 // ============================================
-// VEHICLES
+// VEHICLES (unified: customer cars + rental fleet)
 // ============================================
 
-model Car {
-  id        String   @id @default(cuid())
-  userId    String
-  vin       String?  @unique
-  model     String   // e.g., "GLE 2023"
-  year      Int
-  mileage   Int      @default(0)
-  color     String?
-  plate     String?  // Госномер
+model Vehicle {
+  id            String               @id @default(cuid())
+  ownershipType VehicleOwnershipType @default(CUSTOMER)
+  ownerUserId   String? // Required for CUSTOMER, null for RENTAL/LOANER
+
+  // Shared identification
+  vin   String? @unique
+  plate String?
+  make  String  @default("Mercedes-Benz")
+  model String // e.g., "G 500", "GLE 350d"
+  year  Int
+  color String?
+
+  // Specs (useful for both customer cars and fleet)
+  engine       String?
+  horsepower   Int?
+  transmission String?
+  features     String[]
+  seats        Int      @default(5)
+  mileage      Int      @default(0)
+
+  // Fleet-specific (null for customer cars)
+  dailyRate   Int?
+  isAvailable Boolean  @default(true)
+  description String?
+  photos      String[]
+
+  // Soft-delete: hard-delete cascades to RentalBooking + RepairOrder, wiping history
+  isArchived Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  appointments Appointment[]
+  // Relations
+  owner          User?           @relation("VehicleOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  repairOrders   RepairOrder[]
+  rentalBookings RentalBooking[]
 
-  @@index([userId])
+  @@index([ownerUserId])
+  @@index([ownershipType])
+  @@index([isAvailable])
+  @@index([isArchived])
 }
 
 // ============================================
-// SERVICES & MASTER
+// SERVICES (catalog — what the shop offers)
 // ============================================
 
 model Service {
-  id                String   @id @default(cuid())
-  slug              String   @unique
-  name              String
-  description       String?
-  priceMin          Int?     // Min price in rubles
-  priceMax          Int?     // Max price in rubles
-  durationMinutes   Int?     // Estimated duration
-  applicableModels  String[] // e.g., ["GLE", "GLS", "G-Class"]
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  appointments AppointmentService[]
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  description      String?
+  priceMin         Int?
+  priceMax         Int?
+  durationMinutes  Int?
+  applicableModels String[]
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([slug])
 }
 
-model Master {
-  id             String   @id @default(cuid())
-  name           String
-  specialization String
-  photo          String?  // URL to photo
-  certifications String[] // e.g., ["STAR Diagnostics", "AMG Certified"]
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  appointments Appointment[]
-
-  @@index([isActive])
-}
-
 // ============================================
-// APPOINTMENTS
+// REPAIR ORDERS (unified: replaces Appointment + Estimate)
 // ============================================
 
-model Appointment {
-  id          String            @id @default(cuid())
-  userId     String
-  carId      String
-  masterId   String?
-  status     AppointmentStatus @default(BOOKED)
-  dateTime   DateTime
-  notes      String?
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+model RepairOrder {
+  id           String            @id @default(cuid())
+  roNumber     String?           @unique // Human-friendly sequential number
+  userId       String // Customer
+  vehicleId    String
+  masterUserId String? // Assigned technician
+  status       RepairOrderStatus @default(ESTIMATE)
+  dateTime     DateTime // Scheduled date/time
+  mileageIn    Int?
+  mileageOut   Int?
+  concern      String? // Customer's words: "what's wrong"
+  notes        String?
+
+  // Financial summary (computed from job lines)
+  subtotalLabor Int @default(0)
+  subtotalParts Int @default(0)
+  tax           Int @default(0)
+  discount      Int @default(0)
+  total         Int @default(0)
+
+  promisedAt  DateTime?
   completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  car           Car                  @relation(fields: [carId], references: [id], onDelete: Cascade)
-  master        Master?              @relation(fields: [masterId], references: [id], onDelete: SetNull)
-  services      AppointmentService[]
-  estimate      Estimate?
+  // Relations
+  user    User    @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  master  User?   @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
+  slot    Slot?
+
+  jobLines            JobLine[]
   loyaltyTransactions LoyaltyTransaction[]
 
-  // Slot locking: unique date+master prevents double-booking
-  @@unique([dateTime, masterId])
   @@index([userId])
-  @@index([carId])
+  @@index([vehicleId])
+  @@index([masterUserId])
   @@index([status])
   @@index([dateTime])
 }
 
-model AppointmentService {
-  appointmentId String
-  serviceId     String
+// Slot locking: one row per scheduled time. Non-nullable unique dateTime
+// makes concurrent booking attempts at the same time fail at the DB level.
+// NOTE: single-bay shop assumption — one booking per dateTime across the
+// whole workshop. Multi-bay capacity is out of scope for the redesign;
+// upgrade later by replacing @unique([dateTime]) with @unique([dateTime, bayId])
+// or introducing a capacity counter.
+model Slot {
+  id            String   @id @default(cuid())
+  dateTime      DateTime @unique
+  repairOrderId String   @unique
+  createdAt     DateTime @default(now())
 
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  service     Service     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-
-  @@id([appointmentId, serviceId])
+  repairOrder RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
 }
 
-// ============================================
-// ESTIMATES
-// ============================================
+model JobLine {
+  id            String        @id @default(cuid())
+  repairOrderId String
+  sortOrder     Int           @default(0)
+  description   String // "Brake pad replacement", "Oil change", etc.
+  status        JobLineStatus @default(PROPOSED)
 
-model Estimate {
-  id            String         @id @default(cuid())
-  appointmentId String        @unique
-  status        EstimateStatus @default(PENDING)
-  total         Int            @default(0) // Total in rubles
-  finalCost     Int?           // Actual cost after adjustments
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  sentAt        DateTime?      // When sent to client
-  approvedAt    DateTime?
-  rejectedAt    DateTime?
+  // Financial totals (computed from labor + part lines)
+  laborTotal Int @default(0)
+  partsTotal Int @default(0)
+  total      Int @default(0)
 
-  appointment Appointment     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
-  items       EstimateItem[]
+  createdAt DateTime @default(now())
 
+  repairOrder RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  laborLines  LaborLine[]
+  partLines   PartLine[]
+
+  @@index([repairOrderId])
   @@index([status])
 }
 
-model EstimateItem {
-  id          String           @id @default(cuid())
-  estimateId  String
-  type        EstimateItemType
-  description String
-  quantity    Int              @default(1)
-  unitPrice   Int              // Price per unit in rubles
-  approved    Boolean?
-  approvedAt  DateTime?
-  rejectedAt  DateTime?
+model LaborLine {
+  id               String  @id @default(cuid())
+  jobLineId        String
+  description      String
+  bookHours        Float   @default(0) // Estimated hours (from flat-rate guide)
+  actualHours      Float? // Actual hours worked
+  rate             Int     @default(0) // Rate per hour in rubles
+  total            Int     @default(0)
+  technicianUserId String? // Which technician performed this
 
-  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
 
-  @@index([estimateId])
+  jobLine    JobLine @relation(fields: [jobLineId], references: [id], onDelete: Cascade)
+  technician User?   @relation("LaborLineTechnician", fields: [technicianUserId], references: [id], onDelete: SetNull)
+
+  @@index([jobLineId])
+}
+
+model PartLine {
+  id             String         @id @default(cuid())
+  jobLineId      String
+  partId         String? // Nullable — free-text for special-order / non-catalog parts
+  description    String
+  qty            Int            @default(1)
+  unitCost       Int            @default(0) // What we pay
+  unitPrice      Int            @default(0) // What we charge
+  supplierUserId String? // Which supplier for this part
+  status         PartLineStatus @default(NEEDED)
+
+  createdAt DateTime @default(now())
+
+  jobLine JobLine @relation(fields: [jobLineId], references: [id], onDelete: Cascade)
+  part    Part?   @relation(fields: [partId], references: [id], onDelete: SetNull)
+
+  @@index([jobLineId])
+  @@index([partId])
 }
 
 // ============================================
@@ -256,7 +414,7 @@ model LoyaltyAccount {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions LoyaltyTransaction[]
 
   @@index([referralCode])
@@ -266,14 +424,14 @@ model LoyaltyAccount {
 model LoyaltyTransaction {
   id            String                 @id @default(cuid())
   accountId     String
-  amount        Int                    // Positive = earned, negative = redeemed
+  amount        Int
   type          LoyaltyTransactionType
-  appointmentId String?
+  repairOrderId String? // Was appointmentId — now links to RepairOrder
   description   String?
-  createdAt     DateTime              @default(now())
+  createdAt     DateTime               @default(now())
 
   account     LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  appointment Appointment?   @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  repairOrder RepairOrder?   @relation(fields: [repairOrderId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
 }
@@ -283,13 +441,13 @@ model LoyaltyTransaction {
 // ============================================
 
 model Notification {
-  id        String           @id @default(cuid())
-  userId    String
-  type      NotificationType
-  message   String
-  sentAt    DateTime         @default(now())
-  readAt    DateTime?
-  metadata  Json?            // Additional data (appointmentId, etc.)
+  id       String           @id @default(cuid())
+  userId   String
+  type     NotificationType
+  message  String
+  sentAt   DateTime         @default(now())
+  readAt   DateTime?
+  metadata Json?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -298,52 +456,31 @@ model Notification {
 }
 
 // ============================================
-// CMS
+// CMS & BLOG
 // ============================================
 
 model CMSBlock {
   id        String   @id @default(cuid())
-  key       String   @unique // e.g., "home.hero.title"
-  content   Json     // Rich text content
+  key       String   @unique
+  content   Json
   updatedAt DateTime @updatedAt
 
   @@index([key])
 }
 
-model MasterProfile {
-  id             String   @id @default(cuid())
-  name           String
-  role           String   // e.g., "Главный механик"
-  bio            String?
-  photo          String?
-  experience     Int?     // Years
-  certifications String[]
-  sortOrder      Int      @default(0)
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([sortOrder])
-  @@index([isActive])
-}
-
-// ============================================
-// BLOG
-// ============================================
-
 model BlogPost {
-  id          String   @id @default(cuid())
-  slug        String   @unique
+  id          String    @id @default(cuid())
+  slug        String    @unique
   title       String
-  content     String   // Markdown content
-  excerpt     String?  // Short description
+  content     String
+  excerpt     String?
   authorId    String?
-  tags        String[] // e.g., ["oil", "brakes"]
-  modelTags   String[] // e.g., ["GLE", "G-Class"]
-  published    Boolean  @default(false)
+  tags        String[]
+  modelTags   String[]
+  published   Boolean   @default(false)
   publishedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   author User? @relation(fields: [authorId], references: [id], onDelete: SetNull)
 
@@ -355,14 +492,6 @@ model BlogPost {
 // ============================================
 // PARTS SHOP
 // ============================================
-
-enum PartOrderStatus {
-  PENDING
-  CONFIRMED
-  SHIPPED
-  COMPLETED
-  CANCELLED
-}
 
 model PartCategory {
   id        String   @id @default(cuid())
@@ -379,23 +508,24 @@ model PartCategory {
 model Part {
   id               String   @id @default(cuid())
   slug             String   @unique
-  article          String   @unique // Артикул
+  article          String   @unique
   name             String
   description      String?
-  price            Int      // Price in rubles
-  compareAtPrice   Int?     // Old price for discount display
-  quantity         Int      @default(0) // Stock
+  price            Int
+  compareAtPrice   Int?
+  quantity         Int      @default(0)
   isOEM            Boolean  @default(true)
-  photos           String[] // URLs
-  compatibleModels String[] // e.g., ["G-Class", "GLE"]
+  photos           String[]
+  compatibleModels String[]
   categoryId       String?
   isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  category           PartCategory?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category           PartCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   orderItems         PartOrderItem[]
   supplierOrderItems SupplierOrderItem[]
+  partLines          PartLine[]
 
   @@index([slug])
   @@index([article])
@@ -427,7 +557,7 @@ model PartOrderItem {
   orderId   String
   partId    String
   quantity  Int    @default(1)
-  unitPrice Int    // Price at time of order
+  unitPrice Int
 
   order PartOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part      @relation(fields: [partId], references: [id], onDelete: Cascade)
@@ -437,44 +567,12 @@ model PartOrderItem {
 }
 
 // ============================================
-// RENTAL CARS
+// RENTAL BOOKINGS
 // ============================================
-
-enum RentalBookingStatus {
-  PENDING
-  CONFIRMED
-  ACTIVE
-  RETURNED
-  CANCELLED
-}
-
-model RentalCar {
-  id           String   @id @default(cuid())
-  model        String   // e.g., "G 500"
-  year         Int
-  dailyRate    Int      // Price per day in rubles
-  photos       String[]
-  description  String?
-  isAvailable  Boolean  @default(true)
-  plate        String?
-  color        String?
-  mileage      Int      @default(0)
-  engine       String?  // e.g., "4.0 V8 Biturbo"
-  horsepower   Int?     // e.g., 422
-  transmission String?  // e.g., "9G-TRONIC"
-  features     String[] // e.g., ["Кожаный салон", "Панорамная крыша"]
-  seats        Int      @default(5)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  bookings RentalBooking[]
-
-  @@index([isAvailable])
-}
 
 model RentalBooking {
   id           String              @id @default(cuid())
-  carId        String
+  vehicleId    String // Was carId — now references Vehicle
   userId       String?
   status       RentalBookingStatus @default(PENDING)
   startDate    DateTime
@@ -487,10 +585,10 @@ model RentalBooking {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
-  car  RentalCar @relation(fields: [carId], references: [id], onDelete: Cascade)
-  user User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([carId])
+  @@index([vehicleId])
   @@index([userId])
   @@index([status])
 }
@@ -500,77 +598,26 @@ model RentalBooking {
 // ============================================
 
 model Vacancy {
-  id          String   @id @default(cuid())
-  title       String
-  type        String   @default("Полная занятость")
-  description String
-  requirements String[]
-  isActive    Boolean  @default(true)
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@index([isActive])
-}
-
-// ============================================
-// FOUNDERS & SUPPLIERS
-// ============================================
-
-enum SupplierOrderStatus {
-  DRAFT
-  ORDERED
-  IN_TRANSIT
-  CUSTOMS
-  RECEIVED
-  COMPLETED
-  CANCELLED
-}
-
-enum SupplierOrderItemType {
-  PART
-  CUSTOM
-  FEE
-  SERVICE
-}
-
-model Founder {
   id           String   @id @default(cuid())
-  name         String
-  email        String?
-  phone        String?
-  sharePercent Int      @default(25) // 25 = 25%
+  title        String
+  type         String   @default("Полная занятость")
+  description  String
+  requirements String[]
   isActive     Boolean  @default(true)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  contributions FounderContribution[]
-
-  @@index([isActive])
-  @@index([sortOrder])
-}
-
-model Supplier {
-  id          String   @id @default(cuid())
-  name        String
-  contactName String?
-  email       String?
-  phone       String?
-  country     String?
-  notes       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  orders SupplierOrder[]
-
   @@index([isActive])
 }
+
+// ============================================
+// SUPPLIER ORDERS
+// ============================================
 
 model SupplierOrder {
   id               String              @id @default(cuid())
-  supplierId       String
+  userId           String // Was supplierId — references User (isSupplier=true)
   orderNumber      String?
   orderDate        DateTime
   status           SupplierOrderStatus @default(DRAFT)
@@ -587,11 +634,10 @@ model SupplierOrder {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
 
-  supplier      Supplier              @relation(fields: [supplierId], references: [id])
-  items         SupplierOrderItem[]
-  contributions FounderContribution[]
+  supplier User                @relation(fields: [userId], references: [id])
+  items    SupplierOrderItem[]
 
-  @@index([supplierId])
+  @@index([userId])
   @@index([status])
   @@index([orderDate])
 }
@@ -611,23 +657,4 @@ model SupplierOrderItem {
 
   @@index([orderId])
   @@index([partId])
-}
-
-model FounderContribution {
-  id           String    @id @default(cuid())
-  orderId      String
-  founderId    String
-  amount       Int
-  sharePercent Int
-  isPaid       Boolean   @default(false)
-  paidAt       DateTime?
-  notes        String?
-  createdAt    DateTime  @default(now())
-
-  order   SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  founder Founder       @relation(fields: [founderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([founderId])
-  @@index([isPaid])
 }

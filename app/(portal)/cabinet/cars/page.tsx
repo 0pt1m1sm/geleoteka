@@ -9,8 +9,8 @@ export default async function CarsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const cars = await db.car.findMany({
-    where: { userId: session.id },
+  const cars = await db.vehicle.findMany({
+    where: { ownerUserId: session.id, ownershipType: "CUSTOMER" },
     orderBy: { createdAt: "desc" },
   });
 

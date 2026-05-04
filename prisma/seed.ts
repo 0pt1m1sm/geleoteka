@@ -12,16 +12,7 @@ const services = [
     priceMin: 8000,
     priceMax: 45000,
     durationMinutes: 120,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-      "EQ",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
   {
     slug: "diagnostic",
@@ -31,16 +22,7 @@ const services = [
     priceMin: 5000,
     priceMax: 15000,
     durationMinutes: 60,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-      "EQ",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
   {
     slug: "repair",
@@ -50,15 +32,7 @@ const services = [
     priceMin: 15000,
     priceMax: 350000,
     durationMinutes: 480,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG"],
   },
   {
     slug: "brakes",
@@ -68,15 +42,7 @@ const services = [
     priceMin: 4500,
     priceMax: 80000,
     durationMinutes: 90,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG"],
   },
   {
     slug: "suspension",
@@ -86,15 +52,7 @@ const services = [
     priceMin: 5500,
     priceMax: 120000,
     durationMinutes: 180,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG"],
   },
   {
     slug: "conditioner",
@@ -104,16 +62,7 @@ const services = [
     priceMin: 3500,
     priceMax: 45000,
     durationMinutes: 60,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-      "EQ",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
   {
     slug: "transmission",
@@ -123,15 +72,7 @@ const services = [
     priceMin: 8000,
     priceMax: 250000,
     durationMinutes: 240,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG"],
   },
   {
     slug: "electric",
@@ -141,16 +82,7 @@ const services = [
     priceMin: 5000,
     priceMax: 80000,
     durationMinutes: 120,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-      "EQ",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
   {
     slug: "body",
@@ -160,63 +92,58 @@ const services = [
     priceMin: 10000,
     priceMax: 500000,
     durationMinutes: 480,
-    applicableModels: [
-      "C-Class",
-      "E-Class",
-      "S-Class",
-      "GLE",
-      "GLS",
-      "G-Class",
-      "AMG",
-      "EQ",
-    ],
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
 ];
 
 const masters = [
   {
     name: "Алексей Петров",
-    role: "Главный механик",
-    bio: "Более 18 лет специализируется на двигателях Mercedes-Benz. Сертифицированный специалист STAR Diagnostics. Работал в официальном дилерском центре.",
-    experience: 18,
-    certifications: [
-      "Mercedes-Benz STAR Certified",
-      "AMG Performance Specialist",
-    ],
-    sortOrder: 1,
+    email: "master-petrov@geleoteka.local",
+    phone: "+79001000001",
+    profile: {
+      specialty: "Главный механик — двигатели Mercedes-Benz",
+      yearsExperience: 18,
+      bio: "Более 18 лет специализируется на двигателях Mercedes-Benz. Сертифицированный специалист STAR Diagnostics. Работал в официальном дилерском центре.",
+      certifications: ["Mercedes-Benz STAR Certified", "AMG Performance Specialist"],
+      sortOrder: 1,
+    },
   },
   {
     name: "Дмитрий Козлов",
-    role: "Специалист по электронике",
-    bio: "12 лет опыта в диагностике и ремонте электронных систем. Эксперт по COMAND, MBUX, системам помощи водителю. Программирование блоков управления.",
-    experience: 12,
-    certifications: [
-      "Mercedes-Benz Electronics Certified",
-      "ADAS Calibration Specialist",
-    ],
-    sortOrder: 2,
+    email: "master-kozlov@geleoteka.local",
+    phone: "+79001000002",
+    profile: {
+      specialty: "Специалист по электронике",
+      yearsExperience: 12,
+      bio: "12 лет опыта в диагностике и ремонте электронных систем. Эксперт по COMAND, MBUX, системам помощи водителю. Программирование блоков управления.",
+      certifications: ["Mercedes-Benz Electronics Certified", "ADAS Calibration Specialist"],
+      sortOrder: 2,
+    },
   },
   {
     name: "Сергей Васильев",
-    role: "Специалист по ходовой части",
-    bio: "15 лет опыта в ремонте подвески и трансмиссии. Эксперт по пневмоподвеске AIRMATIC и системе 4MATIC. Регулировка углов установки колёс.",
-    experience: 15,
-    certifications: [
-      "Hunter Alignment Certified",
-      "AIRMATIC Specialist",
-    ],
-    sortOrder: 3,
+    email: "master-vasiliev@geleoteka.local",
+    phone: "+79001000003",
+    profile: {
+      specialty: "Специалист по ходовой части",
+      yearsExperience: 15,
+      bio: "15 лет опыта в ремонте подвески и трансмиссии. Эксперт по пневмоподвеске AIRMATIC и системе 4MATIC. Регулировка углов установки колёс.",
+      certifications: ["Hunter Alignment Certified", "AIRMATIC Specialist"],
+      sortOrder: 3,
+    },
   },
   {
     name: "Михаил Новиков",
-    role: "Кузовной мастер",
-    bio: "10 лет опыта в кузовном ремонте премиальных автомобилей. Покраска с подбором цвета, работа с алюминиевыми кузовными панелями.",
-    experience: 10,
-    certifications: [
-      "Standox Certified Painter",
-      "Aluminum Body Repair",
-    ],
-    sortOrder: 4,
+    email: "master-novikov@geleoteka.local",
+    phone: "+79001000004",
+    profile: {
+      specialty: "Кузовной мастер",
+      yearsExperience: 10,
+      bio: "10 лет опыта в кузовном ремонте премиальных автомобилей. Покраска с подбором цвета, работа с алюминиевыми кузовными панелями.",
+      certifications: ["Standox Certified Painter", "Aluminum Body Repair"],
+      sortOrder: 4,
+    },
   },
 ];
 
@@ -235,7 +162,7 @@ const cmsBlocks = [
   { key: "contacts.hours.parts", content: { text: "Пн–Пт: 9:00–19:00, Сб: 10:00–17:00" } },
 ];
 
-async function main() {
+async function main(): Promise<void> {
   console.log("Seeding database...");
 
   // Services
@@ -248,11 +175,6 @@ async function main() {
   }
   console.log(`Seeded ${services.length} services`);
 
-  // Master profiles — delete and recreate for idempotency
-  await prisma.masterProfile.deleteMany();
-  await prisma.masterProfile.createMany({ data: masters });
-  console.log(`Seeded ${masters.length} master profiles`);
-
   // CMS blocks
   for (const block of cmsBlocks) {
     await prisma.cMSBlock.upsert({
@@ -263,9 +185,12 @@ async function main() {
   }
   console.log(`Seeded ${cmsBlocks.length} CMS blocks`);
 
-  // Default users
+  // ============================================
+  // USERS — auth identities + role-based profiles
+  // ============================================
   const passwordHash = await bcrypt.hash("admin123", 12);
 
+  // Admin
   const admin = await prisma.user.upsert({
     where: { email: "admin@geleoteka.ru" },
     update: {},
@@ -274,7 +199,8 @@ async function main() {
       phone: "+79991234567",
       name: "Администратор",
       passwordHash,
-      role: "ADMIN",
+      permissionRole: "ADMIN",
+      isCustomer: false,
     },
   });
   await prisma.loyaltyAccount.upsert({
@@ -283,6 +209,7 @@ async function main() {
     create: { userId: admin.id },
   });
 
+  // Client
   const client = await prisma.user.upsert({
     where: { email: "client@test.ru" },
     update: {},
@@ -291,7 +218,8 @@ async function main() {
       phone: "+79997654321",
       name: "Тестовый Клиент",
       passwordHash,
-      role: "CLIENT",
+      permissionRole: "CLIENT",
+      isCustomer: true,
     },
   });
   await prisma.loyaltyAccount.upsert({
@@ -299,12 +227,44 @@ async function main() {
     update: {},
     create: { userId: client.id, points: 150 },
   });
+  await prisma.customerProfile.upsert({
+    where: { userId: client.id },
+    update: {},
+    create: { userId: client.id },
+  });
 
   console.log("Seeded default users:");
   console.log("  Admin: admin@geleoteka.ru / admin123");
   console.log("  Client: client@test.ru / admin123");
 
-  // Part categories
+  // ============================================
+  // MASTERS — Users with isMaster=true + MasterProfile
+  // ============================================
+  for (const m of masters) {
+    const masterUser = await prisma.user.upsert({
+      where: { email: m.email },
+      update: { name: m.name },
+      create: {
+        email: m.email,
+        phone: m.phone,
+        name: m.name,
+        passwordHash: null,
+        permissionRole: "NONE",
+        isCustomer: false,
+        isMaster: true,
+      },
+    });
+    await prisma.masterProfile.upsert({
+      where: { userId: masterUser.id },
+      update: m.profile,
+      create: { userId: masterUser.id, ...m.profile, isActive: true },
+    });
+  }
+  console.log(`Seeded ${masters.length} master profiles`);
+
+  // ============================================
+  // PART CATEGORIES & PARTS
+  // ============================================
   const categories = [
     { name: "Масла и жидкости", slug: "oils" },
     { name: "Фильтры", slug: "filters" },
@@ -325,21 +285,19 @@ async function main() {
   }
   console.log(`Seeded ${categories.length} part categories`);
 
-  // Sample parts
   const oilsCat = await prisma.partCategory.findUnique({ where: { slug: "oils" } });
   const filtersCat = await prisma.partCategory.findUnique({ where: { slug: "filters" } });
   const brakesCat = await prisma.partCategory.findUnique({ where: { slug: "brakes" } });
 
-  // Parts photos: empty for now — admin uploads real product photos via the admin panel
   const sampleParts = [
-    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, compatibleModels: ["G-Class", "GLE", "GLS", "S-Class"], categoryId: oilsCat?.id, photos: [] as string[] },
-    { slug: "engine-oil-0w40", article: "A000989690617", name: "Масло моторное Mercedes AMG 0W-40 (5л)", price: 8900, quantity: 10, isOEM: true, compatibleModels: ["G-Class", "AMG"], categoryId: oilsCat?.id, photos: [] as string[] },
-    { slug: "oil-filter-g", article: "A2761800009", name: "Фильтр масляный M176/M177", price: 1200, quantity: 30, isOEM: true, compatibleModels: ["G-Class", "AMG", "S-Class"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W464", price: 3500, quantity: 15, isOEM: true, compatibleModels: ["G-Class"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, compatibleModels: ["G-Class"], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, compatibleModels: ["G-Class"], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W464 (MANN)", price: 1800, quantity: 20, isOEM: false, compatibleModels: ["G-Class"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, compatibleModels: ["G-Class", "GLE", "GLS", "C-Class", "E-Class", "S-Class", "AMG", "EQ"], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "GLE W166", "GLE V167", "GLS X166", "GLS X167", "S-Class W222", "S-Class W223"], categoryId: oilsCat?.id, photos: [] as string[] },
+    { slug: "engine-oil-0w40", article: "A000989690617", name: "Масло моторное Mercedes AMG 0W-40 (5л)", price: 8900, quantity: 10, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "AMG C63", "AMG E63", "AMG GT", "AMG G63", "AMG GLE 63"], categoryId: oilsCat?.id, photos: [] as string[] },
+    { slug: "oil-filter-g", article: "A2761800009", name: "Фильтр масляный M176/M177", price: 1200, quantity: 30, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "AMG G63", "AMG GLE 63", "S-Class W222", "S-Class W223"], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W464", price: 3500, quantity: 15, isOEM: true, compatibleModels: ["G-Class W464"], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464"], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464"], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W464 (MANN)", price: 1800, quantity: 20, isOEM: false, compatibleModels: ["G-Class W464"], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "GLE W166", "GLE V167", "GLS X166", "GLS X167", "C-Class W205", "C-Class W206", "E-Class W213", "E-Class W214", "S-Class W222", "S-Class W223", "AMG C63", "AMG E63", "AMG GT", "AMG G63", "AMG GLE 63", "EQ EQA", "EQ EQB", "EQ EQC", "EQ EQE", "EQ EQS"], categoryId: brakesCat?.id, photos: [] as string[] },
   ];
 
   for (const part of sampleParts) {
@@ -351,112 +309,66 @@ async function main() {
   }
   console.log(`Seeded ${sampleParts.length} sample parts`);
 
-  // Sample rental cars with full specs
-  const rentalCars = [
+  // ============================================
+  // VEHICLES — fleet (RENTAL ownership type)
+  // ============================================
+  const rentalVehicles = [
     {
       model: "G 500",
       year: 2024,
+      ownershipType: "RENTAL" as const,
       dailyRate: 35000,
-      description: "Mercedes-Benz G 500 — легенда бездорожья. 4.0-литровый битурбо V8 в сочетании с полным приводом 4MATIC обеспечивает уверенное движение по любым дорогам. Идеальный выбор для поездок за город и дальних путешествий.",
+      description: "Mercedes-Benz G 500 — легенда бездорожья. 4.0-литровый битурбо V8 в сочетании с полным приводом 4MATIC.",
       color: "Чёрный",
       mileage: 12000,
       photos: ["/images/rentals/g-black.jpg"],
       engine: "4.0 V8 Biturbo",
       horsepower: 422,
       transmission: "9G-TRONIC",
-      features: [
-        "Полный привод 4MATIC",
-        "Кожаный салон Nappa",
-        "Электрорегулировка сидений с памятью",
-        "Климат-контроль 3-зонный",
-        "Панорамная крыша",
-        "Мультимедиа MBUX",
-        "Камера 360°",
-        "Адаптивный круиз-контроль",
-      ],
+      features: ["Полный привод 4MATIC", "Кожаный салон Nappa", "Электрорегулировка сидений с памятью", "Климат-контроль 3-зонный", "Панорамная крыша", "Мультимедиа MBUX", "Камера 360°", "Адаптивный круиз-контроль"],
       seats: 5,
     },
     {
       model: "G 63 AMG",
       year: 2023,
+      ownershipType: "RENTAL" as const,
       dailyRate: 55000,
-      description: "Mercedes-AMG G 63 — ультимативная версия легенды. 585 лошадиных сил, разгон до 100 км/ч за 4.5 секунды и характерный звук AMG — эмоции в каждом повороте, без компромиссов в комфорте.",
+      description: "Mercedes-AMG G 63 — ультимативная версия легенды. 585 лошадиных сил, разгон до 100 км/ч за 4.5 секунды.",
       color: "Белый",
       mileage: 18000,
       photos: ["/images/rentals/g-white.jpg"],
       engine: "4.0 V8 Biturbo AMG",
       horsepower: 585,
       transmission: "AMG SPEEDSHIFT TCT 9G",
-      features: [
-        "AMG RIDE CONTROL",
-        "Спортивные сиденья AMG",
-        "Выхлопная система Performance",
-        "Керамические тормоза (опция)",
-        "AMG Track Pace",
-        "Burmester аудио 3D",
-        "Подогрев/вентиляция сидений",
-        "Массаж сидений",
-      ],
+      features: ["AMG RIDE CONTROL", "Спортивные сиденья AMG", "Выхлопная система Performance", "Керамические тормоза (опция)", "AMG Track Pace", "Burmester аудио 3D", "Подогрев/вентиляция сидений", "Массаж сидений"],
       seats: 5,
     },
     {
       model: "G 400d",
       year: 2024,
+      ownershipType: "RENTAL" as const,
       dailyRate: 28000,
-      description: "Mercedes-Benz G 400d — рациональный выбор для длинных маршрутов. Экономичный 3.0-литровый рядный шестицилиндровый дизель сочетает мощь с низким расходом топлива.",
+      description: "Mercedes-Benz G 400d — рациональный выбор для длинных маршрутов. Экономичный 3.0-литровый дизель.",
       color: "Серый",
       mileage: 8000,
       photos: ["/images/rentals/g-grey.jpg"],
       engine: "3.0 I6 Diesel",
       horsepower: 330,
       transmission: "9G-TRONIC",
-      features: [
-        "Полный привод 4MATIC",
-        "Экономичный дизель",
-        "Кожаный салон",
-        "Навигация с пробками",
-        "Парктроники 360°",
-        "Активный круиз-контроль",
-        "LED MULTIBEAM фары",
-        "Память настроек водителя",
-      ],
+      features: ["Полный привод 4MATIC", "Экономичный дизель", "Кожаный салон", "Навигация с пробками", "Парктроники 360°", "Активный круиз-контроль", "LED MULTIBEAM фары", "Память настроек водителя"],
       seats: 5,
     },
   ];
 
-  for (const car of rentalCars) {
-    const existing = await prisma.rentalCar.findFirst({ where: { model: car.model, year: car.year } });
+  for (const v of rentalVehicles) {
+    const existing = await prisma.vehicle.findFirst({ where: { model: v.model, year: v.year, ownershipType: "RENTAL" } });
     if (existing) {
-      // Update existing with new spec fields
-      await prisma.rentalCar.update({ where: { id: existing.id }, data: car });
+      await prisma.vehicle.update({ where: { id: existing.id }, data: v });
     } else {
-      await prisma.rentalCar.create({ data: car });
+      await prisma.vehicle.create({ data: v });
     }
   }
-  console.log(`Seeded ${rentalCars.length} rental cars`);
-
-  // ============================================
-  // FOUNDERS (4 @ 25% each)
-  // ============================================
-  const founders = [
-    { name: "Учредитель 1", sharePercent: 25, sortOrder: 1 },
-    { name: "Учредитель 2", sharePercent: 25, sortOrder: 2 },
-    { name: "Учредитель 3", sharePercent: 25, sortOrder: 3 },
-    { name: "Учредитель 4", sharePercent: 25, sortOrder: 4 },
-  ];
-
-  for (const f of founders) {
-    const existing = await prisma.founder.findFirst({ where: { name: f.name } });
-    if (existing) {
-      await prisma.founder.update({
-        where: { id: existing.id },
-        data: { sharePercent: f.sharePercent, sortOrder: f.sortOrder, isActive: true },
-      });
-    } else {
-      await prisma.founder.create({ data: { ...f, isActive: true } });
-    }
-  }
-  console.log(`Seeded ${founders.length} founders`);
+  console.log(`Seeded ${rentalVehicles.length} rental vehicles`);
 
   console.log("Seeding complete!");
 }

@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
 
   // Admin routes — require MANAGER or ADMIN role
   if (pathname.startsWith("/admin")) {
-    if (payload.role !== "MANAGER" && payload.role !== "ADMIN") {
+    if (payload.permissionRole !== "MANAGER" && payload.permissionRole !== "ADMIN") {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }

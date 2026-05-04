@@ -5,8 +5,8 @@ import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 
 export default async function RentalsPage() {
-  const cars = await db.rentalCar.findMany({
-    where: { isAvailable: true },
+  const cars = await db.vehicle.findMany({
+    where: { ownershipType: "RENTAL", isAvailable: true, isArchived: false },
     orderBy: { dailyRate: "asc" },
   });
 

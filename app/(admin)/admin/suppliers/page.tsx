@@ -8,17 +8,24 @@ import { formatPrice } from "@/lib/utils";
 
 export default async function SuppliersPage() {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
-  const suppliers = await db.supplier.findMany({
-    orderBy: [{ isActive: "desc" }, { name: "asc" }],
+  const suppliers = await db.user.findMany({
+    where: { isSupplier: true },
     include: {
-      orders: {
-        select: { totalCost: true },
-      },
+      supplierProfile: true,
+      supplierOrders: { select: { totalCost: true } },
     },
+  });
+
+  // Sort: active first, then by name
+  suppliers.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+    const ap = (a.supplierProfile as { isActive: boolean } | null)?.isActive ?? false;
+    const bp = (b.supplierProfile as { isActive: boolean } | null)?.isActive ?? false;
+    if (ap !== bp) return ap ? -1 : 1;
+    return (a.name as string).localeCompare(b.name as string);
   });
 
   return (
@@ -42,7 +49,12 @@ export default async function SuppliersPage() {
       ) : (
         <div className="space-y-3">
           {suppliers.map((s: Record<string, unknown>) => {
-            const orders = s.orders as Array<{ totalCost: number }>;
+            const profile = s.supplierProfile as {
+              isActive: boolean;
+              country: string | null;
+              contactName: string | null;
+            } | null;
+            const orders = s.supplierOrders as Array<{ totalCost: number }>;
             const totalSpent = orders.reduce((sum, o) => sum + o.totalCost, 0);
 
             return (
@@ -54,23 +66,27 @@ export default async function SuppliersPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-medium">{s.name as string}</p>
-                    {!(s.isActive as boolean) && (
+                    {!profile?.isActive && (
                       <span className="badge text-[10px] bg-[var(--background-secondary)] text-[var(--foreground-muted)]">
                         Неактивен
                       </span>
                     )}
-                    {s.country ? (
-                      <span className="text-xs text-[var(--foreground-muted)]">· {s.country as string}</span>
-                    ) : null}
+                    {profile?.country && (
+                      <span className="text-xs text-[var(--foreground-muted)]">
+                        · {profile.country}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-[var(--foreground-muted)]">
                     {orders.length} заказов
-                    {s.contactName ? ` · ${s.contactName as string}` : ""}
+                    {profile?.contactName ? ` · ${profile.contactName}` : ""}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm text-[var(--foreground-muted)]">Всего потрачено</p>
-                  <p className="font-bold text-[var(--color-accent)]">{formatPrice(totalSpent)}</p>
+                  <p className="font-bold text-[var(--color-accent)]">
+                    {formatPrice(totalSpent)}
+                  </p>
                 </div>
               </Link>
             );

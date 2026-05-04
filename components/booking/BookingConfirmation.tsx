@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useBooking } from "./BookingProvider";
-import { createAppointment } from "@/app/actions/booking";
+import { createRepairOrder } from "@/app/actions/booking";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -12,13 +12,13 @@ export function BookingConfirmation() {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
-    appointmentId?: string;
+    repairOrderId?: string;
     error?: string;
   } | null>(null);
 
   async function handleSubmit() {
     setSubmitting(true);
-    const res = await createAppointment(data);
+    const res = await createRepairOrder(data);
     setResult(res);
     setSubmitting(false);
     if (res.success) {

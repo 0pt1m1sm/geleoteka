@@ -2,116 +2,153 @@
 
 import { useState } from "react";
 import { formatPrice } from "@/lib/utils";
-import { respondToEstimateItem } from "@/app/actions/estimates";
+import { respondToJobLine } from "@/app/actions/estimates";
 
-interface EstimateItem {
-  id: string;
-  type: string;
+type JobStatus = "PROPOSED" | "APPROVED" | "DECLINED" | "DEFERRED" | "IN_PROGRESS" | "DONE";
+
+interface LaborLine {
   description: string;
-  quantity: number;
-  unitPrice: number;
-  approved: boolean | null;
+  bookHours: number;
+  rate: number;
+  total: number;
 }
 
-interface Estimate {
+interface PartLine {
+  description: string;
+  qty: number;
+  unitPrice: number;
+}
+
+interface JobLine {
+  id: string;
+  description: string;
+  status: JobStatus;
+  total: number;
+  laborLines: LaborLine[];
+  partLines: PartLine[];
+}
+
+interface RepairOrderEstimate {
   id: string;
   total: number;
-  status: string;
   carModel: string;
-  items: EstimateItem[];
+  jobs: JobLine[];
 }
 
-export function EstimateReview({ estimates }: { estimates: Estimate[] }) {
+export function EstimateReview({ repairOrders }: { repairOrders: RepairOrderEstimate[] }) {
   return (
     <div className="space-y-6">
-      {estimates.map((est) => (
-        <EstimateCard key={est.id} estimate={est} />
+      {repairOrders.map((ro) => (
+        <EstimateCard key={ro.id} repairOrder={ro} />
       ))}
     </div>
   );
 }
 
-function EstimateCard({ estimate }: { estimate: Estimate }) {
-  const [items, setItems] = useState(estimate.items);
+function EstimateCard({ repairOrder }: { repairOrder: RepairOrderEstimate }) {
+  const [jobs, setJobs] = useState(repairOrder.jobs);
 
-  const approvedTotal = items
-    .filter((item) => item.approved !== false)
-    .reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+  const approvedTotal = jobs
+    .filter((j) => j.status === "APPROVED")
+    .reduce((sum, j) => sum + j.total, 0);
 
-  async function handleResponse(itemId: string, approved: boolean) {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === itemId ? { ...item, approved } : item
-      )
+  async function handleResponse(jobId: string, decision: "APPROVED" | "DECLINED" | "DEFERRED") {
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, status: decision } : j))
     );
-    await respondToEstimateItem(itemId, approved);
+    await respondToJobLine(jobId, decision);
   }
 
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold">
-          Mercedes-Benz {estimate.carModel}
-        </h3>
+        <h3 className="font-semibold">Mercedes-Benz {repairOrder.carModel}</h3>
         <p className="text-lg font-bold text-[var(--color-accent)]">
           {formatPrice(approvedTotal)}
         </p>
       </div>
 
       <div className="space-y-3">
-        {items.map((item) => (
+        {jobs.map((job) => (
           <div
-            key={item.id}
-            className={`flex items-center justify-between gap-4 p-3 rounded-lg transition-colors ${
-              item.approved === false
+            key={job.id}
+            className={`p-3 rounded-lg transition-colors ${
+              job.status === "DECLINED"
                 ? "bg-[var(--color-error-bg)] opacity-60"
-                : item.approved === true
+                : job.status === "APPROVED"
                   ? "bg-[var(--color-success-bg)]"
-                  : "bg-[var(--background-secondary)]"
+                  : job.status === "DEFERRED"
+                    ? "bg-[var(--color-warning-bg)]"
+                    : "bg-[var(--background-secondary)]"
             }`}
           >
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] uppercase text-[var(--foreground-muted)] bg-[var(--card)] px-1.5 py-0.5 rounded">
-                  {item.type === "WORK" ? "Работа" : "Запчасть"}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{job.description}</p>
+                {job.laborLines.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {job.laborLines.map((l, i) => (
+                      <p key={i} className="text-xs text-[var(--foreground-muted)]">
+                        Работа: {l.bookHours} ч × {formatPrice(l.rate)} = {formatPrice(l.total)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {job.partLines.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {job.partLines.map((p, i) => (
+                      <p key={i} className="text-xs text-[var(--foreground-muted)]">
+                        Запчасть: {p.description} — {p.qty} × {formatPrice(p.unitPrice)} ={" "}
+                        {formatPrice(p.qty * p.unitPrice)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                <p className="text-sm font-semibold mt-2">Итого: {formatPrice(job.total)}</p>
+              </div>
+
+              {job.status === "PROPOSED" && (
+                <div className="flex flex-col gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleResponse(job.id, "APPROVED")}
+                    className="btn btn-primary text-xs py-1 px-3"
+                  >
+                    Одобрить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResponse(job.id, "DEFERRED")}
+                    className="btn btn-secondary text-xs py-1 px-3"
+                  >
+                    Отложить
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleResponse(job.id, "DECLINED")}
+                    className="text-xs text-[var(--color-error)] hover:underline"
+                  >
+                    Отклонить
+                  </button>
+                </div>
+              )}
+
+              {job.status === "APPROVED" && (
+                <span className="text-xs text-[var(--color-success)] font-medium shrink-0">
+                  Одобрено
                 </span>
-                <span className="text-sm font-medium">{item.description}</span>
-              </div>
-              <p className="text-sm text-[var(--foreground-muted)] mt-1">
-                {item.quantity} × {formatPrice(item.unitPrice)} ={" "}
-                {formatPrice(item.unitPrice * item.quantity)}
-              </p>
+              )}
+              {job.status === "DECLINED" && (
+                <span className="text-xs text-[var(--color-error)] font-medium line-through shrink-0">
+                  Отклонено
+                </span>
+              )}
+              {job.status === "DEFERRED" && (
+                <span className="text-xs text-[var(--color-warning)] font-medium shrink-0">
+                  Отложено
+                </span>
+              )}
             </div>
-
-            {item.approved === null && (
-              <div className="flex gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleResponse(item.id, true)}
-                  className="btn btn-primary text-xs py-1 px-3"
-                >
-                  Да
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleResponse(item.id, false)}
-                  className="btn btn-secondary text-xs py-1 px-3"
-                >
-                  Нет
-                </button>
-              </div>
-            )}
-
-            {item.approved === true && (
-              <span className="text-xs text-[var(--color-success)] font-medium">
-                Одобрено
-              </span>
-            )}
-            {item.approved === false && (
-              <span className="text-xs text-[var(--color-error)] font-medium line-through">
-                Отклонено
-              </span>
-            )}
           </div>
         ))}
       </div>

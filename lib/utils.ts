@@ -61,16 +61,28 @@ export function normalizePhone(phone: string): string {
   return phone;
 }
 
-/** Parse appointment status for display */
-export const APPOINTMENT_STATUS_LABELS: Record<string, string> = {
-  BOOKED: "Записан",
-  ACCEPTED: "Принят",
-  DIAGNOSIS: "Диагностика",
-  IN_REPAIR: "В ремонте",
+/** RepairOrder status labels (Russian) */
+export const REPAIR_ORDER_STATUS_LABELS: Record<string, string> = {
+  ESTIMATE: "Смета",
+  APPROVED: "Согласовано",
+  IN_PROGRESS: "В работе",
+  AWAITING_PARTS: "Ожидает запчасти",
   QC: "Контроль качества",
-  READY: "Готов",
-  COMPLETED: "Завершён",
+  READY: "Готов к выдаче",
+  INVOICED: "Выставлен счёт",
+  PAID: "Оплачено",
+  CLOSED: "Закрыт",
   CANCELLED: "Отменён",
+};
+
+/** JobLine status labels (Russian) */
+export const JOB_LINE_STATUS_LABELS: Record<string, string> = {
+  PROPOSED: "Предложено",
+  APPROVED: "Согласовано",
+  DECLINED: "Отклонено",
+  DEFERRED: "Отложено",
+  IN_PROGRESS: "В работе",
+  DONE: "Готово",
 };
 
 /** Loyalty tier configuration */

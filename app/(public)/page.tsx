@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { MODELS } from "@/lib/models-data";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
+import { YANDEX_PROFILE_URL, YANDEX_REVIEWS_IFRAME_URL } from "@/lib/yandex";
 
 const faqItems = [
   {
@@ -67,22 +67,54 @@ export default function HomePage() {
             <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto mb-4 font-light">
               Специализированный сервис Mercedes-Benz G-Class
             </p>
-            <p className="text-sm text-white/40 max-w-xl mx-auto mb-12 tracking-wide">
+            <p className="text-sm text-white/40 max-w-xl mx-auto mb-8 tracking-wide">
               Онлайн-запись · Отслеживание статуса · Личный кабинет
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/booking"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium bg-[#d4af37] text-black rounded-[var(--radius-lg)] hover:bg-[#e0c04a] transition-colors"
-              >
-                Записаться на сервис
-              </Link>
-              <Link
-                href="/services"
-                className="inline-flex items-center justify-center px-8 py-4 text-lg font-medium border border-white/30 text-white rounded-[var(--radius-lg)] hover:bg-white/10 transition-colors"
-              >
-                Наши услуги
-              </Link>
+
+            {/* Hairline divider between brand pillar and dual CTA */}
+            <div className="w-32 h-px bg-gradient-to-r from-transparent via-[#d4af37]/40 to-transparent mx-auto mb-8" />
+
+            {/* Dual-purpose split: Сервис (left) | Запчасти (right). Mobile stacks service-first. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto text-left">
+              {/* Left card — Сервис */}
+              <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-6 rounded-[var(--radius-lg)] flex flex-col">
+                <h2 className="text-xl sm:text-2xl font-bold mb-2">Сервис в Москве</h2>
+                <p className="text-sm text-white/60 mb-6 flex-1">
+                  ТО, диагностика, ремонт. Прозрачные цены, гарантия 12 месяцев.
+                </p>
+                <Link
+                  href="/booking"
+                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium bg-[#d4af37] text-black rounded-[var(--radius-lg)] hover:bg-[#e0c04a] transition-colors"
+                >
+                  Записаться на сервис
+                </Link>
+                <Link
+                  href="/services"
+                  className="text-sm text-[#d4af37] hover:text-[#e0c04a] mt-3 transition-colors"
+                >
+                  Прайс на работы →
+                </Link>
+              </div>
+
+              {/* Right card — Запчасти */}
+              <div className="bg-black/40 backdrop-blur-sm border border-white/10 p-6 rounded-[var(--radius-lg)] flex flex-col">
+                <h2 className="text-xl sm:text-2xl font-bold mb-2">Запчасти для G-Class</h2>
+                <p className="text-sm text-white/60 mb-6 flex-1">
+                  Оригинал и качественные аналоги. Подбор по вашему автомобилю.
+                </p>
+                <Link
+                  href="/parts"
+                  className="inline-flex items-center justify-center px-6 py-3 text-base font-medium bg-[#d4af37] text-black rounded-[var(--radius-lg)] hover:bg-[#e0c04a] transition-colors"
+                >
+                  В каталог запчастей
+                </Link>
+                <Link
+                  href="/parts?category=oils"
+                  className="text-sm text-[#d4af37] hover:text-[#e0c04a] mt-3 transition-colors"
+                >
+                  Масла и фильтры →
+                </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -189,36 +221,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Models */}
-      <section className="py-20 bg-[var(--card)]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-display text-3xl sm:text-4xl font-bold mb-4">
-              Популярные модели
-            </h2>
-            <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto">
-              Обслуживаем весь модельный ряд Mercedes-Benz
-            </p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
-            {MODELS.map((model) => (
-              <Link
-                key={model.slug}
-                href={`/models/${model.slug}`}
-                className="card card-hover text-center group py-4"
-              >
-                <div className="text-lg font-bold group-hover:text-[var(--color-accent)] transition-colors">
-                  {model.name}
-                </div>
-                <div className="text-[10px] text-[var(--foreground-muted)] mt-1">
-                  {model.generations}
-                </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Why Us */}
       <section className="py-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
@@ -289,51 +291,30 @@ export default function HomePage() {
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              {
-                name: "Андрей К.",
-                car: "GLE 350d",
-                text: "Отличный сервис. Сделали ТО за 2 часа, всё по регламенту. Удобно следить за статусом через личный кабинет.",
-                rating: 5,
-              },
-              {
-                name: "Мария С.",
-                car: "C 200",
-                text: "Нашли и устранили причину стука в подвеске, которую два других сервиса не смогли диагностировать. Рекомендую!",
-                rating: 5,
-              },
-              {
-                name: "Дмитрий В.",
-                car: "G 63 AMG",
-                text: "Единственное место, куда доверяю свой G-Class. Знают все нюансы AMG. Честные цены, никаких навязываний.",
-                rating: 5,
-              },
-            ].map((review, i) => (
-              <div key={i} className="card">
-                <div className="flex mb-3">
-                  {Array.from({ length: review.rating }).map((_, j) => (
-                    <svg
-                      key={j}
-                      className="w-4 h-4 text-[var(--color-gold)]"
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-sm text-[var(--foreground-muted)] mb-4">
-                  «{review.text}»
-                </p>
-                <div>
-                  <p className="font-medium text-sm">{review.name}</p>
-                  <p className="text-xs text-[var(--foreground-muted)]">
-                    {review.car}
-                  </p>
-                </div>
-              </div>
-            ))}
+          {/* Yandex Maps reviews widget. May be blocked by uBlock Origin / privacy
+              extensions; we accept the blank-iframe risk and do NOT add a JS fallback
+              because cross-origin frame-load detection is unreliable. */}
+          <div className="overflow-x-auto mx-auto max-w-full" style={{ minHeight: 800 }}>
+            <iframe
+              src={YANDEX_REVIEWS_IFRAME_URL}
+              loading="lazy"
+              frameBorder="0"
+              width="560"
+              height="800"
+              className="block mx-auto"
+              title="Отзывы клиентов на Яндекс Картах"
+            />
+          </div>
+
+          <div className="text-center mt-6">
+            <a
+              href={YANDEX_PROFILE_URL}
+              target="_blank"
+              rel="noopener"
+              className="text-[var(--color-accent)] hover:underline text-sm font-medium"
+            >
+              Все отзывы на Яндекс Картах →
+            </a>
           </div>
         </div>
       </section>

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { MODEL_GENERATIONS } from "@/lib/models-data";
 
 function slugify(text: string): string {
   return text
@@ -11,6 +12,27 @@ function slugify(text: string): string {
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
     .trim();
+}
+
+/**
+ * Validates that every entry in `compatibleModels` includes a generation.
+ * The picker on /parts hard-filters by `compatibleModels: { has: "<Model> <Gen>" }`
+ * so bare model names ("G-Class") never match. Reject them at the write boundary
+ * to prevent admins from silently breaking parts visibility.
+ */
+function validateCompatibleModels(values: string[]): string | null {
+  for (const v of values) {
+    if (!v.includes(" ")) {
+      const known = Boolean(MODEL_GENERATIONS[v]);
+      if (known) {
+        const gens = MODEL_GENERATIONS[v].slice(0, 3).map((g) => `${v} ${g}`).join(", ");
+        return `Каждая запись в "Совместимые модели" должна содержать поколение, например "${gens}". Нашли "${v}".`;
+      }
+      // Unknown bare token — reject too
+      return `Запись "${v}" в "Совместимые модели" должна быть в формате "Модель Поколение", например "G-Class W463".`;
+    }
+  }
+  return null;
 }
 
 export async function createPart(
@@ -35,6 +57,9 @@ export async function createPart(
   if (!article || !name || isNaN(price)) {
     return { error: "Артикул, название и цена обязательны" };
   }
+
+  const compatErr = validateCompatibleModels(compatibleModels);
+  if (compatErr) return { error: compatErr };
 
   const existing = await db.part.findUnique({ where: { article } });
   if (existing) {
@@ -85,6 +110,9 @@ export async function updatePart(
   if (!name || isNaN(price)) {
     return { error: "Название и цена обязательны" };
   }
+
+  const compatErr = validateCompatibleModels(compatibleModels);
+  if (compatErr) return { error: compatErr };
 
   await db.part.update({
     where: { id: partId },

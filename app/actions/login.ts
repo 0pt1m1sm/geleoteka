@@ -16,8 +16,12 @@ export async function loginAction(_prevState: { error: string | null } | null, f
 
   const user = await db.user.findUnique({ where: { email } });
 
-  if (!user) {
+  if (!user || !user.passwordHash) {
     return { error: "Неверный email или пароль" };
+  }
+
+  if (user.permissionRole === "NONE") {
+    return { error: "Учётная запись не может выполнить вход" };
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);
@@ -26,10 +30,10 @@ export async function loginAction(_prevState: { error: string | null } | null, f
     return { error: "Неверный email или пароль" };
   }
 
-  const token = createToken({ userId: user.id, role: user.role });
+  const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
 
-  if (user.role === "ADMIN" || user.role === "MANAGER") {
+  if (user.permissionRole === "ADMIN" || user.permissionRole === "MANAGER") {
     redirect("/admin");
   }
 

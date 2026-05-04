@@ -19,7 +19,7 @@ export default async function MyRentalsPage() {
 
   const bookings = await db.rentalBooking.findMany({
     where: { userId: session.id },
-    include: { car: { select: { model: true, year: true } } },
+    include: { vehicle: { select: { model: true, year: true } } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -34,12 +34,12 @@ export default async function MyRentalsPage() {
       ) : (
         <div className="space-y-4">
           {bookings.map((b: Record<string, unknown>) => {
-            const car = b.car as Record<string, unknown>;
+            const vehicle = b.vehicle as { model: string; year: number };
             return (
               <div key={b.id as string} className="card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium">Mercedes-Benz {car.model as string} ({car.year as number})</p>
+                    <p className="font-medium">Mercedes-Benz {vehicle.model} ({vehicle.year})</p>
                     <p className="text-sm text-[var(--foreground-muted)]">
                       {formatDate(b.startDate as Date)} — {formatDate(b.endDate as Date)}
                     </p>

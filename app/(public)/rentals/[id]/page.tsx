@@ -13,7 +13,9 @@ interface Props {
 
 export default async function RentalCarPage({ params }: Props) {
   const { id } = await params;
-  const car = await db.rentalCar.findUnique({ where: { id } });
+  const car = await db.vehicle.findFirst({
+    where: { id, ownershipType: "RENTAL", isArchived: false },
+  });
 
   if (!car || !(car as Record<string, unknown>).isAvailable) notFound();
 
@@ -277,7 +279,7 @@ export default async function RentalCarPage({ params }: Props) {
             <div className="mb-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold text-[var(--color-accent)]">
-                  {formatPrice(c.dailyRate as number)}
+                  {formatPrice((c.dailyRate as number) ?? 0)}
                 </span>
                 <span className="text-sm text-[var(--foreground-muted)]">/ сутки</span>
               </div>
@@ -295,7 +297,7 @@ export default async function RentalCarPage({ params }: Props) {
             {/* Booking form */}
             <RentalBookingForm
               carId={c.id as string}
-              dailyRate={c.dailyRate as number}
+              dailyRate={(c.dailyRate as number) ?? 0}
             />
 
             {/* Trust signals */}

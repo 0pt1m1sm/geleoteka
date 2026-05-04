@@ -1,18 +1,25 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 
 export default async function CustomersPage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
   const customers = await db.user.findMany({
-    where: { role: "CLIENT" },
+    where: { isCustomer: true, permissionRole: { in: ["CLIENT", "NONE"] } },
     include: {
-      cars: { select: { model: true } },
+      vehicles: {
+        where: { ownershipType: "CUSTOMER" },
+        select: { model: true },
+      },
       loyaltyAccount: { select: { points: true, tier: true } },
-      _count: { select: { appointments: true } },
+      _count: { select: { repairOrders: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -23,9 +30,9 @@ export default async function CustomersPage() {
 
       <div className="space-y-3">
         {customers.map((c: Record<string, unknown>) => {
-          const cars = c.cars as Array<{ model: string }>;
-          const loyalty = c.loyaltyAccount as Record<string, unknown> | null;
-          const count = c._count as { appointments: number };
+          const vehicles = c.vehicles as Array<{ model: string }>;
+          const loyalty = c.loyaltyAccount as { points: number; tier: string } | null;
+          const count = c._count as { repairOrders: number };
           return (
             <Link
               key={c.id as string}
@@ -37,19 +44,23 @@ export default async function CustomersPage() {
                 <p className="text-sm text-[var(--foreground-muted)]">
                   {c.phone as string} · {c.email as string}
                 </p>
-                {cars.length > 0 && (
+                {vehicles.length > 0 && (
                   <p className="text-xs text-[var(--foreground-muted)] mt-1">
-                    {cars.map((car) => car.model).join(", ")}
+                    {vehicles.map((v) => v.model).join(", ")}
                   </p>
                 )}
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-medium">{count.appointments} визитов</p>
+                <p className="text-sm font-medium">{count.repairOrders} визитов</p>
                 {loyalty && (
                   <span
-                    className={`badge text-[10px] badge-${(loyalty.tier as string) === "AMG_CLUB" ? "amg" : (loyalty.tier as string).toLowerCase()}`}
+                    className={`badge text-[10px] badge-${
+                      loyalty.tier === "AMG_CLUB"
+                        ? "amg"
+                        : loyalty.tier.toLowerCase()
+                    }`}
                   >
-                    {loyalty.points as number} б.
+                    {loyalty.points} б.
                   </span>
                 )}
               </div>

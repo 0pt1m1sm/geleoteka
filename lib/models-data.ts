@@ -134,3 +134,16 @@ export const MODELS: ModelInfo[] = [
 export function getModelBySlug(slug: string): ModelInfo | undefined {
   return MODELS.find((m) => m.slug === slug);
 }
+
+/**
+ * Map of model name to its list of generations (chassis codes for sedans/SUVs,
+ * sub-models for AMG/EQ). Derived from `MODELS[].generations` (comma-separated string).
+ *
+ * Used by MyCarPicker, the compatibility normalization script, and admin write-path
+ * validation in `app/actions/parts.ts` to enforce the "<Model> <Generation>" format
+ * in `Part.compatibleModels` (e.g. "G-Class W463").
+ */
+export const MODEL_GENERATIONS: Record<string, string[]> = Object.fromEntries(
+  MODELS.map((m) => [m.name, m.generations.split(",").map((g) => g.trim())])
+);
+

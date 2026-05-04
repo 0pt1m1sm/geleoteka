@@ -3,134 +3,194 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 
-export async function updateAppointmentStatus(
-  appointmentId: string,
+export async function updateRepairOrderStatus(
+  repairOrderId: string,
   newStatus: string
 ): Promise<void> {
   await requireRole(["ADMIN", "MANAGER"]);
 
   const updateData: Record<string, unknown> = { status: newStatus };
-  if (newStatus === "COMPLETED") {
+  if (newStatus === "PAID" || newStatus === "CLOSED") {
     updateData.completedAt = new Date();
   }
 
-  await db.appointment.update({
-    where: { id: appointmentId },
+  await db.repairOrder.update({
+    where: { id: repairOrderId },
     data: updateData,
   });
 
-  // Create status change notification + SMS
-  const appointment = await db.appointment.findUnique({
-    where: { id: appointmentId },
+  // Cancelled ROs release their slot so the time becomes bookable again.
+  // Hard-delete keeps the slot row consistent with there being no active RO.
+  if (newStatus === "CANCELLED") {
+    await db.slot.deleteMany({ where: { repairOrderId } });
+  }
+
+  const repairOrder = await db.repairOrder.findUnique({
+    where: { id: repairOrderId },
     include: { user: { select: { id: true, phone: true } } },
   });
 
-  if (appointment) {
-    const statusLabels: Record<string, string> = {
-      BOOKED: "Записан",
-      ACCEPTED: "Принят",
-      DIAGNOSIS: "Диагностика",
-      IN_REPAIR: "В ремонте",
-      QC: "Контроль качества",
-      READY: "Готов",
-      COMPLETED: "Завершён",
-      CANCELLED: "Отменён",
-    };
-
-    const user = (appointment as Record<string, unknown>).user as { id: string; phone: string };
+  if (repairOrder) {
+    const user = (repairOrder as Record<string, unknown>).user as { id: string; phone: string };
+    const label = REPAIR_ORDER_STATUS_LABELS[newStatus] ?? newStatus;
 
     await db.notification.create({
       data: {
         userId: user.id,
         type: "STATUS_CHANGE",
-        message: `Статус вашего заказа изменён: ${statusLabels[newStatus] ?? newStatus}`,
-        metadata: { appointmentId },
+        message: `Статус вашего заказ-наряда изменён: ${label}`,
+        metadata: { repairOrderId },
       },
     });
 
-    // Send SMS
     const { sendStatusChange } = await import("@/lib/sms");
-    await sendStatusChange(user.phone, statusLabels[newStatus] ?? newStatus);
+    await sendStatusChange(user.phone, label);
   }
 }
 
 export async function assignMaster(
-  appointmentId: string,
-  masterId: string
+  repairOrderId: string,
+  masterUserId: string
 ): Promise<void> {
   await requireRole(["ADMIN", "MANAGER"]);
 
-  await db.appointment.update({
-    where: { id: appointmentId },
-    data: { masterId },
+  await db.repairOrder.update({
+    where: { id: repairOrderId },
+    data: { masterUserId },
   });
 }
 
-export async function deleteAppointment(appointmentId: string): Promise<void> {
+export async function deleteRepairOrder(repairOrderId: string): Promise<void> {
   await requireRole(["ADMIN"]);
 
-  await db.appointment.delete({
-    where: { id: appointmentId },
+  await db.repairOrder.delete({
+    where: { id: repairOrderId },
   });
 }
 
-export async function createEstimate(
+interface JobLineInput {
+  description: string;
+  laborHours: number;
+  laborRate: number;
+  partDescription?: string;
+  partQty?: number;
+  partUnitCost?: number;
+  partUnitPrice?: number;
+}
+
+export async function addJobLines(
   _prevState: { error: string | null; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error: string | null; success?: boolean }> {
   await requireRole(["ADMIN", "MANAGER"]);
 
-  const appointmentId = formData.get("appointmentId") as string;
-  if (!appointmentId) return { error: "Выберите запись" };
+  const repairOrderId = formData.get("repairOrderId") as string;
+  if (!repairOrderId) return { error: "Выберите заказ-наряд" };
 
   const descriptions = formData.getAll("description") as string[];
-  const types = formData.getAll("type") as string[];
-  const prices = formData.getAll("price") as string[];
-  const quantities = formData.getAll("quantity") as string[];
+  const laborHoursList = formData.getAll("laborHours") as string[];
+  const laborRates = formData.getAll("laborRate") as string[];
+  const partDescriptions = formData.getAll("partDescription") as string[];
+  const partQtys = formData.getAll("partQty") as string[];
+  const partUnitCosts = formData.getAll("partUnitCost") as string[];
+  const partUnitPrices = formData.getAll("partUnitPrice") as string[];
 
   if (descriptions.length === 0 || descriptions.every((d) => !d.trim())) {
-    return { error: "Добавьте хотя бы одну позицию" };
+    return { error: "Добавьте хотя бы одну работу" };
   }
 
-  const items = descriptions
+  const jobs: JobLineInput[] = descriptions
     .map((desc, i) => ({
-      type: (types[i] as "WORK" | "PART") || "WORK",
       description: desc.trim(),
-      unitPrice: parseInt(prices[i]) || 0,
-      quantity: parseInt(quantities[i]) || 1,
+      laborHours: parseFloat(laborHoursList[i]) || 0,
+      laborRate: parseInt(laborRates[i]) || 0,
+      partDescription: partDescriptions[i]?.trim() || undefined,
+      partQty: parseInt(partQtys[i]) || undefined,
+      partUnitCost: parseInt(partUnitCosts[i]) || undefined,
+      partUnitPrice: parseInt(partUnitPrices[i]) || undefined,
     }))
-    .filter((item) => item.description && item.unitPrice > 0);
+    .filter((j) => j.description);
 
-  if (items.length === 0) return { error: "Нет валидных позиций" };
+  if (jobs.length === 0) return { error: "Нет валидных работ" };
 
-  const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-
-  await db.estimate.create({
-    data: {
-      appointmentId,
-      total,
-      sentAt: new Date(),
-      items: { create: items },
-    },
+  // Find current max sortOrder so new jobs append
+  const existing = await db.jobLine.findMany({
+    where: { repairOrderId },
+    orderBy: { sortOrder: "desc" },
+    take: 1,
+    select: { sortOrder: true },
   });
+  const startSort = existing.length > 0 ? (existing[0] as { sortOrder: number }).sortOrder + 1 : 0;
 
-  // Notify client
-  const appointment = await db.appointment.findUnique({
-    where: { id: appointmentId },
-    select: { userId: true },
-  });
+  for (const [idx, job] of jobs.entries()) {
+    const laborTotal = Math.round(job.laborHours * job.laborRate);
+    const partTotal = job.partDescription && job.partUnitPrice && job.partQty
+      ? job.partUnitPrice * job.partQty
+      : 0;
+    const jobTotal = laborTotal + partTotal;
 
-  if (appointment) {
-    await db.notification.create({
+    await db.jobLine.create({
       data: {
-        userId: appointment.userId,
-        type: "ESTIMATE_READY",
-        message: "Смета готова к согласованию. Откройте личный кабинет для просмотра.",
-        metadata: { appointmentId },
+        repairOrderId,
+        sortOrder: startSort + idx,
+        description: job.description,
+        status: "PROPOSED",
+        laborTotal,
+        partsTotal: partTotal,
+        total: jobTotal,
+        laborLines: job.laborRate > 0 || job.laborHours > 0 ? {
+          create: [{
+            description: job.description,
+            bookHours: job.laborHours,
+            rate: job.laborRate,
+            total: laborTotal,
+          }],
+        } : undefined,
+        partLines: job.partDescription ? {
+          create: [{
+            description: job.partDescription,
+            qty: job.partQty || 1,
+            unitCost: job.partUnitCost || 0,
+            unitPrice: job.partUnitPrice || 0,
+          }],
+        } : undefined,
       },
     });
   }
 
-  redirect("/admin/estimates");
+  // Recompute RO totals from all job lines
+  const allJobs = await db.jobLine.findMany({
+    where: { repairOrderId },
+    select: { laborTotal: true, partsTotal: true, total: true },
+  });
+  const subtotalLabor = allJobs.reduce((s: number, j: { laborTotal: number }) => s + j.laborTotal, 0);
+  const subtotalParts = allJobs.reduce((s: number, j: { partsTotal: number }) => s + j.partsTotal, 0);
+  const total = allJobs.reduce((s: number, j: { total: number }) => s + j.total, 0);
+
+  await db.repairOrder.update({
+    where: { id: repairOrderId },
+    data: { subtotalLabor, subtotalParts, total },
+  });
+
+  // Notify client
+  const repairOrder = await db.repairOrder.findUnique({
+    where: { id: repairOrderId },
+    select: { userId: true },
+  });
+
+  if (repairOrder) {
+    const ro = repairOrder as { userId: string };
+    await db.notification.create({
+      data: {
+        userId: ro.userId,
+        type: "ESTIMATE_READY",
+        message: "Смета готова к согласованию. Откройте личный кабинет для просмотра.",
+        metadata: { repairOrderId },
+      },
+    });
+  }
+
+  redirect("/admin/repair-orders");
 }

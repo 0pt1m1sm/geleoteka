@@ -5,7 +5,23 @@ import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/utils";
 
-function parseCarFormData(formData: FormData) {
+interface VehicleFormData {
+  model: string;
+  year: number;
+  dailyRate: number;
+  description: string | null;
+  color: string | null;
+  plate: string | null;
+  mileage: number;
+  engine: string | null;
+  horsepower: number | null;
+  transmission: string | null;
+  seats: number;
+  isAvailable: boolean;
+  features: string[];
+}
+
+function parseCarFormData(formData: FormData): VehicleFormData {
   const model = (formData.get("model") as string)?.trim();
   const year = parseInt(formData.get("year") as string);
   const dailyRate = parseInt(formData.get("dailyRate") as string);
@@ -19,10 +35,7 @@ function parseCarFormData(formData: FormData) {
   const seats = parseInt(formData.get("seats") as string) || 5;
   const isAvailable = formData.get("isAvailable") !== "off";
   const featuresRaw = (formData.get("features") as string) || "";
-  const features = featuresRaw
-    .split("\n")
-    .map((f) => f.trim())
-    .filter(Boolean);
+  const features = featuresRaw.split("\n").map((f) => f.trim()).filter(Boolean);
 
   return { model, year, dailyRate, description, color, plate, mileage, engine, horsepower, transmission, seats, isAvailable, features };
 }
@@ -39,15 +52,15 @@ export async function createRentalCar(
     return { error: "Модель, год и стоимость обязательны" };
   }
 
-  await db.rentalCar.create({
-    data: { ...data, photos: [] },
+  await db.vehicle.create({
+    data: { ...data, ownershipType: "RENTAL", photos: [] },
   });
 
   redirect("/admin/rentals");
 }
 
 export async function updateRentalCar(
-  carId: string,
+  carId: string, // Vehicle.id
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
@@ -59,7 +72,7 @@ export async function updateRentalCar(
     return { error: "Модель, год и стоимость обязательны" };
   }
 
-  await db.rentalCar.update({
+  await db.vehicle.update({
     where: { id: carId },
     data,
   });
@@ -69,7 +82,11 @@ export async function updateRentalCar(
 
 export async function deleteRentalCar(carId: string): Promise<void> {
   await requireRole(["ADMIN", "MANAGER"]);
-  await db.rentalCar.delete({ where: { id: carId } });
+  // Soft-delete: hard-delete cascades to RentalBooking + RepairOrder, wiping history.
+  await db.vehicle.update({
+    where: { id: carId },
+    data: { isArchived: true, isAvailable: false },
+  });
 }
 
 export async function updateRentalBookingStatus(
@@ -84,7 +101,7 @@ export async function updateRentalBookingStatus(
 }
 
 interface RentalBookingInput {
-  carId: string;
+  carId: string; // Vehicle.id
   startDate: string;
   endDate: string;
   contactName: string;
@@ -122,20 +139,19 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
   }
 
   try {
-    const car: { dailyRate: number } | null = await db.rentalCar.findUnique({
+    const vehicle = await db.vehicle.findUnique({
       where: { id: carId },
-      select: { dailyRate: true },
+      select: { dailyRate: true, ownershipType: true },
     });
-    if (!car) return { success: false, error: "Автомобиль не найден" };
+    if (!vehicle || vehicle.ownershipType !== "RENTAL" || !vehicle.dailyRate) {
+      return { success: false, error: "Автомобиль не найден" };
+    }
 
-    // Check availability — no overlapping bookings
     const overlap = await db.rentalBooking.findFirst({
       where: {
-        carId,
+        vehicleId: carId,
         status: { notIn: ["CANCELLED", "RETURNED"] },
-        OR: [
-          { startDate: { lte: end }, endDate: { gte: start } },
-        ],
+        OR: [{ startDate: { lte: end }, endDate: { gte: start } }],
       },
     });
 
@@ -144,13 +160,13 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
     }
 
     const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const totalCost = days * car.dailyRate;
+    const totalCost = days * vehicle.dailyRate;
 
     const session = await getSession();
 
     const booking = await db.rentalBooking.create({
       data: {
-        carId,
+        vehicleId: carId,
         userId: session?.id ?? null,
         startDate: start,
         endDate: end,
@@ -162,7 +178,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
       },
     });
 
-    return { success: true, bookingId: (booking as Record<string, unknown>).id as string };
+    return { success: true, bookingId: booking.id };
   } catch (err) {
     console.error("Rental booking error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };

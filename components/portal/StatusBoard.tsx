@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { APPOINTMENT_STATUS_LABELS, formatDateTime } from "@/lib/utils";
+import { REPAIR_ORDER_STATUS_LABELS, formatDateTime } from "@/lib/utils";
 
 interface Appointment {
   id: string;
@@ -12,16 +12,16 @@ interface Appointment {
 }
 
 const STATUS_ORDER = [
-  "BOOKED",
-  "ACCEPTED",
-  "DIAGNOSIS",
-  "IN_REPAIR",
+  "ESTIMATE",
+  "APPROVED",
+  "IN_PROGRESS",
+  "AWAITING_PARTS",
   "QC",
   "READY",
 ];
 
 async function fetchStatus(id: string): Promise<{ status: string }> {
-  const res = await fetch(`/api/appointments/${id}/status`);
+  const res = await fetch(`/api/repair-orders/${id}/status`);
   if (!res.ok) throw new Error("Failed to fetch");
   return res.json();
 }
@@ -81,7 +81,7 @@ function AppointmentTracker({ appointment }: { appointment: Appointment }) {
         <span
           className={`badge text-xs shrink-0 status-${currentStatus.toLowerCase()}`}
         >
-          {APPOINTMENT_STATUS_LABELS[currentStatus] ?? currentStatus}
+          {REPAIR_ORDER_STATUS_LABELS[currentStatus] ?? currentStatus}
         </span>
       </div>
       <StatusTimeline current={currentStatus} />

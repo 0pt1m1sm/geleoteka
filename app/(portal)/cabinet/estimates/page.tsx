@@ -9,37 +9,59 @@ export default async function EstimatesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const estimates = await db.estimate.findMany({
+  const repairOrders = await db.repairOrder.findMany({
     where: {
-      appointment: { userId: session.id },
-      status: "PENDING",
+      userId: session.id,
+      status: "ESTIMATE",
     },
     include: {
-      items: true,
-      appointment: {
+      vehicle: { select: { model: true } },
+      jobLines: {
+        orderBy: { sortOrder: "asc" },
         include: {
-          car: { select: { model: true } },
-          services: { include: { service: { select: { name: true } } } },
+          laborLines: { select: { description: true, bookHours: true, rate: true, total: true } },
+          partLines: { select: { description: true, qty: true, unitPrice: true } },
         },
       },
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const serialized = estimates.map((e: Record<string, unknown>) => ({
-    id: e.id as string,
-    total: e.total as number,
-    status: e.status as string,
-    carModel: ((e.appointment as Record<string, unknown>).car as Record<string, string>).model,
-    items: (e.items as Array<Record<string, unknown>>).map((item) => ({
-      id: item.id as string,
-      type: item.type as string,
-      description: item.description as string,
-      quantity: item.quantity as number,
-      unitPrice: item.unitPrice as number,
-      approved: item.approved as boolean | null,
-    })),
-  }));
+  const serialized = repairOrders.map((ro: Record<string, unknown>) => {
+    const vehicle = ro.vehicle as { model: string };
+    const jobs = ro.jobLines as Array<Record<string, unknown>>;
+    return {
+      id: ro.id as string,
+      total: ro.total as number,
+      carModel: vehicle.model,
+      jobs: jobs.map((j) => ({
+        id: j.id as string,
+        description: j.description as string,
+        status: j.status as "PROPOSED" | "APPROVED" | "DECLINED" | "DEFERRED" | "IN_PROGRESS" | "DONE",
+        total: j.total as number,
+        laborLines: (j.laborLines as Array<{
+          description: string;
+          bookHours: number;
+          rate: number;
+          total: number;
+        }>).map((l) => ({
+          description: l.description,
+          bookHours: l.bookHours,
+          rate: l.rate,
+          total: l.total,
+        })),
+        partLines: (j.partLines as Array<{
+          description: string;
+          qty: number;
+          unitPrice: number;
+        }>).map((p) => ({
+          description: p.description,
+          qty: p.qty,
+          unitPrice: p.unitPrice,
+        })),
+      })),
+    };
+  });
 
   return (
     <div>
@@ -51,7 +73,7 @@ export default async function EstimatesPage() {
           </p>
         </div>
       ) : (
-        <EstimateReview estimates={serialized} />
+        <EstimateReview repairOrders={serialized} />
       )}
     </div>
   );

@@ -1,9 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierEditForm } from "@/components/admin/SupplierEditForm";
@@ -24,15 +23,16 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default async function SupplierDetailPage({ params }: Props) {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
   const { id } = await params;
-  const supplier = await db.supplier.findUnique({
-    where: { id },
+  const supplier = await db.user.findFirst({
+    where: { id, isSupplier: true },
     include: {
-      orders: {
+      supplierProfile: true,
+      supplierOrders: {
         orderBy: { orderDate: "desc" },
         take: 20,
       },
@@ -42,17 +42,23 @@ export default async function SupplierDetailPage({ params }: Props) {
   if (!supplier) notFound();
 
   const s = supplier as Record<string, unknown>;
-  const orders = s.orders as Array<Record<string, unknown>>;
+  const profile = s.supplierProfile as {
+    contactName: string | null;
+    country: string | null;
+    notes: string | null;
+    isActive: boolean;
+  } | null;
+  const orders = s.supplierOrders as Array<Record<string, unknown>>;
 
   const serialized = {
     id: s.id as string,
     name: s.name as string,
-    contactName: (s.contactName as string) ?? "",
+    contactName: profile?.contactName ?? "",
     email: (s.email as string) ?? "",
     phone: (s.phone as string) ?? "",
-    country: (s.country as string) ?? "",
-    notes: (s.notes as string) ?? "",
-    isActive: s.isActive as boolean,
+    country: profile?.country ?? "",
+    notes: profile?.notes ?? "",
+    isActive: profile?.isActive ?? true,
   };
 
   return (
@@ -68,7 +74,10 @@ export default async function SupplierDetailPage({ params }: Props) {
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-semibold">История заказов</h2>
-            <Link href={`/admin/suppliers/orders/new?supplierId=${s.id as string}`} className="btn btn-primary text-xs">
+            <Link
+              href={`/admin/suppliers/orders/new?supplierId=${s.id as string}`}
+              className="btn btn-primary text-xs"
+            >
               + Новый заказ
             </Link>
           </div>
@@ -87,10 +96,13 @@ export default async function SupplierDetailPage({ params }: Props) {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm">
-                      {o.orderNumber ? `#${o.orderNumber as string}` : `Заказ от ${formatDate(o.orderDate as Date)}`}
+                      {o.orderNumber
+                        ? `#${o.orderNumber as string}`
+                        : `Заказ от ${formatDate(o.orderDate as Date)}`}
                     </p>
                     <p className="text-xs text-[var(--foreground-muted)]">
-                      {formatDate(o.orderDate as Date)} · {STATUS_LABELS[o.status as string] ?? (o.status as string)}
+                      {formatDate(o.orderDate as Date)} ·{" "}
+                      {STATUS_LABELS[o.status as string] ?? (o.status as string)}
                     </p>
                   </div>
                   <p className="font-bold text-[var(--color-accent)] text-sm shrink-0">

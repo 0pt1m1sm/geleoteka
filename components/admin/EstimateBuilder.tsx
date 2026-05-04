@@ -2,46 +2,56 @@
 
 import { useState, useActionState } from "react";
 import Link from "next/link";
-import { createEstimate } from "@/app/actions/admin";
+import { addJobLines } from "@/app/actions/admin";
 import { formatPrice } from "@/lib/utils";
 
-interface LineItem {
-  type: "WORK" | "PART";
+interface JobRow {
   description: string;
-  price: string;
-  quantity: string;
+  laborHours: string;
+  laborRate: string;
+  partDescription: string;
+  partQty: string;
+  partUnitCost: string;
+  partUnitPrice: string;
 }
 
+const EMPTY_JOB: JobRow = {
+  description: "",
+  laborHours: "",
+  laborRate: "",
+  partDescription: "",
+  partQty: "1",
+  partUnitCost: "",
+  partUnitPrice: "",
+};
+
 export function EstimateBuilder({
-  appointments,
+  repairOrders,
 }: {
-  appointments: { id: string; label: string }[];
+  repairOrders: { id: string; label: string }[];
 }) {
-  const [state, formAction, isPending] = useActionState(createEstimate, null);
-  const [items, setItems] = useState<LineItem[]>([
-    { type: "WORK", description: "", price: "", quantity: "1" },
-  ]);
+  const [state, formAction, isPending] = useActionState(addJobLines, null);
+  const [jobs, setJobs] = useState<JobRow[]>([{ ...EMPTY_JOB }]);
 
-  function addItem() {
-    setItems([...items, { type: "WORK", description: "", price: "", quantity: "1" }]);
+  function addJob() {
+    setJobs([...jobs, { ...EMPTY_JOB }]);
   }
 
-  function removeItem(index: number) {
-    setItems(items.filter((_, i) => i !== index));
+  function removeJob(index: number) {
+    setJobs(jobs.filter((_, i) => i !== index));
   }
 
-  function updateItem(index: number, field: keyof LineItem, value: string) {
-    setItems(
-      items.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
+  function updateJob(index: number, field: keyof JobRow, value: string) {
+    setJobs(
+      jobs.map((j, i) => (i === index ? { ...j, [field]: value } : j))
     );
   }
 
-  const total = items.reduce(
-    (sum, item) => sum + (parseInt(item.price) || 0) * (parseInt(item.quantity) || 1),
-    0
-  );
+  const total = jobs.reduce((sum, j) => {
+    const labor = (parseFloat(j.laborHours) || 0) * (parseInt(j.laborRate) || 0);
+    const parts = (parseInt(j.partUnitPrice) || 0) * (parseInt(j.partQty) || 0);
+    return sum + labor + parts;
+  }, 0);
 
   return (
     <form action={formAction}>
@@ -53,14 +63,14 @@ export function EstimateBuilder({
         )}
 
         <div>
-          <label htmlFor="appointmentId" className="block text-sm font-medium mb-2">
-            Запись *
+          <label htmlFor="repairOrderId" className="block text-sm font-medium mb-2">
+            Заказ-наряд *
           </label>
-          <select id="appointmentId" name="appointmentId" required className="input">
-            <option value="">Выберите запись</option>
-            {appointments.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
+          <select id="repairOrderId" name="repairOrderId" required className="input">
+            <option value="">Выберите заказ-наряд</option>
+            {repairOrders.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
               </option>
             ))}
           </select>
@@ -68,57 +78,87 @@ export function EstimateBuilder({
 
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-medium">Позиции</h3>
-            <button type="button" onClick={addItem} className="btn btn-secondary text-xs py-1 px-3">
-              + Добавить
+            <h3 className="font-medium">Работы</h3>
+            <button type="button" onClick={addJob} className="btn btn-secondary text-xs py-1 px-3">
+              + Добавить работу
             </button>
           </div>
 
           <div className="space-y-3">
-            {items.map((item, i) => (
-              <div key={i} className="flex gap-2 items-start p-3 rounded-lg bg-[var(--background-secondary)]">
-                <select
-                  name="type"
-                  value={item.type}
-                  onChange={(e) => updateItem(i, "type", e.target.value)}
-                  className="input w-28 shrink-0 text-xs"
-                >
-                  <option value="WORK">Работа</option>
-                  <option value="PART">Запчасть</option>
-                </select>
-                <input
-                  name="description"
-                  value={item.description}
-                  onChange={(e) => updateItem(i, "description", e.target.value)}
-                  className="input flex-1 text-sm"
-                  placeholder="Описание"
-                />
-                <input
-                  name="quantity"
-                  type="number"
-                  value={item.quantity}
-                  onChange={(e) => updateItem(i, "quantity", e.target.value)}
-                  className="input w-16 shrink-0 text-sm"
-                  placeholder="Кол"
-                  min="1"
-                />
-                <input
-                  name="price"
-                  type="number"
-                  value={item.price}
-                  onChange={(e) => updateItem(i, "price", e.target.value)}
-                  className="input w-28 shrink-0 text-sm"
-                  placeholder="Цена ₽"
-                />
-                {items.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeItem(i)}
-                    className="text-[var(--color-error)] text-xs mt-2 shrink-0"
-                  >
-                    ×
-                  </button>
-                )}
+            {jobs.map((job, i) => (
+              <div
+                key={i}
+                className="space-y-2 p-3 rounded-lg bg-[var(--background-secondary)]"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <input
+                    name="description"
+                    value={job.description}
+                    onChange={(e) => updateJob(i, "description", e.target.value)}
+                    className="input flex-1 text-sm"
+                    placeholder="Описание работы (например, замена колодок)"
+                  />
+                  {jobs.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeJob(i)}
+                      className="text-[var(--color-error)] text-xs mt-2"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <input
+                    name="laborHours"
+                    type="number"
+                    step="0.25"
+                    value={job.laborHours}
+                    onChange={(e) => updateJob(i, "laborHours", e.target.value)}
+                    className="input text-sm"
+                    placeholder="Часы"
+                  />
+                  <input
+                    name="laborRate"
+                    type="number"
+                    value={job.laborRate}
+                    onChange={(e) => updateJob(i, "laborRate", e.target.value)}
+                    className="input text-sm"
+                    placeholder="Ставка ₽/ч"
+                  />
+                  <input
+                    name="partDescription"
+                    value={job.partDescription}
+                    onChange={(e) => updateJob(i, "partDescription", e.target.value)}
+                    className="input text-sm col-span-2"
+                    placeholder="Запчасть (опционально)"
+                  />
+                  <input
+                    name="partQty"
+                    type="number"
+                    value={job.partQty}
+                    onChange={(e) => updateJob(i, "partQty", e.target.value)}
+                    className="input text-sm"
+                    placeholder="Кол-во"
+                  />
+                  <input
+                    name="partUnitCost"
+                    type="number"
+                    value={job.partUnitCost}
+                    onChange={(e) => updateJob(i, "partUnitCost", e.target.value)}
+                    className="input text-sm"
+                    placeholder="Себестоимость ₽"
+                  />
+                  <input
+                    name="partUnitPrice"
+                    type="number"
+                    value={job.partUnitPrice}
+                    onChange={(e) => updateJob(i, "partUnitPrice", e.target.value)}
+                    className="input text-sm col-span-2"
+                    placeholder="Цена для клиента ₽"
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -137,7 +177,7 @@ export function EstimateBuilder({
           Отмена
         </Link>
         <button type="submit" disabled={isPending} className="btn btn-primary">
-          {isPending ? "Создание..." : "Создать и отправить клиенту"}
+          {isPending ? "Сохранение..." : "Добавить и отправить клиенту"}
         </button>
       </div>
     </form>

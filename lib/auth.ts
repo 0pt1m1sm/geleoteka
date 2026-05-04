@@ -8,7 +8,7 @@ const JWT_EXPIRES_IN: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN || 
 
 export interface JWTPayload {
   userId: string;
-  role: string;
+  permissionRole: string;
 }
 
 export interface SessionUser {
@@ -16,7 +16,7 @@ export interface SessionUser {
   email: string;
   phone: string;
   name: string;
-  role: string;
+  permissionRole: string;
 }
 
 /** Create a JWT token for a user */
@@ -63,10 +63,21 @@ export async function getSession(): Promise<SessionUser | null> {
 
   const user = await db.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, email: true, phone: true, name: true, role: true },
+    select: { id: true, email: true, phone: true, name: true, permissionRole: true, passwordHash: true },
   });
 
-  return user;
+  if (!user) return null;
+  // NONE permission role = entity exists in DB but cannot log in (e.g. suppliers).
+  // If a NONE token somehow exists, reject it.
+  if (user.permissionRole === "NONE") return null;
+
+  return {
+    id: user.id,
+    email: user.email,
+    phone: user.phone,
+    name: user.name,
+    permissionRole: user.permissionRole,
+  };
 }
 
 /** Require authentication — redirects to /login if not authenticated */
@@ -84,7 +95,7 @@ export async function requireRole(roles: string[]): Promise<SessionUser> {
   if (!session) {
     redirect("/login");
   }
-  if (!roles.includes(session.role)) {
+  if (!roles.includes(session.permissionRole)) {
     redirect("/");
   }
   return session;

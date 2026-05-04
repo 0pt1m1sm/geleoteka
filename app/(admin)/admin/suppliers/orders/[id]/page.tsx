@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierOrderStatusChanger } from "@/components/admin/SupplierOrderStatusChanger";
-import { ContributionPaidToggle } from "@/components/admin/ContributionPaidToggle";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -21,7 +20,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default async function SupplierOrderDetailPage({ params }: Props) {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
@@ -31,19 +30,10 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
     include: {
       supplier: true,
       items: true,
-      contributions: {
-        include: { founder: { select: { name: true } } },
-        orderBy: { createdAt: "asc" },
-      },
     },
   });
 
   if (!order) notFound();
-
-  const totalContributions = order.contributions.reduce((sum, c) => sum + c.amount, 0);
-  const totalPaid = order.contributions
-    .filter((c) => c.isPaid)
-    .reduce((sum, c) => sum + c.amount, 0);
 
   return (
     <div>
@@ -68,9 +58,8 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 cols — items + financials */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="max-w-3xl">
+        <div className="space-y-6">
           {/* Items */}
           <div>
             <h2 className="text-lg font-semibold mb-3">Позиции ({order.items.length})</h2>
@@ -170,47 +159,6 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
           )}
         </div>
 
-        {/* Right — founder contributions */}
-        <div>
-          <h2 className="text-lg font-semibold mb-3">Вклады учредителей</h2>
-          <div className="card space-y-3">
-            {order.contributions.length === 0 ? (
-              <p className="text-sm text-[var(--foreground-muted)]">Нет активных учредителей</p>
-            ) : (
-              order.contributions.map((c) => (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between gap-2 pb-3 border-b border-[var(--border)] last:border-0 last:pb-0"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{c.founder.name}</p>
-                    <p className="text-xs text-[var(--foreground-muted)]">
-                      {c.sharePercent}% · {formatPrice(c.amount)}
-                    </p>
-                  </div>
-                  <ContributionPaidToggle contributionId={c.id} isPaid={c.isPaid} />
-                </div>
-              ))
-            )}
-
-            <div className="pt-3 border-t border-[var(--border)] space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-[var(--foreground-muted)]">Всего</span>
-                <span className="font-medium">{formatPrice(totalContributions)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--foreground-muted)]">Внесено</span>
-                <span className="text-[var(--color-success)] font-medium">{formatPrice(totalPaid)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[var(--foreground-muted)]">Осталось</span>
-                <span className="text-[var(--color-warning)] font-medium">
-                  {formatPrice(totalContributions - totalPaid)}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

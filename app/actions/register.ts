@@ -40,7 +40,7 @@ export async function registerAction(_prevState: { error: string | null } | null
     data: { userId: user.id },
   });
 
-  const token = createToken({ userId: user.id, role: user.role });
+  const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
 
   redirect("/cabinet");

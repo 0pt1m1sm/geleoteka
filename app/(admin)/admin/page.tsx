@@ -4,12 +4,12 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formatPrice, formatDate, APPOINTMENT_STATUS_LABELS } from "@/lib/utils";
+import { formatPrice, formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 
 export default async function AdminDashboard() {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
@@ -19,38 +19,38 @@ export default async function AdminDashboard() {
   const weekEnd = endOfDay(addDays(today, 7));
 
   const [todayCount, activeCount, completedToday, upcoming] = await Promise.all([
-    db.appointment.count({
+    db.repairOrder.count({
       where: { dateTime: { gte: dayStart, lte: dayEnd } },
     }),
-    db.appointment.count({
-      where: { status: { in: ["ACCEPTED", "DIAGNOSIS", "IN_REPAIR", "QC"] } },
+    db.repairOrder.count({
+      where: { status: { in: ["APPROVED", "IN_PROGRESS", "AWAITING_PARTS", "QC"] } },
     }),
-    db.appointment.findMany({
+    db.repairOrder.findMany({
       where: {
-        status: "COMPLETED",
+        status: { in: ["PAID", "CLOSED"] },
         completedAt: { gte: dayStart, lte: dayEnd },
       },
-      include: { estimate: true },
+      select: { total: true },
     }),
-    db.appointment.findMany({
+    db.repairOrder.findMany({
       where: {
         dateTime: { gte: dayStart, lte: weekEnd },
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
+        status: { notIn: ["PAID", "CLOSED", "CANCELLED"] },
       },
       include: {
         user: { select: { name: true, phone: true } },
-        car: { select: { model: true } },
-        services: { include: { service: { select: { name: true } } } },
+        vehicle: { select: { model: true } },
+        jobLines: { select: { description: true }, orderBy: { sortOrder: "asc" } },
       },
       orderBy: { dateTime: "asc" },
       take: 20,
     }),
   ]);
 
-  const dailyRevenue = completedToday.reduce((sum: number, a: Record<string, unknown>) => {
-    const est = a.estimate as Record<string, unknown> | null;
-    return sum + ((est?.finalCost as number) ?? (est?.total as number) ?? 0);
-  }, 0);
+  const dailyRevenue = completedToday.reduce(
+    (sum: number, ro: { total: number }) => sum + ro.total,
+    0
+  );
 
   return (
     <div>
@@ -77,10 +77,9 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* Upcoming appointments */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Ближайшие записи (7 дней)</h2>
-        <Link href="/admin/appointments" className="text-sm text-[var(--color-accent)]">
+        <Link href="/admin/repair-orders" className="text-sm text-[var(--color-accent)]">
           Все записи →
         </Link>
       </div>
@@ -91,28 +90,28 @@ export default async function AdminDashboard() {
         </div>
       ) : (
         <div className="space-y-3">
-          {upcoming.map((apt: Record<string, unknown>) => {
-            const user = apt.user as Record<string, string>;
-            const car = apt.car as Record<string, string>;
-            const services = apt.services as Array<{ service: { name: string } }>;
+          {upcoming.map((ro: Record<string, unknown>) => {
+            const user = ro.user as Record<string, string>;
+            const vehicle = ro.vehicle as Record<string, string>;
+            const jobs = ro.jobLines as Array<{ description: string }>;
             return (
-              <div key={apt.id as string} className="card">
+              <div key={ro.id as string} className="card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-medium">{user.name}</p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      {car.model} · {formatDate(apt.dateTime as Date)}
+                      {vehicle.model} · {formatDate(ro.dateTime as Date)}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {services.map((s, i) => (
+                      {jobs.map((j, i) => (
                         <span key={i} className="badge badge-silver text-xs">
-                          {s.service.name}
+                          {j.description}
                         </span>
                       ))}
                     </div>
                   </div>
-                  <span className={`badge text-xs status-${(apt.status as string).toLowerCase()}`}>
-                    {APPOINTMENT_STATUS_LABELS[apt.status as string] ?? apt.status}
+                  <span className={`badge text-xs status-${(ro.status as string).toLowerCase()}`}>
+                    {REPAIR_ORDER_STATUS_LABELS[ro.status as string] ?? ro.status}
                   </span>
                 </div>
               </div>

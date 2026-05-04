@@ -31,15 +31,16 @@ export async function addCar(
   }
 
   if (vin) {
-    const existing = await db.car.findUnique({ where: { vin } });
+    const existing = await db.vehicle.findUnique({ where: { vin } });
     if (existing) {
       return { error: "Автомобиль с таким VIN уже зарегистрирован" };
     }
   }
 
-  await db.car.create({
+  await db.vehicle.create({
     data: {
-      userId: session.id,
+      ownershipType: "CUSTOMER",
+      ownerUserId: session.id,
       model,
       year: yearNum,
       vin,

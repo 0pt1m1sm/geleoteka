@@ -11,17 +11,17 @@ export async function GET(
 ): Promise<NextResponse> {
   const { id } = await context.params;
 
-  const appointment = await db.appointment.findUnique({
+  const repairOrder = await db.repairOrder.findUnique({
     where: { id },
     select: { status: true, updatedAt: true },
   });
 
-  if (!appointment) {
+  if (!repairOrder) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({
-    status: appointment.status,
-    updatedAt: appointment.updatedAt,
+    status: repairOrder.status,
+    updatedAt: repairOrder.updatedAt,
   });
 }

@@ -8,13 +8,13 @@ import { SupplierOrderForm } from "@/components/admin/SupplierOrderForm";
 
 export default async function NewSupplierOrderPage() {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
   const [suppliers, parts] = await Promise.all([
-    db.supplier.findMany({
-      where: { isActive: true },
+    db.user.findMany({
+      where: { isSupplier: true, supplierProfile: { isActive: true } },
       orderBy: { name: "asc" },
       select: { id: true, name: true },
     }),

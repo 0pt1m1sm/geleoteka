@@ -16,7 +16,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default async function AdminOrdersPage() {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 

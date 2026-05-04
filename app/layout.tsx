@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Suspense } from "react";
 import { Providers } from "./providers";
 import { ThemeInit } from "@/components/shared/ThemeInit";
+import { MyCarInit } from "@/components/shared/MyCarInit";
 
 export const metadata: Metadata = {
   title: {
@@ -32,6 +34,10 @@ export default function RootLayout({
     <html lang="ru" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
         <ThemeInit />
+        {/* MyCarInit reads useSearchParams — must be wrapped in Suspense per Next.js. */}
+        <Suspense fallback={null}>
+          <MyCarInit />
+        </Suspense>
         <Providers>{children}</Providers>
       </body>
     </html>

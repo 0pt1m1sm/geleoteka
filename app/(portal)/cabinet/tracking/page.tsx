@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { StatusBoard } from "@/components/portal/StatusBoard";
 
-interface ActiveAppointment {
+interface ActiveRepairOrder {
   id: string;
   status: string;
   dateTime: string;
@@ -17,26 +17,26 @@ export default async function TrackingPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const appointments = await db.appointment.findMany({
+  const repairOrders = await db.repairOrder.findMany({
     where: {
       userId: session.id,
-      status: { notIn: ["COMPLETED", "CANCELLED"] },
+      status: { notIn: ["PAID", "CLOSED", "CANCELLED"] },
     },
     include: {
-      car: { select: { model: true } },
-      services: { include: { service: { select: { name: true } } } },
+      vehicle: { select: { model: true } },
+      jobLines: { select: { description: true }, orderBy: { sortOrder: "asc" } },
     },
     orderBy: { dateTime: "asc" },
   });
 
-  const active: ActiveAppointment[] = appointments.map(
-    (a: Record<string, unknown>) => ({
-      id: a.id as string,
-      status: a.status as string,
-      dateTime: (a.dateTime as Date).toISOString(),
-      carModel: (a.car as Record<string, string>).model,
-      services: (a.services as Array<{ service: { name: string } }>).map(
-        (s) => s.service.name
+  const active: ActiveRepairOrder[] = repairOrders.map(
+    (ro: Record<string, unknown>) => ({
+      id: ro.id as string,
+      status: ro.status as string,
+      dateTime: (ro.dateTime as Date).toISOString(),
+      carModel: (ro.vehicle as { model: string }).model,
+      services: (ro.jobLines as Array<{ description: string }>).map(
+        (j) => j.description
       ),
     })
   );
@@ -48,9 +48,7 @@ export default async function TrackingPage() {
       </h1>
       {active.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-[var(--foreground-muted)]">
-            Нет активных заказов
-          </p>
+          <p className="text-[var(--foreground-muted)]">Нет активных заказ-нарядов</p>
         </div>
       ) : (
         <StatusBoard initial={active} />

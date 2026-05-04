@@ -12,12 +12,14 @@ interface Props {
 
 export default async function EditRentalCarPage({ params }: Props) {
   const session = await getSession();
-  if (!session || (session.role !== "ADMIN" && session.role !== "MANAGER")) {
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
   const { id } = await params;
-  const car = await db.rentalCar.findUnique({ where: { id } });
+  const car = await db.vehicle.findFirst({
+    where: { id, ownershipType: "RENTAL" },
+  });
 
   if (!car) notFound();
 
@@ -26,7 +28,7 @@ export default async function EditRentalCarPage({ params }: Props) {
     id: c.id as string,
     model: c.model as string,
     year: c.year as number,
-    dailyRate: c.dailyRate as number,
+    dailyRate: (c.dailyRate as number) ?? 0,
     description: (c.description as string) ?? "",
     color: (c.color as string) ?? "",
     plate: (c.plate as string) ?? "",

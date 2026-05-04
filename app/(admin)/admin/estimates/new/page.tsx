@@ -1,33 +1,37 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { EstimateBuilder } from "@/components/admin/EstimateBuilder";
 
 export default async function NewEstimatePage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
-  const appointments = await db.appointment.findMany({
+  const repairOrders = await db.repairOrder.findMany({
     where: {
-      status: { notIn: ["COMPLETED", "CANCELLED"] },
-      estimate: null,
+      status: { in: ["ESTIMATE", "APPROVED", "IN_PROGRESS"] },
     },
     include: {
       user: { select: { name: true } },
-      car: { select: { model: true } },
+      vehicle: { select: { model: true } },
     },
     orderBy: { dateTime: "desc" },
+    take: 100,
   });
 
-  const options = appointments.map((a: Record<string, unknown>) => ({
-    id: a.id as string,
-    label: `${(a.user as Record<string, string>).name} — ${(a.car as Record<string, string>).model}`,
+  const options = repairOrders.map((ro: Record<string, unknown>) => ({
+    id: ro.id as string,
+    label: `${(ro.user as { name: string }).name} — ${(ro.vehicle as { model: string }).model}`,
   }));
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-display text-2xl font-bold mb-6">Создать смету</h1>
-      <EstimateBuilder appointments={options} />
+      <EstimateBuilder repairOrders={options} />
     </div>
   );
 }

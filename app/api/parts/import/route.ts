@@ -1,9 +1,37 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { MODEL_GENERATIONS } from "@/lib/models-data";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
+}
+
+/**
+ * CSV-import path auto-expands bare model names ("G-Class") into all known
+ * generations ("G-Class W463", "G-Class W464"). Batch import has no interactive
+ * feedback; silent expansion is preferable to rejecting the row. The admin form
+ * (`app/actions/parts.ts`) rejects bare names because it can show a clear error.
+ */
+function expandCompatibleModels(values: string[]): string[] {
+  const out = new Set<string>();
+  for (const v of values) {
+    const trimmed = v.trim();
+    if (!trimmed) continue;
+    if (trimmed.includes(" ")) {
+      out.add(trimmed);
+      continue;
+    }
+    const gens = MODEL_GENERATIONS[trimmed];
+    if (gens && gens.length > 0) {
+      for (const g of gens) out.add(`${trimmed} ${g}`);
+    } else {
+      // Unknown bare token — pass through; the picker simply won't match it,
+      // which is the right behavior for free-form data.
+      out.add(trimmed);
+    }
+  }
+  return Array.from(out);
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -62,7 +90,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     const quantity = parseInt(quantityStr) || 0;
     const isOEM = oemStr === "1";
     const categoryId = categorySlug ? (catMap.get(categorySlug) ?? null) : null;
-    const compatibleModels = modelsStr ? modelsStr.split(",").map((m) => m.trim()).filter(Boolean) : [];
+    const compatibleModels = expandCompatibleModels(
+      modelsStr ? modelsStr.split(",").map((m) => m.trim()).filter(Boolean) : []
+    );
     const slug = slugify(`${article}-${name}`).slice(0, 80);
 
     try {

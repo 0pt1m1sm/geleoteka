@@ -1,13 +1,25 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 
 export default async function TeamPage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
-  const masters = await db.masterProfile.findMany({
-    orderBy: { sortOrder: "asc" },
+  const masters = await db.user.findMany({
+    where: { isMaster: true },
+    include: { masterProfile: true },
+  });
+
+  // Sort by profile.sortOrder
+  masters.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
+    const ap = (a.masterProfile as { sortOrder: number } | null)?.sortOrder ?? 0;
+    const bp = (b.masterProfile as { sortOrder: number } | null)?.sortOrder ?? 0;
+    return ap - bp;
   });
 
   return (
@@ -15,40 +27,60 @@ export default async function TeamPage() {
       <h1 className="text-display text-2xl font-bold mb-6">Команда</h1>
 
       <div className="space-y-4">
-        {masters.map((m: Record<string, unknown>) => (
-          <div key={m.id as string} className="card flex items-start gap-4">
-            <div className="w-12 h-12 rounded-full bg-[var(--color-secondary)] flex items-center justify-center shrink-0">
-              <span className="text-sm font-bold text-[var(--foreground-muted)]">
-                {(m.name as string)
-                  .split(" ")
-                  .map((n: string) => n[0])
-                  .join("")}
+        {masters.map((m: Record<string, unknown>) => {
+          const profile = m.masterProfile as {
+            specialty: string | null;
+            yearsExperience: number | null;
+            bio: string | null;
+            certifications: string[];
+            isActive: boolean;
+          } | null;
+          const name = m.name as string;
+          return (
+            <div key={m.id as string} className="card flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-[var(--color-secondary)] flex items-center justify-center shrink-0">
+                <span className="text-sm font-bold text-[var(--foreground-muted)]">
+                  {name
+                    .split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </span>
+              </div>
+              <div className="flex-1">
+                <p className="font-medium">{name}</p>
+                {profile?.specialty && (
+                  <p className="text-sm text-[var(--color-accent)]">{profile.specialty}</p>
+                )}
+                {profile?.bio ? (
+                  <p className="text-sm text-[var(--foreground-muted)] mt-1">{profile.bio}</p>
+                ) : null}
+                {profile?.yearsExperience ? (
+                  <p className="text-xs text-[var(--foreground-muted)]">
+                    Опыт: {profile.yearsExperience} лет
+                  </p>
+                ) : null}
+                {profile?.certifications && profile.certifications.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {profile.certifications.map((cert: string) => (
+                      <span key={cert} className="badge badge-silver text-[10px]">
+                        {cert}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span
+                className={`badge text-[10px] ${
+                  profile?.isActive
+                    ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
+                    : "bg-[var(--color-error-bg)] text-[var(--color-error)]"
+                }`}
+              >
+                {profile?.isActive ? "Активен" : "Неактивен"}
               </span>
             </div>
-            <div className="flex-1">
-              <p className="font-medium">{m.name as string}</p>
-              <p className="text-sm text-[var(--color-accent)]">{m.role as string}</p>
-              {m.bio ? <p className="text-sm text-[var(--foreground-muted)] mt-1">{m.bio as string}</p> : null}
-              {m.experience ? <p className="text-xs text-[var(--foreground-muted)]">Опыт: {m.experience as number} лет</p> : null}
-              <div className="flex flex-wrap gap-1 mt-2">
-                {(m.certifications as string[]).map((cert: string) => (
-                  <span key={cert} className="badge badge-silver text-[10px]">
-                    {cert}
-                  </span>
-                ))}
-              </div>
-            </div>
-            <span
-              className={`badge text-[10px] ${
-                (m.isActive as boolean)
-                  ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
-                  : "bg-[var(--color-error-bg)] text-[var(--color-error)]"
-              }`}
-            >
-              {(m.isActive as boolean) ? "Активен" : "Неактивен"}
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

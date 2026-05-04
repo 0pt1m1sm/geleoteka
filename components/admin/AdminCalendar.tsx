@@ -3,23 +3,23 @@
 import { useState } from "react";
 import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
-import { APPOINTMENT_STATUS_LABELS } from "@/lib/utils";
+import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 
-interface CalendarAppointment {
+interface CalendarRepairOrder {
   id: string;
   dateTime: string;
   status: string;
   clientName: string;
   clientPhone: string;
-  carModel: string;
+  vehicleModel: string;
   masterName: string | null;
-  services: string[];
+  jobs: string[];
 }
 
 export function AdminCalendar({
-  appointments,
+  repairOrders,
 }: {
-  appointments: CalendarAppointment[];
+  repairOrders: CalendarRepairOrder[];
 }) {
   const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -27,7 +27,7 @@ export function AdminCalendar({
     addDays(startOfDay(selectedDate), i - 3)
   );
 
-  const dayAppointments = appointments.filter((a) =>
+  const dayOrders = repairOrders.filter((a) =>
     isSameDay(parseISO(a.dateTime), selectedDate)
   );
 
@@ -37,7 +37,7 @@ export function AdminCalendar({
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6">
         {days.map((day) => {
           const isSelected = isSameDay(day, selectedDate);
-          const count = appointments.filter((a) =>
+          const count = repairOrders.filter((a) =>
             isSameDay(parseISO(a.dateTime), day)
           ).length;
           return (
@@ -76,48 +76,48 @@ export function AdminCalendar({
         <h3 className="font-medium mb-4">
           {format(selectedDate, "d MMMM, EEEE", { locale: ru })}
           <span className="text-[var(--foreground-muted)] ml-2">
-            ({dayAppointments.length} записей)
+            ({dayOrders.length} записей)
           </span>
         </h3>
 
-        {dayAppointments.length === 0 ? (
+        {dayOrders.length === 0 ? (
           <p className="text-[var(--foreground-muted)] text-sm py-4">
             Нет записей на этот день
           </p>
         ) : (
           <div className="space-y-3">
-            {dayAppointments
+            {dayOrders
               .sort(
                 (a, b) =>
                   new Date(a.dateTime).getTime() -
                   new Date(b.dateTime).getTime()
               )
-              .map((apt) => (
+              .map((ro) => (
                 <div
-                  key={apt.id}
+                  key={ro.id}
                   className="flex items-start gap-4 p-3 rounded-lg bg-[var(--background-secondary)]"
                 >
                   <div className="text-center shrink-0">
                     <p className="text-lg font-bold">
-                      {format(parseISO(apt.dateTime), "HH:mm")}
+                      {format(parseISO(ro.dateTime), "HH:mm")}
                     </p>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium truncate">{apt.clientName}</p>
+                      <p className="font-medium truncate">{ro.clientName}</p>
                       <span
-                        className={`badge text-[10px] status-${apt.status.toLowerCase()}`}
+                        className={`badge text-[10px] status-${ro.status.toLowerCase()}`}
                       >
-                        {APPOINTMENT_STATUS_LABELS[apt.status] ?? apt.status}
+                        {REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status}
                       </span>
                     </div>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      {apt.carModel}
-                      {apt.masterName && ` · ${apt.masterName}`}
+                      {ro.vehicleModel}
+                      {ro.masterName && ` · ${ro.masterName}`}
                     </p>
                     <div className="flex flex-wrap gap-1 mt-1">
-                      {apt.services.map((s) => (
-                        <span key={s} className="badge badge-silver text-[10px]">
+                      {ro.jobs.map((s, i) => (
+                        <span key={i} className="badge badge-silver text-[10px]">
                           {s}
                         </span>
                       ))}

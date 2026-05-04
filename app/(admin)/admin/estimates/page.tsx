@@ -1,22 +1,23 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formatPrice, formatDate } from "@/lib/utils";
+import { formatPrice, formatDate, JOB_LINE_STATUS_LABELS } from "@/lib/utils";
 
 export default async function AdminEstimatesPage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
-  const estimates = await db.estimate.findMany({
+  const estimates = await db.repairOrder.findMany({
+    where: { status: "ESTIMATE" },
     include: {
-      items: true,
-      appointment: {
-        include: {
-          user: { select: { name: true } },
-          car: { select: { model: true } },
-        },
-      },
+      user: { select: { name: true } },
+      vehicle: { select: { model: true } },
+      jobLines: { select: { id: true, status: true, total: true } },
     },
     orderBy: { createdAt: "desc" },
     take: 50,
@@ -37,34 +38,46 @@ export default async function AdminEstimatesPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {estimates.map((e: Record<string, unknown>) => {
-            const apt = e.appointment as Record<string, unknown>;
-            const user = apt.user as Record<string, string>;
-            const car = apt.car as Record<string, string>;
+          {estimates.map((ro: Record<string, unknown>) => {
+            const user = ro.user as { name: string };
+            const vehicle = ro.vehicle as { model: string };
+            const jobs = ro.jobLines as Array<{ id: string; status: string; total: number }>;
+            const approvedCount = jobs.filter((j) => j.status === "APPROVED").length;
+            const declinedCount = jobs.filter((j) => j.status === "DECLINED").length;
+            const proposedCount = jobs.filter((j) => j.status === "PROPOSED").length;
+
             return (
-              <div key={e.id as string} className="card">
+              <div key={ro.id as string} className="card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium">{user.name} — {car.model}</p>
-                    <p className="text-sm text-[var(--foreground-muted)]">
-                      {formatDate(e.createdAt as Date)}
+                    <p className="font-medium">
+                      {user.name} — {vehicle.model}
                     </p>
+                    <p className="text-sm text-[var(--foreground-muted)]">
+                      {formatDate(ro.createdAt as Date)}
+                    </p>
+                    <div className="flex flex-wrap gap-2 mt-2 text-xs">
+                      {proposedCount > 0 && (
+                        <span className="badge badge-silver text-[10px]">
+                          {JOB_LINE_STATUS_LABELS.PROPOSED}: {proposedCount}
+                        </span>
+                      )}
+                      {approvedCount > 0 && (
+                        <span className="badge text-[10px] bg-[var(--color-success-bg)] text-[var(--color-success)]">
+                          {JOB_LINE_STATUS_LABELS.APPROVED}: {approvedCount}
+                        </span>
+                      )}
+                      {declinedCount > 0 && (
+                        <span className="badge text-[10px] bg-[var(--color-error-bg)] text-[var(--color-error)]">
+                          {JOB_LINE_STATUS_LABELS.DECLINED}: {declinedCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-[var(--color-accent)]">
-                      {formatPrice(e.total as number)}
+                      {formatPrice(ro.total as number)}
                     </p>
-                    <span
-                      className={`badge text-[10px] ${
-                        e.status === "APPROVED"
-                          ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
-                          : e.status === "REJECTED"
-                            ? "bg-[var(--color-error-bg)] text-[var(--color-error)]"
-                            : "bg-[var(--color-warning-bg)] text-[var(--color-warning)]"
-                      }`}
-                    >
-                      {e.status === "APPROVED" ? "Одобрена" : e.status === "REJECTED" ? "Отклонена" : "Ожидает"}
-                    </span>
                   </div>
                 </div>
               </div>

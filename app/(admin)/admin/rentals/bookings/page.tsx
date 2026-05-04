@@ -1,16 +1,20 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { RentalStatusChanger } from "@/components/admin/RentalStatusChanger";
 
 export default async function RentalBookingsPage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
   const bookings = await db.rentalBooking.findMany({
     include: {
-      car: { select: { model: true } },
+      vehicle: { select: { model: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -26,22 +30,30 @@ export default async function RentalBookingsPage() {
       ) : (
         <div className="space-y-3">
           {bookings.map((b: Record<string, unknown>) => {
-            const car = b.car as Record<string, string>;
+            const vehicle = b.vehicle as { model: string };
             return (
               <div key={b.id as string} className="card">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium">{b.contactName as string} — {car.model}</p>
+                    <p className="font-medium">
+                      {b.contactName as string} — {vehicle.model}
+                    </p>
                     <p className="text-sm text-[var(--foreground-muted)]">
-                      {formatDate(b.startDate as Date)} — {formatDate(b.endDate as Date)}
+                      {formatDate(b.startDate as Date)} —{" "}
+                      {formatDate(b.endDate as Date)}
                     </p>
                     <p className="text-xs text-[var(--foreground-muted)]">
                       {b.contactPhone as string} · {b.contactEmail as string}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-[var(--color-accent)]">{formatPrice(b.totalCost as number)}</p>
-                    <RentalStatusChanger bookingId={b.id as string} currentStatus={b.status as string} />
+                    <p className="font-bold text-[var(--color-accent)]">
+                      {formatPrice(b.totalCost as number)}
+                    </p>
+                    <RentalStatusChanger
+                      bookingId={b.id as string}
+                      currentStatus={b.status as string}
+                    />
                   </div>
                 </div>
               </div>

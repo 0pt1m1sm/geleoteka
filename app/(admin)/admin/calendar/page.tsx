@@ -1,40 +1,42 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
+import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { AdminCalendar } from "@/components/admin/AdminCalendar";
 
 export default async function CalendarPage() {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
 
-  const appointments = await db.appointment.findMany({
+  const repairOrders = await db.repairOrder.findMany({
     where: { status: { notIn: ["CANCELLED"] } },
     include: {
       user: { select: { name: true, phone: true } },
-      car: { select: { model: true } },
-      services: { include: { service: { select: { name: true } } } },
+      vehicle: { select: { model: true } },
+      jobLines: { select: { description: true }, orderBy: { sortOrder: "asc" } },
       master: { select: { name: true } },
     },
     orderBy: { dateTime: "asc" },
   });
 
-  const serialized = appointments.map((a: Record<string, unknown>) => ({
-    id: a.id as string,
-    dateTime: (a.dateTime as Date).toISOString(),
-    status: a.status as string,
-    clientName: (a.user as Record<string, string>).name,
-    clientPhone: (a.user as Record<string, string>).phone,
-    carModel: (a.car as Record<string, string>).model,
-    masterName: (a.master as Record<string, string> | null)?.name ?? null,
-    services: (a.services as Array<{ service: { name: string } }>).map(
-      (s) => s.service.name
-    ),
+  const serialized = repairOrders.map((ro: Record<string, unknown>) => ({
+    id: ro.id as string,
+    dateTime: (ro.dateTime as Date).toISOString(),
+    status: ro.status as string,
+    clientName: (ro.user as Record<string, string>).name,
+    clientPhone: (ro.user as Record<string, string>).phone,
+    vehicleModel: (ro.vehicle as Record<string, string>).model,
+    masterName: (ro.master as Record<string, string> | null)?.name ?? null,
+    jobs: (ro.jobLines as Array<{ description: string }>).map((j) => j.description),
   }));
 
   return (
     <div>
       <h1 className="text-display text-2xl font-bold mb-6">Календарь записей</h1>
-      <AdminCalendar appointments={serialized} />
+      <AdminCalendar repairOrders={serialized} />
     </div>
   );
 }

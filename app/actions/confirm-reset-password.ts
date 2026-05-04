@@ -47,7 +47,7 @@ export async function confirmResetPasswordAction(_prevState: { error: string | n
     db.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
   ]);
 
-  const token = createToken({ userId: user.id, role: user.role });
+  const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
 
   redirect("/cabinet");

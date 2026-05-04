@@ -23,18 +23,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
 
-  const bookedAppointments = await db.appointment.findMany({
-    where: {
-      dateTime: { gte: dayStart, lte: dayEnd },
-      status: { notIn: ["CANCELLED"] },
-    },
+  const reservedSlots = await db.slot.findMany({
+    where: { dateTime: { gte: dayStart, lte: dayEnd } },
     select: { dateTime: true },
   });
 
   const bookedTimes = new Set(
-    bookedAppointments.map((a: { dateTime: Date }) => {
-      const h = a.dateTime.getHours().toString().padStart(2, "0");
-      const m = a.dateTime.getMinutes().toString().padStart(2, "0");
+    reservedSlots.map((s: { dateTime: Date }) => {
+      const h = s.dateTime.getHours().toString().padStart(2, "0");
+      const m = s.dateTime.getMinutes().toString().padStart(2, "0");
       return `${h}:${m}`;
     })
   );

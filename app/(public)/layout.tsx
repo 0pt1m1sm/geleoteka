@@ -12,7 +12,7 @@ export default async function PublicLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  const isStaff = session?.role === "ADMIN" || session?.role === "MANAGER";
+  const isStaff = session?.permissionRole === "ADMIN" || session?.permissionRole === "MANAGER";
   const cabinetHref = isStaff ? "/admin" : "/cabinet";
   const cabinetLabel = isStaff ? "Админ-панель" : "Кабинет";
 

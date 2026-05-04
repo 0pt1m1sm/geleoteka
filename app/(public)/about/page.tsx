@@ -12,18 +12,31 @@ interface MasterData {
 }
 
 export default async function AboutPage() {
-  const masters: MasterData[] = await db.masterProfile.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-    select: {
-      id: true,
-      name: true,
-      role: true,
-      bio: true,
-      experience: true,
-      certifications: true,
-    },
+  const users = await db.user.findMany({
+    where: { isMaster: true, masterProfile: { isActive: true } },
+    include: { masterProfile: true },
   });
+
+  const masters: MasterData[] = users
+    .map((u: Record<string, unknown>) => {
+      const profile = u.masterProfile as {
+        specialty: string | null;
+        bio: string | null;
+        yearsExperience: number | null;
+        certifications: string[];
+        sortOrder: number;
+      } | null;
+      return {
+        id: u.id as string,
+        name: u.name as string,
+        role: profile?.specialty ?? "",
+        bio: profile?.bio ?? null,
+        experience: profile?.yearsExperience ?? null,
+        certifications: profile?.certifications ?? [],
+        sortOrder: profile?.sortOrder ?? 0,
+      };
+    })
+    .sort((a, b) => a.sortOrder - b.sortOrder);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

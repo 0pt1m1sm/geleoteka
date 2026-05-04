@@ -1,28 +1,30 @@
 export const dynamic = "force-dynamic";
 
-import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { APPOINTMENT_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
+import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default async function CustomerDetailPage({ params }: Props) {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await getSession();
+  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+    redirect("/login");
+  }
   const { id } = await params;
 
   const customer = await db.user.findUnique({
     where: { id },
     include: {
-      cars: true,
+      vehicles: { where: { ownershipType: "CUSTOMER" } },
       loyaltyAccount: true,
-      appointments: {
+      repairOrders: {
         include: {
-          car: { select: { model: true } },
-          services: { include: { service: { select: { name: true } } } },
-          estimate: true,
+          vehicle: { select: { model: true } },
+          jobLines: { select: { description: true, status: true } },
         },
         orderBy: { dateTime: "desc" },
         take: 20,
@@ -33,15 +35,13 @@ export default async function CustomerDetailPage({ params }: Props) {
   if (!customer) notFound();
 
   const c = customer as Record<string, unknown>;
-  const loyalty = c.loyaltyAccount as Record<string, unknown> | null;
-  const cars = c.cars as Array<Record<string, unknown>>;
-  const appointments = c.appointments as Array<Record<string, unknown>>;
+  const loyalty = c.loyaltyAccount as { points: number } | null;
+  const vehicles = c.vehicles as Array<Record<string, unknown>>;
+  const repairOrders = c.repairOrders as Array<Record<string, unknown>>;
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-2">
-        {c.name as string}
-      </h1>
+      <h1 className="text-display text-2xl font-bold mb-2">{c.name as string}</h1>
       <p className="text-[var(--foreground-muted)] mb-6">
         {c.phone as string} · {c.email as string}
       </p>
@@ -49,50 +49,52 @@ export default async function CustomerDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Автомобили</p>
-          <p className="text-2xl font-bold">{cars.length}</p>
+          <p className="text-2xl font-bold">{vehicles.length}</p>
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Визиты</p>
-          <p className="text-2xl font-bold">{appointments.length}</p>
+          <p className="text-2xl font-bold">{repairOrders.length}</p>
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Баллы</p>
-          <p className="text-2xl font-bold">{(loyalty?.points as number) ?? 0}</p>
+          <p className="text-2xl font-bold">{loyalty?.points ?? 0}</p>
         </div>
       </div>
 
-      {/* Cars */}
       <h2 className="text-lg font-semibold mb-3">Автомобили</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {cars.map((car) => (
-          <div key={car.id as string} className="card">
-            <p className="font-medium">{car.model as string}, {car.year as number}</p>
-            {car.vin ? <p className="text-xs text-[var(--foreground-muted)] font-mono">VIN: {car.vin as string}</p> : null}
+        {vehicles.map((v) => (
+          <div key={v.id as string} className="card">
+            <p className="font-medium">
+              {v.model as string}, {v.year as number}
+            </p>
+            {v.vin ? (
+              <p className="text-xs text-[var(--foreground-muted)] font-mono">
+                VIN: {v.vin as string}
+              </p>
+            ) : null}
           </div>
         ))}
       </div>
 
-      {/* History */}
-      <h2 className="text-lg font-semibold mb-3">История визитов</h2>
+      <h2 className="text-lg font-semibold mb-3">История заказ-нарядов</h2>
       <div className="space-y-3">
-        {appointments.map((apt) => {
-          const est = apt.estimate as Record<string, unknown> | null;
+        {repairOrders.map((ro) => {
+          const vehicle = ro.vehicle as { model: string };
           return (
-            <div key={apt.id as string} className="card">
+            <div key={ro.id as string} className="card">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="font-medium">{formatDate(apt.dateTime as Date)}</p>
-                  <p className="text-sm text-[var(--foreground-muted)]">
-                    {(apt.car as Record<string, string>).model}
-                  </p>
+                  <p className="font-medium">{formatDate(ro.dateTime as Date)}</p>
+                  <p className="text-sm text-[var(--foreground-muted)]">{vehicle.model}</p>
                 </div>
-                <span className={`badge text-xs status-${(apt.status as string).toLowerCase()}`}>
-                  {APPOINTMENT_STATUS_LABELS[apt.status as string] ?? apt.status}
+                <span className={`badge text-xs status-${(ro.status as string).toLowerCase()}`}>
+                  {REPAIR_ORDER_STATUS_LABELS[ro.status as string] ?? ro.status}
                 </span>
               </div>
-              {est && (
+              {(ro.total as number) > 0 && (
                 <p className="text-sm mt-2">
-                  Стоимость: {formatPrice((est.finalCost as number) ?? (est.total as number))}
+                  Стоимость: {formatPrice(ro.total as number)}
                 </p>
               )}
             </div>
