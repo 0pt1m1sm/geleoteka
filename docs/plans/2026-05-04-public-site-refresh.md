@@ -2,7 +2,7 @@
 
 Created: 2026-05-04
 Author: aleksandr's.spiskov@gmail.com
-Status: COMPLETE
+Status: VERIFIED
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -269,6 +269,19 @@ User pre-approved deploy to production at the end of `/spec`. After verification
 - [x] Task 8: Final regression + smoke (TS-001..TS-008) + commit + push to origin/main
 
       **Total Tasks:** 9 | **Completed:** 9 | **Remaining:** 0
+
+## E2E Results
+
+| Scenario | Priority | Result | Fix Attempts | Notes |
+|----------|----------|--------|--------------|-------|
+| TS-001 split-hero CTAs | Critical | PASS | 1 | First attempt squeezed cards under giant wordmark; rebuilt as full-height transparent split per user direction |
+| TS-002 mobile hero stacks service-first | Critical | PASS | 0 | Verified at 375×667; Сервис above, Запчасти below |
+| TS-003 Yandex iframe + CTA | High | PASS | 0 | Iframe loads from yandex.ru, CTA opens profile in new tab with rel="noopener noreferrer" |
+| TS-004 picker writes URL+localStorage | Critical | PASS | 1 | Initial Link wrapping bug fixed (whole-half link swallowed secondary spans) |
+| TS-005 returning visit auto-restore | Critical | PASS | 0 | localStorage `geleoteka:my-car={"model":"G-Class","generation":"W464"}` → navigate `/parts` → URL replaces to `/parts?model=G-Class&generation=W464` |
+| TS-006 sidebar facets layer | High | PASS | 1 | Initial mobile button stretched on desktop (lg:hidden specificity); fixed via wrapper div |
+| TS-007 showAll escape | High | PASS | 0 | `?showAll=1` skips compatibleModels filter; "Показаны все запчасти" badge renders |
+| TS-008 mobile drawer | Medium | PASS | 0 | Drawer opens at 375×667, body+html overflow:hidden during open, OEM toggle + Применить closes drawer + updates URL `&oem=true` |
 
 ## Implementation Tasks
 
