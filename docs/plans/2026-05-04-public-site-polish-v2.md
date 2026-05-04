@@ -2,7 +2,7 @@
 
 Created: 2026-05-04
 Author: aleksandr's.spiskov@gmail.com
-Status: COMPLETE
+Status: VERIFIED
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -591,6 +591,11 @@ Verified against prod (`https://geleoteka-production.up.railway.app/`) at commit
 > 2. MyCarStrip "Сменить" / "✕" — switched `router.push` → `router.replace` and added `scrollTo(0)` so the picker (which mounts above where the strip was) is in view immediately on mobile. Mitigates the user's "list opens and closes" report.
 > 3. Why-Us warranty card: "На все работы и запчасти. 20 000 км пробега. Без мелкого шрифта." → "Только на работы — 12 месяцев или 20 000 км пробега. Условия в договоре." Mirrored on the FAQ answer (parts warranty correctly attributed to manufacturer).
 > 4. Floating contact buttons: Telegram + WhatsApp duo collapsed into a single accent-coloured "Связаться с нами" FAB. Tap expands a vertical menu of three branded channels: Telegram, WhatsApp, **Max** (new VK-Tech messenger). Click-outside / Escape to close.
+>
+> **Iter-5 follow-up (commit 2ea4d64)** — three more refinements:
+> 1. `/parts/cart` contact form — prefills name + phone + email from `getSession()` for logged-in users (server-rendered, `defaultValue` on inputs so users can override). Small "Заполнено из профиля" note shown next to the section heading. Verified prefill on prod by signing in as `client@test.ru`.
+> 2. Cart line-item rows — switched from `flex items-center` to `flex flex-col sm:flex-row`. Mobile: name + article block on top, qty/price/remove on a second row. Bumped qty buttons to `px-3 py-1` and remove button text size for touch reach. Fixes the previous mobile bug where names truncated to ~3 characters.
+> 3. MyCarStrip — removed the "Сменить" button entirely. User reported it still didn't surface the picker reliably on mobile after Iter-4. Single-action "✕" both clears localStorage and drops URL params, picker reappears with fresh state.
 >
 > **Deferred to a follow-up PRD (out of scope here):**
 > - Refactor `Part.compatibleModels: string[]` (denormalized strings) → proper Part-Model relation table, surface in admin panel for manual edits. The cascading Model→Generation picker already exists in MyCarPicker — only the schema + admin CRUD piece is outstanding.
