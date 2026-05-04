@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
-import { YANDEX_PROFILE_URL, YANDEX_REVIEWS_IFRAME_URL } from "@/lib/yandex";
+import { YANDEX_PROFILE_URL } from "@/lib/yandex";
+import { ReviewsIframeWithSkeleton } from "@/components/shared/ReviewsIframeWithSkeleton";
 
 const faqItems = [
   {
@@ -51,16 +52,15 @@ export default function HomePage() {
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
         </div>
 
-        {/* Vertical gold hairline divider — desktop only, middle 70% of height */}
-        <div className="absolute inset-y-[15%] left-1/2 z-10 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
-
         {/* Two halves spanning full hero height. Each is transparent, lets the photo through.
-            Mobile: stacks to two rows (service first). Desktop: 50/50 split.
+            Mobile: stacks to two rows (service first). Desktop: 50/50 split with hover-expand.
             Half is a <div> (not a Link) so the primary CTA and secondary link inside
-            remain independent <Link>s with their own hrefs and proper a11y. */}
-        <div className="relative z-10 grid h-full animate-fade-in grid-cols-1 text-white md:grid-cols-2">
-          {/* Left half — Сервис */}
-          <div className="flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center sm:px-10 md:border-b-0">
+            remain independent <Link>s with their own hrefs and proper a11y.
+            Hover-expand rules live in globals.css scoped to .hero-split + data-half. */}
+        <div className="hero-split relative z-10 grid h-full animate-fade-in grid-cols-1 text-white md:grid-cols-2">
+          {/* Left half — Сервис. Gradient divider lives at right-0 so it moves with the column boundary on hover-expand. */}
+          <div data-half="left" className="relative flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center sm:px-10 md:border-b-0">
+            <div aria-hidden className="absolute inset-y-[15%] right-0 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
             <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
               Сервис
             </div>
@@ -85,7 +85,7 @@ export default function HomePage() {
           </div>
 
           {/* Right half — Запчасти */}
-          <div className="flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
+          <div data-half="right" className="flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
             <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
               Запчасти
             </div>
@@ -256,55 +256,35 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Reviews */}
-      <section className="py-20 bg-[var(--card)]">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-display text-3xl sm:text-4xl font-bold mb-4">
-              Отзывы клиентов
-            </h2>
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <svg
-                    key={star}
-                    className="w-5 h-5 text-[var(--color-gold)]"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                ))}
-              </div>
-              <span className="text-lg font-semibold">4.9</span>
-              <span className="text-[var(--foreground-muted)]">
-                — 230+ отзывов
-              </span>
+      {/* Reviews — uses the page background (no contrasting strip = no horizontal bar).
+          Iframe is wrapped in a themed card with rounded corners + soft shadow so the
+          fixed-white Yandex iframe has a visual anchor that respects light/dark mode. */}
+      <section className="py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-display text-3xl sm:text-4xl font-bold mb-3">
+            Отзывы клиентов
+          </h2>
+          <p className="text-foreground-muted max-w-xl mx-auto mb-12">
+            Реальные отзывы с Яндекс&nbsp;Карт — обновляются автоматически
+          </p>
+
+          {/* Themed frame around the iframe. The iframe itself is white (cross-origin,
+              can't recolor), but the surrounding card + shadow softens the transition
+              and respects theme. */}
+          <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-card p-2 sm:p-4 shadow-xl overflow-hidden">
+            <div className="rounded-xl overflow-hidden">
+              <ReviewsIframeWithSkeleton />
             </div>
           </div>
-          {/* Yandex Maps reviews widget. May be blocked by uBlock Origin / privacy
-              extensions; we accept the blank-iframe risk and do NOT add a JS fallback
-              because cross-origin frame-load detection is unreliable. */}
-          <div className="overflow-x-auto mx-auto max-w-full" style={{ minHeight: 800 }}>
-            <iframe
-              src={YANDEX_REVIEWS_IFRAME_URL}
-              loading="lazy"
-              frameBorder="0"
-              width="560"
-              height="800"
-              className="block mx-auto"
-              title="Отзывы клиентов на Яндекс Картах"
-            />
-          </div>
 
-          <div className="text-center mt-6">
+          <div className="mt-8">
             <a
               href={YANDEX_PROFILE_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[var(--color-accent)] hover:underline text-sm font-medium"
+              className="inline-flex items-center text-accent hover:text-accent-hover transition-colors text-sm font-medium"
             >
-              Все отзывы на Яндекс Картах →
+              Открыть страницу Геолотеки на Яндекс&nbsp;Картах →
             </a>
           </div>
         </div>

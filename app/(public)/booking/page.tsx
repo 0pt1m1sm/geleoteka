@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
-import { ServiceSelector } from "@/components/booking/ServiceSelector";
+import { Step1ServiceVehicle } from "@/components/booking/Step1ServiceVehicle";
 import { StepIndicator } from "@/components/booking/StepIndicator";
 
 interface ServiceItem {
@@ -30,12 +30,12 @@ export default async function BookingStep1() {
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
       <StepIndicator current={1} />
       <h1 className="text-display text-3xl font-bold mb-2 text-center">
-        Выберите услуги
+        Запись на сервис
       </h1>
-      <p className="text-[var(--foreground-muted)] text-center mb-8">
-        Можно выбрать несколько
+      <p className="text-foreground-muted text-center mb-8">
+        Услуги и автомобиль — шаг 1 из 3
       </p>
-      <ServiceSelector services={services} />
+      <Step1ServiceVehicle services={services} />
     </div>
   );
 }

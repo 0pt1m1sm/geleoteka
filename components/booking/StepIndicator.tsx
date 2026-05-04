@@ -1,11 +1,9 @@
 "use client";
 
 const STEPS = [
-  "Услуги",
-  "Автомобиль",
+  "Услуги и авто",
   "Дата и время",
   "Контакты",
-  "Подтверждение",
 ];
 
 export function StepIndicator({ current }: { current: number }) {

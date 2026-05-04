@@ -565,3 +565,19 @@ html::-webkit-scrollbar-thumb:hover {
 .stagger-3 { animation-delay: 300ms; }
 .stagger-4 { animation-delay: 400ms; }
 .stagger-5 { animation-delay: 500ms; }
+
+/* Hero hover treatment: hovering a half lifts its background (slight brighten),
+   the other half darkens slightly. Spotlight effect — no layout reflow, no button
+   movement (avoids "button-running-away" hover trap). Desktop only (md+).
+   prefers-reduced-motion users see no transition.
+   Browser support: :has() Chrome 105+/FF121+/Safari 15.4+; older browsers see
+   no hover effect (rules don't match). */
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .hero-split [data-half] {
+    transition: background-color 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .hero-split:has([data-half="left"]:hover) [data-half="left"]   { background-color: rgba(255, 255, 255, 0.04); }
+  .hero-split:has([data-half="left"]:hover) [data-half="right"]  { background-color: rgba(0, 0, 0, 0.22); }
+  .hero-split:has([data-half="right"]:hover) [data-half="right"] { background-color: rgba(255, 255, 255, 0.04); }
+  .hero-split:has([data-half="right"]:hover) [data-half="left"]  { background-color: rgba(0, 0, 0, 0.22); }
+}

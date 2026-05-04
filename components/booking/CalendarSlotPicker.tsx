@@ -117,11 +117,11 @@ export function CalendarSlotPicker() {
       </div>
 
       <div className="flex justify-between">
-        <Link href="/booking/step-2" className="btn btn-secondary">
+        <Link href="/booking" className="btn btn-secondary">
           ← Назад
         </Link>
         {data.dateTime ? (
-          <Link href="/booking/step-4" className="btn btn-primary">
+          <Link href="/booking/step-3" className="btn btn-primary">
             Далее →
           </Link>
         ) : (

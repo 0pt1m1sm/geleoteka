@@ -26,7 +26,7 @@ const services = [
   },
   {
     slug: "repair",
-    name: "Ремонт двигателя",
+    name: "Двигатель",
     description:
       "Капитальный и текущий ремонт двигателей M264, M256, M276, M278, OM654 и других. Диагностика неисправностей, замена цепей ГРМ, ремонт головки блока, замена прокладок и уплотнений.",
     priceMin: 15000,
@@ -66,7 +66,7 @@ const services = [
   },
   {
     slug: "transmission",
-    name: "Трансмиссия",
+    name: "АКПП",
     description:
       "Ремонт и обслуживание АКПП 9G-Tronic, 7G-Tronic, 4MATIC. Замена масла в коробке, ремонт мехатроника, замена сцепления.",
     priceMin: 8000,
@@ -76,7 +76,7 @@ const services = [
   },
   {
     slug: "electric",
-    name: "Электрика и электроника",
+    name: "Электрика",
     description:
       "Диагностика и ремонт электрических систем: COMAND, MBUX, система освещения MULTIBEAM LED, парктроники, камеры, датчики. Программирование блоков управления.",
     priceMin: 5000,
@@ -92,6 +92,16 @@ const services = [
     priceMin: 10000,
     priceMax: 500000,
     durationMinutes: 480,
+    applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
+  },
+  {
+    slug: "other",
+    name: "Другое",
+    description:
+      "Не уверены, что именно нужно? Приезжайте на диагностику — мастера определят причину и предложат решение.",
+    priceMin: null,
+    priceMax: null,
+    durationMinutes: null,
     applicableModels: ["C-Class", "E-Class", "S-Class", "GLE", "GLS", "G-Class", "AMG", "EQ"],
   },
 ];
