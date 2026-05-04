@@ -93,7 +93,9 @@ export default async function PartsPage({ searchParams }: Props) {
       <MyCarStrip />
       {!hasCarFilter && !showAll ? <MyCarPicker /> : null}
 
-      <div className="flex gap-6">
+      {/* Mobile-first stack: filter button + main content stack vertically below lg.
+          Above lg the sidebar sits to the left of main. */}
+      <div className="flex flex-col gap-6 lg:flex-row">
         <PartsFilterSidebar categories={cats} />
 
         <main className="flex-1 min-w-0">

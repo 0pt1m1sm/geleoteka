@@ -32,12 +32,17 @@ export function MyCarStrip(): React.ReactElement | null {
 
   function handleChange(): void {
     // Keep localStorage; just drop URL params so picker re-appears.
-    router.push(urlWithoutCar());
+    // Use replace (not push) so the back button doesn't bounce the user
+    // between filtered/unfiltered states. Scroll to top so the picker
+    // (which mounts above where the strip used to be) is in view.
+    router.replace(urlWithoutCar(), { scroll: false });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleClear(): void {
     setMyCar(null);
-    router.push(urlWithoutCar());
+    router.replace(urlWithoutCar(), { scroll: false });
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (

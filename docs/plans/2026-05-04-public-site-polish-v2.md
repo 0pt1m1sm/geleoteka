@@ -575,7 +575,16 @@ Type: Feature
 
 ## E2E Results
 
-Verified against prod (`https://geleoteka-production.up.railway.app/`) at commit `7886936` after prod seed applied via `DATABASE_PUBLIC_URL`.
+Verified against prod (`https://geleoteka-production.up.railway.app/`) at commit `e61dd6a` (Iter-3 polish) after prod seed applied via `DATABASE_PUBLIC_URL`.
+
+> **Iter-3 follow-up (commits b8965f3 + e61dd6a)** — six copy + ordering refinements after the user reviewed the live Iter-2 prod state:
+> 1. Hero parts title broadened from "Запчасти для G-Class" → "Запчасти Mercedes-Benz" (the shop sells across MB lineup; many parts cross-fit between G/S/E/GLE).
+> 2. Hero parts subtitle dropped "качественные аналоги" framing — same edit applied to the FAQ answer about OEM parts.
+> 3. Hero "Масла и фильтры →" secondary link removed (felt random).
+> 4. Hero editorial numerals 01/02 removed — they competed with the existing "СЕРВИС"/"ЗАПЧАСТИ" badges. Corner ticks + divider pip + spotlight remain.
+> 5. Hero service warranty: "гарантия 12 месяцев" → "гарантия на работы 12 месяцев*" with footnote linking to `/about#warranty`.
+> 6. Homepage Services hardcoded promo tile "Ремонт двигателя" → "Двигатель" (mirrors the seed-level rename).
+> 7. Booking Step 1: "Другое" tile pinned to the bottom regardless of alpha sort (post-fetch JS sort in `app/(public)/booking/page.tsx`); "~Nч" duration display removed from all tiles.
 
 | Scenario | Priority | Result | Fix Attempts | Notes |
 |----------|----------|--------|--------------|-------|
