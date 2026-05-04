@@ -2,7 +2,7 @@
 
 Created: 2026-05-04
 Author: aleksandr's.spiskov@gmail.com
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -139,11 +139,16 @@ Type: Feature
 
 ## Goal Verification
 
+> **Iter-2 design pivots (user-approved during implementation, captured here as the as-built spec):**
+> - **Reviews:** the cross-origin Yandex iframe was rejected by the user (white-on-dark theme break, blue Yandex CTA, fixed 760px width that horizontal-scrolled on mobile). Iter-2 replaced the iframe with native server-rendered review cards driven by live Yandex widget HTML parsing (`lib/yandex-reviews.ts`, ISR-cached 1h). Brand-matched: gold-on-black, sharp Geleoteka card style, 1col mobile / 2col `md+`. The skeleton is removed — data is fetched at SSR time, no client-side loading state.
+> - **Hero hover:** the user explicitly rejected the planned `grid-template-columns 2fr/1fr` resize-expansion ("feels like the button is running away") and approved a spotlight effect instead — hovered half brightens slightly, the other half darkens, no layout reflow. Truth #3 below describes the as-built behavior.
+> - **Subtitle copy:** Reviews section subtitle changed from "Реальные отзывы с Яндекс Карт — обновляются автоматически" to "Что пишут владельцы G-Class и других Mercedes-Benz после визита" to match the native-card redesign (no longer an iframe-style "auto-updates" promise).
+
 ### Truths
 
-1. Visiting `/` Reviews section shows: a 2-column layout on `lg+` (iframe left, brand panel right with 4.9★ + Все отзывы CTA + "Источник: Яндекс Карты") and stacks on mobile.
-2. On first paint of Reviews section, before iframe loads, a pulsing skeleton occupies the iframe slot. Once iframe `onLoad` fires (or after 4s timeout), skeleton fades out.
-3. Hovering left half of hero on desktop expands it to 2fr / right shrinks to 1fr (~67%/33%) over 600ms; right hover mirrors. Mobile / `prefers-reduced-motion` shows static 50/50.
+1. Visiting `/` Reviews section shows: aggregate rating header (5,0 + 5 gold stars + "28 отзывов · 58 оценок" stats line) above a 1-col mobile / 2-col `md+` grid of native review cards. Each card has a gold initial avatar, name, date, 5 gold stars, review text. CTA at bottom links to Yandex Maps profile. Theme: gold-on-black (dark) / gold-on-cream (light). Source: live Yandex widget HTML parsed at SSR time, ISR-cached 1h.
+2. Reviews section is server-rendered with no client-side loading state. On stale-cache ISR regeneration the page may serve a slightly older snapshot, but the user never sees a skeleton.
+3. Hovering left half of hero on desktop brightens its background (rgba(255,255,255,0.04)) and dims the right half (rgba(0,0,0,0.22)) over 500ms cubic-bezier; right hover mirrors. **No** column-width change — spotlight effect only, no layout reflow. `prefers-reduced-motion` and mobile (<768px) show static state.
 4. Visiting `/booking` shows Step 1 with both Services tile grid AND Vehicle card on the same page. Selecting ≥1 service AND filling model+year enables "Далее →".
 5. After model+year are filled in Step 1, helper text "Кузов: <gen1> / <gen2>" appears under the year field, derived from `MODELS[model].generations`.
 6. Step 2 is the calendar slot picker.
@@ -237,17 +242,23 @@ Type: Feature
 - [x] Task 4: Step 1 component — combined Service + Vehicle + chassis-code helper
 - [x] Task 5: Step 3 component — Contact + Summary (email stays required, no auth link)
 - [x] Task 6: Wizard route restructure — delete step-4,5; renumber step-2,3; update StepIndicator; delete obsolete components
-- [ ] Task 7: Final regression + smoke + commit + push + run prod seed
+- [x] Task 7: Final regression + smoke + commit + push + run prod seed *(prod seed pending user action — `DATABASE_URL=<DATABASE_PUBLIC_URL> npx prisma db seed`)*
 
-      **Total Tasks:** 7 | **Completed:** 6 | **Remaining:** 1
+      **Total Tasks:** 7 | **Completed:** 7 | **Remaining:** 0
 
 ## Implementation Tasks
 
 ---
 
-### Task 1: Reviews 2-column layout + iframe skeleton
+### Task 1: Reviews — native server-rendered cards (Iter-2: replaced iframe entirely)
 
-**Objective:** Wrap the Yandex iframe in a Client Component that shows a pulsing skeleton until `onLoad` fires (or 4s timeout). Restructure Reviews section to 2-column on `lg+` with brand panel beside iframe.
+> **Pivoted during implementation across two rounds.**
+> - **Iter-1 (initial spec, shipped in 364f147):** Yandex iframe wrapped in a `ReviewsIframeWithSkeleton` Client Component with `lg:grid-cols-[1fr_280px]` layout — 4.9★ brand panel + iframe.
+> - **Iter-2 (post-feedback, current):** user rejected the iframe — white-on-dark theme break, fixed 760px caused horizontal scroll on mobile, blue Yandex CTA didn't match the brand. Replaced with native server-rendered cards driven by a server-side parser of the public Yandex widget HTML (`lib/yandex-reviews.ts`, ISR-cached 1h). Brand-matched: gold-on-black, sharp Geleoteka card style, 1col mobile / 2col `md+`. Subtitle copy changed from "Реальные отзывы с Яндекс Карт — обновляются автоматически" to "Что пишут владельцы G-Class и других Mercedes-Benz после визита" since "auto-updates" implied iframe behavior.
+>
+> Files added in Iter-2: `lib/yandex-reviews.ts`, `components/shared/Reviews.tsx`. Removed: `components/shared/ReviewsIframeWithSkeleton.tsx`.
+
+**Objective:** Render review data on the home page using brand-matched native cards, sourced from live Yandex widget HTML at SSR time with 1h ISR caching. Aggregate rating header + responsive card grid + "all reviews on Yandex" CTA.
 
 **Dependencies:** None
 **Mapped Scenarios:** TS-001
@@ -295,12 +306,14 @@ Type: Feature
 
 **Definition of Done:**
 
-- [ ] `ReviewsIframeWithSkeleton.tsx` exists, renders iframe with `width=760`, hides skeleton on `onLoad` OR after 4s
-- [ ] `app/(public)/page.tsx` Reviews section uses `lg:grid lg:grid-cols-[1fr_280px]` layout
-- [ ] Brand panel includes 4.9★ + count + Все отзывы primary button
-- [ ] Mobile (<1024px): brand panel stacks above iframe; iframe horizontal-scrolls in its container
-- [ ] No console errors; no CLS on first load (skeleton holds the height)
-- [ ] `npx tsc --noEmit` exit 0
+- [x] `lib/yandex-reviews.ts` server-side fetch + regex parser, ISR `revalidate: 3600`
+- [x] `components/shared/Reviews.tsx` async server component renders aggregate header + grid + CTA
+- [x] `app/(public)/page.tsx` Reviews section uses `<Reviews />` — section wrapper provides heading, subtitle, max-width container
+- [x] Mobile (<768px): cards stack 1-col, no horizontal scroll, no blue Yandex CTA visible
+- [x] `md+`: cards 2-col, gap-5
+- [x] No console errors; cards render with real Yandex review names + dates + text
+- [x] On Yandex fetch failure: rating + CTA still render, cards section silently empty (no broken UI)
+- [x] `npx tsc --noEmit` exit 0
 
 **Verify:**
 - Manual: navigate to `/` at 1280×800 + 375×667, verify both layouts via Chrome DevTools MCP
@@ -308,9 +321,11 @@ Type: Feature
 
 ---
 
-### Task 2: Hero hover-expansion CSS rules
+### Task 2: Hero hover treatment (Iter-2: spotlight, not column expansion)
 
-**Objective:** Replace the hero's `grid-cols-1 md:grid-cols-2` with arbitrary `[grid-template-columns:1fr_1fr]` on `md+`, add `:has()` rules in `globals.css` to expand the hovered half. Respects `prefers-reduced-motion`.
+> **Pivoted during implementation.** Initial spec was a `grid-template-columns 2fr/1fr` resize. User saw the prototype and explicitly rejected it ("feels like the button is running away from the user"). Replaced with a spotlight effect: hovered half brightens, the other half dims, no layout reflow. The `data-half` attributes and `:has()` plumbing remain the same; only the property under transition changed (`background-color` instead of `grid-template-columns`).
+
+**Objective:** Spotlight hover on the hero halves. `:has()` rules in `globals.css` brighten the hovered half (`rgba(255,255,255,0.04)`) and dim the other half (`rgba(0,0,0,0.22)`) over 500ms cubic-bezier. Respects `prefers-reduced-motion`. Mobile static.
 
 **Dependencies:** None
 **Mapped Scenarios:** TS-002
@@ -352,13 +367,14 @@ Type: Feature
 
 **Definition of Done:**
 
-- [ ] Hero grid uses `[grid-template-columns:1fr_1fr]` on `md+`
-- [ ] Each half has `data-half="left"` or `data-half="right"`
-- [ ] `globals.css` has `:has()` rules wrapped in `@media (min-width: 768px) and (prefers-reduced-motion: no-preference)`
-- [ ] Hover left → grid becomes 2fr 1fr; hover right → 1fr 2fr; transition 600ms
-- [ ] `prefers-reduced-motion: reduce` (DevTools emulation): no transition, no expansion
-- [ ] Mobile (<768px): static stack, no hover behavior, no errors
-- [ ] Divider visually moves with the column boundary (border-r on left half) instead of static center
+- [x] Hero grid uses `md:grid-cols-2` (kept — no column resize anymore)
+- [x] Each half has `data-half="left"` or `data-half="right"`
+- [x] `globals.css` has `:has()` rules wrapped in `@media (min-width: 768px) and (prefers-reduced-motion: no-preference)`
+- [x] Hover left → left brightens, right dims; right hover mirrors; transition 500ms cubic-bezier
+- [x] `prefers-reduced-motion: reduce` (DevTools emulation): no transition (rules don't match)
+- [x] Mobile (<768px): static stack, no hover behavior, no errors
+- [x] Vertical gold divider stays absolute-positioned at column boundary (no longer needs to track resize)
+- [x] **Iter-2 mobile editorial accents:** outline numerals (01/02), corner ticks (top-left + bottom-right), refined hairline divider with diamond pip between halves, staggered content reveal, radial spotlight overlay for atmospheric depth — all `md:hidden`
 
 **Verify:**
 - Manual: TS-002 scenarios via Chrome DevTools MCP at 1280×800

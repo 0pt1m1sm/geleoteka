@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
-import { YANDEX_PROFILE_URL } from "@/lib/yandex";
-import { ReviewsIframeWithSkeleton } from "@/components/shared/ReviewsIframeWithSkeleton";
+import { Reviews } from "@/components/shared/Reviews";
 
 const faqItems = [
   {
@@ -41,7 +40,8 @@ export default function HomePage() {
     <div className="flex flex-col">
       {/* Hero */}
       <section className="relative overflow-hidden md:min-h-[600px] md:max-h-[90vh] md:h-screen">
-        {/* Background photo spans full hero. Both halves are transparent — photo shows through. */}
+        {/* Background photo spans full hero. Overlays add depth (atmospheric vignette
+            via radial spotlight) and respect light/dark theme through hero-overlay. */}
         <div className="absolute inset-0">
           <img
             src="/images/hero/g-class-4k.jpg"
@@ -49,64 +49,86 @@ export default function HomePage() {
             className="size-full object-cover"
           />
           <div className="absolute inset-0 bg-black/55 hero-overlay" />
+          <div className="hero-spotlight" />
           <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
         </div>
 
         {/* Two halves spanning full hero height. Each is transparent, lets the photo through.
-            Mobile: stacks to two rows (service first). Desktop: 50/50 split with hover-expand.
-            Half is a <div> (not a Link) so the primary CTA and secondary link inside
-            remain independent <Link>s with their own hrefs and proper a11y.
-            Hover-expand rules live in globals.css scoped to .hero-split + data-half. */}
+            Mobile: stacks to two rows with a proper hairline+pip divider between them.
+            Desktop: 50/50 split with hover-expand spotlight (rules in globals.css).
+            Editorial accents (numerals, corner ticks) are mobile-only — desktop relies on
+            the hover-spotlight for differentiation. */}
         <div className="hero-split relative z-10 grid h-full animate-fade-in grid-cols-1 text-white md:grid-cols-2">
           {/* Left half — Сервис. Gradient divider lives at right-0 so it moves with the column boundary on hover-expand. */}
-          <div data-half="left" className="relative flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center sm:px-10 md:border-b-0">
+          <div data-half="left" className="relative flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
             <div aria-hidden className="absolute inset-y-[15%] right-0 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
-            <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
-              Сервис
+
+            {/* Mobile-only editorial accents */}
+            <span aria-hidden className="hero-numeral md:hidden">01</span>
+            <span aria-hidden className="hero-corner hero-corner-tl md:hidden" />
+            <span aria-hidden className="hero-corner hero-corner-br md:hidden" />
+
+            <div className="hero-stagger flex flex-col items-center">
+              <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
+                Сервис
+              </div>
+              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+                Сервис в&nbsp;Москве
+              </h2>
+              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+                ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;12 месяцев.
+              </p>
+              <Link
+                href="/booking"
+                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+              >
+                Записаться на&nbsp;сервис
+              </Link>
+              <Link
+                href="/services"
+                className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
+              >
+                Прайс на&nbsp;работы →
+              </Link>
             </div>
-            <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
-              Сервис в&nbsp;Москве
-            </h2>
-            <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
-              ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;12 месяцев.
-            </p>
-            <Link
-              href="/booking"
-              className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
-            >
-              Записаться на&nbsp;сервис
-            </Link>
-            <Link
-              href="/services"
-              className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
-            >
-              Прайс на&nbsp;работы →
-            </Link>
+          </div>
+
+          {/* Mobile-only section divider between halves. Removed from desktop layout via
+              md:hidden so the 2-column grid sits side-by-side with the vertical accent. */}
+          <div className="hero-divider-mobile py-3 md:hidden" aria-hidden>
+            <span className="hero-divider-pip" />
           </div>
 
           {/* Right half — Запчасти */}
-          <div data-half="right" className="flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
-            <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
-              Запчасти
+          <div data-half="right" className="relative flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
+            {/* Mobile-only editorial accents */}
+            <span aria-hidden className="hero-numeral md:hidden">02</span>
+            <span aria-hidden className="hero-corner hero-corner-tl md:hidden" />
+            <span aria-hidden className="hero-corner hero-corner-br md:hidden" />
+
+            <div className="hero-stagger flex flex-col items-center">
+              <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
+                Запчасти
+              </div>
+              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+                Запчасти для&nbsp;G-Class
+              </h2>
+              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+                Оригинал и&nbsp;качественные аналоги. Подбор по&nbsp;вашему автомобилю.
+              </p>
+              <Link
+                href="/parts"
+                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+              >
+                В&nbsp;каталог запчастей
+              </Link>
+              <Link
+                href="/parts?category=oils"
+                className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
+              >
+                Масла и&nbsp;фильтры →
+              </Link>
             </div>
-            <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
-              Запчасти для&nbsp;G-Class
-            </h2>
-            <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
-              Оригинал и&nbsp;качественные аналоги. Подбор по&nbsp;вашему автомобилю.
-            </p>
-            <Link
-              href="/parts"
-              className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
-            >
-              В&nbsp;каталог запчастей
-            </Link>
-            <Link
-              href="/parts?category=oils"
-              className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
-            >
-              Масла и&nbsp;фильтры →
-            </Link>
           </div>
         </div>
       </section>
@@ -256,37 +278,19 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Reviews — uses the page background (no contrasting strip = no horizontal bar).
-          Iframe is wrapped in a themed card with rounded corners + soft shadow so the
-          fixed-white Yandex iframe has a visual anchor that respects light/dark mode. */}
+      {/* Reviews — native cards rendered with our brand tokens. Replaces the cross-origin
+          Yandex iframe (white background, blue CTA, fixed 760px width that mobile-scrolled).
+          Source data is curated from the Yandex listing; the CTA links to the live profile
+          for the full list. */}
       <section className="py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-display text-3xl sm:text-4xl font-bold mb-3">
+        <div className="mx-auto max-w-6xl px-4 text-center sm:px-6 lg:px-8">
+          <h2 className="text-display mb-3 text-3xl font-bold sm:text-4xl">
             Отзывы клиентов
           </h2>
-          <p className="text-foreground-muted max-w-xl mx-auto mb-12">
-            Реальные отзывы с Яндекс&nbsp;Карт — обновляются автоматически
+          <p className="text-foreground-muted mx-auto mb-12 max-w-xl">
+            Что пишут владельцы G-Class и других Mercedes-Benz после визита
           </p>
-
-          {/* Themed frame around the iframe. The iframe itself is white (cross-origin,
-              can't recolor), but the surrounding card + shadow softens the transition
-              and respects theme. */}
-          <div className="mx-auto max-w-3xl rounded-2xl border border-border bg-card p-2 sm:p-4 shadow-xl overflow-hidden">
-            <div className="rounded-xl overflow-hidden">
-              <ReviewsIframeWithSkeleton />
-            </div>
-          </div>
-
-          <div className="mt-8">
-            <a
-              href={YANDEX_PROFILE_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center text-accent hover:text-accent-hover transition-colors text-sm font-medium"
-            >
-              Открыть страницу Геолотеки на Яндекс&nbsp;Картах →
-            </a>
-          </div>
+          <Reviews />
         </div>
       </section>
 
