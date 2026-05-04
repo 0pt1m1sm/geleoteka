@@ -55,13 +55,12 @@ export default function HomePage() {
         <div className="absolute inset-y-[15%] left-1/2 z-10 hidden w-px bg-gradient-to-b from-transparent via-accent/40 to-transparent md:block pointer-events-none" />
 
         {/* Two halves spanning full hero height. Each is transparent, lets the photo through.
-            Mobile: stacks to two rows (service first). Desktop: 50/50 split. */}
+            Mobile: stacks to two rows (service first). Desktop: 50/50 split.
+            Half is a <div> (not a Link) so the primary CTA and secondary link inside
+            remain independent <Link>s with their own hrefs and proper a11y. */}
         <div className="relative z-10 grid h-full animate-fade-in grid-cols-1 text-white md:grid-cols-2">
           {/* Left half — Сервис */}
-          <Link
-            href="/booking"
-            className="group flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center transition-colors hover:bg-black/20 focus:bg-black/20 focus:outline-hidden sm:px-10 md:border-b-0"
-          >
+          <div className="flex flex-col items-center justify-center border-b border-white/10 px-6 py-12 text-center sm:px-10 md:border-b-0">
             <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
               Сервис
             </div>
@@ -71,19 +70,22 @@ export default function HomePage() {
             <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
               ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;12 месяцев.
             </p>
-            <span className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors group-hover:bg-accent-hover">
+            <Link
+              href="/booking"
+              className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+            >
               Записаться на&nbsp;сервис
-            </span>
-            <span className="mt-4 text-sm text-accent/80 transition-colors group-hover:text-accent-hover">
+            </Link>
+            <Link
+              href="/services"
+              className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
+            >
               Прайс на&nbsp;работы →
-            </span>
-          </Link>
+            </Link>
+          </div>
 
           {/* Right half — Запчасти */}
-          <Link
-            href="/parts"
-            className="group flex flex-col items-center justify-center px-6 py-12 text-center transition-colors hover:bg-black/20 focus:bg-black/20 focus:outline-hidden sm:px-10"
-          >
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center sm:px-10">
             <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
               Запчасти
             </div>
@@ -93,13 +95,19 @@ export default function HomePage() {
             <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
               Оригинал и&nbsp;качественные аналоги. Подбор по&nbsp;вашему автомобилю.
             </p>
-            <span className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors group-hover:bg-accent-hover">
+            <Link
+              href="/parts"
+              className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+            >
               В&nbsp;каталог запчастей
-            </span>
-            <span className="mt-4 text-sm text-accent/80 transition-colors group-hover:text-accent-hover">
+            </Link>
+            <Link
+              href="/parts?category=oils"
+              className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
+            >
               Масла и&nbsp;фильтры →
-            </span>
-          </Link>
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -293,7 +301,7 @@ export default function HomePage() {
             <a
               href={YANDEX_PROFILE_URL}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               className="text-[var(--color-accent)] hover:underline text-sm font-medium"
             >
               Все отзывы на Яндекс Картах →

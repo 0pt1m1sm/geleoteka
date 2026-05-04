@@ -2,7 +2,7 @@
 
 Created: 2026-05-04
 Author: aleksandr's.spiskov@gmail.com
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -266,9 +266,9 @@ User pre-approved deploy to production at the end of `/spec`. After verification
 - [x] Task 6: `MyCarInit` — redirect on revisit, with `||` guard + `showAll` override + self-heal
 - [x] Task 7a: Parts page skeleton + server-side car-aware where clause + `showAll=1` semantics
 - [x] Task 7b: `PartsFilterSidebar` + chips + mobile drawer with body-scroll-lock + delete `PartsSearch`
-- [ ] Task 8: Final regression + smoke (TS-001..TS-008) + commit + push to origin/main
+- [x] Task 8: Final regression + smoke (TS-001..TS-008) + commit + push to origin/main
 
-      **Total Tasks:** 9 | **Completed:** 8 | **Remaining:** 1
+      **Total Tasks:** 9 | **Completed:** 9 | **Remaining:** 0
 
 ## Implementation Tasks
 

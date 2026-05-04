@@ -117,7 +117,9 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
 
       <div>
         <label className="block text-sm font-medium mb-1">Цена, ₽</label>
-        <div className="flex items-center gap-2">
+        {/* key forces re-mount when URL-derived values change (e.g., chip ✕ clears the param)
+            so the uncontrolled defaultValue stays in sync with the URL. */}
+        <div key={`price-${minPriceStr}-${maxPriceStr}`} className="flex items-center gap-2">
           <input
             type="number"
             inputMode="numeric"
@@ -128,7 +130,7 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
             className="input w-full text-sm"
             aria-label="Минимальная цена"
           />
-          <span className="text-[var(--foreground-muted)]">—</span>
+          <span className="text-foreground-muted">—</span>
           <input
             type="number"
             inputMode="numeric"
