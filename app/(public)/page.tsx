@@ -39,7 +39,7 @@ export default function HomePage() {
   return (
     <div className="flex flex-col">
       {/* Hero */}
-      <section className="relative min-h-[600px] max-h-[90vh] h-screen overflow-hidden">
+      <section className="relative overflow-hidden md:min-h-[600px] md:max-h-[90vh] md:h-screen">
         {/* Background photo spans full hero. Both halves are transparent — photo shows through. */}
         <div className="absolute inset-0">
           <img
