@@ -56,6 +56,18 @@ export function generationLabel(g: Pick<Generation, "code" | "yearFrom" | "yearT
   return `${g.yearFrom}–${end} · ${g.code}`;
 }
 
+/**
+ * Display name for a vehicle model in pickers and saved-car strips. Prepends
+ * the manufacturer brand so single-letter models ("CLA", "GLE") read
+ * consistently next to suffixed ones ("G-Class", "S-Class"). Single seam for
+ * the future multi-brand refactor — when brand becomes config-driven this is
+ * the function that swaps "Mercedes-Benz" for the active brand's display
+ * name.
+ */
+export function modelDisplayName(modelName: string): string {
+  return `Mercedes-Benz ${modelName}`;
+}
+
 /** Just the code, for compact contexts. */
 export function generationShort(g: Pick<Generation, "code">): string {
   return g.code;

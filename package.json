@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-443}",
     "lint": "eslint",
-    "migrate-static-photos": "tsx scripts/migrate-static-photos.ts"
+    "migrate-static-photos": "tsx scripts/migrate-static-photos.ts",
+    "verify-vehicle-catalog": "tsx scripts/verify-vehicle-catalog.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
