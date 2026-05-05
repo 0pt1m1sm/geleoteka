@@ -77,14 +77,16 @@ const CURATED: CuratedGeneration[] = [
       { code: "G 550 / G 500 (M113)", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113.965 E 50", displacementL: 5.0, horsepower: 382, notes: "V8; 2009–2018" },
       { code: "G 250 Diesel", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 602.931 D 25", displacementL: 2.5, notes: "1990s; HP not documented in source" },
       { code: "G 270 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 612.965 DE 27 LA", displacementL: 2.7, notes: "I5 турбо; 2001–2006" },
-      { code: "G 350 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642 DE 30 LA", displacementL: 3.0, notes: "V6 турбо; 2006–2018" },
+      { code: "G 350 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642 DE 30 LA", displacementL: 3.0, horsepower: 211, notes: "V6 турбо; 2006–2010" },
+      { code: "G 350 BlueTEC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642 DE 30 LA", displacementL: 3.0, horsepower: 211, notes: "V6 турбо; 2010–2015 (ребрендинг G 350 CDI)" },
+      { code: "G 350 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642 DE 30 LA", displacementL: 3.0, horsepower: 245, notes: "V6 турбо, рестайлинг; 2015–2018" },
       { code: "G 400 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 606.964 D 30 LA", displacementL: 3.0, notes: "I6 турбо; 2001–2006" },
       { code: "G 36 AMG", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 104.992", displacementL: 3.6, notes: "1994–1997" },
       { code: "G 55 AMG", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113.965 E 55", displacementL: 5.4, horsepower: 469, notes: "V8 атмо AMG; 2002–2004" },
       { code: "G 55 AMG Kompressor", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113 E 55 ML", displacementL: 5.4, horsepower: 500, notes: "V8 компрессор AMG; 2004–2012" },
       { code: "G 63 AMG V12 (M137)", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 137 E 63", displacementL: 6.3, horsepower: 443, notes: "V12; 2001–2003" },
-      { code: "G 63 AMG (M157)", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157 DE 55", displacementL: 5.5, notes: "V8 битурбо AMG; 2012–2018; HP not documented in source" },
-      { code: "G 65 AMG", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 279 E 60 AL", displacementL: 6.0, notes: "V12 битурбо AMG; 2012–2018; HP not documented in source" },
+      { code: "G 63 AMG (M157)", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157 DE 55", displacementL: 5.5, horsepower: 544, notes: "V8 битурбо AMG; 2012–2018 (вариации 544/571 л.с. по годам)" },
+      { code: "G 65 AMG", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 279 E 60 AL", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо AMG; 2012–2018" },
       { code: "G 500 4×4²", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M176", displacementL: 4.0, horsepower: 416, notes: "V8 битурбо; 2015–2018" },
       { code: "Maybach G 650 Landaulet", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 621, notes: "V12 битурбо; 2017" },
     ],
@@ -101,6 +103,20 @@ const CURATED: CuratedGeneration[] = [
       { code: "G 400 d", bodyStyle: "long", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM656", displacementL: 3.0, horsepower: 330, notes: "I6 дизель — Mercedes spec sheet, not Wikipedia" },
       { code: "G 500", bodyStyle: "long", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M176", displacementL: 4.0, horsepower: 422, notes: "V8 битурбо — Mercedes spec sheet, not Wikipedia" },
       { code: "G 63 AMG", bodyStyle: "long", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M177", displacementL: 4.0, horsepower: 585, notes: "AMG handcrafted V8 — Mercedes spec sheet, not Wikipedia" },
+    ],
+  },
+  // G-Class W465 (2024 – present) — facelift second-generation luxury G.
+  // Mild-hybrid I6 lineup replaces V8 G 500 with M256 inline-6, adds the
+  // electric G 580. AMG G 63 retains the 4.0 V8 biturbo with mild hybrid.
+  {
+    modelSlug: "g-class",
+    generationCode: "W465",
+    source: "https://www.auto-data.net/en/mercedes-benz-g-class-long-w465-generation-9955",
+    trims: [
+      { code: "G 450 d", bodyStyle: "long", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM656", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid; 2024–" },
+      { code: "G 500", bodyStyle: "long", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M256", displacementL: 3.0, horsepower: 449, notes: "I6 mild hybrid; 2024–" },
+      { code: "G 580 with EQ Technology", bodyStyle: "long", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 587, notes: "4× электромоторы, батарея 116 кВт·ч, запас хода 434–473 км; 2024–" },
+      { code: "AMG G 63", bodyStyle: "long", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M177", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо mild hybrid AMG; 2024–" },
     ],
   },
   // GLE V167 (2019 – present) — pre-existing curated set; engine codes/HP
