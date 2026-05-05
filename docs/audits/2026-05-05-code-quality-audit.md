@@ -10,9 +10,9 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 
 ## Top Findings (highest leverage first)
 
-| # | Axis | Title | Leverage | Where |
-|---|------|-------|----------|-------|
-| 1 | Reuse | Mobile/desktop nav components share ~150 duplicated lines across 4 files | **High** | `components/admin/AdminMobileNav.tsx`, `components/admin/AdminSidebar.tsx`, `components/shared/MobileMenu.tsx`, `components/shared/PanelMobileNav.tsx` |
+| # | Axis | Title | Leverage | Evidence |
+|---|------|-------|----------|----------|
+| 1 | Reuse | Mobile/desktop nav components share ~210 duplicated lines across 9 jscpd clone pairs in 4 files | **High** | `components/admin/AdminMobileNav.tsx`, `components/admin/AdminSidebar.tsx`, `components/shared/MobileMenu.tsx`, `components/shared/PanelMobileNav.tsx` |
 | 2 | Reuse | `defaultContact` server-side prefill pattern reimplemented in 2 places | **High** | `app/(public)/parts/cart/page.tsx`, `app/(public)/booking/step-3/page.tsx` |
 | 3 | Reuse | `useSyncExternalStore` cached-snapshot pattern reimplemented 3 times | **High** | `lib/my-car-store.ts`, `components/booking/BookingProvider.tsx`, `components/parts/PartsCart.tsx` |
 | 4 | Quality | Three dead exports in `lib/utils.ts` (`cn`, `generateReferralCode`, `getTierFromPoints`) | **High** | `lib/utils.ts:5,40,98` |
@@ -21,7 +21,7 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 | 7 | Reuse | Auth + admin-create page chrome duplicated across login/register/reset-password/admin-suppliers-new | **Medium** | `app/(public)/{login,register,reset-password/confirm}/page.tsx`, `app/(admin)/admin/suppliers/new/page.tsx` |
 | 8 | Quality | Three dead server actions (`assignMaster`, `deletePart`, `deleteSupplierOrder`) — exported but no consumer wired up | **Medium** | `app/actions/admin.ts:53`, `app/actions/parts.ts:126`, `app/actions/supplier-orders.ts:106` |
 | 9 | Quality | `useMyCar` hook is exported but unused — only the `setMyCar` setter is consumed | **Medium** | `lib/my-car-store.ts:78` |
-| 10 | Quality | `lib/models-data.ts` re-export shim duplicates types from `lib/vehicle-catalog.ts` (left over from recent migration) | **Medium** | `lib/models-data.ts` (whole file) |
+| 10 | Quality | `lib/models-data.ts` shim has 3 unused re-exports (Generation, Manufacturer, generationShort); 2 are still consumed and must stay or be migrated | **Medium** | `lib/models-data.ts`, `lib/vehicle-catalog.ts` |
 
 ---
 
@@ -37,7 +37,7 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 - `components/admin/AdminMobileNav.tsx:46-68` ↔ `components/shared/PanelMobileNav.tsx:30-49` (23 lines)
 - `components/admin/AdminMobileNav.tsx:41-63` ↔ `components/shared/PanelMobileNav.tsx:25-46` (23 lines)
 
-**Rationale:** Six jscpd hits cluster around a single architectural duplication: the admin sidebar/mobile-nav and the shared mobile-menu/panel-nav each implement open-state tracking, focus management, escape handling, and link-list rendering separately. ~150 lines duplicated across 4 components — every nav-related fix has to land in 4 places. An extractable `<NavPanel />` primitive in `components/shared/` taking a list shape + open-state owner as props would collapse this. Highest-leverage extraction in the codebase: visible from a maintenance angle (4 places to edit a nav rule today) and the reuse cost is structural (drift between admin and public nav UX is exactly what this kind of duplication produces).
+**Rationale:** Nine jscpd hits cluster around a single architectural duplication: the admin sidebar/mobile-nav and the shared mobile-menu/panel-nav each implement open-state tracking, focus management, escape handling, and link-list rendering separately. ~210 jscpd-reported lines duplicated across the 4 components (some clone ranges overlap, so the unique extractable block is somewhat smaller — but every nav-related fix has to land in 4 places regardless). An extractable `<NavPanel />` primitive in `components/shared/` taking a list shape + open-state owner as props would collapse this. Highest-leverage extraction in the codebase: visible from a maintenance angle (4 places to edit a nav rule today) and the reuse cost is structural (drift between admin and public nav UX is exactly what this kind of duplication produces).
 
 ### `defaultContact` server-side prefill pattern — High
 
@@ -88,6 +88,17 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 - `components/admin/GenerationManager.tsx:99-114` ↔ `components/admin/ModelEditForm.tsx:90-105` (16 lines): both wrap mutations in `useTransition` + try/catch with the same error-banner shape. Candidate for a small `useFormAction(action)` hook.
 - `app/actions/parts.ts:3-22` ↔ `app/api/parts/import/route.ts:1-15` (20 lines): import block + slugify helper duplicated. The slugify helper is identical in both files — should be extracted to `lib/utils.ts` or similar.
 - `app/actions/rentals.ts:64-75` ↔ `app/actions/rentals.ts:44-55` (12 lines): self-duplication inside a single file. Two action functions share enough scaffolding to extract a private helper.
+- `components/booking/Step3ContactConfirm.tsx:67-77` ↔ `components/parts/PartsCart.tsx:91-101` (11 lines): the success-state SVG-checkmark + card wrapper used after both booking submit and cart submit. Cross-domain duplication that's a clean candidate for a `<SuccessCard message={...} cta={...} />` primitive in `components/shared/`.
+
+### Reviewed and judged below the action threshold
+
+Three additional 11-line jscpd clones were inspected and not promoted into the recommendations because the duplication is structural boilerplate that's cheaper to leave than to abstract:
+
+- `app/(portal)/cabinet/page.tsx:14-24` ↔ `app/(portal)/cabinet/tracking/page.tsx:20-30` — page-shell auth check
+- `app/(admin)/admin/page.tsx:103-113` ↔ `app/(portal)/cabinet/page.tsx:81-92` — dashboard-card iteration
+- `app/(admin)/admin/parts/[id]/page.tsx:38-48` ↔ `app/(admin)/admin/parts/new/page.tsx:14-24` — admin parts page categories prep (already addressed by the "Admin form shells" finding above)
+
+Recording them here so the reader can see the full set of 29 clones was examined.
 
 ---
 
@@ -109,7 +120,7 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 
 ### Zero circular dependencies — High-confidence positive
 
-**Evidence:** `madge --circular --ts-config tsconfig.json` over 143 files reports "No circular dependency found!"
+**Evidence:** `madge --circular --ts-config tsconfig.json` over 143 files produced an empty cycle list (the stdout file `/tmp/audit-2026-05-05/madge-cycles.txt` contains only the "Processed 143 files (1.2s) (1 warning)" status line — empty result = zero cycles). The single warning was a routine path-resolution note from madge and was not a cycle.
 
 **Rationale:** With TypeScript path aliases properly resolved (this required `--ts-config tsconfig.json` — see Tooling appendix for why the first attempt produced a misleadingly empty graph), the codebase is cycle-free. Worth recording as a baseline so a future audit can detect regression.
 
@@ -147,11 +158,11 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 
 **Rationale:** The hook was provided to let any component subscribe to the saved-car selection, but the actual portal/parts UI uses `MyCarStrip` and `MyCarPicker` which read URL params and set localStorage via `setMyCar` — the read path is via URL, not the hook. Either make the hook the canonical read API and migrate consumers, or delete it. Medium leverage — an unused public API is an invitation for the next implementer to use it the wrong way.
 
-### `lib/models-data.ts` re-export shim duplicates types — Medium
+### `lib/models-data.ts` re-export shim has partially-dead exports — Medium
 
-**Evidence:** `lib/models-data.ts` re-exports `Generation`, `VehicleModel`, `Manufacturer`, `generationLabel`, `generationShort` from `./vehicle-catalog-types`. ts-prune flags 4 entries (`Generation`, `Manufacturer`, `generationShort` × 2 because both files export them).
+**Evidence:** `lib/models-data.ts` re-exports `Generation`, `VehicleModel`, `Manufacturer`, `generationLabel`, `generationShort` from `./vehicle-catalog-types`. ts-prune flags 3 of those re-exports as unused: `Generation` (line 13), `Manufacturer` (line 13), `generationShort` (line 14). The corresponding 3 source exports in `lib/vehicle-catalog-types.ts` (re-exported through `lib/vehicle-catalog.ts`) are also flagged. `VehicleModel` and `generationLabel` are NOT flagged — they are actively imported by `components/booking/Step1ServiceVehicle.tsx:6` and `components/parts/MyCarPicker.tsx:5`.
 
-**Rationale:** During the recent vehicle-catalog migration this file was reduced to a thin compatibility shim. Now grep confirms zero consumers still import from `@/lib/models-data` for type/helper purposes. Either delete `lib/models-data.ts` entirely OR keep it explicitly as a deprecation pointer. Medium leverage — small structural cleanup that also reduces the surface area for "which file is the source of truth?" confusion.
+**Rationale:** During the recent vehicle-catalog migration this file was reduced to a thin compatibility shim. Two of the five re-exports (`VehicleModel`, `generationLabel`) are still consumed by client components — those imports are the reason `lib/models-data.ts` cannot simply be deleted. The other three (`Generation`, `Manufacturer`, `generationShort`) re-export through both `models-data.ts` and `vehicle-catalog.ts` but are never imported anywhere. Recommend partial cleanup: drop the unused re-exports from both files, keep the ones with active consumers (or migrate the two consumers to import directly from `@/lib/vehicle-catalog-types` and then delete `lib/models-data.ts` entirely). Medium leverage — small structural cleanup that also reduces the surface area for "which file is the source of truth?" confusion.
 
 ### Internal-only types exported as public — Low
 
@@ -160,14 +171,14 @@ This is a **dated snapshot**. Each high-leverage finding below should become its
 - `lib/admin-nav.ts:15` — `AdminNavLink`
 - `lib/admin-nav.ts:28` — `AdminNavEntry`
 - `lib/auth.ts:9` — `JWTPayload`
-- `lib/auth.ts:14` — `SessionUser` (this one IS used externally in many places — likely a ts-prune false positive worth verifying)
+- `lib/auth.ts:14` — `SessionUser` (verified: only used internally as the return type of `getSession()`/`requireAuth()`/`requireRole()`; no external file imports the type itself, only calls the functions and uses inferred types)
 - `lib/my-car-store.ts:5` — `MyCar`
 - `lib/yandex-reviews.ts:10` — `YandexReviewsData`
 - `lib/yandex.ts:2` — `YANDEX_ORG_ID`
-- `lib/vehicle-catalog.ts:6` — `VehicleModel`
+- `lib/vehicle-catalog.ts:6` — `VehicleModel` (re-exported through `lib/models-data.ts` and consumed via that re-export — see "models-data shim" finding above for context)
 - `components/booking/BookingProvider.tsx:11` — `BookingData`
 
-**Rationale:** ts-prune marks these with `(used in module)` — the symbol is used inside its own module but never imported by another file. Either the type/value is genuinely public-by-intention but unconsumed (a small surface-area expansion smell), or it should be `type Foo = ...` instead of `export type Foo = ...`. **Caveat:** ts-prune occasionally flags exports as "(used in module)" when they're actually used externally via path-alias imports it didn't follow — `SessionUser` looks like a clear false positive on inspection. Hand-verify before deleting any of these. Low leverage — pure hygiene.
+**Rationale:** ts-prune marks these with `(used in module)` — the symbol is used inside its own module but never imported by another file directly. Each is a candidate to demote from `export type Foo = ...` to `type Foo = ...` (or `export function` to `function` for `YANDEX_ORG_ID`-style values). Hand-verify each before changing — for some (`VehicleModel`) the consumer reaches the type indirectly via a re-export shim. Low leverage — pure hygiene.
 
 ### File length — clean
 
