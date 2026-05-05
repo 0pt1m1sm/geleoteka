@@ -12,15 +12,15 @@
  */
 import "dotenv/config";
 import { db } from "@/lib/db";
-import { MODEL_GENERATIONS } from "@/lib/models-data";
+import { getModelGenerationsMap } from "@/lib/vehicle-catalog";
 
-function expand(entry: string): string[] {
+function expand(entry: string, map: Record<string, string[]>): string[] {
   const trimmed = entry.trim();
   if (!trimmed) return [];
   // Already has generation (contains a space inside the value)
   if (trimmed.includes(" ")) return [trimmed];
   // Bare model name — expand to all known generations for that model
-  const gens = MODEL_GENERATIONS[trimmed];
+  const gens = map[trimmed];
   if (!gens || gens.length === 0) {
     // Unknown model — leave as-is, the dry-run report will flag it for manual review
     return [trimmed];
@@ -28,10 +28,10 @@ function expand(entry: string): string[] {
   return gens.map((g) => `${trimmed} ${g}`);
 }
 
-function normalize(values: string[]): string[] {
+function normalize(values: string[], map: Record<string, string[]>): string[] {
   const out = new Set<string>();
   for (const v of values) {
-    for (const e of expand(v)) out.add(e);
+    for (const e of expand(v, map)) out.add(e);
   }
   return Array.from(out);
 }
@@ -39,9 +39,10 @@ function normalize(values: string[]): string[] {
 async function main(): Promise<void> {
   const apply = process.argv.includes("--apply");
 
-  const parts = await db.part.findMany({
-    select: { id: true, slug: true, compatibleModels: true },
-  });
+  const [parts, map] = await Promise.all([
+    db.part.findMany({ select: { id: true, slug: true, compatibleModels: true } }),
+    getModelGenerationsMap(),
+  ]);
 
   let changedCount = 0;
   let unchangedCount = 0;
@@ -50,7 +51,7 @@ async function main(): Promise<void> {
 
   for (const p of parts) {
     const before = (p as { compatibleModels: string[] }).compatibleModels;
-    const after = normalize(before);
+    const after = normalize(before, map);
     const equal =
       before.length === after.length && before.every((v, i) => v === after[i]);
     if (equal) {
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
       continue;
     }
     for (const v of before) {
-      if (!v.includes(" ") && !MODEL_GENERATIONS[v]) {
+      if (!v.includes(" ") && !map[v]) {
         unknownEntries.add(v);
       }
     }

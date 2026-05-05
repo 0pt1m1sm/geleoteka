@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { MODEL_GENERATIONS } from "@/lib/models-data";
+import { getModelGenerationsMap } from "@/lib/vehicle-catalog";
 
 function slugify(text: string): string {
   return text
@@ -20,12 +20,13 @@ function slugify(text: string): string {
  * so bare model names ("G-Class") never match. Reject them at the write boundary
  * to prevent admins from silently breaking parts visibility.
  */
-function validateCompatibleModels(values: string[]): string | null {
+async function validateCompatibleModels(values: string[]): Promise<string | null> {
+  const map = await getModelGenerationsMap();
   for (const v of values) {
     if (!v.includes(" ")) {
-      const known = Boolean(MODEL_GENERATIONS[v]);
+      const known = Boolean(map[v]);
       if (known) {
-        const gens = MODEL_GENERATIONS[v].slice(0, 3).map((g) => `${v} ${g}`).join(", ");
+        const gens = map[v].slice(0, 3).map((g) => `${v} ${g}`).join(", ");
         return `Каждая запись в "Совместимые модели" должна содержать поколение, например "${gens}". Нашли "${v}".`;
       }
       // Unknown bare token — reject too
@@ -58,7 +59,7 @@ export async function createPart(
     return { error: "Артикул, название и цена обязательны" };
   }
 
-  const compatErr = validateCompatibleModels(compatibleModels);
+  const compatErr = await validateCompatibleModels(compatibleModels);
   if (compatErr) return { error: compatErr };
 
   const existing = await db.part.findUnique({ where: { article } });
@@ -111,7 +112,7 @@ export async function updatePart(
     return { error: "Название и цена обязательны" };
   }
 
-  const compatErr = validateCompatibleModels(compatibleModels);
+  const compatErr = await validateCompatibleModels(compatibleModels);
   if (compatErr) return { error: compatErr };
 
   await db.part.update({

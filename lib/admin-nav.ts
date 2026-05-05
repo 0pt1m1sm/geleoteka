@@ -74,6 +74,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Сайт",
     items: [
       { href: "/admin/cms", label: "Контент" },
+      { href: "/admin/models", label: "Модели и поколения" },
     ],
   },
 ];

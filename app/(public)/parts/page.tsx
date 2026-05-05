@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { getActiveModels } from "@/lib/vehicle-catalog";
 import { MyCarPicker } from "@/components/parts/MyCarPicker";
 import { MyCarStrip } from "@/components/parts/MyCarStrip";
 import { PartsFilterSidebar, PartsFilterChips } from "@/components/parts/PartsFilterSidebar";
@@ -66,7 +67,7 @@ export default async function PartsPage({ searchParams }: Props) {
     where.price = priceFilter;
   }
 
-  const [parts, categories] = await Promise.all([
+  const [parts, categories, models] = await Promise.all([
     db.part.findMany({
       where,
       include: { category: { select: { name: true, slug: true } } },
@@ -74,6 +75,7 @@ export default async function PartsPage({ searchParams }: Props) {
       take: 100,
     }),
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
+    getActiveModels(),
   ]);
 
   const cats = categories.map((c: Record<string, unknown>) => ({
@@ -91,7 +93,7 @@ export default async function PartsPage({ searchParams }: Props) {
       </div>
 
       <MyCarStrip />
-      {!hasCarFilter && !showAll ? <MyCarPicker /> : null}
+      {!hasCarFilter && !showAll ? <MyCarPicker models={models} /> : null}
 
       {/* Mobile-first stack: filter button + main content stack vertically below lg.
           Above lg the sidebar sits to the left of main. */}

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { formatPrice } from "@/lib/utils";
-import { MODELS, MODEL_GENERATIONS_FULL, generationLabel } from "@/lib/models-data";
+import { generationLabel, type VehicleModel } from "@/lib/models-data";
 
 interface ServiceItem {
   id: string;
@@ -12,6 +12,11 @@ interface ServiceItem {
   priceMin: number | null;
   priceMax: number | null;
   durationMinutes: number | null;
+}
+
+interface Props {
+  services: ServiceItem[];
+  models: VehicleModel[];
 }
 
 /**
@@ -25,7 +30,7 @@ interface ServiceItem {
  *   After both Model AND Year are filled, helper text shows the model's chassis codes
  *   (e.g., "Кузов: W463 / W464") derived from MODEL_GENERATIONS.
  */
-export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): React.ReactElement {
+export function Step1ServiceVehicle({ services, models }: Props): React.ReactElement {
   const { data, update } = useBooking();
 
   function toggleService(service: ServiceItem): void {
@@ -43,7 +48,9 @@ export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): 
     }
   }
 
-  const generations = data.model ? MODEL_GENERATIONS_FULL[data.model] ?? [] : [];
+  const generations = data.model
+    ? models.find((m) => m.name === data.model)?.generations ?? []
+    : [];
   const showChassisHelper = data.model && data.year && generations.length > 0;
   const canProceed =
     data.serviceIds.length >= 1 && data.model.trim() !== "" && data.year.trim() !== "";
@@ -112,7 +119,7 @@ export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): 
             className="input"
           >
             <option value="">Выберите модель</option>
-            {MODELS.map((m) => (
+            {models.map((m) => (
               <option key={m.slug} value={m.name}>
                 {m.name}
               </option>

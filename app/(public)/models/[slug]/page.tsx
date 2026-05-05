@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getModelBySlug, MODELS, generationLabel } from "@/lib/models-data";
+import { getModelBySlug, generationLabel } from "@/lib/vehicle-catalog";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 
@@ -10,13 +10,9 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams(): Array<{ slug: string }> {
-  return MODELS.map((m) => ({ slug: m.slug }));
-}
-
 export default async function ModelPage({ params }: Props): Promise<React.ReactElement> {
   const { slug } = await params;
-  const model = getModelBySlug(slug);
+  const model = await getModelBySlug(slug);
 
   if (!model) notFound();
 
@@ -42,20 +38,19 @@ export default async function ModelPage({ params }: Props): Promise<React.ReactE
       </h1>
       <ul className="flex flex-wrap gap-2 mb-8">
         {model.generations.map((g) => (
-          <li
-            key={g.code}
-            className="badge badge-silver text-xs font-mono"
-          >
+          <li key={g.code} className="badge badge-silver text-xs font-mono">
             {generationLabel(g)}
           </li>
         ))}
       </ul>
 
-      <div className="card mb-8">
-        <p className="text-[var(--foreground-muted)] leading-relaxed text-lg">
-          {model.description}
-        </p>
-      </div>
+      {model.description && (
+        <div className="card mb-8">
+          <p className="text-[var(--foreground-muted)] leading-relaxed text-lg">
+            {model.description}
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         <div className="card">
@@ -70,12 +65,14 @@ export default async function ModelPage({ params }: Props): Promise<React.ReactE
             ))}
           </ul>
         </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-2">
-            Двигатели
-          </h3>
-          <p className="text-sm font-medium">{model.engines}</p>
-        </div>
+        {model.engines && (
+          <div className="card">
+            <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-2">
+              Двигатели
+            </h3>
+            <p className="text-sm font-medium">{model.engines}</p>
+          </div>
+        )}
       </div>
 
       {model.features.length > 0 && (

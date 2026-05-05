@@ -3,13 +3,13 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { createPart } from "@/app/actions/parts";
-import { MODELS } from "@/lib/models-data";
 
 interface Props {
   categories: { id: string; name: string }[];
+  modelNames: string[];
 }
 
-export function PartForm({ categories }: Props) {
+export function PartForm({ categories, modelNames }: Props) {
   const [state, formAction, isPending] = useActionState(createPart, null);
 
   return (
@@ -67,7 +67,7 @@ export function PartForm({ categories }: Props) {
         </label>
         <input id="compatibleModels" name="compatibleModels" className="input" placeholder="G-Class, GLE, S-Class" />
         <p className="text-xs text-[var(--foreground-muted)] mt-1">
-          Доступные: {MODELS.map((m) => m.name).join(", ")}
+          Доступные: {modelNames.join(", ")}
         </p>
       </div>
 

@@ -2,21 +2,28 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MODELS, MODEL_GENERATIONS_FULL, generationLabel } from "@/lib/models-data";
+import { generationLabel, type VehicleModel } from "@/lib/models-data";
 import { setMyCar } from "@/lib/my-car-store";
 
+interface Props {
+  models: VehicleModel[];
+}
+
 /**
- * Two-step "my car" picker: Model + Generation.
+ * Two-step "my car" picker: Model + Generation. Receives the catalog as a
+ * prop from the page server component (the data lives in the DB now).
  * Submit writes localStorage AND pushes the picker's keys into the URL so
  * SSR applies the compatibility filter on first paint.
  */
-export function MyCarPicker(): React.ReactElement {
+export function MyCarPicker({ models }: Props): React.ReactElement {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [model, setModel] = useState<string>("");
   const [generation, setGeneration] = useState<string>("");
 
-  const generations = model ? MODEL_GENERATIONS_FULL[model] ?? [] : [];
+  const generations = model
+    ? models.find((m) => m.name === model)?.generations ?? []
+    : [];
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
@@ -52,7 +59,7 @@ export function MyCarPicker(): React.ReactElement {
             aria-label="Модель"
           >
             <option value="">Модель</option>
-            {MODELS.map((m) => (
+            {models.map((m) => (
               <option key={m.slug} value={m.name}>
                 {m.name}
               </option>

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { getActiveModels } from "@/lib/vehicle-catalog";
 import { PartEditForm } from "@/components/admin/PartEditForm";
 
 interface Props {
@@ -13,9 +14,10 @@ export default async function EditPartPage({ params }: Props) {
   await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 
-  const [part, categories] = await Promise.all([
+  const [part, categories, models] = await Promise.all([
     db.part.findUnique({ where: { id } }),
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
+    getActiveModels(),
   ]);
 
   if (!part) notFound();
@@ -39,11 +41,12 @@ export default async function EditPartPage({ params }: Props) {
     id: c.id as string,
     name: c.name as string,
   }));
+  const modelNames = models.map((m) => m.name);
 
   return (
     <div className="max-w-2xl">
       <h1 className="text-display text-2xl font-bold mb-6">Редактировать запчасть</h1>
-      <PartEditForm part={serialized} categories={cats} />
+      <PartEditForm part={serialized} categories={cats} modelNames={modelNames} />
     </div>
   );
 }

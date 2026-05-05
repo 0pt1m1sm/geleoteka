@@ -1,5 +1,6 @@
 import { PrismaClient } from "../app/generated/prisma/client";
 import bcrypt from "bcryptjs";
+import { seedVehicleCatalog } from "./seed-vehicles";
 
 const prisma = new PrismaClient();
 
@@ -379,6 +380,11 @@ async function main(): Promise<void> {
     }
   }
   console.log(`Seeded ${rentalVehicles.length} rental vehicles`);
+
+  // ============================================
+  // VEHICLE CATALOG — Manufacturer / Model / Generation
+  // ============================================
+  await seedVehicleCatalog(prisma);
 
   console.log("Seeding complete!");
 }

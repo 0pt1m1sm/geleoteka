@@ -658,3 +658,59 @@ model SupplierOrderItem {
   @@index([orderId])
   @@index([partId])
 }
+
+// ============================================
+// VEHICLE CATALOG — Manufacturer / Model / Generation
+// Source of truth for the picker. Service.applicableModels and
+// Part.compatibleModels still use string arrays keyed by VehicleModel.name
+// for a soft join — refactoring those to FKs is a follow-up.
+// ============================================
+
+model Manufacturer {
+  id        String         @id @default(cuid())
+  slug      String         @unique
+  name      String
+  sortOrder Int            @default(0)
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  models    VehicleModel[]
+
+  @@index([isActive, sortOrder])
+}
+
+model VehicleModel {
+  id             String              @id @default(cuid())
+  slug           String              @unique
+  name           String
+  description    String?
+  engines        String?
+  features       String[]            @default([])
+  manufacturerId String
+  sortOrder      Int                 @default(0)
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  manufacturer   Manufacturer        @relation(fields: [manufacturerId], references: [id], onDelete: Cascade)
+  generations    VehicleGeneration[]
+
+  @@index([manufacturerId, sortOrder])
+  @@index([isActive])
+}
+
+model VehicleGeneration {
+  id        String       @id @default(cuid())
+  code      String
+  yearFrom  Int
+  yearTo    Int?
+  modelId   String
+  sortOrder Int          @default(0)
+  isActive  Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  model     VehicleModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@unique([modelId, code])
+  @@index([modelId, sortOrder])
+  @@index([isActive])
+}

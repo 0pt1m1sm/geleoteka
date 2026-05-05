@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { MODEL_GENERATIONS } from "@/lib/models-data";
+import { getModelGenerationsMap } from "@/lib/vehicle-catalog";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
@@ -13,7 +13,8 @@ function slugify(text: string): string {
  * feedback; silent expansion is preferable to rejecting the row. The admin form
  * (`app/actions/parts.ts`) rejects bare names because it can show a clear error.
  */
-function expandCompatibleModels(values: string[]): string[] {
+async function expandCompatibleModels(values: string[]): Promise<string[]> {
+  const map = await getModelGenerationsMap();
   const out = new Set<string>();
   for (const v of values) {
     const trimmed = v.trim();
@@ -22,7 +23,7 @@ function expandCompatibleModels(values: string[]): string[] {
       out.add(trimmed);
       continue;
     }
-    const gens = MODEL_GENERATIONS[trimmed];
+    const gens = map[trimmed];
     if (gens && gens.length > 0) {
       for (const g of gens) out.add(`${trimmed} ${g}`);
     } else {
@@ -90,7 +91,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const quantity = parseInt(quantityStr) || 0;
     const isOEM = oemStr === "1";
     const categoryId = categorySlug ? (catMap.get(categorySlug) ?? null) : null;
-    const compatibleModels = expandCompatibleModels(
+    const compatibleModels = await expandCompatibleModels(
       modelsStr ? modelsStr.split(",").map((m) => m.trim()).filter(Boolean) : []
     );
     const slug = slugify(`${article}-${name}`).slice(0, 80);

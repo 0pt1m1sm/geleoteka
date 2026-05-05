@@ -1,7 +1,11 @@
-import Link from "next/link";
-import { MODELS, generationLabel } from "@/lib/models-data";
+export const dynamic = "force-dynamic";
 
-export default function ModelsPage(): React.ReactElement {
+import Link from "next/link";
+import { getActiveModels, generationLabel } from "@/lib/vehicle-catalog";
+
+export default async function ModelsPage(): Promise<React.ReactElement> {
+  const models = await getActiveModels();
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <div className="text-center mb-12">
@@ -9,13 +13,13 @@ export default function ModelsPage(): React.ReactElement {
           Модели Mercedes-Benz
         </h1>
         <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto text-lg">
-          Обслуживаем весь модельный ряд — от A-Class до AMG и электрических EQ.
+          Обслуживаем весь модельный ряд — от A-Class до AMG GT и электрических EQ.
           Выберите свою модель, чтобы посмотреть доступные услуги.
         </p>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {MODELS.map((model) => (
+        {models.map((model) => (
           <Link
             key={model.slug}
             href={`/models/${model.slug}`}
@@ -25,7 +29,7 @@ export default function ModelsPage(): React.ReactElement {
               Mercedes-Benz {model.name}
             </h2>
             <ul className="flex flex-wrap gap-1.5 mb-3">
-              {model.generations.map((g) => (
+              {model.generations.slice(0, 4).map((g) => (
                 <li
                   key={g.code}
                   className="badge badge-silver text-[10px] font-mono"
@@ -34,9 +38,14 @@ export default function ModelsPage(): React.ReactElement {
                   {generationLabel(g)}
                 </li>
               ))}
+              {model.generations.length > 4 && (
+                <li className="text-[10px] text-[var(--foreground-muted)] self-center">
+                  +{model.generations.length - 4} ещё
+                </li>
+              )}
             </ul>
             <p className="text-sm text-[var(--foreground-muted)] flex-1 line-clamp-3">
-              {model.description}
+              {model.description ?? ""}
             </p>
             <span className="text-sm text-[var(--color-accent)] font-medium mt-4 group-hover:translate-x-0.5 transition-transform inline-block">
               Услуги для {model.name} →

@@ -3,7 +3,6 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { updatePart } from "@/app/actions/parts";
-import { MODELS } from "@/lib/models-data";
 
 interface PartData {
   id: string;
@@ -22,9 +21,10 @@ interface PartData {
 interface Props {
   part: PartData;
   categories: { id: string; name: string }[];
+  modelNames: string[];
 }
 
-export function PartEditForm({ part, categories }: Props) {
+export function PartEditForm({ part, categories, modelNames }: Props) {
   const boundAction = updatePart.bind(null, part.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
@@ -81,7 +81,7 @@ export function PartEditForm({ part, categories }: Props) {
         <label htmlFor="compatibleModels" className="block text-sm font-medium mb-2">Совместимые модели</label>
         <input id="compatibleModels" name="compatibleModels" defaultValue={part.compatibleModels} className="input" />
         <p className="text-xs text-[var(--foreground-muted)] mt-1">
-          {MODELS.map((m) => m.name).join(", ")}
+          {modelNames.join(", ")}
         </p>
       </div>
 
