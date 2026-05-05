@@ -212,15 +212,17 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
           "Раздаточная коробка",
         ],
         generations: [
+          // 6 generations per Wikipedia. W463 splits into two visually
+          // separate vehicles (1st gen 1990–2018; 2nd gen 2018–2024 commonly
+          // designated W463A in the aftermarket). W464 is the 2022+ utility
+          // line that replaced W461. W465 is the 2024+ luxury that replaced
+          // the W463 second-gen.
           { code: "W460", yearFrom: 1979, yearTo: 1991 },
-          // W461 — Puch G / military + civilian utility variant. Civilian
-          // production ran through 2019, full production through 2022. Same
-          // chassis family as W460 with W463 powertrain.
           { code: "W461", yearFrom: 1985, yearTo: 2022 },
           { code: "W463", yearFrom: 1990, yearTo: 2018 },
-          // 2018+ civilian uses W463A (aftermarket-parts naming). True W464 is
-          // the 2022+ military 4×4² variant, not a customer-facing platform.
-          { code: "W463A", yearFrom: 2018, yearTo: null },
+          { code: "W463A", yearFrom: 2018, yearTo: 2024 },
+          { code: "W464", yearFrom: 2022, yearTo: null },
+          { code: "W465", yearFrom: 2024, yearTo: null },
         ],
       },
       {

@@ -87,11 +87,10 @@ const EXPECTED: ExpectedModel[] = [
     generations: [
       { code: "W460", yearFrom: 1979, yearTo: 1991, verified: true, notes: "Original civilian" },
       { code: "W461", yearFrom: 1985, yearTo: 2022, verified: true, notes: "Puch G / utility & military; civilian production through 2019, full through 2022" },
-      { code: "W463", yearFrom: 1990, yearTo: 2018, verified: true, notes: "Classic luxury W463" },
-      // 2018+ civilian G-Class is officially still W463 but the aftermarket
-      // distinguishes it as W463A. The 2022+ military 4×4² is the true W464
-      // and is not customer-facing here, so we use W463A for the picker.
-      { code: "W463A", yearFrom: 2018, yearTo: null, verified: true, notes: "Aftermarket-parts naming for civilian 2018+; Mercedes internal still W463" },
+      { code: "W463", yearFrom: 1990, yearTo: 2018, verified: true, notes: "Classic luxury, first generation" },
+      { code: "W463A", yearFrom: 2018, yearTo: 2024, verified: true, notes: "Wikipedia: W463 second generation (2018–2024); also designated W463A/W464 in some sources. Aftermarket convention: W463A." },
+      { code: "W464", yearFrom: 2022, yearTo: null, verified: true, notes: "Wikipedia: W461 replacement (utility/military); details limited in source. Customer-facing: yes." },
+      { code: "W465", yearFrom: 2024, yearTo: null, verified: true, notes: "Wikipedia: section heading present but body truncated; details limited in source. Likely the next-gen luxury successor to W463A." },
     ],
   },
   {
