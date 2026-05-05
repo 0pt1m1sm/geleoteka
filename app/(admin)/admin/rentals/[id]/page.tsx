@@ -39,6 +39,7 @@ export default async function EditRentalCarPage({ params }: Props) {
     seats: (c.seats as number) ?? 5,
     isAvailable: c.isAvailable as boolean,
     features: ((c.features as string[]) ?? []).join("\n"),
+    photos: ((c.photos as string[]) ?? []),
   };
 
   return (

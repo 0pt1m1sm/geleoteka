@@ -3,6 +3,9 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { updatePart } from "@/app/actions/parts";
+import { PartTrimPicker } from "./PartTrimPicker";
+import { PhotoUploader } from "./PhotoUploader";
+import type { VehicleModel } from "@/lib/vehicle-catalog-types";
 
 interface PartData {
   id: string;
@@ -15,16 +18,17 @@ interface PartData {
   isOEM: boolean;
   isActive: boolean;
   categoryId: string;
-  compatibleModels: string;
+  trimIds: string[];
+  photos: string[];
 }
 
 interface Props {
   part: PartData;
   categories: { id: string; name: string }[];
-  modelNames: string[];
+  models: VehicleModel[];
 }
 
-export function PartEditForm({ part, categories, modelNames }: Props) {
+export function PartEditForm({ part, categories, models }: Props) {
   const boundAction = updatePart.bind(null, part.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
@@ -78,11 +82,13 @@ export function PartEditForm({ part, categories, modelNames }: Props) {
       </div>
 
       <div>
-        <label htmlFor="compatibleModels" className="block text-sm font-medium mb-2">Совместимые модели</label>
-        <input id="compatibleModels" name="compatibleModels" defaultValue={part.compatibleModels} className="input" />
-        <p className="text-xs text-[var(--foreground-muted)] mt-1">
-          {modelNames.join(", ")}
-        </p>
+        <label className="block text-sm font-medium mb-2">Совместимые варианты</label>
+        <PartTrimPicker name="trimIds" initial={part.trimIds} models={models} />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Фотографии</label>
+        <PhotoUploader name="photos" initial={part.photos} />
       </div>
 
       <div className="flex gap-6">

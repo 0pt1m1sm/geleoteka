@@ -1,36 +1,73 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getModelGenerationsMap } from "@/lib/vehicle-catalog";
 
 function slugify(text: string): string {
   return text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
 }
 
 /**
- * CSV-import path auto-expands bare model names ("G-Class") into all known
- * generations ("G-Class W463", "G-Class W464"). Batch import has no interactive
- * feedback; silent expansion is preferable to rejecting the row. The admin form
- * (`app/actions/parts.ts`) rejects bare names because it can show a clear error.
+ * Resolves a CSV "compatible models" cell to a set of trim ids. Each token can
+ * be either:
+ *   "<Model> <GenerationCode>"  → one trim id (the generation's default).
+ *   "<Model>"                   → one trim id per active generation under the
+ *                                 model (each generation's default trim).
+ * Unknown tokens are silently skipped — CSV import is non-interactive, so a
+ * permissive parse beats hard-failing the row. The admin form rejects the same
+ * shapes explicitly because it can show errors.
  */
-async function expandCompatibleModels(values: string[]): Promise<string[]> {
-  const map = await getModelGenerationsMap();
+async function expandToTrimIds(values: string[]): Promise<string[]> {
   const out = new Set<string>();
-  for (const v of values) {
-    const trimmed = v.trim();
+  if (values.length === 0) return [];
+
+  // Pre-load active models with generations and default trim ids.
+  const models = (await db.vehicleModel.findMany({
+    where: { isActive: true },
+    select: {
+      name: true,
+      generations: {
+        where: { isActive: true },
+        select: {
+          code: true,
+          trims: {
+            where: { isDefault: true },
+            select: { id: true },
+          },
+        },
+      },
+    },
+  })) as Array<{
+    name: string;
+    generations: Array<{ code: string; trims: Array<{ id: string }> }>;
+  }>;
+
+  // Build lookup maps: name → generations[], "name|code" → defaultTrimId
+  const byModel = new Map<string, string[]>();
+  const byPair = new Map<string, string>();
+  for (const m of models) {
+    const ids: string[] = [];
+    for (const g of m.generations) {
+      const defaultId = g.trims[0]?.id;
+      if (!defaultId) continue;
+      ids.push(defaultId);
+      byPair.set(`${m.name}|${g.code}`, defaultId);
+    }
+    byModel.set(m.name, ids);
+  }
+
+  for (const raw of values) {
+    const trimmed = raw.trim();
     if (!trimmed) continue;
     if (trimmed.includes(" ")) {
-      out.add(trimmed);
+      const lastSpace = trimmed.lastIndexOf(" ");
+      const modelName = trimmed.slice(0, lastSpace).trim();
+      const genCode = trimmed.slice(lastSpace + 1).trim();
+      const id = byPair.get(`${modelName}|${genCode}`);
+      if (id) out.add(id);
       continue;
     }
-    const gens = map[trimmed];
-    if (gens && gens.length > 0) {
-      for (const g of gens) out.add(`${trimmed} ${g}`);
-    } else {
-      // Unknown bare token — pass through; the picker simply won't match it,
-      // which is the right behavior for free-form data.
-      out.add(trimmed);
-    }
+    const ids = byModel.get(trimmed);
+    if (ids) for (const id of ids) out.add(id);
   }
   return Array.from(out);
 }
@@ -91,23 +128,45 @@ export async function POST(request: Request): Promise<NextResponse> {
     const quantity = parseInt(quantityStr) || 0;
     const isOEM = oemStr === "1";
     const categoryId = categorySlug ? (catMap.get(categorySlug) ?? null) : null;
-    const compatibleModels = await expandCompatibleModels(
-      modelsStr ? modelsStr.split(",").map((m) => m.trim()).filter(Boolean) : []
+    const trimIds = await expandToTrimIds(
+      modelsStr ? modelsStr.split(",").map((m) => m.trim()).filter(Boolean) : [],
     );
     const slug = slugify(`${article}-${name}`).slice(0, 80);
 
     try {
-      const existing = await db.part.findUnique({ where: { article } });
+      const existing = (await db.part.findUnique({ where: { article }, select: { id: true } })) as
+        | { id: string }
+        | null;
 
       if (existing) {
-        await db.part.update({
-          where: { article },
-          data: { name, description: description || null, price, quantity, isOEM, categoryId, compatibleModels },
+        await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+          await tx.part.update({
+            where: { article },
+            data: { name, description: description || null, price, quantity, isOEM, categoryId },
+          });
+          await tx.partTrim.deleteMany({ where: { partId: existing.id } });
+          if (trimIds.length > 0) {
+            await tx.partTrim.createMany({
+              data: trimIds.map((trimId) => ({ partId: existing.id, trimId })),
+              skipDuplicates: true,
+            });
+          }
         });
         updated++;
       } else {
         await db.part.create({
-          data: { slug, article, name, description: description || null, price, quantity, isOEM, categoryId, compatibleModels, photos: [] },
+          data: {
+            slug,
+            article,
+            name,
+            description: description || null,
+            price,
+            quantity,
+            isOEM,
+            categoryId,
+            photos: [],
+            partTrims: { create: trimIds.map((trimId) => ({ trimId })) },
+          },
         });
         created++;
       }

@@ -107,6 +107,13 @@ enum RentalBookingStatus {
   CANCELLED
 }
 
+enum FuelType {
+  PETROL
+  DIESEL
+  ELECTRIC
+  HYBRID
+}
+
 // ============================================
 // USER & AUTH (unified person model)
 // ============================================
@@ -148,6 +155,9 @@ model User {
 
   // Relations — as supplier
   supplierOrders SupplierOrder[]
+
+  // Relations — as uploader (admin who uploaded an image)
+  uploadedImages UploadedImage[] @relation("UploadedImageCreator")
 
   // Self-referential — referrals
   referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
@@ -290,6 +300,7 @@ model RepairOrder {
   userId       String // Customer
   vehicleId    String
   masterUserId String? // Assigned technician
+  trimId       String? // Captured from booking picker; null for older flows or "Не уверен"
   status       RepairOrderStatus @default(ESTIMATE)
   dateTime     DateTime // Scheduled date/time
   mileageIn    Int?
@@ -310,9 +321,10 @@ model RepairOrder {
   updatedAt   DateTime  @updatedAt
 
   // Relations
-  user    User    @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  master  User?   @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
+  user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
+  trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
   slot    Slot?
 
   jobLines            JobLine[]
@@ -321,6 +333,7 @@ model RepairOrder {
   @@index([userId])
   @@index([vehicleId])
   @@index([masterUserId])
+  @@index([trimId])
   @@index([status])
   @@index([dateTime])
 }
@@ -456,6 +469,28 @@ model Notification {
 }
 
 // ============================================
+// UPLOADED IMAGES (admin-uploaded photo bytes stored in Postgres BYTEA;
+// served via GET /api/images/[id]; referenced by Part.photos / Vehicle.photos
+// as `/api/images/<id>` URLs)
+// ============================================
+
+model UploadedImage {
+  id          String   @id @default(cuid())
+  bytes       Bytes
+  mimeType    String
+  width       Int
+  height      Int
+  size        Int
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  createdBy User? @relation("UploadedImageCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([createdById])
+}
+
+// ============================================
 // CMS & BLOG
 // ============================================
 
@@ -506,26 +541,26 @@ model PartCategory {
 }
 
 model Part {
-  id               String   @id @default(cuid())
-  slug             String   @unique
-  article          String   @unique
-  name             String
-  description      String?
-  price            Int
-  compareAtPrice   Int?
-  quantity         Int      @default(0)
-  isOEM            Boolean  @default(true)
-  photos           String[]
-  compatibleModels String[]
-  categoryId       String?
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  article        String   @unique
+  name           String
+  description    String?
+  price          Int
+  compareAtPrice Int?
+  quantity       Int      @default(0)
+  isOEM          Boolean  @default(true)
+  photos         String[]
+  categoryId     String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   category           PartCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   orderItems         PartOrderItem[]
   supplierOrderItems SupplierOrderItem[]
   partLines          PartLine[]
+  partTrims          PartTrim[]
 
   @@index([slug])
   @@index([article])
@@ -699,18 +734,65 @@ model VehicleModel {
 }
 
 model VehicleGeneration {
-  id        String       @id @default(cuid())
+  id        String        @id @default(cuid())
   code      String
   yearFrom  Int
   yearTo    Int?
   modelId   String
-  sortOrder Int          @default(0)
-  isActive  Boolean      @default(true)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  model     VehicleModel @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  sortOrder Int           @default(0)
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  model     VehicleModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  trims     VehicleTrim[]
 
   @@unique([modelId, code])
   @@index([modelId, sortOrder])
   @@index([isActive])
+}
+
+// Engine/body/drivetrain variant within a generation. One isDefault=true row per
+// generation absorbs legacy compatibility data and acts as the "Все варианты"
+// fallback for the public picker. Default trims are system-managed — admins
+// can't create or delete them; only specific (non-default) trims are
+// editable via the TrimManager.
+model VehicleTrim {
+  id            String    @id @default(cuid())
+  generationId  String
+  code          String
+  bodyStyle     String?
+  drivetrain    String?
+  fuelType      FuelType?
+  engineCode    String?
+  displacementL Decimal?  @db.Decimal(3, 1)
+  horsepower    Int?
+  notes         String?
+  isDefault     Boolean   @default(false)
+  sortOrder     Int       @default(0)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  generation   VehicleGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  partTrims    PartTrim[]
+  repairOrders RepairOrder[]
+
+  @@unique([generationId, code])
+  @@index([generationId, sortOrder])
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+// Join table between Part and VehicleTrim. Composite primary key on (partId,
+// trimId) prevents duplicates. Cascade from both sides — deleting a part or
+// trim drops the link without leaving orphan rows.
+model PartTrim {
+  partId String
+  trimId String
+
+  part Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  trim VehicleTrim @relation(fields: [trimId], references: [id], onDelete: Cascade)
+
+  @@id([partId, trimId])
+  @@index([trimId])
 }

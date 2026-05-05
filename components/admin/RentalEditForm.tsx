@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { updateRentalCar, deleteRentalCar } from "@/app/actions/rentals";
+import { PhotoUploader } from "./PhotoUploader";
 
 interface CarData {
   id: string;
@@ -20,6 +21,7 @@ interface CarData {
   seats: number;
   isAvailable: boolean;
   features: string;
+  photos: string[];
 }
 
 export function RentalEditForm({ car }: { car: CarData }) {
@@ -104,6 +106,11 @@ export function RentalEditForm({ car }: { car: CarData }) {
           <label htmlFor="mileage" className="block text-sm font-medium mb-2">Пробег (км)</label>
           <input id="mileage" name="mileage" type="number" defaultValue={car.mileage} className="input" />
         </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Фотографии</label>
+        <PhotoUploader name="photos" initial={car.photos} />
       </div>
 
       <label className="flex items-center gap-3 cursor-pointer">

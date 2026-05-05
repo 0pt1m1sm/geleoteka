@@ -5,11 +5,33 @@
  * Server-only queries (which use Prisma) live in `@/lib/vehicle-catalog`.
  */
 
+export type FuelType = "PETROL" | "DIESEL" | "ELECTRIC" | "HYBRID";
+
+export interface Trim {
+  id: string;
+  code: string;
+  bodyStyle: string | null;
+  drivetrain: string | null;
+  fuelType: FuelType | null;
+  engineCode: string | null;
+  /** Decimal serialised as string by Prisma. Render as float when needed. */
+  displacementL: string | null;
+  horsepower: number | null;
+  notes: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export interface Generation {
   id: string;
   code: string;
   yearFrom: number;
   yearTo: number | null;
+  /** Populated only by trim-aware queries (`getActiveModelsWithTrims`). */
+  trims?: Trim[];
+  /** Default trim id for the generation, populated by trim-aware queries. */
+  defaultTrimId?: string;
 }
 
 export interface VehicleModel {
@@ -37,4 +59,19 @@ export function generationLabel(g: Pick<Generation, "code" | "yearFrom" | "yearT
 /** Just the code, for compact contexts. */
 export function generationShort(g: Pick<Generation, "code">): string {
   return g.code;
+}
+
+/**
+ * Human-readable trim label for picker dropdowns and admin UI. Joins non-empty
+ * fields with " · " in priority order: code · engineCode · drivetrain ·
+ * bodyStyle. Default trims render as "Все варианты этого поколения".
+ */
+export function trimLabel(
+  t: Pick<Trim, "code" | "engineCode" | "drivetrain" | "bodyStyle" | "isDefault">,
+): string {
+  if (t.isDefault) return "Все варианты этого поколения";
+  const parts = [t.code, t.engineCode, t.drivetrain, t.bodyStyle].filter(
+    (p): p is string => Boolean(p && p.trim()),
+  );
+  return parts.join(" · ");
 }

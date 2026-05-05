@@ -7,6 +7,21 @@ import {
   updateGeneration,
   deleteGeneration,
 } from "@/app/actions/vehicle-catalog";
+import { TrimManager } from "./TrimManager";
+import type { FuelType } from "@/lib/vehicle-catalog-types";
+
+interface TrimRow {
+  id: string;
+  code: string;
+  bodyStyle: string | null;
+  drivetrain: string | null;
+  fuelType: FuelType | null;
+  engineCode: string | null;
+  displacementL: string | null;
+  horsepower: number | null;
+  notes: string | null;
+  isActive: boolean;
+}
 
 interface Generation {
   id: string;
@@ -14,6 +29,7 @@ interface Generation {
   yearFrom: number;
   yearTo: number | null;
   isActive: boolean;
+  trims: TrimRow[];
 }
 
 interface Props {
@@ -120,61 +136,64 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
         {generations.map((g) => (
           <div
             key={g.id}
-            className="flex flex-wrap items-center gap-2 rounded-lg border border-[var(--border)] p-3"
+            className="space-y-2 rounded-lg border border-[var(--border)] p-3"
           >
-            <input
-              type="text"
-              defaultValue={g.code}
-              onBlur={(e) => {
-                if (e.target.value.trim() !== g.code) handleUpdate(g.id, "code", e.target.value);
-              }}
-              className="input font-mono text-sm w-24"
-              aria-label="Шасси-код"
-            />
-            <span className="text-xs text-[var(--foreground-muted)]">с</span>
-            <input
-              type="number"
-              defaultValue={g.yearFrom}
-              onBlur={(e) => {
-                if (parseInt(e.target.value) !== g.yearFrom) handleUpdate(g.id, "yearFrom", e.target.value);
-              }}
-              className="input text-sm w-24"
-              min={1900}
-              max={2100}
-              aria-label="Год начала"
-            />
-            <span className="text-xs text-[var(--foreground-muted)]">по</span>
-            <input
-              type="number"
-              defaultValue={g.yearTo ?? ""}
-              onBlur={(e) => {
-                const cur = g.yearTo === null ? "" : String(g.yearTo);
-                if (e.target.value !== cur) handleUpdate(g.id, "yearTo", e.target.value);
-              }}
-              className="input text-sm w-24"
-              min={1900}
-              max={2100}
-              placeholder="н.в."
-              aria-label="Год окончания (пусто = по сей день)"
-            />
-            <label className="flex items-center gap-2 ml-auto text-xs cursor-pointer">
+            <div className="flex flex-wrap items-center gap-2">
               <input
-                type="checkbox"
-                checked={g.isActive}
-                onChange={(e) => handleUpdate(g.id, "isActive", e.target.checked)}
-                className="w-3.5 h-3.5 accent-[var(--color-accent)]"
+                type="text"
+                defaultValue={g.code}
+                onBlur={(e) => {
+                  if (e.target.value.trim() !== g.code) handleUpdate(g.id, "code", e.target.value);
+                }}
+                className="input font-mono text-sm w-24"
+                aria-label="Шасси-код"
               />
-              Активно
-            </label>
-            <button
-              type="button"
-              onClick={() => handleDelete(g)}
-              disabled={pending}
-              className="text-xs text-[var(--color-error)] hover:opacity-80"
-              aria-label={`Удалить ${g.code}`}
-            >
-              ×
-            </button>
+              <span className="text-xs text-[var(--foreground-muted)]">с</span>
+              <input
+                type="number"
+                defaultValue={g.yearFrom}
+                onBlur={(e) => {
+                  if (parseInt(e.target.value) !== g.yearFrom) handleUpdate(g.id, "yearFrom", e.target.value);
+                }}
+                className="input text-sm w-24"
+                min={1900}
+                max={2100}
+                aria-label="Год начала"
+              />
+              <span className="text-xs text-[var(--foreground-muted)]">по</span>
+              <input
+                type="number"
+                defaultValue={g.yearTo ?? ""}
+                onBlur={(e) => {
+                  const cur = g.yearTo === null ? "" : String(g.yearTo);
+                  if (e.target.value !== cur) handleUpdate(g.id, "yearTo", e.target.value);
+                }}
+                className="input text-sm w-24"
+                min={1900}
+                max={2100}
+                placeholder="н.в."
+                aria-label="Год окончания (пусто = по сей день)"
+              />
+              <label className="flex items-center gap-2 ml-auto text-xs cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={g.isActive}
+                  onChange={(e) => handleUpdate(g.id, "isActive", e.target.checked)}
+                  className="w-3.5 h-3.5 accent-[var(--color-accent)]"
+                />
+                Активно
+              </label>
+              <button
+                type="button"
+                onClick={() => handleDelete(g)}
+                disabled={pending}
+                className="text-xs text-[var(--color-error)] hover:opacity-80"
+                aria-label={`Удалить ${g.code}`}
+              >
+                ×
+              </button>
+            </div>
+            <TrimManager generationId={g.id} generationCode={g.code} trims={g.trims} />
           </div>
         ))}
       </div>

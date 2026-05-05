@@ -5,6 +5,8 @@ import { useSyncExternalStore } from "react";
 export interface MyCar {
   model: string;
   generation: string;
+  /** Trim id. Optional — older entries lack it; "Не уверен" stores undefined. */
+  trim?: string;
 }
 
 export const MY_CAR_KEY = "geleoteka:my-car";
@@ -46,7 +48,12 @@ function getSnapshot(): MyCar | null {
       cachedValue = null;
       return null;
     }
-    cachedValue = parsed as MyCar;
+    const obj = parsed as { model: string; generation: string; trim?: unknown };
+    cachedValue = {
+      model: obj.model,
+      generation: obj.generation,
+      trim: typeof obj.trim === "string" && obj.trim.length > 0 ? obj.trim : undefined,
+    };
     return cachedValue;
   } catch {
     try {

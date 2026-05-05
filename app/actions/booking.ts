@@ -10,6 +10,8 @@ interface BookingInput {
   model: string;
   year: string;
   mileage: string;
+  /** Trim id captured by the booking step 1 dropdown. Empty = "Не уверен". */
+  trim?: string;
   dateTime: string;
   name: string;
   phone: string;
@@ -26,7 +28,7 @@ interface BookingResult {
 }
 
 export async function createRepairOrder(input: BookingInput): Promise<BookingResult> {
-  const { serviceIds, vin, model, year, mileage, dateTime, name, phone, email, notes } = input;
+  const { serviceIds, vin, model, year, mileage, trim, dateTime, name, phone, email, notes } = input;
 
   if (!serviceIds.length || !model || !year || !dateTime || !name || !phone || !email) {
     return { success: false, error: "Не все обязательные поля заполнены" };
@@ -98,6 +100,17 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       select: { id: true, name: true, priceMin: true },
     });
 
+    // Validate trim id: only persist when it points at an existing trim.
+    // Bad ids degrade gracefully to NULL — the booking still goes through.
+    let validatedTrimId: string | null = null;
+    if (trim && trim.trim() !== "") {
+      const found = await db.vehicleTrim.findUnique({
+        where: { id: trim },
+        select: { id: true },
+      });
+      if (found) validatedTrimId = (found as { id: string }).id;
+    }
+
     // Slot reservation + RO creation in one transaction. The unique constraint on
     // Slot.dateTime is what actually prevents concurrent double-booking; if two
     // requests race, only one slot.create succeeds — the other rolls back its RO.
@@ -106,6 +119,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
         data: {
           userId: user!.id,
           vehicleId: vehicle!.id,
+          trimId: validatedTrimId,
           dateTime: appointmentDate,
           status: "ESTIMATE",
           notes: notes || null,

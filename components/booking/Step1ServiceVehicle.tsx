@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { formatPrice } from "@/lib/utils";
-import { generationLabel, type VehicleModel } from "@/lib/models-data";
+import { generationLabel, trimLabel, type VehicleModel } from "@/lib/vehicle-catalog-types";
 
 interface ServiceItem {
   id: string;
@@ -52,6 +52,17 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
     ? models.find((m) => m.name === data.model)?.generations ?? []
     : [];
   const showChassisHelper = data.model && data.year && generations.length > 0;
+  // Pick the generation matching the user's year (oldest covering range wins).
+  // Booking has no explicit generation picker; the year + model pair selects it.
+  const yearNum = parseInt(data.year, 10);
+  const matchedGeneration = Number.isFinite(yearNum)
+    ? generations.find(
+        (g) => yearNum >= g.yearFrom && (g.yearTo === null || yearNum <= g.yearTo),
+      )
+    : undefined;
+  const trims = matchedGeneration?.trims ?? [];
+  const showTrimPicker = Boolean(matchedGeneration) && trims.length > 0;
+  const selectedTrim = trims.find((t) => t.id === data.trim);
   const canProceed =
     data.serviceIds.length >= 1 && data.model.trim() !== "" && data.year.trim() !== "";
 
@@ -115,7 +126,7 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
           <select
             id="model"
             value={data.model}
-            onChange={(e) => update({ model: e.target.value })}
+            onChange={(e) => update({ model: e.target.value, trim: "" })}
             className="input"
           >
             <option value="">Выберите модель</option>
@@ -137,7 +148,7 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
               id="year"
               type="number"
               value={data.year}
-              onChange={(e) => update({ year: e.target.value })}
+              onChange={(e) => update({ year: e.target.value, trim: "" })}
               className="input"
               placeholder="2023"
               min={1990}
@@ -181,6 +192,32 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
             17 символов. Помогает точнее определить комплектацию.
           </p>
         </div>
+
+        {showTrimPicker && (
+          <div>
+            <label htmlFor="trim" className="block text-sm font-medium mb-2">
+              Вариант (двигатель / привод)
+            </label>
+            <select
+              id="trim"
+              value={data.trim}
+              onChange={(e) => update({ trim: e.target.value })}
+              className="input"
+            >
+              <option value="">Не уверен</option>
+              {trims.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {trimLabel(t)}
+                </option>
+              ))}
+            </select>
+            {selectedTrim && (
+              <p className="text-xs text-foreground-muted mt-1">
+                Вариант: {trimLabel(selectedTrim)}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/utils";
+import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 
 interface VehicleFormData {
   model: string;
@@ -47,13 +48,15 @@ export async function createRentalCar(
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseCarFormData(formData);
+  const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
+  if (photoErr) return { error: photoErr };
 
   if (!data.model || isNaN(data.year) || isNaN(data.dailyRate)) {
     return { error: "Модель, год и стоимость обязательны" };
   }
 
   await db.vehicle.create({
-    data: { ...data, ownershipType: "RENTAL", photos: [] },
+    data: { ...data, ownershipType: "RENTAL", photos: photoUrls },
   });
 
   redirect("/admin/rentals");
@@ -67,14 +70,28 @@ export async function updateRentalCar(
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseCarFormData(formData);
+  const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
+  if (photoErr) return { error: photoErr };
 
   if (!data.model || isNaN(data.year) || isNaN(data.dailyRate)) {
     return { error: "Модель, год и стоимость обязательны" };
   }
 
-  await db.vehicle.update({
-    where: { id: carId },
-    data,
+  // Persist new photos[] and ref-counted-delete UploadedImage rows for any URL
+  // that no other Part/Vehicle still references.
+  await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+    const current = (await tx.vehicle.findUnique({
+      where: { id: carId },
+      select: { photos: true },
+    })) as { photos: string[] } | null;
+    const removed = (current?.photos ?? []).filter((u: string) => !photoUrls.includes(u));
+    await tx.vehicle.update({
+      where: { id: carId },
+      data: { ...data, photos: photoUrls },
+    });
+    if (removed.length > 0) {
+      await deleteOrphanImages(removed, tx);
+    }
   });
 
   redirect("/admin/rentals");

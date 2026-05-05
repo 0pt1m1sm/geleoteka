@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
-import { getActiveModels } from "@/lib/vehicle-catalog";
+import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { MyCarPicker } from "@/components/parts/MyCarPicker";
 import { MyCarStrip } from "@/components/parts/MyCarStrip";
 import { PartsFilterSidebar, PartsFilterChips } from "@/components/parts/PartsFilterSidebar";
@@ -19,6 +19,7 @@ interface Props {
     maxPrice?: string;
     model?: string;
     generation?: string;
+    trim?: string;
     showAll?: string;
   }>;
 }
@@ -33,15 +34,20 @@ export default async function PartsPage({ searchParams }: Props) {
   const maxPrice = params.maxPrice ? parseInt(params.maxPrice) : null;
   const model = params.model || "";
   const generation = params.generation || "";
+  const trimParam = params.trim || "";
   const showAll = params.showAll === "1";
   const hasCarFilter = Boolean(model && generation && !showAll);
+
+  const [categories, models] = await Promise.all([
+    db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
+    getActiveModelsWithTrims(),
+  ]);
 
   const where: Record<string, unknown> = { isActive: true };
 
   if (q) {
-    // Free-text search: name + article only. compatibleModels uses denormalized
-    // "Model Generation" strings — Prisma's `has`/`hasSome` require exact array-element
-    // matches and cannot do substring search. The picker is the canonical model entry point.
+    // Free-text search: name + article only. PartTrim relation isn't text-searchable;
+    // the picker is the canonical model entry point.
     where.OR = [
       { name: { contains: q, mode: "insensitive" } },
       { article: { contains: q, mode: "insensitive" } },
@@ -49,7 +55,27 @@ export default async function PartsPage({ searchParams }: Props) {
   }
 
   if (hasCarFilter) {
-    where.compatibleModels = { has: `${model} ${generation}` };
+    // Resolve the picked generation by walking the in-memory catalog (already cached
+    // for this request) — saves a roundtrip and keeps the filter shape compact.
+    const pickedModel = models.find((m) => m.name === model);
+    const pickedGeneration = pickedModel?.generations.find((g) => g.code === generation);
+    if (pickedGeneration) {
+      const defaultTrimId = pickedGeneration.defaultTrimId;
+      const specificTrim = trimParam
+        ? pickedGeneration.trims?.find((t) => t.id === trimParam)
+        : undefined;
+      if (specificTrim && defaultTrimId) {
+        // Specific trim picked: match parts tagged with this trim OR the
+        // generation's default trim (which represents "fits all variants").
+        where.partTrims = {
+          some: { trimId: { in: [specificTrim.id, defaultTrimId] } },
+        };
+      } else {
+        // Generation-level filter ("Не уверен" or unknown trim id): include any
+        // PartTrim whose trim belongs to this generation.
+        where.partTrims = { some: { trim: { generationId: pickedGeneration.id } } };
+      }
+    }
   }
 
   if (categorySlug) {
@@ -67,16 +93,12 @@ export default async function PartsPage({ searchParams }: Props) {
     where.price = priceFilter;
   }
 
-  const [parts, categories, models] = await Promise.all([
-    db.part.findMany({
-      where,
-      include: { category: { select: { name: true, slug: true } } },
-      orderBy: { name: "asc" },
-      take: 100,
-    }),
-    db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
-    getActiveModels(),
-  ]);
+  const parts = await db.part.findMany({
+    where,
+    include: { category: { select: { name: true, slug: true } } },
+    orderBy: { name: "asc" },
+    take: 100,
+  });
 
   const cats = categories.map((c: Record<string, unknown>) => ({
     name: c.name as string,
@@ -92,7 +114,7 @@ export default async function PartsPage({ searchParams }: Props) {
         </p>
       </div>
 
-      <MyCarStrip />
+      <MyCarStrip models={models} />
       {!hasCarFilter && !showAll ? <MyCarPicker models={models} /> : null}
 
       {/* Mobile-first stack: filter button + main content stack vertically below lg.

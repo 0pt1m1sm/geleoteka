@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
-import { getActiveModels } from "@/lib/vehicle-catalog";
+import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { Step1ServiceVehicle } from "@/components/booking/Step1ServiceVehicle";
 import { StepIndicator } from "@/components/booking/StepIndicator";
 
@@ -27,7 +27,7 @@ export default async function BookingStep1() {
         durationMinutes: true,
       },
     }) as Promise<ServiceItem[]>,
-    getActiveModels(),
+    getActiveModelsWithTrims(),
   ]);
   // Pin "Другое" (slug: other) to the bottom — it's the diagnostic catch-all,
   // belongs after the named services regardless of alphabetical position.

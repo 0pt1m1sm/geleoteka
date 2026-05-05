@@ -15,6 +15,8 @@ export interface BookingData {
   model: string;
   year: string;
   mileage: string;
+  /** Trim id captured from the third dropdown. Empty = "Не уверен". */
+  trim: string;
   dateTime: string;
   name: string;
   phone: string;
@@ -31,6 +33,7 @@ const INITIAL: BookingData = {
   model: "",
   year: "",
   mileage: "",
+  trim: "",
   dateTime: "",
   name: "",
   phone: "",

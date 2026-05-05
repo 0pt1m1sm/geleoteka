@@ -6,7 +6,8 @@
     "dev": "next dev --port 443 --experimental-https",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-443}",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate-static-photos": "tsx scripts/migrate-static-photos.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -22,6 +23,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.34.5",
     "tailwind-merge": "^3.5.0"
   },
   "prisma": {

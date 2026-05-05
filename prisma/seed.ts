@@ -1,6 +1,7 @@
 import { PrismaClient } from "../app/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { seedVehicleCatalog } from "./seed-vehicles";
+import { seedTrims } from "./seed-trims";
 
 const prisma = new PrismaClient();
 
@@ -299,26 +300,28 @@ async function main(): Promise<void> {
   const oilsCat = await prisma.partCategory.findUnique({ where: { slug: "oils" } });
   const filtersCat = await prisma.partCategory.findUnique({ where: { slug: "filters" } });
   const brakesCat = await prisma.partCategory.findUnique({ where: { slug: "brakes" } });
-
+  // Sample parts are inserted AFTER seedVehicleCatalog + seedTrims (see end of
+  // main()) so they can reference real trim ids via partTrims links.
   const sampleParts = [
-    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "GLE W166", "GLE V167", "GLS X166", "GLS X167", "S-Class W222", "S-Class W223"], categoryId: oilsCat?.id, photos: [] as string[] },
-    { slug: "engine-oil-0w40", article: "A000989690617", name: "Масло моторное Mercedes AMG 0W-40 (5л)", price: 8900, quantity: 10, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "AMG C63", "AMG E63", "AMG GT", "AMG G63", "AMG GLE 63"], categoryId: oilsCat?.id, photos: [] as string[] },
-    { slug: "oil-filter-g", article: "A2761800009", name: "Фильтр масляный M176/M177", price: 1200, quantity: 30, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "AMG G63", "AMG GLE 63", "S-Class W222", "S-Class W223"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W464", price: 3500, quantity: 15, isOEM: true, compatibleModels: ["G-Class W464"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464"], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464"], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W464 (MANN)", price: 1800, quantity: 20, isOEM: false, compatibleModels: ["G-Class W464"], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, compatibleModels: ["G-Class W463", "G-Class W464", "GLE W166", "GLE V167", "GLS X166", "GLS X167", "C-Class W205", "C-Class W206", "E-Class W213", "E-Class W214", "S-Class W222", "S-Class W223", "AMG C63", "AMG E63", "AMG GT", "AMG G63", "AMG GLE 63", "EQ EQA", "EQ EQB", "EQ EQC", "EQ EQE", "EQ EQS"], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "s-class:W222", "s-class:W223"], specificTrims: [] as Array<{ modelSlug: string; generationCode: string; trimCode: string }>, categoryId: oilsCat?.id, photos: [] as string[] },
+    { slug: "engine-oil-0w40", article: "A000989690617", name: "Масло моторное Mercedes AMG 0W-40 (5л)", price: 8900, quantity: 10, isOEM: true, defaultTrims: ["g-class:W463"], specificTrims: [
+      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 63 AMG" },
+      { modelSlug: "c-class", generationCode: "W205", trimCode: "AMG C 63 S" },
+      { modelSlug: "e-class", generationCode: "W213", trimCode: "AMG E 63 S" },
+      { modelSlug: "amg-gt", generationCode: "C190", trimCode: "ALL" },
+      { modelSlug: "gle", generationCode: "V167", trimCode: "AMG GLE 63 S" },
+    ], categoryId: oilsCat?.id, photos: [] as string[] },
+    { slug: "oil-filter-g", article: "A2761800009", name: "Фильтр масляный M176/M177", price: 1200, quantity: 30, isOEM: true, defaultTrims: ["g-class:W463", "s-class:W222", "s-class:W223"], specificTrims: [
+      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 500" },
+      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 63 AMG" },
+      { modelSlug: "gle", generationCode: "V167", trimCode: "AMG GLE 63 S" },
+    ], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W464", price: 3500, quantity: 15, isOEM: true, defaultTrims: ["g-class:W464"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W464 (MANN)", price: 1800, quantity: 20, isOEM: false, defaultTrims: ["g-class:W464"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "c-class:W205", "c-class:W206", "e-class:W213", "e-class:W214", "s-class:W222", "s-class:W223", "eqa:H243", "eqb:X243", "eqc:N293", "eqe:V295", "eqe:X294", "eqs:V297", "eqs:X296"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
   ];
-
-  for (const part of sampleParts) {
-    await prisma.part.upsert({
-      where: { article: part.article },
-      update: { ...part, isActive: true },
-      create: { ...part, isActive: true },
-    });
-  }
-  console.log(`Seeded ${sampleParts.length} sample parts`);
 
   // ============================================
   // VEHICLES — fleet (RENTAL ownership type)
@@ -385,6 +388,89 @@ async function main(): Promise<void> {
   // VEHICLE CATALOG — Manufacturer / Model / Generation
   // ============================================
   await seedVehicleCatalog(prisma);
+
+  // ============================================
+  // VEHICLE TRIMS — default trim per generation + curated trims for popular generations
+  // ============================================
+  await seedTrims(prisma);
+
+  // ============================================
+  // SAMPLE PARTS — must run after trim seed because parts link to trim ids
+  // ============================================
+  async function resolveTrimId(
+    modelSlug: string,
+    generationCode: string,
+    trimCode: string,
+  ): Promise<string | null> {
+    const model = (await prisma.vehicleModel.findUnique({
+      where: { slug: modelSlug },
+      select: { id: true },
+    })) as { id: string } | null;
+    if (!model) return null;
+    const generation = (await prisma.vehicleGeneration.findUnique({
+      where: { modelId_code: { modelId: model.id, code: generationCode } },
+      select: { id: true },
+    })) as { id: string } | null;
+    if (!generation) return null;
+    const trim = (await prisma.vehicleTrim.findUnique({
+      where: { generationId_code: { generationId: generation.id, code: trimCode } },
+      select: { id: true },
+    })) as { id: string } | null;
+    return trim?.id ?? null;
+  }
+
+  for (const sp of sampleParts) {
+    const trimIds = new Set<string>();
+    for (const key of sp.defaultTrims) {
+      const [modelSlug, generationCode] = key.split(":");
+      const id = await resolveTrimId(modelSlug, generationCode, "ALL");
+      if (id) trimIds.add(id);
+      else console.warn(`  ↪ ${sp.article}: default trim not found for ${key}`);
+    }
+    for (const t of sp.specificTrims) {
+      const id = await resolveTrimId(t.modelSlug, t.generationCode, t.trimCode);
+      if (id) trimIds.add(id);
+      else console.warn(`  ↪ ${sp.article}: specific trim not found for ${t.modelSlug}/${t.generationCode}/${t.trimCode}`);
+    }
+
+    // Idempotent: upsert the part, then sync its PartTrim rows.
+    const part = await prisma.part.upsert({
+      where: { article: sp.article },
+      update: {
+        slug: sp.slug,
+        name: sp.name,
+        price: sp.price,
+        quantity: sp.quantity,
+        isOEM: sp.isOEM,
+        categoryId: sp.categoryId,
+        photos: sp.photos,
+        isActive: true,
+      },
+      create: {
+        slug: sp.slug,
+        article: sp.article,
+        name: sp.name,
+        price: sp.price,
+        quantity: sp.quantity,
+        isOEM: sp.isOEM,
+        categoryId: sp.categoryId,
+        photos: sp.photos,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+    const p = part as { id: string };
+
+    // Sync PartTrim rows: clear and recreate to match the seed definition exactly.
+    await prisma.partTrim.deleteMany({ where: { partId: p.id } });
+    if (trimIds.size > 0) {
+      await prisma.partTrim.createMany({
+        data: Array.from(trimIds).map((trimId) => ({ partId: p.id, trimId })),
+        skipDuplicates: true,
+      });
+    }
+  }
+  console.log(`Seeded ${sampleParts.length} sample parts (with PartTrim links)`);
 
   console.log("Seeding complete!");
 }

@@ -3,13 +3,16 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { createPart } from "@/app/actions/parts";
+import { PartTrimPicker } from "./PartTrimPicker";
+import { PhotoUploader } from "./PhotoUploader";
+import type { VehicleModel } from "@/lib/vehicle-catalog-types";
 
 interface Props {
   categories: { id: string; name: string }[];
-  modelNames: string[];
+  models: VehicleModel[];
 }
 
-export function PartForm({ categories, modelNames }: Props) {
+export function PartForm({ categories, models }: Props) {
   const [state, formAction, isPending] = useActionState(createPart, null);
 
   return (
@@ -62,13 +65,13 @@ export function PartForm({ categories, modelNames }: Props) {
       </div>
 
       <div>
-        <label htmlFor="compatibleModels" className="block text-sm font-medium mb-2">
-          Совместимые модели <span className="text-[var(--foreground-muted)]">(через запятую)</span>
-        </label>
-        <input id="compatibleModels" name="compatibleModels" className="input" placeholder="G-Class, GLE, S-Class" />
-        <p className="text-xs text-[var(--foreground-muted)] mt-1">
-          Доступные: {modelNames.join(", ")}
-        </p>
+        <label className="block text-sm font-medium mb-2">Совместимые варианты</label>
+        <PartTrimPicker name="trimIds" initial={[]} models={models} />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Фотографии</label>
+        <PhotoUploader name="photos" initial={[]} />
       </div>
 
       <label className="flex items-center gap-3 cursor-pointer">

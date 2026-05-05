@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
+import { trimLabel } from "@/lib/vehicle-catalog-types";
 import { AddToCartButton } from "@/components/parts/AddToCartButton";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 
@@ -12,19 +13,78 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+interface RawPartTrim {
+  trim: {
+    id: string;
+    code: string;
+    bodyStyle: string | null;
+    drivetrain: string | null;
+    engineCode: string | null;
+    isDefault: boolean;
+    generation: {
+      code: string;
+      model: { name: string; slug: string };
+    };
+  };
+}
+
+interface CompatibilityRow {
+  modelName: string;
+  modelSlug: string;
+  generationCode: string;
+  trims: string[];
+}
+
 export default async function PartDetailPage({ params }: Props) {
   const { slug } = await params;
   const part = await db.part.findUnique({
     where: { slug },
-    include: { category: { select: { name: true, slug: true } } },
+    include: {
+      category: { select: { name: true, slug: true } },
+      partTrims: {
+        include: {
+          trim: {
+            include: {
+              generation: {
+                include: { model: { select: { name: true, slug: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!part || !(part as Record<string, unknown>).isActive) notFound();
 
   const p = part as Record<string, unknown>;
   const cat = p.category as Record<string, string> | null;
-  const models = p.compatibleModels as string[];
+  const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
   const photos = p.photos as string[];
+
+  // Group by (model, generation). Default-trim rows surface as "Все варианты"
+  // so the customer can tell whether the part is generation-wide or specific.
+  const compatibilityMap = new Map<string, CompatibilityRow>();
+  for (const pt of partTrims) {
+    const t = pt.trim;
+    const key = `${t.generation.model.slug}|${t.generation.code}`;
+    let row = compatibilityMap.get(key);
+    if (!row) {
+      row = {
+        modelName: t.generation.model.name,
+        modelSlug: t.generation.model.slug,
+        generationCode: t.generation.code,
+        trims: [],
+      };
+      compatibilityMap.set(key, row);
+    }
+    row.trims.push(trimLabel(t));
+  }
+  const compatibilityRows = Array.from(compatibilityMap.values()).sort((a, b) => {
+    const cmp = a.modelName.localeCompare(b.modelName);
+    if (cmp !== 0) return cmp;
+    return a.generationCode.localeCompare(b.generationCode);
+  });
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -98,19 +158,29 @@ export default async function PartDetailPage({ params }: Props) {
           </div>
 
           {/* Compatible models */}
-          {models.length > 0 && (
+          {compatibilityRows.length > 0 && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-3">Совместимые модели</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {models.map((model: string) => (
-                  <Link
-                    key={model}
-                    href={`/models/${model.toLowerCase().replace(/\s+/g, "-")}`}
-                    className="card card-hover text-center py-3 text-sm font-medium"
-                  >
-                    Mercedes-Benz {model}
-                  </Link>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {compatibilityRows.map((row) => {
+                  const allDefault = row.trims.length === 1 && row.trims[0] === "Все варианты этого поколения";
+                  return (
+                    <Link
+                      key={`${row.modelSlug}-${row.generationCode}`}
+                      href={`/models/${row.modelSlug}`}
+                      className="card card-hover py-3 px-4 text-sm"
+                    >
+                      <div className="font-medium">
+                        Mercedes-Benz {row.modelName} · {row.generationCode}
+                      </div>
+                      {!allDefault && (
+                        <div className="text-xs text-[var(--foreground-muted)] mt-1">
+                          {row.trims.join(", ")}
+                        </div>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           )}

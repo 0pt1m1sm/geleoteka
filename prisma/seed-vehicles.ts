@@ -381,7 +381,7 @@ export async function seedVehicleCatalog(prisma: PrismaClient): Promise<void> {
 
       for (let genIdx = 0; genIdx < m.generations.length; genIdx++) {
         const g = m.generations[genIdx];
-        await prisma.vehicleGeneration.upsert({
+        const generation = await prisma.vehicleGeneration.upsert({
           where: { modelId_code: { modelId: model.id, code: g.code } },
           update: { yearFrom: g.yearFrom, yearTo: g.yearTo, sortOrder: genIdx, isActive: true },
           create: {
@@ -394,6 +394,21 @@ export async function seedVehicleCatalog(prisma: PrismaClient): Promise<void> {
           },
         });
         generationCount++;
+
+        // Default trim: every generation gets one isDefault=true trim that
+        // absorbs legacy compatibility data and acts as the "Все варианты"
+        // fallback for the public picker. Idempotent via composite unique.
+        await prisma.vehicleTrim.upsert({
+          where: { generationId_code: { generationId: generation.id, code: "ALL" } },
+          update: { isActive: true, isDefault: true, sortOrder: 0 },
+          create: {
+            generationId: generation.id,
+            code: "ALL",
+            isDefault: true,
+            isActive: true,
+            sortOrder: 0,
+          },
+        });
       }
     }
   }
