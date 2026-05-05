@@ -1,6 +1,21 @@
 import Link from "next/link";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
+import { getCMSMany } from "@/lib/cms";
+
+const STATS_KEYS = [
+  "home.stats.years",
+  "home.stats.cars",
+  "home.stats.satisfaction",
+  "home.stats.parts",
+] as const;
+
+const STATS_FALLBACKS: Record<string, string> = {
+  "home.stats.years": "15+",
+  "home.stats.cars": "2 400+",
+  "home.stats.satisfaction": "98%",
+  "home.stats.parts": "3 500+",
+};
 
 const faqItems = [
   {
@@ -35,7 +50,14 @@ const faqItems = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const stats = await getCMSMany(STATS_KEYS, STATS_FALLBACKS);
+  const statsList = [
+    { value: stats["home.stats.years"], label: "Лет опыта" },
+    { value: stats["home.stats.cars"], label: "Авто в год" },
+    { value: stats["home.stats.satisfaction"], label: "Довольных клиентов" },
+    { value: stats["home.stats.parts"], label: "Запчастей в наличии" },
+  ];
   return (
     <div className="flex flex-col">
       {/* Hero */}
@@ -133,12 +155,7 @@ export default function HomePage() {
       <section className="border-y border-[var(--border)] bg-[var(--card)]">
         <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {[
-              { value: "15+", label: "Лет опыта" },
-              { value: "2 400+", label: "Авто в год" },
-              { value: "98%", label: "Довольных клиентов" },
-              { value: "3 500+", label: "Запчастей в наличии" },
-            ].map((stat, i) => (
+            {statsList.map((stat, i) => (
               <div
                 key={i}
                 className="animate-fade-in"

@@ -1,21 +1,67 @@
+export interface Generation {
+  /** Chassis code shown in workshop refs (e.g., "W463", "W464", "EQS"). */
+  code: string;
+  /** First production year. */
+  yearFrom: number;
+  /** Last production year, or null if still in production. */
+  yearTo: number | null;
+}
+
 export interface ModelInfo {
   slug: string;
   name: string;
   description: string;
-  priceNote: string;
-  generations: string;
+  generations: Generation[];
   engines: string;
   features: string[];
 }
 
+/** Current → "year–н.в.", retired → "year–year". Always followed by · code.
+ *  Example: "2018–н.в. · W464", "2007–2018 · W463". */
+export function generationLabel(g: Generation): string {
+  const end = g.yearTo === null ? "н.в." : String(g.yearTo);
+  return `${g.yearFrom}–${end} · ${g.code}`;
+}
+
+/** Short label for compact contexts (chassis helper, breadcrumbs). */
+export function generationShort(g: Generation): string {
+  return g.code;
+}
+
 export const MODELS: ModelInfo[] = [
+  {
+    slug: "a-class",
+    name: "A-Class",
+    description:
+      "Компактный хэтчбек/седан. Передний или полный привод, MBUX мультимедиа, экономичные дизели и бензиновые турбо-моторы.",
+    generations: [
+      { code: "W176", yearFrom: 2012, yearTo: 2018 },
+      { code: "W177", yearFrom: 2018, yearTo: null },
+    ],
+    engines: "M270, M260, M282, OM607, OM654q",
+    features: ["MBUX", "Передний/полный привод", "Активные ассистенты", "Турбо-моторы"],
+  },
+  {
+    slug: "b-class",
+    name: "B-Class",
+    description:
+      "Компактвэн с увеличенным внутренним пространством. Универсальный городской автомобиль для семей.",
+    generations: [
+      { code: "W246", yearFrom: 2011, yearTo: 2019 },
+      { code: "W247", yearFrom: 2019, yearTo: null },
+    ],
+    engines: "M270, M260, OM607, OM654q",
+    features: ["Просторный салон", "Низкая погрузочная высота", "Опц. 4MATIC", "Электромотор (B 250e)"],
+  },
   {
     slug: "c-class",
     name: "C-Class",
     description:
       "Компактный бизнес-класс. Один из самых популярных Mercedes в обслуживании. Сбалансированное сочетание комфорта и динамики.",
-    priceNote: "Стандартные расценки",
-    generations: "W205, W206",
+    generations: [
+      { code: "W205", yearFrom: 2014, yearTo: 2021 },
+      { code: "W206", yearFrom: 2021, yearTo: null },
+    ],
     engines: "M264, M256, OM654",
     features: [
       "9G-Tronic АКПП",
@@ -25,17 +71,31 @@ export const MODELS: ModelInfo[] = [
     ],
   },
   {
+    slug: "cla",
+    name: "CLA",
+    description:
+      "Четырёхдверное купе на платформе A-Class. Выразительный дизайн, динамичная посадка, спортивные настройки шасси.",
+    generations: [
+      { code: "C117", yearFrom: 2013, yearTo: 2019 },
+      { code: "C118", yearFrom: 2019, yearTo: null },
+    ],
+    engines: "M270, M260, M139 (AMG)",
+    features: ["Купе-седан", "Опц. 4MATIC", "AMG-версии", "MBUX"],
+  },
+  {
     slug: "e-class",
     name: "E-Class",
     description:
       "Бизнес-класс. Широкий выбор двигателей и комплектаций. Пневмоподвеска AIRMATIC доступна на отдельных версиях.",
-    priceNote: "Стандартные расценки, +15% на AIRMATIC",
-    generations: "W213, W214",
+    generations: [
+      { code: "W213", yearFrom: 2016, yearTo: 2023 },
+      { code: "W214", yearFrom: 2023, yearTo: null },
+    ],
     engines: "M264, M256, M276, OM654, OM656",
     features: [
       "Пневмоподвеска AIRMATIC (опция)",
       "MBUX с AR-навигацией",
-      "Система полуавтономного вождения",
+      "Полуавтономное вождение",
       "4MATIC полный привод",
     ],
   },
@@ -44,8 +104,10 @@ export const MODELS: ModelInfo[] = [
     name: "S-Class",
     description:
       "Флагман модельного ряда. Полная пневмоподвеска, передовые технологии комфорта и безопасности. Требует высшей квалификации мастеров.",
-    priceNote: "+20–30% к стандартным расценкам",
-    generations: "W222, W223",
+    generations: [
+      { code: "W222", yearFrom: 2013, yearTo: 2020 },
+      { code: "W223", yearFrom: 2020, yearTo: null },
+    ],
     engines: "M256, M176, M256E, OM656",
     features: [
       "E-Active Body Control",
@@ -55,13 +117,39 @@ export const MODELS: ModelInfo[] = [
     ],
   },
   {
+    slug: "gla",
+    name: "GLA",
+    description:
+      "Компактный кроссовер на базе A-Class. Опционально полный привод 4MATIC, удобная посадка для города.",
+    generations: [
+      { code: "X156", yearFrom: 2014, yearTo: 2020 },
+      { code: "H247", yearFrom: 2020, yearTo: null },
+    ],
+    engines: "M270, M260, OM607, OM654q",
+    features: ["Опц. 4MATIC", "Высокая посадка", "MBUX", "AMG GLA 35/45"],
+  },
+  {
+    slug: "glc",
+    name: "GLC",
+    description:
+      "Среднеразмерный кроссовер. Один из самых продаваемых Mercedes. Опц. AIRMATIC, 4MATIC, AMG-версии.",
+    generations: [
+      { code: "X253", yearFrom: 2015, yearTo: 2022 },
+      { code: "X254", yearFrom: 2022, yearTo: null },
+    ],
+    engines: "M264, M256, OM654, OM656, M177 (AMG)",
+    features: ["4MATIC", "AIRMATIC (опция)", "MBUX", "Версии Coupé"],
+  },
+  {
     slug: "gle",
     name: "GLE",
     description:
       "Среднеразмерный кроссовер. Полный привод 4MATIC, пневмоподвеска. Популярная модель для семейного использования.",
-    priceNote: "+10% к стандартным расценкам",
-    generations: "W166, V167",
-    engines: "M276, M256, OM654",
+    generations: [
+      { code: "W166", yearFrom: 2015, yearTo: 2019 },
+      { code: "V167", yearFrom: 2019, yearTo: null },
+    ],
+    engines: "M276, M256, OM654, OM656",
     features: [
       "Полный привод 4MATIC",
       "Пневмоподвеска AIRMATIC",
@@ -74,8 +162,10 @@ export const MODELS: ModelInfo[] = [
     name: "GLS",
     description:
       "Полноразмерный кроссовер. 7-местная конфигурация, максимальный комфорт в классе больших SUV.",
-    priceNote: "+15–25% к стандартным расценкам",
-    generations: "X166, X167",
+    generations: [
+      { code: "X166", yearFrom: 2015, yearTo: 2019 },
+      { code: "X167", yearFrom: 2019, yearTo: null },
+    ],
     engines: "M276, M256, M177",
     features: [
       "7 мест",
@@ -89,8 +179,10 @@ export const MODELS: ModelInfo[] = [
     name: "G-Class",
     description:
       "Легендарный внедорожник. Рамная конструкция, мосты, раздаточная коробка, три блокировки дифференциалов. Уникальная конструкция требует специализированного подхода.",
-    priceNote: "+25–40% к стандартным расценкам",
-    generations: "W463, W464",
+    generations: [
+      { code: "W463", yearFrom: 1990, yearTo: 2018 },
+      { code: "W464", yearFrom: 2018, yearTo: null },
+    ],
     engines: "M176, M177 (AMG), OM656",
     features: [
       "Рамная конструкция",
@@ -100,12 +192,28 @@ export const MODELS: ModelInfo[] = [
     ],
   },
   {
+    slug: "v-class",
+    name: "V-Class",
+    description:
+      "Премиальный минивэн. До 8 мест, варианты с длинной/удлинённой колёсной базой. Комфорт уровня бизнес-седана для перевозок и семьи.",
+    generations: [
+      { code: "W447", yearFrom: 2014, yearTo: null },
+    ],
+    engines: "OM651, OM654",
+    features: ["До 8 мест", "Электрические двери (опция)", "Опц. 4MATIC", "Долговечный дизель"],
+  },
+  {
     slug: "amg",
     name: "AMG",
     description:
       "Спортивные модели Affalterbach. Двигатели ручной сборки, спортивные тормоза, адаптивная подвеска AMG RIDE CONTROL. Требует мастеров с AMG-сертификацией.",
-    priceNote: "+30–50% AMG-наценка",
-    generations: "C63, E63, GT, G63, GLE 63",
+    generations: [
+      { code: "C63", yearFrom: 2014, yearTo: null },
+      { code: "E63", yearFrom: 2017, yearTo: null },
+      { code: "GT", yearFrom: 2014, yearTo: null },
+      { code: "G63", yearFrom: 2018, yearTo: null },
+      { code: "GLE 63", yearFrom: 2019, yearTo: null },
+    ],
     engines: "M177, M178, M139",
     features: [
       "Двигатели ручной сборки (One Man, One Engine)",
@@ -119,8 +227,13 @@ export const MODELS: ModelInfo[] = [
     name: "EQ",
     description:
       "Электрические модели Mercedes. Высоковольтные батареи, электромоторы, рекуперативное торможение. Обслуживание требует сертификации по электробезопасности.",
-    priceNote: "Индивидуальный расчёт",
-    generations: "EQA, EQB, EQC, EQE, EQS",
+    generations: [
+      { code: "EQA", yearFrom: 2021, yearTo: null },
+      { code: "EQB", yearFrom: 2021, yearTo: null },
+      { code: "EQC", yearFrom: 2019, yearTo: null },
+      { code: "EQE", yearFrom: 2022, yearTo: null },
+      { code: "EQS", yearFrom: 2021, yearTo: null },
+    ],
     engines: "Электромоторы, батарея до 120 кВт·ч",
     features: [
       "Высоковольтная система (400–800В)",
@@ -136,14 +249,15 @@ export function getModelBySlug(slug: string): ModelInfo | undefined {
 }
 
 /**
- * Map of model name to its list of generations (chassis codes for sedans/SUVs,
- * sub-models for AMG/EQ). Derived from `MODELS[].generations` (comma-separated string).
- *
- * Used by MyCarPicker, the compatibility normalization script, and admin write-path
- * validation in `app/actions/parts.ts` to enforce the "<Model> <Generation>" format
- * in `Part.compatibleModels` (e.g. "G-Class W463").
+ * Map of model name → list of generation chassis codes (just the strings).
+ * Backwards-compat shape so callers iterating string codes (parts validation,
+ * URL params, label rendering) keep working.
  */
 export const MODEL_GENERATIONS: Record<string, string[]> = Object.fromEntries(
-  MODELS.map((m) => [m.name, m.generations.split(",").map((g) => g.trim())])
+  MODELS.map((m) => [m.name, m.generations.map((g) => g.code)]),
 );
 
+/** Same map but with full Generation objects, for callers that want years. */
+export const MODEL_GENERATIONS_FULL: Record<string, Generation[]> = Object.fromEntries(
+  MODELS.map((m) => [m.name, m.generations]),
+);

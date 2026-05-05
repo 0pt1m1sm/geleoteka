@@ -1,6 +1,34 @@
 import Link from "next/link";
+import { getCMSMany } from "@/lib/cms";
 
-export default function ContactsPage() {
+export const dynamic = "force-dynamic";
+
+const CMS_KEYS = [
+  "contacts.phone.service",
+  "contacts.phone.parts",
+  "contacts.email",
+  "contacts.address",
+  "contacts.hours.service",
+  "contacts.hours.parts",
+] as const;
+
+const FALLBACKS: Record<string, string> = {
+  "contacts.phone.service": "+7 (495) 123-45-67",
+  "contacts.phone.parts": "+7 (495) 123-45-68",
+  "contacts.email": "info@geleoteka.ru",
+  "contacts.address": "Москва, ул. Примерная, 15",
+  "contacts.hours.service": "Пн–Пт: 9:00–20:00, Сб: 10:00–18:00",
+  "contacts.hours.parts": "Пн–Пт: 9:00–19:00, Сб: 10:00–17:00",
+};
+
+/** Strip non-dial chars to build a tel: href. */
+function telHref(display: string): string {
+  return `tel:${display.replace(/[^+\d]/g, "")}`;
+}
+
+export default async function ContactsPage(): Promise<React.ReactElement> {
+  const cms = await getCMSMany(CMS_KEYS, FALLBACKS);
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <div className="text-center mb-12">
@@ -13,27 +41,22 @@ export default function ContactsPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-        {/* Contact info */}
         <div className="space-y-6">
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">Отдел сервиса</h2>
             <div className="space-y-3">
               <div>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Телефон
-                </p>
+                <p className="text-sm text-[var(--foreground-muted)]">Телефон</p>
                 <a
-                  href="tel:+74951234567"
+                  href={telHref(cms["contacts.phone.service"])}
                   className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors"
                 >
-                  +7 (495) 123-45-67
+                  {cms["contacts.phone.service"]}
                 </a>
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Часы работы
-                </p>
-                <p className="font-medium">Пн–Пт: 9:00–20:00, Сб: 10:00–18:00</p>
+                <p className="text-sm text-[var(--foreground-muted)]">Часы работы</p>
+                <p className="font-medium">{cms["contacts.hours.service"]}</p>
               </div>
             </div>
           </div>
@@ -42,21 +65,17 @@ export default function ContactsPage() {
             <h2 className="text-lg font-semibold mb-4">Отдел запчастей</h2>
             <div className="space-y-3">
               <div>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Телефон
-                </p>
+                <p className="text-sm text-[var(--foreground-muted)]">Телефон</p>
                 <a
-                  href="tel:+74951234568"
+                  href={telHref(cms["contacts.phone.parts"])}
                   className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors"
                 >
-                  +7 (495) 123-45-68
+                  {cms["contacts.phone.parts"]}
                 </a>
               </div>
               <div>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Часы работы
-                </p>
-                <p className="font-medium">Пн–Пт: 9:00–19:00, Сб: 10:00–17:00</p>
+                <p className="text-sm text-[var(--foreground-muted)]">Часы работы</p>
+                <p className="font-medium">{cms["contacts.hours.parts"]}</p>
               </div>
             </div>
           </div>
@@ -67,15 +86,15 @@ export default function ContactsPage() {
               <div>
                 <p className="text-sm text-[var(--foreground-muted)]">Email</p>
                 <a
-                  href="mailto:info@geleoteka.ru"
+                  href={`mailto:${cms["contacts.email"]}`}
                   className="font-medium hover:text-[var(--color-accent)] transition-colors"
                 >
-                  info@geleoteka.ru
+                  {cms["contacts.email"]}
                 </a>
               </div>
               <div>
                 <p className="text-sm text-[var(--foreground-muted)]">Адрес</p>
-                <p className="font-medium">Москва, ул. Примерная, 15</p>
+                <p className="font-medium">{cms["contacts.address"]}</p>
               </div>
             </div>
           </div>
@@ -85,7 +104,6 @@ export default function ContactsPage() {
           </Link>
         </div>
 
-        {/* Map placeholder */}
         <div className="card flex items-center justify-center min-h-[400px]">
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-[var(--color-secondary)] mx-auto mb-4 flex items-center justify-center">
@@ -108,9 +126,7 @@ export default function ContactsPage() {
                 />
               </svg>
             </div>
-            <p className="text-[var(--foreground-muted)] text-sm">
-              Яндекс Карта
-            </p>
+            <p className="text-[var(--foreground-muted)] text-sm">Яндекс Карта</p>
             <p className="text-xs text-[var(--foreground-muted)] mt-1">
               Подключается после получения API-ключа
             </p>
@@ -118,29 +134,25 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Directions */}
       <div className="card">
         <h2 className="text-lg font-semibold mb-4">Как добраться</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div>
             <h3 className="font-medium mb-2">На автомобиле</h3>
             <p className="text-sm text-[var(--foreground-muted)]">
-              Съезд с МКАД, 500 м по ул. Примерная. Бесплатная парковка
-              перед сервисом.
+              Съезд с МКАД, 500 м по {cms["contacts.address"].split(",").slice(-1)[0].trim()}. Бесплатная парковка перед сервисом.
             </p>
           </div>
           <div>
             <h3 className="font-medium mb-2">На метро</h3>
             <p className="text-sm text-[var(--foreground-muted)]">
-              Станция «Примерная», выход 2. 10 минут пешком или одна
-              остановка на автобусе.
+              Уточните маршрут по телефону {cms["contacts.phone.service"]}.
             </p>
           </div>
           <div>
             <h3 className="font-medium mb-2">На такси</h3>
             <p className="text-sm text-[var(--foreground-muted)]">
-              Назовите адрес: ул. Примерная, 15. Въезд через шлагбаум —
-              назовите номер записи.
+              Назовите адрес: {cms["contacts.address"]}. Въезд через шлагбаум — назовите номер записи.
             </p>
           </div>
         </div>

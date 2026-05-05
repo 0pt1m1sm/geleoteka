@@ -608,7 +608,10 @@ html::-webkit-scrollbar-thumb:hover {
 
 /* Mobile section divider — replaces the thin accidental bottom-border with an
    intentional hairline + center diamond pip. Hidden on desktop (md+) where the
-   columns sit side-by-side and the vertical column-divider takes over. */
+   columns sit side-by-side and the vertical column-divider takes over.
+   The md+ display:none MUST be inside the same stylesheet so it wins source-
+   order against Tailwind's md:hidden utility — which would otherwise lose to
+   our display:flex declaration on the same specificity. */
 .hero-divider-mobile {
   position: relative;
   z-index: 10;
@@ -617,6 +620,9 @@ html::-webkit-scrollbar-thumb:hover {
   gap: 0.875rem;
   padding: 0 2rem;
   pointer-events: none;
+}
+@media (min-width: 768px) {
+  .hero-divider-mobile { display: none; }
 }
 .hero-divider-mobile::before,
 .hero-divider-mobile::after {

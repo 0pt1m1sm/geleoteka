@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { formatPrice } from "@/lib/utils";
-import { MODELS, MODEL_GENERATIONS } from "@/lib/models-data";
+import { MODELS, MODEL_GENERATIONS_FULL, generationLabel } from "@/lib/models-data";
 
 interface ServiceItem {
   id: string;
@@ -43,7 +43,7 @@ export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): 
     }
   }
 
-  const generations = data.model ? MODEL_GENERATIONS[data.model] ?? [] : [];
+  const generations = data.model ? MODEL_GENERATIONS_FULL[data.model] ?? [] : [];
   const showChassisHelper = data.model && data.year && generations.length > 0;
   const canProceed =
     data.serviceIds.length >= 1 && data.model.trim() !== "" && data.year.trim() !== "";
@@ -138,7 +138,7 @@ export function Step1ServiceVehicle({ services }: { services: ServiceItem[] }): 
             />
             {showChassisHelper && (
               <p className="text-xs text-foreground-muted mt-1">
-                Кузов: {generations.join(" / ")}
+                Кузов: {generations.map(generationLabel).join(" · ")}
               </p>
             )}
           </div>

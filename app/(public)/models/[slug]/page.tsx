@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getModelBySlug, MODELS } from "@/lib/models-data";
+import { getModelBySlug, MODELS, generationLabel } from "@/lib/models-data";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 
@@ -10,17 +10,17 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export function generateStaticParams() {
+export function generateStaticParams(): Array<{ slug: string }> {
   return MODELS.map((m) => ({ slug: m.slug }));
 }
 
-export default async function ModelPage({ params }: Props) {
+export default async function ModelPage({ params }: Props): Promise<React.ReactElement> {
   const { slug } = await params;
   const model = getModelBySlug(slug);
 
   if (!model) notFound();
 
-  const services: { id: string; slug: string; name: string; priceMin: number | null }[] =
+  const services: Array<{ id: string; slug: string; name: string; priceMin: number | null }> =
     await db.service.findMany({
       where: { applicableModels: { has: model.name } },
       orderBy: { name: "asc" },
@@ -30,23 +30,26 @@ export default async function ModelPage({ params }: Props) {
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
       <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">
-          Главная
-        </Link>
+        <Link href="/" className="hover:text-[var(--foreground)]">Главная</Link>
         {" / "}
-        <Link href="/models" className="hover:text-[var(--foreground)]">
-          Модели
-        </Link>
+        <Link href="/models" className="hover:text-[var(--foreground)]">Модели</Link>
         {" / "}
         <span className="text-[var(--foreground)]">{model.name}</span>
       </nav>
 
-      <h1 className="text-display text-4xl font-bold mb-2">
+      <h1 className="text-display text-4xl font-bold mb-3">
         Mercedes-Benz {model.name}
       </h1>
-      <p className="text-[var(--color-accent)] font-medium mb-8">
-        {model.priceNote}
-      </p>
+      <ul className="flex flex-wrap gap-2 mb-8">
+        {model.generations.map((g) => (
+          <li
+            key={g.code}
+            className="badge badge-silver text-xs font-mono"
+          >
+            {generationLabel(g)}
+          </li>
+        ))}
+      </ul>
 
       <div className="card mb-8">
         <p className="text-[var(--foreground-muted)] leading-relaxed text-lg">
@@ -54,37 +57,35 @@ export default async function ModelPage({ params }: Props) {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
         <div className="card">
-          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-1">
+          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-2">
             Поколения
           </h3>
-          <p className="font-semibold">{model.generations}</p>
+          <ul className="space-y-1">
+            {model.generations.map((g) => (
+              <li key={g.code} className="text-sm font-medium">
+                {generationLabel(g)}
+              </li>
+            ))}
+          </ul>
         </div>
         <div className="card">
-          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-1">
+          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-2">
             Двигатели
           </h3>
-          <p className="font-semibold">{model.engines}</p>
-        </div>
-        <div className="card">
-          <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-1">
-            Ценообразование
-          </h3>
-          <p className="font-semibold text-[var(--color-accent)]">
-            {model.priceNote}
-          </p>
+          <p className="text-sm font-medium">{model.engines}</p>
         </div>
       </div>
 
       {model.features.length > 0 && (
         <div className="card mb-8">
           <h2 className="text-lg font-semibold mb-4">Особенности</h2>
-          <ul className="space-y-2">
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {model.features.map((feature) => (
               <li
                 key={feature}
-                className="flex items-center gap-3 text-[var(--foreground-muted)]"
+                className="flex items-center gap-3 text-[var(--foreground-muted)] text-sm"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
                 {feature}
@@ -97,9 +98,9 @@ export default async function ModelPage({ params }: Props) {
       {services.length > 0 && (
         <div className="mb-8">
           <h2 className="text-lg font-semibold mb-4">
-            Доступные услуги для {model.name}
+            Услуги для {model.name}
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {services.map((service) => (
               <Link
                 key={service.id}
@@ -120,12 +121,15 @@ export default async function ModelPage({ params }: Props) {
         </div>
       )}
 
-      <div className="flex gap-4">
-        <Link href="/booking" className="btn btn-primary">
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Link href="/booking" className="btn btn-primary flex-1 text-center">
           Записаться на сервис
         </Link>
-        <Link href="/models" className="btn btn-secondary">
-          Все модели
+        <Link
+          href={`/parts?model=${encodeURIComponent(model.name)}`}
+          className="btn btn-secondary flex-1 text-center"
+        >
+          Запчасти для {model.name}
         </Link>
       </div>
     </div>

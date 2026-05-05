@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { MODELS, MODEL_GENERATIONS } from "@/lib/models-data";
+import { MODELS, MODEL_GENERATIONS_FULL, generationLabel } from "@/lib/models-data";
 import { setMyCar } from "@/lib/my-car-store";
 
 /**
@@ -16,7 +16,7 @@ export function MyCarPicker(): React.ReactElement {
   const [model, setModel] = useState<string>("");
   const [generation, setGeneration] = useState<string>("");
 
-  const generations = model ? MODEL_GENERATIONS[model] ?? [] : [];
+  const generations = model ? MODEL_GENERATIONS_FULL[model] ?? [] : [];
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();
@@ -67,8 +67,8 @@ export function MyCarPicker(): React.ReactElement {
           >
             <option value="">{model ? "Поколение" : "Сначала модель"}</option>
             {generations.map((g) => (
-              <option key={g} value={g}>
-                {g}
+              <option key={g.code} value={g.code}>
+                {generationLabel(g)}
               </option>
             ))}
           </select>
