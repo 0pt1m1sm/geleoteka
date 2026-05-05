@@ -3,60 +3,64 @@ import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { getCMSMany } from "@/lib/cms";
 
-const STATS_KEYS = [
+const HOME_CMS_KEYS = [
   "home.stats.years",
   "home.stats.cars",
   "home.stats.satisfaction",
   "home.stats.parts",
+  "contacts.phone.service",
 ] as const;
 
-const STATS_FALLBACKS: Record<string, string> = {
+const HOME_CMS_FALLBACKS: Record<string, string> = {
   "home.stats.years": "15+",
   "home.stats.cars": "2 400+",
   "home.stats.satisfaction": "98%",
   "home.stats.parts": "3 500+",
+  "contacts.phone.service": "+7 (495) 123-45-67",
 };
 
-const faqItems = [
-  {
-    question: "Какие модели Mercedes-Benz вы обслуживаете?",
-    answer:
-      "Мы обслуживаем весь модельный ряд: C, E, S-Class, GLE, GLS, G-Class, линейку AMG и электрические EQ. Также работаем со старыми моделями W124, W140 и другими.",
-  },
-  {
-    question: "Используете ли вы оригинальные запчасти?",
-    answer:
-      "Да, мы используем только оригинальные запчасти Mercedes-Benz (OEM). По индивидуальному запросу можем подобрать альтернативы от проверенных производителей с гарантией.",
-  },
-  {
-    question: "Сколько времени занимает ТО?",
-    answer:
-      "Стандартное техобслуживание занимает 2–3 часа. Вы можете подождать в зоне отдыха или оставить автомобиль на день. Точное время зависит от модели и объёма работ.",
-  },
-  {
-    question: "Есть ли гарантия на работы?",
-    answer:
-      "Да, мы предоставляем гарантию на выполненные работы — 12 месяцев или 20 000 км пробега. Гарантия на запчасти определяется производителем. Подробные условия — в договоре.",
-  },
-  {
-    question: "Можно ли отслеживать статус ремонта?",
-    answer:
-      "Да. После записи вы получаете доступ к личному кабинету, где в реальном времени видите статус вашего автомобиля — от приёмки до готовности. Также получаете SMS при каждой смене статуса.",
-  },
-  {
-    question: "Как записаться на сервис?",
-    answer:
-      "Через онлайн-форму на сайте (самый быстрый способ), по телефону +7 (495) 123-45-67, или через WhatsApp. После записи вам придёт SMS с подтверждением.",
-  },
-];
+function buildFaqItems(servicePhone: string): Array<{ question: string; answer: string }> {
+  return [
+    {
+      question: "Какие модели Mercedes-Benz вы обслуживаете?",
+      answer:
+        "Мы обслуживаем весь модельный ряд: C, E, S-Class, GLE, GLS, G-Class, линейку AMG и электрические EQ. Также работаем со старыми моделями W124, W140 и другими.",
+    },
+    {
+      question: "Используете ли вы оригинальные запчасти?",
+      answer:
+        "Да, мы используем только оригинальные запчасти Mercedes-Benz (OEM). По индивидуальному запросу можем подобрать альтернативы от проверенных производителей с гарантией.",
+    },
+    {
+      question: "Сколько времени занимает ТО?",
+      answer:
+        "Стандартное техобслуживание занимает 2–3 часа. Вы можете подождать в зоне отдыха или оставить автомобиль на день. Точное время зависит от модели и объёма работ.",
+    },
+    {
+      question: "Есть ли гарантия на работы?",
+      answer:
+        "Да, мы предоставляем гарантию на выполненные работы — 12 месяцев или 20 000 км пробега. Гарантия на запчасти определяется производителем. Подробные условия — в договоре.",
+    },
+    {
+      question: "Можно ли отслеживать статус ремонта?",
+      answer:
+        "Да. После записи вы получаете доступ к личному кабинету, где в реальном времени видите статус вашего автомобиля — от приёмки до готовности. Также получаете SMS при каждой смене статуса.",
+    },
+    {
+      question: "Как записаться на сервис?",
+      answer: `Через онлайн-форму на сайте (самый быстрый способ), по телефону ${servicePhone}, или через WhatsApp. После записи вам придёт SMS с подтверждением.`,
+    },
+  ];
+}
 
 export default async function HomePage() {
-  const stats = await getCMSMany(STATS_KEYS, STATS_FALLBACKS);
+  const cms = await getCMSMany(HOME_CMS_KEYS, HOME_CMS_FALLBACKS);
+  const faqItems = buildFaqItems(cms["contacts.phone.service"]);
   const statsList = [
-    { value: stats["home.stats.years"], label: "Лет опыта" },
-    { value: stats["home.stats.cars"], label: "Авто в год" },
-    { value: stats["home.stats.satisfaction"], label: "Довольных клиентов" },
-    { value: stats["home.stats.parts"], label: "Запчастей в наличии" },
+    { value: cms["home.stats.years"], label: "Лет опыта" },
+    { value: cms["home.stats.cars"], label: "Авто в год" },
+    { value: cms["home.stats.satisfaction"], label: "Довольных клиентов" },
+    { value: cms["home.stats.parts"], label: "Запчастей в наличии" },
   ];
   return (
     <div className="flex flex-col">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { getCMS } from "@/lib/cms";
 import { RentalBookingForm } from "@/components/rentals/RentalBookingForm";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 
@@ -353,7 +354,7 @@ export default async function RentalCarPage({ params }: Props) {
                     d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                   />
                 </svg>
-                Выдача — ул. Примерная, 15
+                Выдача — {await getCMS("contacts.address", "Москва, ул. Примерная, 15")}
               </div>
             </div>
           </div>

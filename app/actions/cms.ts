@@ -4,10 +4,6 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 
-/** Pages that consume CMSBlock data — kept here so the revalidate list stays
- *  next to the only writer. Add a path when a new page starts reading CMS. */
-const CMS_CONSUMER_PATHS = ["/", "/contacts"] as const;
-
 export async function updateCMSBlock(
   key: string,
   content: Record<string, string>,
@@ -20,5 +16,11 @@ export async function updateCMSBlock(
     create: { key, content },
   });
 
-  for (const path of CMS_CONSUMER_PATHS) revalidatePath(path);
+  // The footer (in app/(public)/layout.tsx) consumes CMS keys, so we revalidate
+  // the WHOLE public layout subtree — passing 'layout' as the second argument
+  // tells Next.js to invalidate the matched layout and every page beneath it.
+  // Without this, only the literal "/" page would refresh, and /services,
+  // /parts etc. would keep showing the stale footer until each one revalidated
+  // on its own schedule.
+  revalidatePath("/", "layout");
 }

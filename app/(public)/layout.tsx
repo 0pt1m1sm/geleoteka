@@ -5,13 +5,29 @@ import { MobileMenu } from "@/components/shared/MobileMenu";
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { getSession } from "@/lib/auth";
+import { getCMSMany } from "@/lib/cms";
+
+const FOOTER_CMS_KEYS = [
+  "contacts.phone.service",
+  "contacts.email",
+  "contacts.address",
+] as const;
+
+const FOOTER_CMS_FALLBACKS: Record<string, string> = {
+  "contacts.phone.service": "+7 (495) 123-45-67",
+  "contacts.email": "info@geleoteka.ru",
+  "contacts.address": "Москва, ул. Примерная, 15",
+};
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
+  const [session, cms] = await Promise.all([
+    getSession(),
+    getCMSMany(FOOTER_CMS_KEYS, FOOTER_CMS_FALLBACKS),
+  ]);
   const isStaff = session?.permissionRole === "ADMIN" || session?.permissionRole === "MANAGER";
   const cabinetHref = isStaff ? "/admin" : "/cabinet";
   const cabinetLabel = isStaff ? "Админ-панель" : "Кабинет";
@@ -87,9 +103,17 @@ export default async function PublicLayout({
             <div>
               <h4 className="text-sm font-semibold mb-3">Контакты</h4>
               <ul className="space-y-2 text-sm text-[var(--foreground-muted)]">
-                <li>+7 (495) 123-45-67</li>
-                <li>info@geleoteka.ru</li>
-                <li>Москва, ул. Примерная, 15</li>
+                <li>
+                  <a href={`tel:${cms["contacts.phone.service"].replace(/[^+\d]/g, "")}`} className="hover:text-[var(--foreground)] transition-colors">
+                    {cms["contacts.phone.service"]}
+                  </a>
+                </li>
+                <li>
+                  <a href={`mailto:${cms["contacts.email"]}`} className="hover:text-[var(--foreground)] transition-colors">
+                    {cms["contacts.email"]}
+                  </a>
+                </li>
+                <li>{cms["contacts.address"]}</li>
               </ul>
             </div>
           </div>
