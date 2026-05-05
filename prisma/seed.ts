@@ -303,24 +303,24 @@ async function main(): Promise<void> {
   // Sample parts are inserted AFTER seedVehicleCatalog + seedTrims (see end of
   // main()) so they can reference real trim ids via partTrims links.
   const sampleParts = [
-    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "s-class:W222", "s-class:W223"], specificTrims: [] as Array<{ modelSlug: string; generationCode: string; trimCode: string }>, categoryId: oilsCat?.id, photos: [] as string[] },
+    { slug: "engine-oil-5w40", article: "A000989690613", name: "Масло моторное Mercedes 5W-40 (5л)", price: 6500, quantity: 25, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W463A", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "s-class:W222", "s-class:W223"], specificTrims: [] as Array<{ modelSlug: string; generationCode: string; trimCode: string }>, categoryId: oilsCat?.id, photos: [] as string[] },
     { slug: "engine-oil-0w40", article: "A000989690617", name: "Масло моторное Mercedes AMG 0W-40 (5л)", price: 8900, quantity: 10, isOEM: true, defaultTrims: ["g-class:W463"], specificTrims: [
-      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 63 AMG" },
+      { modelSlug: "g-class", generationCode: "W463A", trimCode: "G 63 AMG" },
       { modelSlug: "c-class", generationCode: "W205", trimCode: "AMG C 63 S" },
       { modelSlug: "e-class", generationCode: "W213", trimCode: "AMG E 63 S" },
       { modelSlug: "amg-gt", generationCode: "C190", trimCode: "ALL" },
       { modelSlug: "gle", generationCode: "V167", trimCode: "AMG GLE 63 S" },
     ], categoryId: oilsCat?.id, photos: [] as string[] },
     { slug: "oil-filter-g", article: "A2761800009", name: "Фильтр масляный M176/M177", price: 1200, quantity: 30, isOEM: true, defaultTrims: ["g-class:W463", "s-class:W222", "s-class:W223"], specificTrims: [
-      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 500" },
-      { modelSlug: "g-class", generationCode: "W464", trimCode: "G 63 AMG" },
+      { modelSlug: "g-class", generationCode: "W463A", trimCode: "G 500" },
+      { modelSlug: "g-class", generationCode: "W463A", trimCode: "G 63 AMG" },
       { modelSlug: "gle", generationCode: "V167", trimCode: "AMG GLE 63 S" },
     ], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W464", price: 3500, quantity: 15, isOEM: true, defaultTrims: ["g-class:W464"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
-    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W464 (MANN)", price: 1800, quantity: 20, isOEM: false, defaultTrims: ["g-class:W464"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
-    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W464", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "c-class:W205", "c-class:W206", "e-class:W213", "e-class:W214", "s-class:W222", "s-class:W223", "eqa:H243", "eqb:X243", "eqc:N293", "eqe:V295", "eqe:X294", "eqs:V297", "eqs:X296"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "air-filter-g463", article: "A4630940004", name: "Фильтр воздушный W463A", price: 3500, quantity: 15, isOEM: true, defaultTrims: ["g-class:W463A"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-pads-front-g", article: "A4634210400", name: "Колодки тормозные передние G-Class", price: 12000, quantity: 8, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W463A"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "brake-disc-front-g", article: "A4634210112", name: "Диск тормозной передний G-Class", price: 18500, quantity: 4, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W463A"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
+    { slug: "air-filter-analog-g", article: "MANN-C29028", name: "Фильтр воздушный W463A (MANN)", price: 1800, quantity: 20, isOEM: false, defaultTrims: ["g-class:W463A"], specificTrims: [], categoryId: filtersCat?.id, photos: [] as string[] },
+    { slug: "brake-fluid-dot4", article: "A000989080720", name: "Жидкость тормозная DOT 4+ (1л)", price: 950, quantity: 40, isOEM: true, defaultTrims: ["g-class:W463", "g-class:W463A", "gle:W166", "gle:V167", "gls:X166", "gls:X167", "c-class:W205", "c-class:W206", "e-class:W213", "e-class:W214", "s-class:W222", "s-class:W223", "eqa:H243", "eqb:X243", "eqc:N293", "eqe:V295", "eqe:X294", "eqs:V297", "eqs:X296"], specificTrims: [], categoryId: brakesCat?.id, photos: [] as string[] },
   ];
 
   // ============================================

@@ -54,8 +54,8 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
         features: ["Просторный салон", "Низкая погрузочная высота", "Опц. 4MATIC"],
         generations: [
           { code: "W245", yearFrom: 2005, yearTo: 2011 },
-          { code: "W246", yearFrom: 2011, yearTo: 2019 },
-          { code: "W247", yearFrom: 2019, yearTo: null },
+          { code: "W246", yearFrom: 2011, yearTo: 2018 },
+          { code: "W247", yearFrom: 2018, yearTo: null },
         ],
       },
       {
@@ -93,9 +93,9 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
         engines: "M272, M273, M276, M256, OM642, OM656",
         features: ["AIRMATIC (опция)", "Опц. 4MATIC", "AMG CLS 53/63"],
         generations: [
-          { code: "C219", yearFrom: 2004, yearTo: 2010 },
-          { code: "C218", yearFrom: 2010, yearTo: 2018 },
-          { code: "C257", yearFrom: 2018, yearTo: null },
+          { code: "C219", yearFrom: 2003, yearTo: 2010 },
+          { code: "C218", yearFrom: 2011, yearTo: 2018 },
+          { code: "C257", yearFrom: 2018, yearTo: 2023 },
         ],
       },
       {
@@ -181,7 +181,7 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
           "Опц. активные стабилизаторы",
         ],
         generations: [
-          { code: "W163", yearFrom: 1997, yearTo: 2005 },
+          { code: "W163", yearFrom: 1997, yearTo: 2004 },
           { code: "W164", yearFrom: 2005, yearTo: 2011 },
           { code: "W166", yearFrom: 2011, yearTo: 2019 },
           { code: "V167", yearFrom: 2019, yearTo: null },
@@ -212,8 +212,15 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
           "Раздаточная коробка",
         ],
         generations: [
+          { code: "W460", yearFrom: 1979, yearTo: 1991 },
+          // W461 — Puch G / military + civilian utility variant. Civilian
+          // production ran through 2019, full production through 2022. Same
+          // chassis family as W460 with W463 powertrain.
+          { code: "W461", yearFrom: 1985, yearTo: 2022 },
           { code: "W463", yearFrom: 1990, yearTo: 2018 },
-          { code: "W464", yearFrom: 2018, yearTo: null },
+          // 2018+ civilian uses W463A (aftermarket-parts naming). True W464 is
+          // the 2022+ military 4×4² variant, not a customer-facing platform.
+          { code: "W463A", yearFrom: 2018, yearTo: null },
         ],
       },
       {
@@ -237,8 +244,8 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
         engines: "M119, M120, M137, M272, M273, M275, M278, M156, M157, M178",
         features: ["Складная крыша", "AMG-версии", "AIRMATIC"],
         generations: [
-          { code: "R129", yearFrom: 1989, yearTo: 2001 },
-          { code: "R230", yearFrom: 2001, yearTo: 2012 },
+          { code: "R129", yearFrom: 1988, yearTo: 2001 },
+          { code: "R230", yearFrom: 2001, yearTo: 2011 },
           { code: "R231", yearFrom: 2012, yearTo: 2020 },
           { code: "R232", yearFrom: 2021, yearTo: null },
         ],
@@ -251,7 +258,7 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
         engines: "M111, M112, M271, M272, M276, M152, M178",
         features: ["Vario-крыша", "AMG SLK/SLC 55", "Магниевая отделка интерьера"],
         generations: [
-          { code: "R170", yearFrom: 1996, yearTo: 2004 },
+          { code: "R170", yearFrom: 1995, yearTo: 2004 },
           { code: "R171", yearFrom: 2004, yearTo: 2011 },
           { code: "R172", yearFrom: 2011, yearTo: 2020 },
         ],
@@ -268,7 +275,7 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
           "Керамические тормоза (опция)",
         ],
         generations: [
-          { code: "C190", yearFrom: 2014, yearTo: 2021 },
+          { code: "C190", yearFrom: 2014, yearTo: 2022 },
           { code: "X290", yearFrom: 2018, yearTo: null },
           { code: "C192", yearFrom: 2023, yearTo: null },
         ],
@@ -303,7 +310,7 @@ const VEHICLE_CATALOG: SeedManufacturer[] = [
         engines: "Два электромотора, батарея 80 кВт·ч",
         features: ["AWD", "Полная электрика", "MBUX"],
         generations: [
-          { code: "N293", yearFrom: 2019, yearTo: null },
+          { code: "N293", yearFrom: 2019, yearTo: 2023 },
         ],
       },
       {

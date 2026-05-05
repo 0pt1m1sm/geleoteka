@@ -58,7 +58,7 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
     const yearTo = draft.yearTo.trim() === "" ? null : parseInt(draft.yearTo);
 
     if (!code) {
-      setError("Шасси-код обязателен (например W464)");
+      setError("Шасси-код обязателен (например W463A)");
       return;
     }
     if (!Number.isFinite(yearFrom) || yearFrom < 1900 || yearFrom > 2100) {
@@ -204,7 +204,7 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
           value={draft.code}
           onChange={(e) => setDraft({ ...draft, code: e.target.value })}
           className="input font-mono text-sm w-24"
-          placeholder="W464"
+          placeholder="W463A"
           aria-label="Новый шасси-код"
         />
         <span className="text-xs text-[var(--foreground-muted)]">с</span>

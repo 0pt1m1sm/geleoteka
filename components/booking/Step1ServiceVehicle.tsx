@@ -28,7 +28,7 @@ interface Props {
  *   self-diagnose).
  * - Bottom card: Vehicle data — Model dropdown + Year + optional VIN + optional Mileage.
  *   After both Model AND Year are filled, helper text shows the model's chassis codes
- *   (e.g., "Кузов: W463 / W464") derived from MODEL_GENERATIONS.
+ *   (e.g., "Кузов: W463 / W463A") derived from MODEL_GENERATIONS.
  */
 export function Step1ServiceVehicle({ services, models }: Props): React.ReactElement {
   const { data, update } = useBooking();

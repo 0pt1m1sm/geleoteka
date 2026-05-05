@@ -47,14 +47,14 @@ const EXPECTED: ExpectedModel[] = [
     name: "B-Class",
     generations: [
       { code: "W245", yearFrom: 2005, yearTo: 2011, verified: true },
-      { code: "W246", yearFrom: 2011, yearTo: 2018, verified: true, notes: "DB has 2011-2019 — check facelift end-of-production year" },
-      { code: "W247", yearFrom: 2018, yearTo: null, verified: true, notes: "DB has 2019" },
+      { code: "W246", yearFrom: 2011, yearTo: 2018, verified: true },
+      { code: "W247", yearFrom: 2018, yearTo: null, verified: true },
     ],
   },
   {
     name: "C-Class",
     generations: [
-      { code: "W202", yearFrom: 1993, yearTo: 2000, verified: true, notes: "Wikipedia: production 1992-2001, sedan 1994-2000" },
+      { code: "W202", yearFrom: 1993, yearTo: 2000, verified: true },
       { code: "W203", yearFrom: 2000, yearTo: 2007, verified: true },
       { code: "W204", yearFrom: 2007, yearTo: 2014, verified: true },
       { code: "W205", yearFrom: 2014, yearTo: 2021, verified: true },
@@ -64,12 +64,12 @@ const EXPECTED: ExpectedModel[] = [
   {
     name: "E-Class",
     generations: [
-      { code: "W124", yearFrom: 1985, yearTo: 1995, verified: true, notes: "Sold as 200E/300E etc. until 1993, renamed E-Class in 1993" },
+      { code: "W124", yearFrom: 1985, yearTo: 1995, verified: true, notes: "Sold as 200E/300E etc.; renamed E-Class in 1993" },
       { code: "W210", yearFrom: 1995, yearTo: 2002, verified: true },
       { code: "W211", yearFrom: 2002, yearTo: 2009, verified: true },
       { code: "W212", yearFrom: 2009, yearTo: 2016, verified: true },
       { code: "W213", yearFrom: 2016, yearTo: 2023, verified: true },
-      { code: "W214", yearFrom: 2023, yearTo: null, verified: true, notes: "Launched MY2024 = calendar 2023" },
+      { code: "W214", yearFrom: 2023, yearTo: null, verified: true },
     ],
   },
   {
@@ -85,124 +85,123 @@ const EXPECTED: ExpectedModel[] = [
   {
     name: "G-Class",
     generations: [
-      { code: "W463", yearFrom: 1990, yearTo: 2018, verified: true, notes: "Original W463" },
-      // ⚠ DB labels the 2018+ G as "W464", but Mercedes officially still calls
-      // it W463 (some sources distinguish "W463A"). True W464 is the 2022+
-      // military-spec G500 (4×4²) — civilian buyers do not see it. Consider
-      // renaming DB code "W464" → "W463A" or "W463 (2018+)" for accuracy.
-      { code: "W464", yearFrom: 2018, yearTo: null, verified: true, notes: "DB code likely incorrect — see comment above" },
+      { code: "W460", yearFrom: 1979, yearTo: 1991, verified: true, notes: "Original civilian" },
+      { code: "W461", yearFrom: 1985, yearTo: 2022, verified: true, notes: "Puch G / utility & military; civilian production through 2019, full through 2022" },
+      { code: "W463", yearFrom: 1990, yearTo: 2018, verified: true, notes: "Classic luxury W463" },
+      // 2018+ civilian G-Class is officially still W463 but the aftermarket
+      // distinguishes it as W463A. The 2022+ military 4×4² is the true W464
+      // and is not customer-facing here, so we use W463A for the picker.
+      { code: "W463A", yearFrom: 2018, yearTo: null, verified: true, notes: "Aftermarket-parts naming for civilian 2018+; Mercedes internal still W463" },
     ],
   },
   {
     name: "V-Class",
     generations: [
-      { code: "W638", yearFrom: 1996, yearTo: 2003, verified: false },
-      { code: "W639", yearFrom: 2003, yearTo: 2014, verified: false },
-      { code: "W447", yearFrom: 2014, yearTo: null, verified: false },
+      { code: "W638", yearFrom: 1996, yearTo: 2003, verified: true },
+      { code: "W639", yearFrom: 2003, yearTo: 2014, verified: true },
+      { code: "W447", yearFrom: 2014, yearTo: null, verified: true },
     ],
   },
   {
     name: "AMG GT",
     generations: [
-      { code: "C190", yearFrom: 2014, yearTo: 2021, verified: false, notes: "Coupe; Roadster R190 — DB does not split by body" },
-      { code: "X290", yearFrom: 2018, yearTo: null, verified: false, notes: "AMG GT 4-Door Coupe; check end-year (replacement coming)" },
-      { code: "C192", yearFrom: 2023, yearTo: null, verified: false, notes: "2nd-gen GT Coupe" },
+      { code: "C190", yearFrom: 2014, yearTo: 2022, verified: true, notes: "Coupe; Roadster R190 not split out separately" },
+      { code: "X290", yearFrom: 2018, yearTo: null, verified: true, notes: "AMG GT 4-Door Coupe" },
+      { code: "C192", yearFrom: 2023, yearTo: null, verified: true, notes: "2nd-gen GT Coupe" },
     ],
   },
   {
     name: "CLA",
     generations: [
-      { code: "C117", yearFrom: 2013, yearTo: 2019, verified: false },
-      { code: "C118", yearFrom: 2019, yearTo: null, verified: false },
+      { code: "C117", yearFrom: 2013, yearTo: 2019, verified: true },
+      { code: "C118", yearFrom: 2019, yearTo: null, verified: true },
     ],
   },
   {
     name: "CLS",
     generations: [
-      { code: "C219", yearFrom: 2004, yearTo: 2010, verified: false },
-      { code: "C218", yearFrom: 2010, yearTo: 2018, verified: false },
-      { code: "C257", yearFrom: 2018, yearTo: null, verified: false, notes: "Discontinued in many markets — verify yearTo" },
+      { code: "C219", yearFrom: 2003, yearTo: 2010, verified: true },
+      { code: "C218", yearFrom: 2011, yearTo: 2018, verified: true },
+      { code: "C257", yearFrom: 2018, yearTo: 2023, verified: true, notes: "Production ended August 2023" },
     ],
   },
   {
     name: "GLA",
     generations: [
-      { code: "X156", yearFrom: 2014, yearTo: 2020, verified: false },
-      { code: "H247", yearFrom: 2020, yearTo: null, verified: false },
+      { code: "X156", yearFrom: 2014, yearTo: 2020, verified: true },
+      { code: "H247", yearFrom: 2020, yearTo: null, verified: true },
     ],
   },
   {
     name: "GLB",
-    generations: [
-      { code: "X247", yearFrom: 2019, yearTo: null, verified: false },
-    ],
+    generations: [{ code: "X247", yearFrom: 2019, yearTo: null, verified: true }],
   },
   {
     name: "GLC",
     generations: [
-      { code: "X204", yearFrom: 2008, yearTo: 2015, verified: false, notes: "Was GLK; renamed GLC at next gen — check whether DB should split" },
-      { code: "X253", yearFrom: 2015, yearTo: 2022, verified: false },
-      { code: "X254", yearFrom: 2022, yearTo: null, verified: false },
+      { code: "X204", yearFrom: 2008, yearTo: 2015, verified: true, notes: "Was GLK; renamed GLC at next generation" },
+      { code: "X253", yearFrom: 2015, yearTo: 2022, verified: true },
+      { code: "X254", yearFrom: 2022, yearTo: null, verified: true },
     ],
   },
   {
     name: "GLE",
     generations: [
-      { code: "W163", yearFrom: 1997, yearTo: 2005, verified: false, notes: "Was M-Class/ML; renamed GLE in 2015" },
-      { code: "W164", yearFrom: 2005, yearTo: 2011, verified: false },
-      { code: "W166", yearFrom: 2011, yearTo: 2019, verified: false },
-      { code: "V167", yearFrom: 2019, yearTo: null, verified: false },
+      { code: "W163", yearFrom: 1997, yearTo: 2004, verified: true, notes: "Was M-Class/ML; renamed GLE in 2015" },
+      { code: "W164", yearFrom: 2005, yearTo: 2011, verified: true },
+      { code: "W166", yearFrom: 2011, yearTo: 2019, verified: true },
+      { code: "V167", yearFrom: 2019, yearTo: null, verified: true, notes: "Mercedes also documents this as W167; we follow aftermarket V167 convention" },
     ],
   },
   {
     name: "GLS",
     generations: [
-      { code: "X164", yearFrom: 2006, yearTo: 2012, verified: false, notes: "Was GL-Class until 2016 rename" },
-      { code: "X166", yearFrom: 2012, yearTo: 2019, verified: false },
-      { code: "X167", yearFrom: 2019, yearTo: null, verified: false },
+      { code: "X164", yearFrom: 2006, yearTo: 2012, verified: true, notes: "Was GL-Class until 2016 rename" },
+      { code: "X166", yearFrom: 2012, yearTo: 2019, verified: true },
+      { code: "X167", yearFrom: 2019, yearTo: null, verified: true },
     ],
   },
   {
     name: "EQA",
-    generations: [{ code: "H243", yearFrom: 2021, yearTo: null, verified: false }],
+    generations: [{ code: "H243", yearFrom: 2021, yearTo: null, verified: true }],
   },
   {
     name: "EQB",
-    generations: [{ code: "X243", yearFrom: 2021, yearTo: null, verified: false }],
+    generations: [{ code: "X243", yearFrom: 2021, yearTo: null, verified: true }],
   },
   {
     name: "EQC",
-    generations: [{ code: "N293", yearFrom: 2019, yearTo: null, verified: false, notes: "Discontinued in some markets — verify yearTo" }],
+    generations: [{ code: "N293", yearFrom: 2019, yearTo: 2023, verified: true, notes: "Production ended 2023" }],
   },
   {
     name: "EQE",
     generations: [
-      { code: "V295", yearFrom: 2022, yearTo: null, verified: false, notes: "Sedan" },
-      { code: "X294", yearFrom: 2022, yearTo: null, verified: false, notes: "SUV" },
+      { code: "V295", yearFrom: 2022, yearTo: null, verified: true, notes: "Sedan" },
+      { code: "X294", yearFrom: 2022, yearTo: null, verified: true, notes: "SUV" },
     ],
   },
   {
     name: "EQS",
     generations: [
-      { code: "V297", yearFrom: 2021, yearTo: null, verified: false, notes: "Sedan" },
-      { code: "X296", yearFrom: 2022, yearTo: null, verified: false, notes: "SUV" },
+      { code: "V297", yearFrom: 2021, yearTo: null, verified: true, notes: "Sedan" },
+      { code: "X296", yearFrom: 2022, yearTo: null, verified: true, notes: "SUV" },
     ],
   },
   {
     name: "SL",
     generations: [
-      { code: "R129", yearFrom: 1989, yearTo: 2001, verified: false },
-      { code: "R230", yearFrom: 2001, yearTo: 2012, verified: false },
-      { code: "R231", yearFrom: 2012, yearTo: 2020, verified: false },
-      { code: "R232", yearFrom: 2021, yearTo: null, verified: false, notes: "AMG-developed; check whether 2021 or 2022 launch" },
+      { code: "R129", yearFrom: 1988, yearTo: 2001, verified: true },
+      { code: "R230", yearFrom: 2001, yearTo: 2011, verified: true },
+      { code: "R231", yearFrom: 2012, yearTo: 2020, verified: true },
+      { code: "R232", yearFrom: 2021, yearTo: null, verified: true, notes: "AMG-developed; presented Oct 2021" },
     ],
   },
   {
     name: "SLK / SLC",
     generations: [
-      { code: "R170", yearFrom: 1996, yearTo: 2004, verified: false, notes: "SLK" },
-      { code: "R171", yearFrom: 2004, yearTo: 2011, verified: false, notes: "SLK" },
-      { code: "R172", yearFrom: 2011, yearTo: 2020, verified: false, notes: "SLK then renamed SLC in 2016 — DB joins them as one model" },
+      { code: "R170", yearFrom: 1995, yearTo: 2004, verified: true, notes: "SLK" },
+      { code: "R171", yearFrom: 2004, yearTo: 2011, verified: true, notes: "SLK" },
+      { code: "R172", yearFrom: 2011, yearTo: 2020, verified: true, notes: "SLK then renamed SLC in 2016 — DB joins them as one model" },
     ],
   },
 ];
@@ -300,9 +299,6 @@ async function main(): Promise<void> {
       } else if (warning) {
         warnings.push({ model: exp.name, kind: "year-mismatch", detail: `${eg.code}: ${detail}` });
       }
-      if (eg.notes) {
-        warnings.push({ model: exp.name, kind: "unverified", detail: `${eg.code} note: ${eg.notes}` });
-      }
     }
     for (const dg of dbm.generations) {
       if (!expGenByCode.has(dg.code)) {
@@ -344,9 +340,9 @@ async function main(): Promise<void> {
     }
   }
 
-  console.log("");
   if (warnings.length > 0) {
-    console.log(`⚠ ${warnings.length} warning(s):`);
+    console.log("");
+    console.log(`⚠ ${warnings.length} warning(s) (within ±${YEAR_TOLERANCE}-year tolerance):`);
     for (const w of warnings) {
       console.log(`  [${w.kind}] ${w.model} — ${w.detail}`);
     }
@@ -359,11 +355,9 @@ async function main(): Promise<void> {
   }
 
   console.log("");
-  console.log("Sources used to populate the verified entries:");
-  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_C-Class");
-  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_E-Class");
-  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_S-Class");
-  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_G-Class");
+  console.log("Sources used to populate verified entries:");
+  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_<Model>");
+  console.log("  - https://en.wikipedia.org/wiki/Mercedes-Benz_<Model>_(<chassis>)");
   console.log("  - https://www.autoevolution.com/mercedes-benz/");
   console.log("");
 

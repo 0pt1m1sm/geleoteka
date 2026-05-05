@@ -50,22 +50,21 @@ export interface Manufacturer {
   name: string;
 }
 
-/** "1990–2018 · W463" / "2018–н.в. · W464" */
+/** "1990–2018 · W463" / "2018–н.в. · W463A" */
 export function generationLabel(g: Pick<Generation, "code" | "yearFrom" | "yearTo">): string {
   const end = g.yearTo === null ? "н.в." : String(g.yearTo);
   return `${g.yearFrom}–${end} · ${g.code}`;
 }
 
 /**
- * Display name for a vehicle model in pickers and saved-car strips. Prepends
- * the manufacturer brand so single-letter models ("CLA", "GLE") read
- * consistently next to suffixed ones ("G-Class", "S-Class"). Single seam for
- * the future multi-brand refactor — when brand becomes config-driven this is
- * the function that swaps "Mercedes-Benz" for the active brand's display
- * name.
+ * Display name for a vehicle model in pickers and saved-car strips. The shop
+ * is single-brand (Mercedes-Benz) so the make is implied by context — we just
+ * show the model name. This is the seam for the future multi-brand refactor:
+ * when more than one brand ships, this function will prepend the brand label
+ * (or skip it when only one brand is configured).
  */
 export function modelDisplayName(modelName: string): string {
-  return `Mercedes-Benz ${modelName}`;
+  return modelName;
 }
 
 /** Just the code, for compact contexts. */
