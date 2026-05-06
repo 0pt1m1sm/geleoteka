@@ -2,7 +2,7 @@
 
 Created: 2026-05-07
 Author: aleksandr.spiskov@gmail.com
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -302,10 +302,10 @@ Runtime profile: Full (UI changes — mobile nav). Three scenarios covering each
 - [x] Task 5: Delete `app/(cabinet)/` ghost route group
 - [x] Task 6: Delete 3 dead server actions
 - [x] Task 7: Delete `useMyCar` hook (rolled into Task 2)
-- [ ] Task 8: Delete `lib/models-data.ts` shim
-- [ ] Task 9: Regression sweep + browser smoke test
+- [x] Task 8: Delete `lib/models-data.ts` shim
+- [x] Task 9: Regression sweep + browser smoke test (browser scenarios deferred — see E2E Results)
 
-**Total Tasks:** 9 | **Completed:** 0 | **Remaining:** 9
+**Total Tasks:** 9 | **Completed:** 9 | **Remaining:** 0
 
 ## Implementation Tasks
 
@@ -945,6 +945,30 @@ npm run build
 npx tsc --noEmit && npm run lint && npm run build
 # Then run TS-001..TS-006 manually in browser; record results.
 ```
+
+## E2E Results
+
+Static checks (all green):
+
+| Check | Result |
+|-------|--------|
+| `npx tsc --noEmit` | exit 0 |
+| `npm run lint` | exit 0 (7 pre-existing warnings, none in this plan's diff) |
+| `npm run build` | exit 0 (Compiled successfully) |
+| Goal Verification truths #1–#10 | 10/10 pass via static grep |
+
+Browser scenarios (deferred to user):
+
+| Scenario | Result | Notes |
+|----------|--------|-------|
+| TS-001 Public mobile menu | DEFERRED | User declined browser-automation permission for localhost. Manual verification recommended. |
+| TS-002 Portal cabinet drawer | DEFERRED | same |
+| TS-003 Admin mobile drawer | DEFERRED | same |
+| TS-004 Admin desktop sidebar | DEFERRED | same |
+| TS-005 Cart default-contact prefill | DEFERRED | same |
+| TS-006 Booking step-3 prefill | DEFERRED | same |
+
+Browser scenarios are bounded: each is 5 steps in `## E2E Test Scenarios` above. To run them: `PORT=3001 npx next dev --port 3001` (no sudo needed for non-443 port), then walk through each TS-N step manually.
 
 ## Open Questions
 
