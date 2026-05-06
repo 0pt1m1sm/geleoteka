@@ -16,6 +16,15 @@ import { useSyncExternalStore } from "react";
  *
  * Cross-tab updates fire a `storage` event; same-tab updates fire a custom
  * `geleoteka:store-change:<key>` event. Both are subscribed.
+ *
+ * **Validator gotcha:** when `validator` returns `null`, the helper treats
+ * the stored value as bad-shape and self-heals (removes the entry, returns
+ * `initial`). This makes `null` an unsuitable sentinel for a *legitimate*
+ * value when `T` includes `null`. The current `MyCar | null` consumer is
+ * fine because it wraps the validator: `(parsed) => parsed === null ? null
+ * : validateMyCar(parsed)` — the outer null short-circuits before validation.
+ * If you need a store where `null` is a legitimate distinct-from-initial
+ * value, omit the validator and rely on `JSON.parse` round-tripping it.
  */
 
 export interface LocalStorageStore<T> {
@@ -37,7 +46,6 @@ export function createLocalStorageStore<T>(
   const eventName = `geleoteka:store-change:${key}`;
   let cachedRaw: string | null | undefined = undefined; // undefined = not yet read
   let cachedValue: T = initial;
-  let listeners: Array<() => void> = [];
 
   function readFromStorage(): T {
     if (typeof window === "undefined") return initial;
@@ -86,7 +94,9 @@ export function createLocalStorageStore<T>(
   }
 
   function subscribe(cb: () => void): () => void {
-    listeners.push(cb);
+    // Subscribers attach directly to window events: `storage` for cross-tab
+    // updates, `eventName` for same-tab updates dispatched by setStore.
+    // No internal listeners array — same-tab dispatch goes through window.
     const onStorage = (e: StorageEvent): void => {
       if (e.key === key || e.key === null) cb();
     };
@@ -94,7 +104,6 @@ export function createLocalStorageStore<T>(
     window.addEventListener("storage", onStorage);
     window.addEventListener(eventName, onChange);
     return () => {
-      listeners = listeners.filter((l) => l !== cb);
       window.removeEventListener("storage", onStorage);
       window.removeEventListener(eventName, onChange);
     };
