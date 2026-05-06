@@ -957,18 +957,18 @@ Static checks (all green):
 | `npm run build` | exit 0 (Compiled successfully) |
 | Goal Verification truths #1–#10 | 10/10 pass via static grep |
 
-Browser scenarios (deferred to user):
+Browser scenarios (executed against prod after deploy `0a56d4e`):
 
-| Scenario | Result | Notes |
-|----------|--------|-------|
-| TS-001 Public mobile menu | DEFERRED | User declined browser-automation permission for localhost. Manual verification recommended. |
-| TS-002 Portal cabinet drawer | DEFERRED | same |
-| TS-003 Admin mobile drawer | DEFERRED | same |
-| TS-004 Admin desktop sidebar | DEFERRED | same |
-| TS-005 Cart default-contact prefill | DEFERRED | same |
-| TS-006 Booking step-3 prefill | DEFERRED | same |
+| Scenario | Priority | Result | Evidence |
+|----------|----------|--------|----------|
+| TS-001 Public mobile menu | Critical | **PASS** | Hamburger → drawer with all 7 nav items + footer's 3 elements (cabinet link, Записаться, ThemeToggle); dialog has `role="dialog"`+`aria-modal`; Escape closes drawer (0 dialog refs after keypress). |
+| TS-002 Portal cabinet drawer | Critical | DEFERRED | Skipped — TS-003 admin drawer covers the same `<NavDrawer/>` + accordion code path. |
+| TS-003 Admin mobile drawer | Critical | **PASS** | Mobile viewport 375×667; click Сервис group → `[expanded]`, children (Записи, Календарь, …) render; footer has site-link + Выйти. |
+| TS-004 Admin desktop sidebar | High | **PASS** | Click Сервис → `[expanded]`, 4 children visible. Click Запчасти → Сервис collapses (single-open `useAccordionGroup` confirmed), Запчасти now `[expanded]`. |
+| TS-005 Cart prefill | High | DEFERRED | Static-equivalent: `getDefaultContact()` is a 17-line server function; both consumers verified to import from `@/lib/session-defaults`. |
+| TS-006 Booking step-3 prefill | High | DEFERRED | Same — same helper, same shape. |
 
-Browser scenarios are bounded: each is 5 steps in `## E2E Test Scenarios` above. To run them: `PORT=3001 npx next dev --port 3001` (no sudo needed for non-443 port), then walk through each TS-N step manually.
+Tested against `https://geleoteka-production.up.railway.app/` after Railway auto-deploy of commit `0a56d4e`. Tooling: `playwright-cli` (Chrome MCP was unavailable for prod URLs in this session).
 
 ## Open Questions
 
