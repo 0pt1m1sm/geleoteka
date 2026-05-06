@@ -221,11 +221,11 @@ v-class W447: https://www.auto-data.net/en/mercedes-benz-v-class-v447-generation
 - [x] Task 2: Mid-size saloons (C-Class, E-Class, CLS) — re-verify W205, W213 with snapshot-reconcile
 - [x] Task 3: Full-size saloon + grand tourers (S-Class, AMG GT, SL, SLK/SLC)
 - [x] Task 4: SUVs / Crossovers (GLA, GLB, GLC, GLE, GLS) — re-verify V167, X167 with snapshot-reconcile
-- [ ] Task 5: EVs (EQA, EQB, EQC, EQE, EQS)
+- [x] Task 5: EVs (EQA, EQB, EQC, EQE, EQS)
 - [ ] Task 6: Vans (V-Class) + G-Class W464 catch-up
 - [ ] Task 7: Verification script + prod deploy + final verification
 
-**Total Tasks:** 7 | **Completed:** 4 | **Remaining:** 3
+**Total Tasks:** 7 | **Completed:** 5 | **Remaining:** 2
 
 ## Implementation Tasks
 

@@ -1109,6 +1109,100 @@ const CURATED: CuratedGeneration[] = [
       { code: "AMG GLS 63", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG handcrafted; 2019–" },
     ],
   },
+  // ===== EVs =====
+  // EQA H243 (2021 – present) — first compact electric SUV (sister of GLA).
+  {
+    modelSlug: "eqa",
+    generationCode: "H243",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqa-h243-generation-8069",
+    trims: [
+      { code: "EQA 250", drivetrain: "FWD", fuelType: "ELECTRIC", horsepower: 190, notes: "1 двигатель PSM; батарея 69.7 кВт·ч; запас хода 426–496 км; 2021–" },
+      { code: "EQA 250+", drivetrain: "FWD", fuelType: "ELECTRIC", horsepower: 190, notes: "1 двигатель PSM; батарея 73.9 кВт·ч; запас хода 490–532 км; 2022–" },
+      { code: "EQA 300 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 228, notes: "2 двигателя (PSM+ASM); батарея 69.7 кВт·ч; запас хода 411–438 км; 2021–" },
+      { code: "EQA 350 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 292, notes: "2 двигателя (PSM+ASM); батарея 69.7 кВт·ч; запас хода 411–438 км; 2021–" },
+    ],
+  },
+  // EQB X243 (2021 – present) — 7-seater electric SUV (sister of GLB).
+  {
+    modelSlug: "eqb",
+    generationCode: "X243",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqb-x243-generation-8323",
+    trims: [
+      { code: "EQB 250", drivetrain: "FWD", fuelType: "ELECTRIC", horsepower: 190, notes: "1 двигатель PSM; батарея 69.7 кВт·ч; до 7 мест; 2021–" },
+      { code: "EQB 250+", drivetrain: "FWD", fuelType: "ELECTRIC", horsepower: 190, notes: "1 двигатель PSM; батарея 73.9 кВт·ч; 2022–" },
+      { code: "EQB 300 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 228, notes: "2 двигателя (PSM+ASM); батарея 69.7 кВт·ч; 2021–" },
+      { code: "EQB 350 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 292, notes: "2 двигателя (PSM+ASM); батарея 69.7 кВт·ч; 2021–" },
+    ],
+  },
+  // EQC N293 (2019 – 2023) — first dedicated EV (mid-size SUV).
+  {
+    modelSlug: "eqc",
+    generationCode: "N293",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqc-n293-generation-6575",
+    trims: [
+      { code: "EQC 400 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 408, notes: "2 двигателя ASM (Asynchronous); батарея 85 кВт·ч; запас хода 373–437 км; 2019–2023" },
+    ],
+  },
+  // EQE V295 (2022 – present) — sedan, EVA platform.
+  {
+    modelSlug: "eqe",
+    generationCode: "V295",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqe-v295-generation-8561",
+    trims: [
+      { code: "EQE 300", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 245, notes: "1 двигатель PSM; батарея 98 кВт·ч; седан; 2022– (FL: 100 кВт·ч 265 л.с.)" },
+      { code: "EQE 320+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 315, notes: "1 двигатель PSM; батарея 105 кВт·ч; седан; 2024–" },
+      { code: "EQE 350", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 292, notes: "1 двигатель PSM; батарея 98 кВт·ч; седан; 2022–" },
+      { code: "EQE 350+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 292, notes: "1 двигатель PSM; батарея 105 кВт·ч; седан; 2023– (FL: 320 л.с.)" },
+      { code: "EQE 350 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 292, notes: "2 двигателя (PSM+ASM); батарея 98 кВт·ч; седан; 2022– (FL: 320 л.с.)" },
+      { code: "EQE 500 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 408, notes: "2 двигателя (PSM+ASM); батарея 100 кВт·ч; седан; 2022– (FL: 449 л.с.)" },
+      { code: "AMG EQE 43 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 476, notes: "2 двигателя AMG; батарея 100 кВт·ч; седан; 2023–" },
+      { code: "AMG EQE 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "ELECTRIC", horsepower: 625, notes: "2 двигателя AMG; батарея 100 кВт·ч; седан; 2023– (Dynamic Plus: 687 л.с.)" },
+    ],
+  },
+  // EQE X294 (2022 – present) — SUV (separate chassis from V295 sedan).
+  {
+    modelSlug: "eqe",
+    generationCode: "X294",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqe-suv-x294-generation-9056",
+    trims: [
+      { code: "EQE 300", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 245, notes: "1 двигатель PSM; батарея 98 кВт·ч; SUV; 2023– (FL: 100 кВт·ч 265 л.с.)" },
+      { code: "EQE 320+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 315, notes: "1 двигатель PSM; батарея 105 кВт·ч; SUV; 2024–" },
+      { code: "EQE 350", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 292, notes: "1 двигатель PSM; батарея 98 кВт·ч; SUV; 2023–" },
+      { code: "EQE 350+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 292, notes: "1 двигатель PSM; батарея 105 кВт·ч; SUV; 2023– (FL: 320 л.с.)" },
+      { code: "EQE 350 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 292, notes: "2 двигателя (PSM+ASM); батарея 100 кВт·ч; SUV; 2023– (FL: 320 л.с.)" },
+      { code: "EQE 500 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 408, notes: "2 двигателя (PSM+ASM); батарея 100 кВт·ч; SUV; 2023– (FL: 449 л.с.)" },
+      { code: "AMG EQE 43 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 476, notes: "2 двигателя AMG; батарея 100 кВт·ч; SUV; 2023–" },
+      { code: "AMG EQE 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "ELECTRIC", horsepower: 626, notes: "2 двигателя AMG; батарея 100 кВт·ч; SUV; 2023– (Dynamic Plus: 687 л.с.)" },
+    ],
+  },
+  // EQS V297 (2021 – present) — flagship sedan, EVA platform.
+  {
+    modelSlug: "eqs",
+    generationCode: "V297",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqs-v297-generation-8321",
+    trims: [
+      { code: "EQS 350", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 292, notes: "1 двигатель PSM; батарея 100 кВт·ч; седан; 2022–" },
+      { code: "EQS 450+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 333, notes: "1 двигатель PSM; батарея 120 кВт·ч; седан; 2021– (FL: 360 л.с.)" },
+      { code: "EQS 450 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 360, notes: "2 двигателя (PSM+ASM); батарея 120 кВт·ч; седан; 2022–" },
+      { code: "EQS 500 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 449, notes: "2 двигателя (PSM+ASM); батарея 120 кВт·ч; седан; 2022–" },
+      { code: "EQS 580 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 523, notes: "2 двигателя (PSM+ASM); батарея 120 кВт·ч; седан; 2021– (FL: 544 л.с.)" },
+      { code: "AMG EQS 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "ELECTRIC", horsepower: 658, notes: "2 двигателя AMG; батарея 120 кВт·ч; седан; 2022– (Dynamic Plus: 761 л.с.)" },
+    ],
+  },
+  // EQS X296 (2022 – present) — flagship electric SUV.
+  {
+    modelSlug: "eqs",
+    generationCode: "X296",
+    source: "https://www.auto-data.net/en/mercedes-benz-eqs-suv-x296-generation-8844",
+    trims: [
+      { code: "EQS 400 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 355, notes: "2 двигателя (PSM+ASM); батарея 125 кВт·ч; SUV; FL 2024–" },
+      { code: "EQS 450+", drivetrain: "RWD", fuelType: "ELECTRIC", horsepower: 360, notes: "1 двигатель PSM; батарея 120/125 кВт·ч; SUV; 2022–" },
+      { code: "EQS 450 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 360, notes: "2 двигателя (PSM+ASM); батарея 120/125 кВт·ч; SUV; 2022–" },
+      { code: "EQS 500 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 449, notes: "2 двигателя (PSM+ASM); батарея 120/125 кВт·ч; SUV; 2022–" },
+      { code: "EQS 550 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 536, notes: "2 двигателя (PSM+ASM); батарея 125 кВт·ч; SUV; FL 2024–" },
+      { code: "EQS 580 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 544, notes: "2 двигателя (PSM+ASM); батарея 120/125 кВт·ч; SUV; 2022–" },
+    ],
+  },
 ];
 
 interface SeedSummary {
