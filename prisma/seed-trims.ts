@@ -283,34 +283,6 @@ const CURATED: CuratedGeneration[] = [
       { code: "AMG CLA 45 S 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 421, notes: "AMG handcrafted I4 турбо; 2019–" },
     ],
   },
-  // GLE V167 (2019 – present) — pre-existing curated set; engine codes/HP
-  // sourced from the previously-approved commit (vehicle-trims spec). Kept
-  // pending an authoritative re-verification pass against Wikipedia.
-  {
-    modelSlug: "gle",
-    generationCode: "V167",
-    source: "previously-approved seed (vehicle-trims spec); needs re-verification",
-    trims: [
-      { code: "GLE 300 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 245 },
-      { code: "GLE 350 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 272 },
-      { code: "GLE 400 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 330 },
-      { code: "GLE 450", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 + EQ Boost" },
-      { code: "AMG GLE 53", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "AMG performance" },
-      { code: "AMG GLE 63 S", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG" },
-    ],
-  },
-  // GLS X167 (2019 – present) — pre-existing curated set; needs re-verification.
-  {
-    modelSlug: "gls",
-    generationCode: "X167",
-    source: "previously-approved seed (vehicle-trims spec); needs re-verification",
-    trims: [
-      { code: "GLS 400 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 330 },
-      { code: "GLS 450", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367 },
-      { code: "GLS 580", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 489, notes: "V8 битурбо" },
-      { code: "AMG GLS 63", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "AMG handcrafted" },
-    ],
-  },
   // ===== Mid-size saloons =====
   // C-Class W202 (1993 – 2000) — first C-Class.
   {
@@ -905,6 +877,236 @@ const CURATED: CuratedGeneration[] = [
       { code: "SLC 300", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 245, notes: "I4 турбо; FL 2016–2020" },
       { code: "SLC 43 AMG", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 367, notes: "V6 битурбо AMG; FL 2016–2020 (заменил AMG SLC 55)" },
       { code: "AMG SLK 55", fuelType: "PETROL", engineCode: "M 152", displacementL: 5.5, horsepower: 421, notes: "V8 атм AMG; 2011–2015" },
+    ],
+  },
+  // ===== SUVs =====
+  // GLA X156 (2014 – 2020) — first GLA, hatchback-based crossover.
+  {
+    modelSlug: "gla",
+    generationCode: "X156",
+    source: "https://www.auto-data.net/en/mercedes-benz-gla-x156-generation-4127",
+    trims: [
+      { code: "GLA 180", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 270", displacementL: 1.6, horsepower: 122, notes: "I4 турбо; 2013–2020" },
+      { code: "GLA 180 CDI", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 607", displacementL: 1.5, horsepower: 109, notes: "I4 турбо дизель; 2013–2020" },
+      { code: "GLA 200", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 270", displacementL: 1.6, horsepower: 156, notes: "I4 турбо; 2013–2020" },
+      { code: "GLA 200 CDI", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 607", displacementL: 2.1, horsepower: 136, notes: "I4 турбо дизель; 2013–2020" },
+      { code: "GLA 220 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 270", displacementL: 2.0, horsepower: 184, notes: "I4 турбо; FL 2017–2020" },
+      { code: "GLA 220 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 170, notes: "I4 турбо дизель; 2014–2020 (FL: 177 л.с.)" },
+      { code: "GLA 250", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 270", displacementL: 2.0, horsepower: 211, notes: "I4 турбо; 2014–2020" },
+      { code: "GLA 250 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 270", displacementL: 2.0, horsepower: 211, notes: "I4 турбо; 2014–2020" },
+      { code: "AMG GLA 45", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 133", displacementL: 2.0, horsepower: 360, notes: "AMG handcrafted I4 турбо; 2014–2020 (FL: 381 л.с.)" },
+    ],
+  },
+  // GLA H247 (2020 – present) — second-gen on MFA2 platform.
+  {
+    modelSlug: "gla",
+    generationCode: "H247",
+    source: "https://www.auto-data.net/en/mercedes-benz-gla-h247-generation-7468",
+    trims: [
+      { code: "GLA 180", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 282", displacementL: 1.3, horsepower: 136, notes: "I4 турбо; 2020–" },
+      { code: "GLA 180 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 1.5, horsepower: 116, notes: "I4 турбо дизель; 2020–" },
+      { code: "GLA 200", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 282", displacementL: 1.3, horsepower: 163, notes: "I4 турбо; 2020–" },
+      { code: "GLA 200 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 282", displacementL: 1.3, horsepower: 163, notes: "I4 турбо; 2020–" },
+      { code: "GLA 200 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 1.5, horsepower: 150, notes: "I4 турбо дизель; 2020–" },
+      { code: "GLA 200 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 1.5, horsepower: 150, notes: "I4 турбо дизель; 2020–" },
+      { code: "GLA 220 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 190, notes: "I4 турбо дизель; 2020–" },
+      { code: "GLA 220 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 190, notes: "I4 турбо дизель; 2020–" },
+      { code: "GLA 250", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 224, notes: "I4 турбо; 2020–" },
+      { code: "GLA 250 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 224, notes: "I4 турбо; 2020–" },
+      { code: "GLA 250 e", drivetrain: "FWD", fuelType: "HYBRID", engineCode: "M 282", displacementL: 1.3, horsepower: 218, notes: "бензин+электро PHEV; батарея 15.6 кВт·ч; 2020–" },
+      { code: "AMG GLA 35 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 306, notes: "AMG performance; 2020–" },
+      { code: "AMG GLA 45 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 387, notes: "AMG handcrafted I4 турбо; 2020–" },
+      { code: "AMG GLA 45 S 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 421, notes: "AMG handcrafted I4 турбо; 2020–" },
+    ],
+  },
+  // GLB X247 (2019 – present) — 7-seater compact SUV.
+  {
+    modelSlug: "glb",
+    generationCode: "X247",
+    source: "https://www.auto-data.net/en/mercedes-benz-glb-x247-generation-7171",
+    trims: [
+      { code: "GLB 180 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 1.5, horsepower: 116, notes: "I4 турбо дизель; 2019–" },
+      { code: "GLB 200", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 282", displacementL: 1.3, horsepower: 163, notes: "I4 турбо; 2019–" },
+      { code: "GLB 200 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 2.0, horsepower: 150, notes: "I4 турбо дизель; 2019–" },
+      { code: "GLB 200 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654q", displacementL: 2.0, horsepower: 150, notes: "I4 турбо дизель; 2019–" },
+      { code: "GLB 220 d", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 190, notes: "I4 турбо дизель; 2019–" },
+      { code: "GLB 220 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 190, notes: "I4 турбо дизель; 2019–" },
+      { code: "GLB 250", drivetrain: "FWD", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 224, notes: "I4 турбо; 2019–" },
+      { code: "GLB 250 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 224, notes: "I4 турбо; 2019–" },
+      { code: "AMG GLB 35 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 260", displacementL: 2.0, horsepower: 306, notes: "AMG performance; 2020–" },
+    ],
+  },
+  // GLC X204 (2008 – 2015) — sold as GLK-Class until 2015 rename.
+  {
+    modelSlug: "glc",
+    generationCode: "X204",
+    source: "https://www.auto-data.net/en/mercedes-benz-glk-x204-generation-2744",
+    trims: [
+      { code: "GLK 200 CDI", drivetrain: "FWD", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 143, notes: "I4 турбо дизель; продавался как GLK; 2010–2015" },
+      { code: "GLK 220 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 170, notes: "I4 турбо дизель; продавался как GLK; 2008–2015" },
+      { code: "GLK 250 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 204, notes: "I4 турбо дизель; продавался как GLK; 2010–2015" },
+      { code: "GLK 280 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; продавался как GLK; 2008–2009" },
+      { code: "GLK 300 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; продавался как GLK; 2008–2015" },
+      { code: "GLK 320 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как GLK; 2008–2015" },
+      { code: "GLK 350 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; продавался как GLK; 2008–2015 (FL: 306 л.с.)" },
+      { code: "GLK 350 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как GLK; 2008–2012 (FL: 231 л.с.)" },
+    ],
+  },
+  // GLC X253 (2015 – 2022) — first to bear GLC nameplate.
+  {
+    modelSlug: "glc",
+    generationCode: "X253",
+    source: "https://www.auto-data.net/en/mercedes-benz-glc-suv-x253-generation-4568",
+    trims: [
+      { code: "GLC 220 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 170, notes: "I4 турбо дизель; 2015–2019 (FL: OM 654 2.0L 194 л.с.)" },
+      { code: "GLC 250 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 211, notes: "I4 турбо; 2015–2019" },
+      { code: "GLC 250 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 204, notes: "I4 турбо дизель; 2015–2019" },
+      { code: "GLC 300", drivetrain: "RWD", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 241, notes: "I4 турбо; 2015–2022" },
+      { code: "GLC 300 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 245, notes: "I4 турбо; 2015–2022" },
+      { code: "GLC 350 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; 2015–2019" },
+      { code: "GLC 350 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 274", displacementL: 2.0, horsepower: 320, notes: "бензин+электро PHEV; батарея 8.7 кВт·ч; 2016–2019" },
+      { code: "AMG GLC 43 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 367, notes: "V6 битурбо AMG; 2016–2022 (FL: 390 л.с.)" },
+      { code: "AMG GLC 63 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 476, notes: "V8 битурбо AMG; 2017–2022" },
+      { code: "AMG GLC 63 S 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 510, notes: "V8 битурбо AMG; 2017–2022" },
+    ],
+  },
+  // GLC X254 (2022 – present) — current generation, fully mild-hybrid.
+  {
+    modelSlug: "glc",
+    generationCode: "X254",
+    source: "https://www.auto-data.net/en/mercedes-benz-glc-suv-x254-generation-8900",
+    trims: [
+      { code: "GLC 200 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 254", displacementL: 2.0, horsepower: 204, notes: "I4 mild hybrid; 2022–" },
+      { code: "GLC 200 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 163, notes: "I4 турбо дизель; 2022–" },
+      { code: "GLC 220 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 197, notes: "I4 турбо дизель mild hybrid; 2022–" },
+      { code: "GLC 300 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 254", displacementL: 2.0, horsepower: 258, notes: "I4 mild hybrid; 2022–" },
+      { code: "GLC 300 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 269, notes: "I4 турбо дизель mild hybrid; 2022–" },
+      { code: "GLC 300 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 254", displacementL: 2.0, horsepower: 313, notes: "бензин+электро PHEV; батарея 31.2 кВт·ч; 2022–" },
+      { code: "GLC 300 de 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "OM 654", displacementL: 2.0, horsepower: 335, notes: "дизель+электро PHEV; батарея 31.2 кВт·ч; 2023–" },
+      { code: "GLC 350 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 254", displacementL: 2.0, horsepower: 313, notes: "бензин+электро PHEV; батарея 31.2 кВт·ч; 2023–" },
+      { code: "GLC 400 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 254", displacementL: 2.0, horsepower: 381, notes: "бензин+электро PHEV; батарея 31.2 кВт·ч; 2023–" },
+      { code: "GLC 450 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 367, notes: "I6 турбо дизель mild hybrid; 2023–" },
+      { code: "AMG GLC 43 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 421, notes: "AMG handcrafted I4 турбо + EM; 2022–" },
+      { code: "AMG GLC 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 449, notes: "I6 mild hybrid AMG; 2024–" },
+      { code: "AMG GLC 63 S E PERFORMANCE", drivetrain: "4MATIC+", fuelType: "HYBRID", engineCode: "M 139", displacementL: 2.0, horsepower: 680, notes: "I4 битурбо AMG + EM PHEV; батарея 6.1 кВт·ч; 2023–" },
+    ],
+  },
+  // GLE W163 (1997 – 2004) — sold as M-Class / ML.
+  {
+    modelSlug: "gle",
+    generationCode: "W163",
+    source: "https://www.auto-data.net/en/mercedes-benz-m-class-w163-generation-2752",
+    trims: [
+      { code: "ML 230", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 111", displacementL: 2.3, horsepower: 150, notes: "I4; продавался как M-Class / ML; 1997–2002" },
+      { code: "ML 270 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 612", displacementL: 2.7, horsepower: 163, notes: "I5 турбо дизель; продавался как ML; 1999–2004" },
+      { code: "ML 320", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.2, horsepower: 218, notes: "V6; продавался как ML; 1997–2004" },
+      { code: "ML 350", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.7, horsepower: 235, notes: "V6; продавался как ML; FL 2002–2004" },
+      { code: "ML 400 CDI", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 628", displacementL: 4.0, horsepower: 250, notes: "V8 турбо дизель; продавался как ML; 2001–2004" },
+      { code: "ML 430", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113", displacementL: 4.3, horsepower: 272, notes: "V8; продавался как ML; 1998–2001" },
+      { code: "ML 500", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.0, horsepower: 292, notes: "V8; продавался как ML; FL 2002–2004" },
+      { code: "AMG ML 55", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.5, horsepower: 347, notes: "V8 AMG; продавался как ML; 2000–2003" },
+    ],
+  },
+  // GLE W164 (2005 – 2011) — second-gen ML; introduced AIRMATIC option.
+  {
+    modelSlug: "gle",
+    generationCode: "W164",
+    source: "https://www.auto-data.net/en/mercedes-benz-m-class-w164-generation-2751",
+    trims: [
+      { code: "ML 280 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 190, notes: "V6 турбо дизель; продавался как ML; 2005–2009" },
+      { code: "ML 300 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 204, notes: "V6 турбо дизель; продавался как ML; FL 2009–2011" },
+      { code: "ML 320 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как ML; 2005–2009" },
+      { code: "ML 350 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; продавался как ML; 2005–2011" },
+      { code: "ML 350 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как ML; FL 2009–2011 (231 л.с. вариант)" },
+      { code: "ML 420 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 629", displacementL: 4.0, horsepower: 306, notes: "V8 турбо дизель; продавался как ML; 2006–2010" },
+      { code: "ML 450 Hybrid 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 272", displacementL: 3.5, horsepower: 340, notes: "бензин+электро гибрид (не PHEV); 2009–2011" },
+      { code: "ML 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 388, notes: "V8; FL 2007–2011 (ранний M 113 5.0L 306 л.с.)" },
+      { code: "ML 550 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 388, notes: "V8; 2007–2011" },
+      { code: "AMG ML 63 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 156", displacementL: 6.2, horsepower: 510, notes: "V8 атм AMG; 2006–2011" },
+    ],
+  },
+  // GLE W166 (2011 – 2019) — third-gen ML, renamed GLE in 2015 facelift.
+  {
+    modelSlug: "gle",
+    generationCode: "W166",
+    source: "https://www.auto-data.net/en/mercedes-benz-gle-suv-w166-generation-4570",
+    trims: [
+      { code: "GLE 250 d", drivetrain: "RWD", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 204, notes: "I4 турбо дизель; FL 2015–2019" },
+      { code: "GLE 250 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 204, notes: "I4 турбо дизель; FL 2015–2019" },
+      { code: "GLE 300 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 201, notes: "I4 турбо дизель; FL 2018–2019" },
+      { code: "GLE 320 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 272, notes: "V6 битурбо; FL 2018–2019" },
+      { code: "GLE 350 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.5, horsepower: 302, notes: "V6 битурбо; FL 2015–2019" },
+      { code: "GLE 350 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; FL 2015–2019" },
+      { code: "GLE 400 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; FL 2015–2019" },
+      { code: "GLE 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 455, notes: "V8 битурбо; FL 2015–2019 (ранний 435 л.с.)" },
+      { code: "GLE 500 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 276", displacementL: 3.0, horsepower: 442, notes: "бензин+электро PHEV; батарея 8.7 кВт·ч; 2015–2019" },
+      { code: "AMG GLE 43", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 390, notes: "V6 битурбо AMG; 2016–2019" },
+      { code: "AMG GLE 63", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 557, notes: "V8 битурбо AMG; 2015–2019" },
+      { code: "AMG GLE 63 S", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 585, notes: "V8 битурбо AMG; 2015–2019" },
+    ],
+  },
+  // GLE V167 (2019 – present) — re-verified against auto-data.net.
+  {
+    modelSlug: "gle",
+    generationCode: "V167",
+    source: "https://www.auto-data.net/en/mercedes-benz-gle-suv-v167-generation-6596",
+    trims: [
+      { code: "GLE 300 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 245, notes: "I4 турбо дизель; 2019– (FL: 272 л.с. EQ Boost)" },
+      { code: "GLE 350", drivetrain: "RWD", fuelType: "PETROL", engineCode: "M 264", displacementL: 2.0, horsepower: 255, notes: "I4 mild hybrid; 2019–" },
+      { code: "GLE 350 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 264", displacementL: 2.0, horsepower: 255, notes: "I4 mild hybrid; 2019–" },
+      { code: "GLE 350 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 272, notes: "I6 турбо дизель mild hybrid; 2019–" },
+      { code: "GLE 350 de", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "OM 654", displacementL: 2.0, horsepower: 320, notes: "дизель+электро PHEV; батарея 31.2 кВт·ч; 2019–" },
+      { code: "GLE 350 e", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 264", displacementL: 2.0, horsepower: 333, notes: "бензин+электро PHEV; батарея 31.2 кВт·ч; 2020–" },
+      { code: "GLE 400 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 330, notes: "I6 турбо дизель mild hybrid; 2019–" },
+      { code: "GLE 450", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid; 2019– (FL 2.5L M 254)" },
+      { code: "GLE 580", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 489, notes: "V8 битурбо mild hybrid; 2020–" },
+      { code: "AMG GLE 53", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "I6 mild hybrid AMG; 2019– (FL: PHEV 544 л.с.)" },
+      { code: "AMG GLE 63", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 571, notes: "V8 битурбо AMG; 2020–" },
+      { code: "AMG GLE 63 S", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG; 2020–" },
+    ],
+  },
+  // GLS X164 (2006 – 2012) — sold as GL-Class.
+  {
+    modelSlug: "gls",
+    generationCode: "X164",
+    source: "https://www.auto-data.net/en/mercedes-benz-gl-x164-generation-3865",
+    trims: [
+      { code: "GL 320 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как GL-Class; 2006–2008" },
+      { code: "GL 350 BlueTEC 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 211, notes: "V6 турбо дизель; продавался как GL-Class; 2009–2012" },
+      { code: "GL 350 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 265, notes: "V6 турбо дизель; продавался как GL-Class; 2009–2012" },
+      { code: "GL 420 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 629", displacementL: 4.0, horsepower: 306, notes: "V8 турбо дизель; продавался как GL-Class; 2006–2009" },
+      { code: "GL 450 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 4.7, horsepower: 340, notes: "V8; продавался как GL-Class; 2006–2008" },
+      { code: "GL 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.0, horsepower: 388, notes: "V8; продавался как GL-Class; 2006–2008" },
+    ],
+  },
+  // GLS X166 (2012 – 2019) — second-gen GL-Class, renamed GLS in 2016.
+  {
+    modelSlug: "gls",
+    generationCode: "X166",
+    source: "https://www.auto-data.net/en/mercedes-benz-gls-x166-generation-4650",
+    trims: [
+      { code: "GL 350 BlueTEC 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; продавался как GL до 2016; 2012–2016" },
+      { code: "GL 400 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; продавался как GL до 2016; 2014–2016" },
+      { code: "GL 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 435, notes: "V8 битурбо; продавался как GL до 2016; 2012–2016" },
+      { code: "AMG GL 63", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 557, notes: "V8 битурбо AMG; продавался как GL до 2016; 2012–2016" },
+      { code: "GLS 350 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; FL 2016–2019" },
+      { code: "GLS 400 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; FL 2016–2019" },
+      { code: "GLS 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 456, notes: "V8 битурбо; FL 2016–2019" },
+      { code: "AMG GLS 63", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 585, notes: "V8 битурбо AMG; FL 2016–2019" },
+    ],
+  },
+  // GLS X167 (2019 – present) — re-verified against auto-data.net.
+  {
+    modelSlug: "gls",
+    generationCode: "X167",
+    source: "https://www.auto-data.net/en/mercedes-benz-gls-x167-generation-7091",
+    trims: [
+      { code: "GLS 350 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 286, notes: "I6 турбо дизель mild hybrid; 2019–" },
+      { code: "GLS 400 d", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 330, notes: "I6 турбо дизель mild hybrid; 2019–" },
+      { code: "GLS 450", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid; 2019–" },
+      { code: "GLS 580", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 489, notes: "V8 битурбо mild hybrid; 2019–" },
+      { code: "GLS 600 (Maybach)", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 558, notes: "V8 битурбо Maybach; 2020–" },
+      { code: "AMG GLS 63", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG handcrafted; 2019–" },
     ],
   },
 ];
