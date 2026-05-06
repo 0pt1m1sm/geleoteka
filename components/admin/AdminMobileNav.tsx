@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shared/LogoutButton";
+import { NavDrawer } from "@/components/shared/NavDrawer";
 import {
   adminNav,
   findActiveGroupLabel,
@@ -17,107 +17,10 @@ import { useAccordionGroup } from "@/lib/use-accordion-group";
 export function AdminMobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const close = (): void => setOpen(false);
   const activeHref = findActiveHref(pathname, adminNav);
   const activeGroupLabel = findActiveGroupLabel(activeHref, adminNav);
   const [openGroup, toggleGroup] = useAccordionGroup(activeGroupLabel);
-
-  function closeDrawer(): void {
-    setOpen(false);
-  }
-
-  const overlay = open ? (
-    <>
-      <div
-        className="fixed inset-0 z-50"
-        style={{ backgroundColor: "rgba(0,0,0,0.6)" }}
-        onClick={closeDrawer}
-      />
-      <div
-        className="fixed top-0 left-0 z-[60] h-full w-72 flex flex-col"
-        style={{
-          backgroundColor: "var(--card)",
-          color: "var(--card-foreground)",
-          borderRight: "1px solid var(--border)",
-          boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between p-4"
-          style={{ borderBottom: "1px solid var(--border)" }}
-        >
-          <div>
-            <span
-              className="text-display text-lg font-bold"
-              style={{ color: "var(--color-accent)" }}
-            >
-              Geleoteka
-            </span>
-            <p className="text-xs" style={{ color: "var(--color-gold)" }}>
-              Админ-панель
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={closeDrawer}
-            className="p-2"
-            style={{ color: "var(--foreground-muted)" }}
-            aria-label="Закрыть меню"
-          >
-            <svg
-              className="w-5 h-5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {adminNav.map((entry) => {
-            if (entry.kind === "link") {
-              return (
-                <DrawerLink
-                  key={entry.href}
-                  href={entry.href}
-                  label={entry.label}
-                  isActive={activeHref === entry.href}
-                  onNavigate={closeDrawer}
-                />
-              );
-            }
-            return (
-              <DrawerGroup
-                key={entry.id}
-                group={entry}
-                isOpen={openGroup === entry.label}
-                onToggle={() => toggleGroup(entry.label)}
-                activeHref={activeHref}
-                onNavigate={closeDrawer}
-              />
-            );
-          })}
-        </nav>
-
-        <div
-          className="p-4 space-y-1"
-          style={{ borderTop: "1px solid var(--border)" }}
-        >
-          <Link
-            href="/"
-            onClick={closeDrawer}
-            className="block px-3 py-2 rounded-lg text-sm transition-colors"
-            style={{ color: "var(--foreground-muted)" }}
-          >
-            ← На сайт
-          </Link>
-          <LogoutButton className="block px-3 py-2 rounded-lg text-sm transition-colors w-full text-left" />
-        </div>
-      </div>
-    </>
-  ) : null;
 
   return (
     <div className="md:hidden">
@@ -151,7 +54,61 @@ export function AdminMobileNav() {
         <div className="w-10" />
       </header>
 
-      {overlay && createPortal(overlay, document.body)}
+      <NavDrawer
+        open={open}
+        onClose={close}
+        side="left"
+        header={
+          <div>
+            <span
+              className="text-display text-lg font-bold"
+              style={{ color: "var(--color-accent)" }}
+            >
+              Geleoteka
+            </span>
+            <p className="text-xs" style={{ color: "var(--color-gold)" }}>
+              Админ-панель
+            </p>
+          </div>
+        }
+        footer={
+          <>
+            <Link
+              href="/"
+              onClick={close}
+              className="block px-3 py-2 rounded-lg text-sm transition-colors"
+              style={{ color: "var(--foreground-muted)" }}
+            >
+              ← На сайт
+            </Link>
+            <LogoutButton className="block px-3 py-2 rounded-lg text-sm transition-colors w-full text-left" />
+          </>
+        }
+      >
+        {adminNav.map((entry) => {
+          if (entry.kind === "link") {
+            return (
+              <DrawerLink
+                key={entry.href}
+                href={entry.href}
+                label={entry.label}
+                isActive={activeHref === entry.href}
+                onNavigate={close}
+              />
+            );
+          }
+          return (
+            <DrawerGroup
+              key={entry.id}
+              group={entry}
+              isOpen={openGroup === entry.label}
+              onToggle={() => toggleGroup(entry.label)}
+              activeHref={activeHref}
+              onNavigate={close}
+            />
+          );
+        })}
+      </NavDrawer>
     </div>
   );
 }
@@ -236,4 +193,3 @@ function DrawerGroup({
     </div>
   );
 }
-
