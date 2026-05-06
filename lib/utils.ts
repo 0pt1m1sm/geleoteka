@@ -1,11 +1,3 @@
-import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
-
-/** Merge Tailwind classes with proper conflict resolution */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
 /** Format price in Rubles */
 export function formatPrice(amount: number): string {
   return new Intl.NumberFormat("ru-RU", {
@@ -34,16 +26,6 @@ export function formatDateTime(date: Date | string): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-/** Generate a random referral code */
-export function generateReferralCode(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
 }
 
 /** Normalize phone number to E.164 format */
@@ -93,13 +75,6 @@ export const LOYALTY_TIERS = {
 } as const;
 
 export type LoyaltyTier = keyof typeof LOYALTY_TIERS;
-
-/** Get tier from points */
-export function getTierFromPoints(points: number): LoyaltyTier {
-  if (points >= 5000) return "AMG_CLUB";
-  if (points >= 1000) return "GOLD";
-  return "SILVER";
-}
 
 /** Get next tier info */
 export function getNextTier(
