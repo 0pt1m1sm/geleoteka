@@ -299,8 +299,8 @@ Runtime profile: Full (UI changes — mobile nav). Three scenarios covering each
 - [x] Task 2: Extract `createLocalStorageStore` and migrate 3 sites
 - [x] Task 3: Extract `getDefaultContact()` and migrate 2 sites
 - [x] Task 4: Mobile/desktop nav primitive (3 sub-extractions)
-- [ ] Task 5: Delete `app/(cabinet)/` ghost route group
-- [ ] Task 6: Delete 3 dead server actions
+- [x] Task 5: Delete `app/(cabinet)/` ghost route group
+- [x] Task 6: Delete 3 dead server actions
 - [x] Task 7: Delete `useMyCar` hook (rolled into Task 2)
 - [ ] Task 8: Delete `lib/models-data.ts` shim
 - [ ] Task 9: Regression sweep + browser smoke test
