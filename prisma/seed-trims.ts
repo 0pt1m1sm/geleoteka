@@ -105,6 +105,18 @@ const CURATED: CuratedGeneration[] = [
       { code: "G 63 AMG", bodyStyle: "long", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 585, notes: "AMG handcrafted V8 — Mercedes spec sheet, not Wikipedia" },
     ],
   },
+  // G-Class W464 (2022 – present) — utility/military/governmental.
+  // Replaces W461. Solid axles, three diff locks, Euro III diesel, 24V electrical.
+  // Sold as Station Wagon (BA06) and Single-Cab (BA09) per Mercedes-Benz GGB.
+  {
+    modelSlug: "g-class",
+    generationCode: "W464",
+    source: "https://ggb.mercedes-benz.com/en/vehicles/base-vehicles-model-series-464 + https://www.ultimatespecs.com/car-specs/Mercedes-Benz/M9879/W464-Class-G",
+    trims: [
+      { code: "G 350 d Station Wagon", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656 D 29 R SCR", displacementL: 2.9, horsepower: 286, notes: "I6 турбо дизель; 5-дверный фургон; военный/коммерческий; 2022–" },
+      { code: "G 350 d Chassis Cab", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656 D 29 R SCR", displacementL: 2.9, horsepower: 286, notes: "I6 турбо дизель; шасси-кабина (одинарная); военный/коммерческий; 2022–" },
+    ],
+  },
   // G-Class W465 (2024 – present) — facelift second-generation luxury G.
   // Mild-hybrid I6 lineup replaces V8 G 500 with M256 inline-6, adds the
   // electric G 580. AMG G 63 retains the 4.0 V8 biturbo with mild hybrid.
@@ -1201,6 +1213,48 @@ const CURATED: CuratedGeneration[] = [
       { code: "EQS 500 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 449, notes: "2 двигателя (PSM+ASM); батарея 120/125 кВт·ч; SUV; 2022–" },
       { code: "EQS 550 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 536, notes: "2 двигателя (PSM+ASM); батарея 125 кВт·ч; SUV; FL 2024–" },
       { code: "EQS 580 4MATIC", drivetrain: "4MATIC", fuelType: "ELECTRIC", horsepower: 544, notes: "2 двигателя (PSM+ASM); батарея 120/125 кВт·ч; SUV; 2022–" },
+    ],
+  },
+  // ===== Vans =====
+  // V-Class W638 (1996 – 2003) — first V-Class, sold as V-Class.
+  {
+    modelSlug: "v-class",
+    generationCode: "W638",
+    source: "https://www.auto-data.net/en/mercedes-benz-vito-w638-generation-2757",
+    trims: [
+      { code: "V 200 CDI", fuelType: "DIESEL", engineCode: "OM 611", displacementL: 2.1, horsepower: 102, notes: "I4 турбо дизель; 1999–2003" },
+      { code: "V 220 CDI", fuelType: "DIESEL", engineCode: "OM 611", displacementL: 2.1, horsepower: 122, notes: "I4 турбо дизель; 1999–2003" },
+      { code: "V 230 TD", fuelType: "DIESEL", engineCode: "OM 601", displacementL: 2.3, horsepower: 98, notes: "I4 турбо дизель; 1996–1999" },
+      { code: "V 230", fuelType: "PETROL", engineCode: "M 111", displacementL: 2.3, horsepower: 143, notes: "I4; 1996–2003" },
+      { code: "V 280", fuelType: "PETROL", engineCode: "M 112", displacementL: 2.8, horsepower: 174, notes: "V6; 1996–2003" },
+    ],
+  },
+  // V-Class W639 (2003 – 2014) — sold as Viano (passenger) / Vito (commercial).
+  {
+    modelSlug: "v-class",
+    generationCode: "W639",
+    source: "https://www.auto-data.net/en/mercedes-benz-viano-w639-generation-2783",
+    trims: [
+      { code: "Viano 2.0 CDI", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 115, notes: "I4 турбо дизель; продавался как Viano; 2007–2010" },
+      { code: "Viano 2.2 CDI", fuelType: "DIESEL", engineCode: "OM 646", displacementL: 2.1, horsepower: 150, notes: "I4 турбо дизель; продавался как Viano; 2003–2010 (FL: OM 651 163 л.с.)" },
+      { code: "Viano CDI 3.0", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 224, notes: "V6 турбо дизель; продавался как Viano; FL 2010–2014" },
+      { code: "Viano 3.0i V6", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.0, horsepower: 190, notes: "V6; продавался как Viano; 2003–2007" },
+      { code: "Viano 3.2 V6", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.2, horsepower: 218, notes: "V6; продавался как Viano; 2003–2004" },
+      { code: "Viano 3.5i V6", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 258, notes: "V6; продавался как Viano; 2007–2010" },
+    ],
+  },
+  // V-Class W447 (2014 – present) — current V-Class (and Vito for commercial).
+  {
+    modelSlug: "v-class",
+    generationCode: "W447",
+    source: "https://www.auto-data.net/en/mercedes-benz-v-class-v447-generation-4379",
+    trims: [
+      { code: "V 200 CDI / V 200 d", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 136, notes: "I4 турбо дизель; 2014– (FL: OM 654 d 2.0L)" },
+      { code: "V 220 CDI / V 220 d", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 163, notes: "I4 турбо дизель; 2014– (FL: OM 654 d 2.0L)" },
+      { code: "V 250 CDI BlueTEC / V 250 d", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 190, notes: "I4 турбо дизель; 2014– (FL: OM 654 d 2.0L)" },
+      { code: "V 250 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 190, notes: "I4 турбо дизель; 2015–" },
+      { code: "V 300 d", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 239, notes: "I4 турбо дизель; FL 2019– (FL: OM 654 d 2.0L 237 л.с.)" },
+      { code: "V 300 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.1, horsepower: 239, notes: "I4 турбо дизель; FL 2019–" },
     ],
   },
 ];
