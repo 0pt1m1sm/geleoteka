@@ -157,7 +157,3 @@ export async function updatePart(
   redirect("/admin/parts");
 }
 
-export async function deletePart(partId: string): Promise<void> {
-  await requireRole(["ADMIN", "MANAGER"]);
-  await db.part.delete({ where: { id: partId } });
-}

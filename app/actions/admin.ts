@@ -50,18 +50,6 @@ export async function updateRepairOrderStatus(
   }
 }
 
-export async function assignMaster(
-  repairOrderId: string,
-  masterUserId: string
-): Promise<void> {
-  await requireRole(["ADMIN", "MANAGER"]);
-
-  await db.repairOrder.update({
-    where: { id: repairOrderId },
-    data: { masterUserId },
-  });
-}
-
 export async function deleteRepairOrder(repairOrderId: string): Promise<void> {
   await requireRole(["ADMIN"]);
 

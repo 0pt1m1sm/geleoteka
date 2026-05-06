@@ -103,7 +103,3 @@ export async function updateSupplierOrderStatus(
   });
 }
 
-export async function deleteSupplierOrder(orderId: string): Promise<void> {
-  await requireRole(["ADMIN"]);
-  await db.supplierOrder.delete({ where: { id: orderId } });
-}
