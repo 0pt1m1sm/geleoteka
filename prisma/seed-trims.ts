@@ -108,10 +108,13 @@ const CURATED: CuratedGeneration[] = [
   // G-Class W464 (2022 – present) — utility/military/governmental.
   // Replaces W461. Solid axles, three diff locks, Euro III diesel, 24V electrical.
   // Sold as Station Wagon (BA06) and Single-Cab (BA09) per Mercedes-Benz GGB.
+  // Engine specs (OM 656 D 29 R SCR, 286 hp) supplemented from
+  // https://www.ultimatespecs.com/car-specs/Mercedes-Benz/118793 since GGB
+  // brochure omits HP/displacement.
   {
     modelSlug: "g-class",
     generationCode: "W464",
-    source: "https://ggb.mercedes-benz.com/en/vehicles/base-vehicles-model-series-464 + https://www.ultimatespecs.com/car-specs/Mercedes-Benz/M9879/W464-Class-G",
+    source: "https://ggb.mercedes-benz.com/en/vehicles/base-vehicles-model-series-464",
     trims: [
       { code: "G 350 d Station Wagon", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656 D 29 R SCR", displacementL: 2.9, horsepower: 286, notes: "I6 турбо дизель; 5-дверный фургон; военный/коммерческий; 2022–" },
       { code: "G 350 d Chassis Cab", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656 D 29 R SCR", displacementL: 2.9, horsepower: 286, notes: "I6 турбо дизель; шасси-кабина (одинарная); военный/коммерческий; 2022–" },
@@ -584,7 +587,6 @@ const CURATED: CuratedGeneration[] = [
       { code: "E 200 d", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 163, notes: "I4 турбо дизель; 2023–" },
       { code: "E 220 d", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 197, notes: "I4 турбо дизель; 2023–" },
       { code: "E 220 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 654", displacementL: 2.0, horsepower: 197, notes: "I4 турбо дизель; 2023–" },
-      { code: "E 260", fuelType: "PETROL", engineCode: "M 254", displacementL: 2.0, horsepower: 204, notes: "I4 mild hybrid (для рынка КНР); 2023–" },
       { code: "E 300", fuelType: "PETROL", engineCode: "M 254", displacementL: 2.0, horsepower: 258, notes: "I4 mild hybrid; 2023–" },
       { code: "E 300 e", fuelType: "HYBRID", engineCode: "M 254", displacementL: 2.0, horsepower: 313, notes: "бензин+электро PHEV; батарея 25.4 кВт·ч; 2023–" },
       { code: "E 300 e 4MATIC", drivetrain: "4MATIC", fuelType: "HYBRID", engineCode: "M 254", displacementL: 2.0, horsepower: 313, notes: "бензин+электро PHEV; батарея 25.4 кВт·ч; 2023–" },
@@ -609,7 +611,6 @@ const CURATED: CuratedGeneration[] = [
       { code: "CLS 350", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; 2004–2010" },
       { code: "CLS 350 CGI", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 292, notes: "V6 DI; 2008–2010" },
       { code: "CLS 500", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 388, notes: "V8; 2006–2010" },
-      { code: "CLS 550", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 382, notes: "V8 (US-spec name; mostly export); 2007–2010" },
       { code: "AMG CLS 55", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.5, horsepower: 476, notes: "V8 компрессор AMG; 2004–2006" },
       { code: "AMG CLS 63", fuelType: "PETROL", engineCode: "M 156", displacementL: 6.2, horsepower: 514, notes: "V8 атм AMG; 2006–2010" },
     ],
@@ -749,11 +750,13 @@ const CURATED: CuratedGeneration[] = [
       { code: "Maybach S 680 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо Maybach; 2021–" },
     ],
   },
-  // AMG GT C190 (2014 – 2022) — 2-door coupe/roadster (per Wikipedia for full lineup).
+  // AMG GT C190 (2014 – 2022) — 2-door coupe/roadster.
+  // Auto-data only listed AMG GT and AMG GT S; AMG GT C / R / R Pro / Black Series
+  // sourced from https://en.wikipedia.org/wiki/Mercedes-AMG_GT for completeness.
   {
     modelSlug: "amg-gt",
     generationCode: "C190",
-    source: "https://www.auto-data.net/en/mercedes-benz-amg-gt-c190-generation-4380 (+ Wikipedia for late-generation variants)",
+    source: "https://www.auto-data.net/en/mercedes-benz-amg-gt-c190-generation-4380",
     trims: [
       { code: "AMG GT", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 462, notes: "V8 битурбо AMG handcrafted; 2014–2021 (FL: 476 л.с.)" },
       { code: "AMG GT S", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 510, notes: "V8 битурбо AMG; 2014–2020 (FL: 522 л.с.)" },

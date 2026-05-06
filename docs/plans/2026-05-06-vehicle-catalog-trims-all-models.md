@@ -122,7 +122,7 @@ Type: Feature
 
 ### Truths
 
-1. `prisma/seed-trims.ts` contains a `CuratedGeneration` entry for every non-G-Class generation in `prisma/seed-vehicles.ts` AND for G-Class W464 (the previously-missed gen). Verifiable by `grep -c "modelSlug:" prisma/seed-trims.ts` returning at least `5 (existing G-Class W460/W461/W463/W463A/W465) + 1 (W464 catch-up) + 61 (non-G entries) = 67`.
+1. `prisma/seed-trims.ts` contains a `CuratedGeneration` entry for every non-G-Class generation in `prisma/seed-vehicles.ts` AND for G-Class W464 (the previously-missed gen). Verifiable by `grep -cE '^\s+modelSlug:' prisma/seed-trims.ts` returning exactly `67` (5 existing G-Class W460/W461/W463/W463A/W465 + 1 W464 catch-up + 61 non-G entries). Note: a plain `grep -c "modelSlug:"` returns `68` because it also matches the `CuratedGeneration` interface declaration on line 14 — anchor the regex to leading whitespace to count only array entries.
 2. Every new `CuratedGeneration` block has a `source` field starting with `https://www.auto-data.net/` or `https://en.wikipedia.org/`.
 3. Running `npx prisma db seed` against prod reports `Trims seeded: ... 0 curated rows skipped` (no model/generation lookup failures).
 4. SQL query against prod shows every non-G-Class generation has ≥ 2 trims (1 default `ALL` + ≥ 1 curated). G-Class W464 may be the sole exception if auto-data.net has no documented utility-line trims (documented in plan).
@@ -213,6 +213,9 @@ eqs    X296: https://www.auto-data.net/en/mercedes-benz-eqs-suv-x296-generation-
 v-class W638: https://www.auto-data.net/en/mercedes-benz-vito-w638-generation-2757 (Vito)
 v-class W639: https://www.auto-data.net/en/mercedes-benz-viano-w639-generation-2783 (Viano)
 v-class W447: https://www.auto-data.net/en/mercedes-benz-v-class-v447-generation-4379
+
+# G-Class W464 catch-up (used in Task 6)
+g-class W464: https://ggb.mercedes-benz.com/en/vehicles/base-vehicles-model-series-464 (auto-data has no W464 page; HP/engine cross-checked at https://www.ultimatespecs.com/car-specs/Mercedes-Benz/118793)
 ```
 
 ## Progress Tracking
