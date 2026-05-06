@@ -664,6 +664,249 @@ const CURATED: CuratedGeneration[] = [
       { code: "AMG CLS 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "I6 mild hybrid AMG; 2018–2023" },
     ],
   },
+  // ===== Full-size saloon + grand tourers =====
+  // S-Class W140 (1991 – 1998) — flagship 1990s.
+  {
+    modelSlug: "s-class",
+    generationCode: "W140",
+    source: "https://www.auto-data.net/en/mercedes-benz-s-class-w140-generation-2778",
+    trims: [
+      { code: "S 280", fuelType: "PETROL", engineCode: "M 104", displacementL: 2.8, horsepower: 193, notes: "I6; 1993–1998" },
+      { code: "300 SE", fuelType: "PETROL", engineCode: "M 104", displacementL: 3.0, horsepower: 231, notes: "I6 (продавался как 300 SE до 1993)" },
+      { code: "S 320", fuelType: "PETROL", engineCode: "M 104", displacementL: 3.2, horsepower: 231, notes: "I6; 1993–1998" },
+      { code: "S 350 Turbodiesel", fuelType: "DIESEL", engineCode: "OM 603", displacementL: 3.4, horsepower: 150, notes: "I6 турбо дизель; 1993–1995" },
+      { code: "400 SE / S 420", fuelType: "PETROL", engineCode: "M 119", displacementL: 4.2, horsepower: 279, notes: "V8 (продавался как 400 SE до 1993, S 420 после)" },
+      { code: "500 SE / S 500", fuelType: "PETROL", engineCode: "M 119", displacementL: 5.0, horsepower: 320, notes: "V8 (продавался как 500 SE до 1993, S 500 после)" },
+      { code: "600 SE / S 600", fuelType: "PETROL", engineCode: "M 120", displacementL: 6.0, horsepower: 408, notes: "V12 (продавался как 600 SE до 1993, S 600 после)" },
+    ],
+  },
+  // S-Class W220 (1998 – 2005) — air-suspension AIRMATIC era.
+  {
+    modelSlug: "s-class",
+    generationCode: "W220",
+    source: "https://www.auto-data.net/en/mercedes-benz-s-class-w220-generation-2776",
+    trims: [
+      { code: "S 280", fuelType: "PETROL", engineCode: "M 112", displacementL: 2.8, horsepower: 204, notes: "V6; 1998–2005" },
+      { code: "S 320", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.2, horsepower: 224, notes: "V6; 1998–2005" },
+      { code: "S 320 CDI", fuelType: "DIESEL", engineCode: "OM 613", displacementL: 3.2, horsepower: 197, notes: "I6 турбо дизель; 1999–2005" },
+      { code: "S 400 CDI", fuelType: "DIESEL", engineCode: "OM 628", displacementL: 4.0, horsepower: 250, notes: "V8 турбо дизель; 1999–2005" },
+      { code: "S 430", fuelType: "PETROL", engineCode: "M 113", displacementL: 4.3, horsepower: 279, notes: "V8; 1998–2005" },
+      { code: "S 500", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.0, horsepower: 306, notes: "V8; 1998–2005" },
+      { code: "S 600", fuelType: "PETROL", engineCode: "M 137", displacementL: 5.8, horsepower: 367, notes: "V12; 1999–2005 (FL: M 275 5.5 битурбо, 500 л.с.)" },
+      { code: "AMG S 55", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.5, horsepower: 360, notes: "V8 AMG; 1999–2002 (FL: компрессор 500+ л.с.)" },
+      { code: "AMG S 65", fuelType: "PETROL", engineCode: "M 275", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо AMG; 2003–2005" },
+    ],
+  },
+  // S-Class W221 (2005 – 2013) — Distronic, Pre-Safe, hybrid debut.
+  {
+    modelSlug: "s-class",
+    generationCode: "W221",
+    source: "https://www.auto-data.net/en/mercedes-benz-s-class-w221-generation-2775",
+    trims: [
+      { code: "S 320 CDI", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 235, notes: "V6 турбо дизель; 2006–2009" },
+      { code: "S 320 CDI 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 235, notes: "V6 турбо дизель; 2006–2009" },
+      { code: "S 350", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; 2005–2013 (FL: BlueTEC дизель)" },
+      { code: "S 350 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; 2005–2013" },
+      { code: "S 400 Hybrid", fuelType: "HYBRID", engineCode: "M 272", displacementL: 3.5, horsepower: 299, notes: "бензин+электро гибрид (не PHEV); 2009–2013" },
+      { code: "S 420 CDI", fuelType: "DIESEL", engineCode: "OM 629", displacementL: 4.0, horsepower: 320, notes: "V8 турбо дизель; 2006–2010" },
+      { code: "S 450", fuelType: "PETROL", engineCode: "M 273", displacementL: 4.7, horsepower: 340, notes: "V8; 2006–2009" },
+      { code: "S 450 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 4.7, horsepower: 340, notes: "V8; 2006–2009" },
+      { code: "S 500", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 388, notes: "V8; 2005–2013 (FL: M 278 битурбо)" },
+      { code: "S 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 273", displacementL: 5.5, horsepower: 388, notes: "V8; 2005–2013" },
+      { code: "S 600", fuelType: "PETROL", engineCode: "M 275", displacementL: 5.5, horsepower: 517, notes: "V12 битурбо; 2005–2013" },
+      { code: "AMG S 63", fuelType: "PETROL", engineCode: "M 156", displacementL: 6.2, horsepower: 525, notes: "V8 атм AMG; 2006–2013 (FL: M 157 битурбо 585 л.с.)" },
+      { code: "AMG S 65", fuelType: "PETROL", engineCode: "M 275", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо AMG; 2006–2013 (FL: 630 л.с.)" },
+    ],
+  },
+  // S-Class W222 (2013 – 2020) — first with Magic Body Control.
+  {
+    modelSlug: "s-class",
+    generationCode: "W222",
+    source: "https://www.auto-data.net/en/mercedes-benz-s-class-w222-generation-4130",
+    trims: [
+      { code: "S 300 BlueTEC Hybrid", fuelType: "HYBRID", engineCode: "OM 651", displacementL: 2.1, horsepower: 231, notes: "дизель+электро гибрид (не PHEV); 2013–2017" },
+      { code: "S 350 d", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; 2014–2020" },
+      { code: "S 350 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 642", displacementL: 3.0, horsepower: 258, notes: "V6 турбо дизель; 2014–2020" },
+      { code: "S 400", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; 2013–2017" },
+      { code: "S 400 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; 2013–2017" },
+      { code: "S 400 Hybrid", fuelType: "HYBRID", engineCode: "M 276", displacementL: 3.5, horsepower: 333, notes: "бензин+электро гибрид (не PHEV); 2013–2017" },
+      { code: "S 450 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid; 2017–2020 (FL)" },
+      { code: "S 500", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 455, notes: "V8 битурбо; 2013–2017 (FL: M 176 4.0L)" },
+      { code: "S 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 455, notes: "V8 битурбо; 2013–2017" },
+      { code: "S 500 e", fuelType: "HYBRID", engineCode: "M 276", displacementL: 3.0, horsepower: 442, notes: "бензин+электро PHEV; батарея 8.7 кВт·ч; 2014–2017" },
+      { code: "S 560", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 469, notes: "V8 битурбо; 2017–2020 (FL)" },
+      { code: "S 560 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 469, notes: "V8 битурбо; 2017–2020" },
+      { code: "S 600", fuelType: "PETROL", engineCode: "M 277", displacementL: 6.0, horsepower: 530, notes: "V12 битурбо; 2014–2017" },
+      { code: "AMG S 63", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 585, notes: "V8 битурбо AMG; 2013–2017 (FL: M 177 4.0L 612 л.с.)" },
+      { code: "AMG S 63 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG; 2017–2020" },
+      { code: "AMG S 65", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 630, notes: "V12 битурбо AMG; 2013–2020" },
+      { code: "Maybach S 600", fuelType: "PETROL", engineCode: "M 277", displacementL: 6.0, horsepower: 530, notes: "V12 битурбо Maybach; 2015–2017" },
+      { code: "Maybach S 650", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 630, notes: "V12 битурбо Maybach; 2017–2020" },
+    ],
+  },
+  // S-Class W223 (2020 – present) — current generation, all-electric option pending.
+  {
+    modelSlug: "s-class",
+    generationCode: "W223",
+    source: "https://www.auto-data.net/en/mercedes-benz-s-class-w223-generation-7908",
+    trims: [
+      { code: "S 350 d", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 286, notes: "I6 турбо дизель mild hybrid; 2020–" },
+      { code: "S 350 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 286, notes: "I6 турбо дизель mild hybrid; 2020–" },
+      { code: "S 400 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 330, notes: "I6 турбо дизель mild hybrid; 2020–" },
+      { code: "S 450 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid; 2020–" },
+      { code: "S 450 d 4MATIC", drivetrain: "4MATIC", fuelType: "DIESEL", engineCode: "OM 656", displacementL: 3.0, horsepower: 367, notes: "I6 турбо дизель mild hybrid; 2023–" },
+      { code: "S 450 e", fuelType: "HYBRID", engineCode: "M 256", displacementL: 3.0, horsepower: 408, notes: "бензин+электро PHEV; батарея 28.6 кВт·ч; 2023–" },
+      { code: "S 500", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "I6 mild hybrid; 2020– (FL: 449 л.с.)" },
+      { code: "S 500 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "I6 mild hybrid; 2020– (FL: 449 л.с.)" },
+      { code: "S 580 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 503, notes: "V8 битурбо mild hybrid; 2020–" },
+      { code: "S 580 e", fuelType: "HYBRID", engineCode: "M 256", displacementL: 3.0, horsepower: 510, notes: "бензин+электро PHEV; батарея 28.6 кВт·ч; 2021–" },
+      { code: "AMG S 63 E PERFORMANCE", drivetrain: "4MATIC+", fuelType: "HYBRID", engineCode: "M 177", displacementL: 4.0, horsepower: 802, notes: "V8 битурбо AMG + EM PHEV; батарея 13.1 кВт·ч; 2022–" },
+      { code: "Maybach S 580 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 176", displacementL: 4.0, horsepower: 503, notes: "V8 битурбо Maybach; 2021–" },
+      { code: "Maybach S 680 4MATIC", drivetrain: "4MATIC", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо Maybach; 2021–" },
+    ],
+  },
+  // AMG GT C190 (2014 – 2022) — 2-door coupe/roadster (per Wikipedia for full lineup).
+  {
+    modelSlug: "amg-gt",
+    generationCode: "C190",
+    source: "https://www.auto-data.net/en/mercedes-benz-amg-gt-c190-generation-4380 (+ Wikipedia for late-generation variants)",
+    trims: [
+      { code: "AMG GT", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 462, notes: "V8 битурбо AMG handcrafted; 2014–2021 (FL: 476 л.с.)" },
+      { code: "AMG GT S", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 510, notes: "V8 битурбо AMG; 2014–2020 (FL: 522 л.с.)" },
+      { code: "AMG GT C", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 557, notes: "V8 битурбо AMG; 2017–2021" },
+      { code: "AMG GT R", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо AMG; 2017–2021" },
+      { code: "AMG GT R Pro", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо AMG (трековая модификация); 2019–2020" },
+      { code: "AMG GT Black Series", fuelType: "PETROL", engineCode: "M 178", displacementL: 4.0, horsepower: 730, notes: "V8 битурбо AMG (плоский коленвал); 2020–2022" },
+    ],
+  },
+  // AMG GT 4-Door X290 (2018 – present) — 4-door coupe (different chassis from C190).
+  {
+    modelSlug: "amg-gt",
+    generationCode: "X290",
+    source: "https://www.auto-data.net/en/mercedes-benz-amg-gt-4-door-coupe-x290-generation-6161",
+    trims: [
+      { code: "AMG GT 43 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 367, notes: "I6 mild hybrid AMG; 2019–" },
+      { code: "AMG GT 53 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 256", displacementL: 3.0, horsepower: 435, notes: "I6 mild hybrid AMG; 2018–" },
+      { code: "AMG GT 63 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо AMG; 2018–" },
+      { code: "AMG GT 63 S 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 639, notes: "V8 битурбо AMG; 2018–" },
+      { code: "AMG GT 63 S E PERFORMANCE", drivetrain: "4MATIC+", fuelType: "HYBRID", engineCode: "M 177", displacementL: 4.0, horsepower: 843, notes: "V8 битурбо AMG + EM PHEV; батарея 6.1 кВт·ч; 2022–" },
+    ],
+  },
+  // AMG GT C192 (2023 – present) — 2nd-gen 2-door, replaces C190.
+  {
+    modelSlug: "amg-gt",
+    generationCode: "C192",
+    source: "https://www.auto-data.net/en/mercedes-benz-amg-gt-c192-generation-9604",
+    trims: [
+      { code: "AMG GT 43", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 421, notes: "I4 mild hybrid AMG; 2024–" },
+      { code: "AMG GT 55 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 476, notes: "V8 битурбо AMG; 2023–" },
+      { code: "AMG GT 63 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо AMG; 2023–" },
+      { code: "AMG GT 63 PRO 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 612, notes: "V8 битурбо AMG; 2024–" },
+      { code: "AMG GT 63 S E PERFORMANCE", drivetrain: "4MATIC+", fuelType: "HYBRID", engineCode: "M 177", displacementL: 4.0, horsepower: 816, notes: "V8 битурбо AMG + EM PHEV; 2024–" },
+    ],
+  },
+  // SL R129 (1988 – 2001) — first modern SL with adaptive chassis.
+  {
+    modelSlug: "sl",
+    generationCode: "R129",
+    source: "https://www.auto-data.net/en/mercedes-benz-sl-r129-generation-7878",
+    trims: [
+      { code: "SL 280", fuelType: "PETROL", engineCode: "M 104", displacementL: 2.8, horsepower: 193, notes: "I6; 1993–2001" },
+      { code: "SL 300", fuelType: "PETROL", engineCode: "M 103", displacementL: 3.0, horsepower: 190, notes: "I6 (SOHC); 1989–1993 (продавался как 300 SL)" },
+      { code: "SL 320", fuelType: "PETROL", engineCode: "M 104", displacementL: 3.2, horsepower: 231, notes: "I6 24-клапанный; 1993–2001 (продавался как 300 SL-24 до 1993)" },
+      { code: "SL 500", fuelType: "PETROL", engineCode: "M 119", displacementL: 5.0, horsepower: 320, notes: "V8; 1989–2001 (продавался как 500 SL до 1993)" },
+      { code: "SL 600", fuelType: "PETROL", engineCode: "M 120", displacementL: 6.0, horsepower: 394, notes: "V12; 1992–2001 (продавался как 600 SL до 1993)" },
+      { code: "AMG SL 60", fuelType: "PETROL", engineCode: "M 119", displacementL: 6.0, horsepower: 381, notes: "V8 AMG; 1993–1998" },
+      { code: "AMG SL 70", fuelType: "PETROL", engineCode: "M 120", displacementL: 7.0, horsepower: 496, notes: "V12 AMG (редкий); 1995–1998" },
+      { code: "AMG SL 73", fuelType: "PETROL", engineCode: "M 120", displacementL: 7.3, horsepower: 525, notes: "V12 AMG (топовый, очень редкий); 1999–2001" },
+    ],
+  },
+  // SL R230 (2001 – 2011) — folding hardtop.
+  {
+    modelSlug: "sl",
+    generationCode: "R230",
+    source: "https://www.auto-data.net/en/mercedes-benz-sl-r230-generation-7874",
+    trims: [
+      { code: "SL 280", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; FL 2008–2011" },
+      { code: "SL 300", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; FL 2008–2011" },
+      { code: "SL 350", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 245, notes: "V6; 2001–2011 (FL: 316 л.с.)" },
+      { code: "SL 500", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.0, horsepower: 306, notes: "V8; 2001–2006 (FL: M 273 5.5 388 л.с.)" },
+      { code: "SL 600", fuelType: "PETROL", engineCode: "M 275", displacementL: 5.5, horsepower: 500, notes: "V12 битурбо; 2003–2011 (FL: 517 л.с.)" },
+      { code: "AMG SL 55", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.5, horsepower: 476, notes: "V8 компрессор AMG; 2002–2008" },
+      { code: "AMG SL 63", fuelType: "PETROL", engineCode: "M 156", displacementL: 6.2, horsepower: 525, notes: "V8 атм AMG; 2008–2011" },
+      { code: "AMG SL 65", fuelType: "PETROL", engineCode: "M 275", displacementL: 6.0, horsepower: 612, notes: "V12 битурбо AMG; 2004–2011 (FL: 670 л.с. Black Series)" },
+    ],
+  },
+  // SL R231 (2012 – 2020) — Aluminium structure debut.
+  {
+    modelSlug: "sl",
+    generationCode: "R231",
+    source: "https://www.auto-data.net/en/mercedes-benz-sl-r231-generation-3869",
+    trims: [
+      { code: "SL 350 BlueEFFICIENCY", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.5, horsepower: 306, notes: "V6 битурбо; 2012–2015" },
+      { code: "SL 400", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 333, notes: "V6 битурбо; 2014–2020" },
+      { code: "SL 500", fuelType: "PETROL", engineCode: "M 278", displacementL: 4.7, horsepower: 435, notes: "V8 битурбо; 2012–2020 (вариации 435–455 л.с.)" },
+      { code: "AMG SL 63", fuelType: "PETROL", engineCode: "M 157", displacementL: 5.5, horsepower: 537, notes: "V8 битурбо AMG; 2012–2020 (вариации 537–585 л.с.)" },
+      { code: "AMG SL 65", fuelType: "PETROL", engineCode: "M 279", displacementL: 6.0, horsepower: 630, notes: "V12 битурбо AMG; 2012–2020" },
+    ],
+  },
+  // SL R232 (2021 – present) — AMG-developed, fabric soft-top, +2 seats.
+  {
+    modelSlug: "sl",
+    generationCode: "R232",
+    source: "https://www.auto-data.net/en/mercedes-benz-sl-r232-generation-8669",
+    trims: [
+      { code: "AMG SL 43", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 381, notes: "I4 mild hybrid AMG (M 139 ESG); 2022–2024" },
+      { code: "AMG SL 43 (FL)", fuelType: "PETROL", engineCode: "M 139", displacementL: 2.0, horsepower: 421, notes: "I4 mild hybrid AMG (FL); 2024–" },
+      { code: "AMG SL 55 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 476, notes: "V8 битурбо AMG; 2021–" },
+      { code: "AMG SL 63 4MATIC+", drivetrain: "4MATIC+", fuelType: "PETROL", engineCode: "M 177", displacementL: 4.0, horsepower: 585, notes: "V8 битурбо AMG; 2021–" },
+      { code: "AMG SL 63 S E PERFORMANCE", drivetrain: "4MATIC+", fuelType: "HYBRID", engineCode: "M 177", displacementL: 4.0, horsepower: 816, notes: "V8 битурбо AMG + EM PHEV; батарея 6.1 кВт·ч; 2023–" },
+    ],
+  },
+  // SLK R170 (1995 – 2004) — first SLK, folding hardtop.
+  {
+    modelSlug: "slk-slc",
+    generationCode: "R170",
+    source: "https://www.auto-data.net/en/mercedes-benz-slk-r170-generation-7883",
+    trims: [
+      { code: "SLK 200", fuelType: "PETROL", engineCode: "M 111", displacementL: 2.0, horsepower: 136, notes: "I4; 1996–2000" },
+      { code: "SLK 200 Kompressor", fuelType: "PETROL", engineCode: "M 111", displacementL: 2.0, horsepower: 192, notes: "I4 компрессор; 1996–2000" },
+      { code: "SLK 230 Kompressor", fuelType: "PETROL", engineCode: "M 111", displacementL: 2.3, horsepower: 193, notes: "I4 компрессор; 1996–2000 (FL: 197 л.с.)" },
+      { code: "SLK 320", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.2, horsepower: 218, notes: "V6; 2000–2004" },
+      { code: "AMG SLK 32", fuelType: "PETROL", engineCode: "M 112", displacementL: 3.2, horsepower: 354, notes: "V6 компрессор AMG; 2001–2004 (редкий)" },
+    ],
+  },
+  // SLK R171 (2004 – 2011) — second-gen.
+  {
+    modelSlug: "slk-slc",
+    generationCode: "R171",
+    source: "https://www.auto-data.net/en/mercedes-benz-slk-r171-generation-7885",
+    trims: [
+      { code: "SLK 200 Kompressor", fuelType: "PETROL", engineCode: "M 271", displacementL: 1.8, horsepower: 163, notes: "I4 компрессор; 2003–2011" },
+      { code: "SLK 280", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; 2005–2008 (переименован в SLK 300 в FL)" },
+      { code: "SLK 300", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.0, horsepower: 231, notes: "V6; 2008–2011" },
+      { code: "SLK 350", fuelType: "PETROL", engineCode: "M 272", displacementL: 3.5, horsepower: 272, notes: "V6; 2004–2011 (FL: 305 л.с.)" },
+      { code: "AMG SLK 55", fuelType: "PETROL", engineCode: "M 113", displacementL: 5.5, horsepower: 360, notes: "V8 атм AMG; 2004–2011" },
+    ],
+  },
+  // SLK/SLC R172 (2011 – 2020) — rebranded SLC in 2016.
+  {
+    modelSlug: "slk-slc",
+    generationCode: "R172",
+    source: "https://www.auto-data.net/en/mercedes-benz-slk-r172-generation-4131",
+    trims: [
+      { code: "SLK 200", fuelType: "PETROL", engineCode: "M 271", displacementL: 1.8, horsepower: 184, notes: "I4 турбо; 2011–2015 (FL: SLC 200 M 274 2.0L)" },
+      { code: "SLK 250", fuelType: "PETROL", engineCode: "M 271", displacementL: 1.8, horsepower: 204, notes: "I4 турбо; 2011–2015" },
+      { code: "SLK 250 CDI", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.2, horsepower: 204, notes: "I4 турбо дизель; 2011–2015 (переименован в SLC 250 d)" },
+      { code: "SLK 350", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.5, horsepower: 306, notes: "V6 битурбо; 2011–2015" },
+      { code: "SLC 180", fuelType: "PETROL", engineCode: "M 274", displacementL: 1.6, horsepower: 156, notes: "I4 турбо; FL 2016–2020 (SLC ребрендинг)" },
+      { code: "SLC 200", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 184, notes: "I4 турбо; FL 2016–2020" },
+      { code: "SLC 250 d", fuelType: "DIESEL", engineCode: "OM 651", displacementL: 2.2, horsepower: 204, notes: "I4 турбо дизель; FL 2016–2020" },
+      { code: "SLC 300", fuelType: "PETROL", engineCode: "M 274", displacementL: 2.0, horsepower: 245, notes: "I4 турбо; FL 2016–2020" },
+      { code: "SLC 43 AMG", fuelType: "PETROL", engineCode: "M 276", displacementL: 3.0, horsepower: 367, notes: "V6 битурбо AMG; FL 2016–2020 (заменил AMG SLC 55)" },
+      { code: "AMG SLK 55", fuelType: "PETROL", engineCode: "M 152", displacementL: 5.5, horsepower: 421, notes: "V8 атм AMG; 2011–2015" },
+    ],
+  },
 ];
 
 interface SeedSummary {
