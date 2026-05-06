@@ -5,7 +5,12 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shared/LogoutButton";
-import { adminNav, type AdminNavGroup } from "@/lib/admin-nav";
+import {
+  adminNav,
+  findActiveGroupLabel,
+  findActiveHref,
+  type AdminNavGroup,
+} from "@/lib/admin-nav";
 
 // Manual toggle state tied to a specific pathname. See AdminSidebar.tsx for
 // the full explanation of this pattern (avoids setState-in-effect).
@@ -20,8 +25,8 @@ export function AdminMobileNav() {
   const [open, setOpen] = useState(false);
   const [override, setOverride] = useState<ManualOverride | null>(null);
 
-  const activeHref = findActiveHref(pathname);
-  const activeGroupLabel = findActiveGroupLabel(activeHref);
+  const activeHref = findActiveHref(pathname, adminNav);
+  const activeGroupLabel = findActiveGroupLabel(activeHref, adminNav);
 
   const activeOverride =
     override && override.pathname === pathname ? override : null;
@@ -250,35 +255,3 @@ function DrawerGroup({
   );
 }
 
-function findActiveHref(pathname: string): string | null {
-  let bestMatch: string | null = null;
-  for (const entry of adminNav) {
-    const candidates =
-      entry.kind === "link" ? [entry.href] : entry.items.map((i) => i.href);
-    for (const href of candidates) {
-      if (matchesHref(pathname, href)) {
-        if (!bestMatch || href.length > bestMatch.length) {
-          bestMatch = href;
-        }
-      }
-    }
-  }
-  return bestMatch;
-}
-
-function findActiveGroupLabel(activeHref: string | null): string | null {
-  if (!activeHref) return null;
-  for (const entry of adminNav) {
-    if (entry.kind !== "group") continue;
-    if (entry.items.some((item) => item.href === activeHref)) {
-      return entry.label;
-    }
-  }
-  return null;
-}
-
-function matchesHref(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/admin") return false;
-  return pathname.startsWith(href + "/");
-}

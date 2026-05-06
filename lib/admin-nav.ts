@@ -78,3 +78,49 @@ export const adminNav: AdminNavEntry[] = [
     ],
   },
 ];
+
+/** Pathname → href match. Exact match OR pathname is a sub-route of href. */
+export function matchesHref(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/admin") return false;
+  return pathname.startsWith(href + "/");
+}
+
+/**
+ * Find the single most-specific (longest) href in `nav` whose path matches
+ * `pathname`. Guarantees exactly one active link even when one nav href is a
+ * prefix of another (e.g. /admin/suppliers vs /admin/suppliers/orders).
+ */
+export function findActiveHref(
+  pathname: string,
+  nav: readonly AdminNavEntry[],
+): string | null {
+  let bestMatch: string | null = null;
+  for (const entry of nav) {
+    const candidates =
+      entry.kind === "link" ? [entry.href] : entry.items.map((i) => i.href);
+    for (const href of candidates) {
+      if (matchesHref(pathname, href)) {
+        if (!bestMatch || href.length > bestMatch.length) {
+          bestMatch = href;
+        }
+      }
+    }
+  }
+  return bestMatch;
+}
+
+/** Find the label of the group that owns `activeHref`, if any. */
+export function findActiveGroupLabel(
+  activeHref: string | null,
+  nav: readonly AdminNavEntry[],
+): string | null {
+  if (!activeHref) return null;
+  for (const entry of nav) {
+    if (entry.kind !== "group") continue;
+    if (entry.items.some((item) => item.href === activeHref)) {
+      return entry.label;
+    }
+  }
+  return null;
+}

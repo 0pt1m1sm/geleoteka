@@ -4,7 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shared/LogoutButton";
-import { adminNav, type AdminNavGroup } from "@/lib/admin-nav";
+import {
+  adminNav,
+  findActiveGroupLabel,
+  findActiveHref,
+  type AdminNavGroup,
+} from "@/lib/admin-nav";
 
 // Manual toggle state tied to a specific pathname. When the user navigates
 // away, the stored pathname no longer matches the current one and the
@@ -21,8 +26,8 @@ export function AdminSidebar() {
   const pathname = usePathname();
   const [override, setOverride] = useState<ManualOverride | null>(null);
 
-  const activeHref = findActiveHref(pathname);
-  const activeGroupLabel = findActiveGroupLabel(activeHref);
+  const activeHref = findActiveHref(pathname, adminNav);
+  const activeGroupLabel = findActiveGroupLabel(activeHref, adminNav);
 
   // Override is only honored for the pathname it was set on. After navigation,
   // the pathname differs and the derived default takes over automatically.
@@ -154,41 +159,3 @@ function SidebarGroup({
   );
 }
 
-/**
- * Find the single most-specific (longest) href in adminNav whose path
- * matches the current pathname. Guarantees exactly one active link
- * even when one nav href is a prefix of another (e.g. /admin/suppliers
- * is a prefix of /admin/suppliers/orders).
- */
-function findActiveHref(pathname: string): string | null {
-  let bestMatch: string | null = null;
-  for (const entry of adminNav) {
-    const candidates =
-      entry.kind === "link" ? [entry.href] : entry.items.map((i) => i.href);
-    for (const href of candidates) {
-      if (matchesHref(pathname, href)) {
-        if (!bestMatch || href.length > bestMatch.length) {
-          bestMatch = href;
-        }
-      }
-    }
-  }
-  return bestMatch;
-}
-
-function findActiveGroupLabel(activeHref: string | null): string | null {
-  if (!activeHref) return null;
-  for (const entry of adminNav) {
-    if (entry.kind !== "group") continue;
-    if (entry.items.some((item) => item.href === activeHref)) {
-      return entry.label;
-    }
-  }
-  return null;
-}
-
-function matchesHref(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/admin") return false;
-  return pathname.startsWith(href + "/");
-}
