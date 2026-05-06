@@ -4,9 +4,9 @@ import {
   createContext,
   useContext,
   useCallback,
-  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { createLocalStorageStore } from "@/lib/local-storage-store";
 
 export interface BookingData {
   serviceIds: string[];
@@ -43,39 +43,7 @@ const INITIAL: BookingData = {
   waitAtService: false,
 };
 
-const STORAGE_KEY = "booking-data";
-
-let bookingListeners: Array<() => void> = [];
-let cachedSnapshot: BookingData = INITIAL;
-let cachedRaw: string | null = null;
-
-function subscribeBooking(cb: () => void) {
-  bookingListeners.push(cb);
-  return () => { bookingListeners = bookingListeners.filter((l) => l !== cb); };
-}
-
-function getBookingSnapshot(): BookingData {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== cachedRaw) {
-      cachedRaw = raw;
-      cachedSnapshot = raw ? JSON.parse(raw) : INITIAL;
-    }
-  } catch {}
-  return cachedSnapshot;
-}
-
-function getServerSnapshot(): BookingData {
-  return INITIAL;
-}
-
-function setBookingStorage(data: BookingData) {
-  const raw = JSON.stringify(data);
-  cachedRaw = raw;
-  cachedSnapshot = data;
-  localStorage.setItem(STORAGE_KEY, raw);
-  bookingListeners.forEach((l) => l());
-}
+const bookingStore = createLocalStorageStore<BookingData>("booking-data", INITIAL);
 
 interface BookingContextValue {
   data: BookingData;
@@ -86,18 +54,14 @@ interface BookingContextValue {
 const BookingContext = createContext<BookingContextValue | null>(null);
 
 export function BookingProvider({ children }: { children: ReactNode }) {
-  const data = useSyncExternalStore(subscribeBooking, getBookingSnapshot, getServerSnapshot);
+  const data = bookingStore.useStore();
 
   const update = useCallback((partial: Partial<BookingData>) => {
-    const current = getBookingSnapshot();
-    setBookingStorage({ ...current, ...partial });
+    bookingStore.setStore({ ...bookingStore.getStore(), ...partial });
   }, []);
 
   const reset = useCallback(() => {
-    cachedRaw = null;
-    cachedSnapshot = INITIAL;
-    localStorage.removeItem(STORAGE_KEY);
-    bookingListeners.forEach((l) => l());
+    bookingStore.setStore(INITIAL);
   }, []);
 
   return (

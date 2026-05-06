@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
+import { createLocalStorageStore } from "@/lib/local-storage-store";
 
 interface CartItem {
   partId: string;
@@ -13,40 +14,8 @@ interface CartItem {
   qty: number;
 }
 
-const CART_KEY = "parts-cart";
-
-let cartListeners: Array<() => void> = [];
 const EMPTY_CART: CartItem[] = [];
-let cachedCartRaw: string | null = null;
-let cachedCartItems: CartItem[] = EMPTY_CART;
-
-function subscribeCart(cb: () => void) {
-  cartListeners.push(cb);
-  return () => { cartListeners = cartListeners.filter((l) => l !== cb); };
-}
-
-function getCartSnapshot(): CartItem[] {
-  try {
-    const raw = localStorage.getItem(CART_KEY);
-    if (raw !== cachedCartRaw) {
-      cachedCartRaw = raw;
-      cachedCartItems = raw ? JSON.parse(raw) : EMPTY_CART;
-    }
-  } catch {}
-  return cachedCartItems;
-}
-
-function setCartStorage(items: CartItem[]) {
-  const raw = JSON.stringify(items);
-  cachedCartRaw = raw;
-  cachedCartItems = items;
-  localStorage.setItem(CART_KEY, raw);
-  cartListeners.forEach((l) => l());
-}
-
-function getCartServerSnapshot(): CartItem[] {
-  return EMPTY_CART;
-}
+const cartStore = createLocalStorageStore<CartItem[]>("parts-cart", EMPTY_CART);
 
 interface DefaultContact {
   name?: string;
@@ -55,7 +24,7 @@ interface DefaultContact {
 }
 
 export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact } = {}) {
-  const items = useSyncExternalStore(subscribeCart, getCartSnapshot, getCartServerSnapshot);
+  const items = cartStore.useStore();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; orderId?: string; error?: string } | null>(null);
 
@@ -63,14 +32,14 @@ export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact 
 
   function updateQty(partId: string, qty: number) {
     if (qty <= 0) {
-      setCartStorage(items.filter((i) => i.partId !== partId));
+      cartStore.setStore(items.filter((i) => i.partId !== partId));
     } else {
-      setCartStorage(items.map((i) => i.partId === partId ? { ...i, qty } : i));
+      cartStore.setStore(items.map((i) => i.partId === partId ? { ...i, qty } : i));
     }
   }
 
   function removeItem(partId: string) {
-    setCartStorage(items.filter((i) => i.partId !== partId));
+    cartStore.setStore(items.filter((i) => i.partId !== partId));
   }
 
   async function handleCheckout(formData: FormData) {
@@ -85,8 +54,7 @@ export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact 
     setResult(res);
     setSubmitting(false);
     if (res.success) {
-      localStorage.removeItem(CART_KEY);
-      cartListeners.forEach((l) => l());
+      cartStore.setStore(EMPTY_CART);
     }
   }
 
