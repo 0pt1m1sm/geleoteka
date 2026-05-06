@@ -11,33 +11,15 @@ import {
   findActiveHref,
   type AdminNavGroup,
 } from "@/lib/admin-nav";
-
-// Manual toggle state tied to a specific pathname. See AdminSidebar.tsx for
-// the full explanation of this pattern (avoids setState-in-effect).
-interface ManualOverride {
-  pathname: string;
-  openLabel: string | null;
-}
+import { useAccordionGroup } from "@/lib/use-accordion-group";
 
 /** Mobile admin drawer with single-open accordion grouping. */
 export function AdminMobileNav() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
-  const [override, setOverride] = useState<ManualOverride | null>(null);
-
   const activeHref = findActiveHref(pathname, adminNav);
   const activeGroupLabel = findActiveGroupLabel(activeHref, adminNav);
-
-  const activeOverride =
-    override && override.pathname === pathname ? override : null;
-  const openGroup = activeOverride ? activeOverride.openLabel : activeGroupLabel;
-
-  function toggleGroup(label: string): void {
-    setOverride({
-      pathname,
-      openLabel: openGroup === label ? null : label,
-    });
-  }
+  const [openGroup, toggleGroup] = useAccordionGroup(activeGroupLabel);
 
   function closeDrawer(): void {
     setOpen(false);

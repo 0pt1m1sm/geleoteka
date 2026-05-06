@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/shared/LogoutButton";
@@ -10,37 +9,14 @@ import {
   findActiveHref,
   type AdminNavGroup,
 } from "@/lib/admin-nav";
-
-// Manual toggle state tied to a specific pathname. When the user navigates
-// away, the stored pathname no longer matches the current one and the
-// override is ignored — control returns to the derived-from-pathname default.
-// This pattern (resetting state via a stored key) avoids the setState-in-effect
-// anti-pattern flagged by react-hooks/set-state-in-effect.
-interface ManualOverride {
-  pathname: string;
-  openLabel: string | null; // null = explicitly closed (sentinel)
-}
+import { useAccordionGroup } from "@/lib/use-accordion-group";
 
 /** Desktop admin sidebar with single-open accordion grouping. */
 export function AdminSidebar() {
   const pathname = usePathname();
-  const [override, setOverride] = useState<ManualOverride | null>(null);
-
   const activeHref = findActiveHref(pathname, adminNav);
   const activeGroupLabel = findActiveGroupLabel(activeHref, adminNav);
-
-  // Override is only honored for the pathname it was set on. After navigation,
-  // the pathname differs and the derived default takes over automatically.
-  const activeOverride =
-    override && override.pathname === pathname ? override : null;
-  const openGroup = activeOverride ? activeOverride.openLabel : activeGroupLabel;
-
-  function toggleGroup(label: string): void {
-    setOverride({
-      pathname,
-      openLabel: openGroup === label ? null : label,
-    });
-  }
+  const [openGroup, toggleGroup] = useAccordionGroup(activeGroupLabel);
 
   return (
     <aside className="w-64 border-r border-[var(--border)] bg-[var(--card)] hidden md:flex flex-col">
