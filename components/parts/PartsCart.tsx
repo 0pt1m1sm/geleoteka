@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { createLocalStorageStore } from "@/lib/local-storage-store";
+import { SuccessCard } from "@/components/shared/SuccessCard";
 
 interface CartItem {
   partId: string;
@@ -60,21 +61,13 @@ export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact 
 
   if (result?.success) {
     return (
-      <div className="card text-center py-12">
-        <div className="w-16 h-16 rounded-full bg-[var(--color-success-bg)] mx-auto mb-6 flex items-center justify-center">
-          <svg className="w-8 h-8 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-display text-2xl font-bold mb-2">Заказ оформлен!</h2>
-        <p className="text-[var(--foreground-muted)] mb-6">
-          Мы свяжемся с вами для подтверждения. Оплата при получении или по реквизитам.
-        </p>
-        <div className="flex gap-4 justify-center">
-          <Link href="/parts" className="btn btn-secondary">Продолжить покупки</Link>
-          <Link href="/cabinet/orders" className="btn btn-primary">Мои заказы</Link>
-        </div>
-      </div>
+      <SuccessCard
+        heading="Заказ оформлен!"
+        message="Мы свяжемся с вами для подтверждения. Оплата при получении или по реквизитам."
+      >
+        <Link href="/parts" className="btn btn-secondary">Продолжить покупки</Link>
+        <Link href="/cabinet/orders" className="btn btn-primary">Мои заказы</Link>
+      </SuccessCard>
     );
   }
 

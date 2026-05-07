@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { SuccessCard } from "@/components/shared/SuccessCard";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
 import { format, parseISO } from "date-fns";
@@ -68,21 +69,13 @@ export function Step3ContactConfirm({
 
   if (result?.success) {
     return (
-      <div className="card text-center py-12">
-        <div className="w-16 h-16 rounded-full bg-[var(--color-success-bg)] mx-auto mb-6 flex items-center justify-center">
-          <svg className="w-8 h-8 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-display text-2xl font-bold mb-2">Запись подтверждена!</h2>
-        <p className="text-foreground-muted mb-6">
-          Мы отправим SMS с подтверждением. Ждём вас!
-        </p>
-        <div className="flex gap-4 justify-center">
-          <Link href="/" className="btn btn-secondary">На главную</Link>
-          <Link href="/cabinet" className="btn btn-primary">Личный кабинет</Link>
-        </div>
-      </div>
+      <SuccessCard
+        heading="Запись подтверждена!"
+        message="Мы отправим SMS с подтверждением. Ждём вас!"
+      >
+        <Link href="/" className="btn btn-secondary">На главную</Link>
+        <Link href="/cabinet" className="btn btn-primary">Личный кабинет</Link>
+      </SuccessCard>
     );
   }
 
