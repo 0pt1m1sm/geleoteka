@@ -46,3 +46,7 @@ next-env.d.ts
 .playwright-cli/
 task.md
 certificates
+
+# Claude Code local state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json

@@ -69,3 +69,6 @@ export type { DataListProps } from "./DataList";
 
 export { StatusSelect } from "./StatusSelect";
 export type { StatusSelectProps, StatusOption } from "./StatusSelect";
+
+export { Pagination } from "./Pagination";
+export type { PaginationProps } from "./Pagination";

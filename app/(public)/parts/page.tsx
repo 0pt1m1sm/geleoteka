@@ -9,6 +9,9 @@ import { MyCarPicker } from "@/components/parts/MyCarPicker";
 import { MyCarStrip } from "@/components/parts/MyCarStrip";
 import { PartsFilterSidebar, PartsFilterChips } from "@/components/parts/PartsFilterSidebar";
 import { PartsSearchBox } from "@/components/parts/PartsSearchBox";
+import { Pagination } from "@/components/ui";
+
+const PAGE_SIZE = 24;
 
 interface Props {
   searchParams: Promise<{
@@ -22,6 +25,7 @@ interface Props {
     generation?: string;
     trim?: string;
     showAll?: string;
+    page?: string;
   }>;
 }
 
@@ -38,6 +42,7 @@ export default async function PartsPage({ searchParams }: Props) {
   const trimParam = params.trim || "";
   const showAll = params.showAll === "1";
   const hasCarFilter = Boolean(model && generation && !showAll);
+  const requestedPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
   const [categories, models] = await Promise.all([
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -94,17 +99,40 @@ export default async function PartsPage({ searchParams }: Props) {
     where.price = priceFilter;
   }
 
+  const totalCount = await db.part.count({ where });
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const skip = (currentPage - 1) * PAGE_SIZE;
+
   const parts = await db.part.findMany({
     where,
     include: { category: { select: { name: true, slug: true } } },
     orderBy: { name: "asc" },
-    take: 100,
+    take: PAGE_SIZE,
+    skip,
   });
 
   const cats = categories.map((c: Record<string, unknown>) => ({
     name: c.name as string,
     slug: c.slug as string,
   }));
+
+  const buildPageHref = (page: number): string => {
+    const sp = new URLSearchParams();
+    if (q) sp.set("q", q);
+    if (categorySlug) sp.set("category", categorySlug);
+    if (oemOnly) sp.set("oem", "true");
+    if (inStockOnly) sp.set("inStock", "true");
+    if (minPrice !== null) sp.set("minPrice", String(minPrice));
+    if (maxPrice !== null) sp.set("maxPrice", String(maxPrice));
+    if (model) sp.set("model", model);
+    if (generation) sp.set("generation", generation);
+    if (trimParam) sp.set("trim", trimParam);
+    if (showAll) sp.set("showAll", "1");
+    if (page > 1) sp.set("page", String(page));
+    const qs = sp.toString();
+    return qs ? `/parts?${qs}` : "/parts";
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -128,13 +156,16 @@ export default async function PartsPage({ searchParams }: Props) {
           <PartsFilterChips categories={cats} />
 
           <div className="text-sm text-[var(--foreground-muted)] mb-4 flex items-center gap-3">
-            <span>Найдено: {parts.length}</span>
+            <span>
+              Найдено: {totalCount}
+              {totalPages > 1 ? ` · стр. ${currentPage} из ${totalPages}` : null}
+            </span>
             {showAll && (
               <span className="badge badge-silver text-xs">Показаны все запчасти</span>
             )}
           </div>
 
-          {parts.length === 0 ? (
+          {totalCount === 0 ? (
             <div className="card text-center py-12">
               <p className="text-[var(--foreground-muted)] mb-4">
                 {hasCarFilter
@@ -234,6 +265,13 @@ export default async function PartsPage({ searchParams }: Props) {
               })}
             </div>
           )}
+
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            buildHref={buildPageHref}
+            ariaLabel="Постраничная навигация по каталогу запчастей"
+          />
         </main>
       </div>
     </div>
