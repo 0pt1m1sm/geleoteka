@@ -2,7 +2,7 @@
 
 Created: 2026-05-07
 Author: aleksandr.spiskov@gmail.com
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -280,9 +280,9 @@ Runtime profile: **Full** (UI changes — auth pages, admin forms, success cards
 - [x] Task 7: ts-prune internal-type demotion (hand-verified — demoted 4, kept 6 exported)
 - [x] Task 8: GitHub Actions CI workflow
 - [x] Task 9: Apex-domain DNS investigation (SERVFAIL confirmed; escalated to user)
-- [ ] Task 10: Regression sweep + browser smoke test (TS-001..TS-004 on prod)
+- [x] Task 10: Regression sweep + browser smoke test (TS-001..TS-004 on prod — see E2E Results)
 
-**Total Tasks:** 10 | **Completed:** 0 | **Remaining:** 10
+**Total Tasks:** 10 | **Completed:** 10 | **Remaining:** 0
 
 ## Implementation Tasks
 
@@ -900,6 +900,28 @@ npx tsc --noEmit && npm run lint && npm run build
 git push origin main
 # Then: playwright-cli smoke against prod, record results in plan.
 ```
+
+## E2E Results
+
+Static checks (all green):
+
+| Check | Result |
+|-------|--------|
+| `npx tsc --noEmit` | exit 0 |
+| `npm run lint` | exit 0 (7 pre-existing warnings, none in this plan's diff) |
+| `npm run build` | exit 0 (Compiled successfully) |
+| Goal Verification truths #1–#13 | 12/13 pass via static grep + browser; #9 (apex domain) escalated to user |
+
+Browser scenarios (executed against prod after deploy `433fb5d`):
+
+| Scenario | Priority | Result | Evidence |
+|----------|----------|--------|----------|
+| TS-001 Login page after `<NarrowFormPage/>` migration | Critical | **PASS** | Geleoteka brand-link header rendered, `<h1>Вход в личный кабинет</h1>` heading, "Ещё нет аккаунта? Зарегистрироваться" description with link to /register, Email + Пароль fields, Войти button. |
+| TS-002 Admin parts/new with `<AdminFormShell/>` | Critical | **PASS** (render + happy-path) | `<h1>Добавить запчасть</h1>` rendered (page-level title preserved), all form fields visible (Артикул, Категория, Название, Описание, Цена, etc.), Submit button "Добавить" wired. AdminFormShell error-banner path verified by static check (Fragment passes through children + injects banner only when error truthy); HTML5 `required` validation kicks in before server-action error path can fire. |
+| TS-003 Booking SuccessCard | High | DEFERRED (static-equivalent) | Live submit would create a real prod repair order. SuccessCard is a thin slot primitive; static check confirms both consumers (Step3ContactConfirm, PartsCart) import it and pass `heading`+`message`+children unchanged — same classes, same SVG path. |
+| TS-004 Admin model edit (`useFormAction`) | High | **PASS** | Navigated to `/admin/models/<g-class-id>`, clicked "Сохранить" → form returned to non-pending state with no error banner. `useFormAction`'s `runAction` successfully ran `updateModel` server action + `router.refresh()`. |
+
+Tested against `https://geleoteka-production.up.railway.app/` after Railway auto-deploy of commit `433fb5d` (full Status: SUCCESS).
 
 ## Open Questions
 
