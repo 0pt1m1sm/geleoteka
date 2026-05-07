@@ -279,7 +279,7 @@ Runtime profile: **Full** (UI changes — auth pages, admin forms, success cards
 - [x] Task 6: `<AdminFormShell/>` primitive
 - [x] Task 7: ts-prune internal-type demotion (hand-verified — demoted 4, kept 6 exported)
 - [x] Task 8: GitHub Actions CI workflow
-- [ ] Task 9: Apex-domain DNS investigation
+- [x] Task 9: Apex-domain DNS investigation (SERVFAIL confirmed; escalated to user)
 - [ ] Task 10: Regression sweep + browser smoke test (TS-001..TS-004 on prod)
 
 **Total Tasks:** 10 | **Completed:** 0 | **Remaining:** 10
