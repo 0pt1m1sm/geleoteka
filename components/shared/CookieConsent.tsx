@@ -1,14 +1,17 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
+import ReactMarkdown, { type Components } from "react-markdown";
 
 const CONSENT_KEY = "cookie-consent";
 
 let listeners: Array<() => void> = [];
 
-function subscribe(cb: () => void) {
+function subscribe(cb: () => void): () => void {
   listeners.push(cb);
-  return () => { listeners = listeners.filter((l) => l !== cb); };
+  return () => {
+    listeners = listeners.filter((l) => l !== cb);
+  };
 }
 
 function getSnapshot(): boolean {
@@ -16,10 +19,21 @@ function getSnapshot(): boolean {
 }
 
 function getServerSnapshot(): boolean {
-  return false; // Never show on server
+  return false;
 }
 
-export function CookieConsent() {
+interface CookieConsentProps {
+  text: string;
+  buttonLabel: string;
+}
+
+// Override `<p>` from react-markdown so it doesn't nest a block-level element
+// inside the inline-flow banner. Markdown features (links, bold) still work.
+const INLINE_COMPONENTS: Components = {
+  p: ({ children }) => <span>{children}</span>,
+};
+
+export function CookieConsent({ text, buttonLabel }: CookieConsentProps): React.ReactElement | null {
   const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const accept = useCallback(() => {
@@ -32,20 +46,15 @@ export function CookieConsent() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-[var(--card)] border-t border-[var(--border)]">
       <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-sm text-[var(--foreground-muted)]">
-          Мы используем файлы cookie для улучшения работы сайта. Продолжая
-          пользоваться сайтом, вы соглашаетесь с{" "}
-          <span className="text-[var(--foreground)]">
-            политикой обработки персональных данных (152-ФЗ)
-          </span>
-          .
-        </p>
+        <div className="text-sm text-[var(--foreground-muted)]">
+          <ReactMarkdown components={INLINE_COMPONENTS}>{text}</ReactMarkdown>
+        </div>
         <button
           type="button"
           onClick={accept}
           className="btn btn-primary text-sm shrink-0"
         >
-          Принять
+          {buttonLabel}
         </button>
       </div>
     </div>

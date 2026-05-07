@@ -2,6 +2,7 @@ import { PrismaClient } from "../app/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { seedVehicleCatalog } from "./seed-vehicles";
 import { seedTrims } from "./seed-trims";
+import { CMS_SCHEMA } from "../lib/cms-schema";
 
 const prisma = new PrismaClient();
 
@@ -159,20 +160,18 @@ const masters = [
   },
 ];
 
-const cmsBlocks = [
-  { key: "home.hero.title", content: { text: "Премиальное обслуживание" } },
-  { key: "home.hero.subtitle", content: { text: "Онлайн-запись, отслеживание статуса в реальном времени, личный кабинет. Комфорт уровня G-Class." } },
-  { key: "home.stats.years", content: { value: "15+" } },
-  { key: "home.stats.cars", content: { value: "2 400+" } },
-  { key: "home.stats.satisfaction", content: { value: "98%" } },
-  { key: "home.stats.parts", content: { value: "3 500+" } },
-  { key: "contacts.phone.service", content: { text: "+7 (495) 123-45-67" } },
-  { key: "contacts.phone.parts", content: { text: "+7 (495) 123-45-68" } },
-  { key: "contacts.email", content: { text: "info@geleoteka.ru" } },
-  { key: "contacts.address", content: { text: "Москва, ул. Примерная, 15" } },
-  { key: "contacts.hours.service", content: { text: "Пн–Пт: 9:00–20:00, Сб: 10:00–18:00" } },
-  { key: "contacts.hours.parts", content: { text: "Пн–Пт: 9:00–19:00, Сб: 10:00–17:00" } },
-];
+// Build seed payloads from CMS_SCHEMA so adding a new key requires nothing
+// here. Each entry's `type` and `defaultValue` come straight from the schema.
+type CMSSeedRow = { key: string; type: "text" | "richtext" | "list"; content: Record<string, unknown> };
+
+const cmsBlocks: CMSSeedRow[] = (Object.keys(CMS_SCHEMA) as Array<keyof typeof CMS_SCHEMA>).map(
+  (key) => {
+    const def = CMS_SCHEMA[key];
+    if (def.type === "text") return { key, type: "text", content: { value: def.defaultValue } };
+    if (def.type === "richtext") return { key, type: "richtext", content: { markdown: def.defaultValue } };
+    return { key, type: "list", content: { items: def.defaultValue as ReadonlyArray<Record<string, string>> } };
+  },
+);
 
 async function main(): Promise<void> {
   console.log("Seeding database...");
@@ -187,12 +186,14 @@ async function main(): Promise<void> {
   }
   console.log(`Seeded ${services.length} services`);
 
-  // CMS blocks
+  // CMS blocks — schema-driven; idempotent.
   for (const block of cmsBlocks) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const content = block.content as any;
     await prisma.cMSBlock.upsert({
       where: { key: block.key },
-      update: { content: block.content },
-      create: block,
+      update: { type: block.type, content },
+      create: { key: block.key, type: block.type, content },
     });
   }
   console.log(`Seeded ${cmsBlocks.length} CMS blocks`);

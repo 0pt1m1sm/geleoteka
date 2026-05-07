@@ -3,11 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 
-interface Channel {
+export interface FloatingChannel {
   name: string;
   href: string;
   color: string;
-  icon: React.ReactNode;
+  iconKey: string;
+}
+
+interface FloatingButtonsProps {
+  channels: FloatingChannel[];
 }
 
 /* Brand iconography — lucide-react does not ship messenger brand icons by design.
@@ -41,13 +45,17 @@ const MaxIcon = (
   </svg>
 );
 
-const CHANNELS: Channel[] = [
-  { name: "Telegram", href: "https://t.me/geleoteka", color: "#229ED9", icon: TelegramIcon },
-  { name: "WhatsApp", href: "https://wa.me/74951234567", color: "#25D366", icon: WhatsAppIcon },
-  { name: "Max", href: "https://max.ru/geleoteka", color: "#E60023", icon: MaxIcon },
-];
+const ICONS: Record<string, React.ReactNode> = {
+  telegram: TelegramIcon,
+  whatsapp: WhatsAppIcon,
+  max: MaxIcon,
+};
 
-export function FloatingButtons(): React.ReactElement {
+function iconFor(key: string): React.ReactNode {
+  return ICONS[key.toLowerCase()] ?? <MessageCircle size={22} aria-hidden />;
+}
+
+export function FloatingButtons({ channels }: FloatingButtonsProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -67,13 +75,17 @@ export function FloatingButtons(): React.ReactElement {
     };
   }, [open]);
 
+  if (channels.length === 0) {
+    return <div ref={ref} className="hidden" />;
+  }
+
   return (
     <div ref={ref} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       {open && (
         <div className="flex flex-col items-end gap-3" role="menu" aria-label="Способы связи">
-          {CHANNELS.map((c, i) => (
+          {channels.map((c, i) => (
             <a
-              key={c.name}
+              key={c.name + i}
               href={c.href}
               target="_blank"
               rel="noopener noreferrer"
@@ -89,7 +101,7 @@ export function FloatingButtons(): React.ReactElement {
                 className="flex size-12 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
                 style={{ backgroundColor: c.color }}
               >
-                {c.icon}
+                {iconFor(c.iconKey)}
               </span>
             </a>
           ))}

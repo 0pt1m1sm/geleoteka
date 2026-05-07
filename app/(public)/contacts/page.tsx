@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { getCMSMany } from "@/lib/cms";
+import { getCMSMany, getCMSText, getCMSList } from "@/lib/cms";
 import { PageHeader } from "@/components/ui";
+import { Markdown } from "@/components/shared/Markdown";
 
 export const dynamic = "force-dynamic";
 
@@ -13,29 +14,27 @@ const CMS_KEYS = [
   "contacts.hours.parts",
 ] as const;
 
-const FALLBACKS: Record<string, string> = {
-  "contacts.phone.service": "+7 (495) 123-45-67",
-  "contacts.phone.parts": "+7 (495) 123-45-68",
-  "contacts.email": "info@geleoteka.ru",
-  "contacts.address": "Москва, ул. Примерная, 15",
-  "contacts.hours.service": "Пн–Пт: 9:00–20:00, Сб: 10:00–18:00",
-  "contacts.hours.parts": "Пн–Пт: 9:00–19:00, Сб: 10:00–17:00",
-};
-
 /** Strip non-dial chars to build a tel: href. */
 function telHref(display: string): string {
   return `tel:${display.replace(/[^+\d]/g, "")}`;
 }
 
 export default async function ContactsPage(): Promise<React.ReactElement> {
-  const cms = await getCMSMany(CMS_KEYS, FALLBACKS);
+  const [cms, eyebrow, title, description, howtoTitle, howtoItems] = await Promise.all([
+    getCMSMany(CMS_KEYS),
+    getCMSText("contacts.eyebrow"),
+    getCMSText("contacts.title"),
+    getCMSText("contacts.description"),
+    getCMSText("contacts.howto.title"),
+    getCMSList("contacts.howto.items"),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <PageHeader
-        eyebrow="Контакты"
-        title="Свяжитесь с нами"
-        description="Свяжитесь с нами или приезжайте — мы всегда рады помочь"
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
         align="center"
         className="mb-12"
       />
@@ -114,11 +113,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
                 stroke="currentColor"
                 strokeWidth={1.5}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"
-                />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -135,26 +130,16 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
       </div>
 
       <div className="card">
-        <h2 className="text-lg font-semibold mb-4">Как добраться</h2>
+        <h2 className="text-lg font-semibold mb-4">{howtoTitle}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-          <div>
-            <h3 className="font-medium mb-2">На автомобиле</h3>
-            <p className="text-sm text-[var(--foreground-muted)]">
-              Съезд с МКАД, 500 м по {cms["contacts.address"].split(",").slice(-1)[0].trim()}. Бесплатная парковка перед сервисом.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium mb-2">На метро</h3>
-            <p className="text-sm text-[var(--foreground-muted)]">
-              Уточните маршрут по телефону {cms["contacts.phone.service"]}.
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium mb-2">На такси</h3>
-            <p className="text-sm text-[var(--foreground-muted)]">
-              Назовите адрес: {cms["contacts.address"]}. Въезд через шлагбаум — назовите номер записи.
-            </p>
-          </div>
+          {howtoItems.map((item, i) => (
+            <div key={i}>
+              <h3 className="font-medium mb-2">{item.title}</h3>
+              <div className="text-sm text-[var(--foreground-muted)]">
+                <Markdown source={item.body ?? ""} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>

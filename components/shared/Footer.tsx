@@ -1,14 +1,34 @@
 import Link from "next/link";
 import Image from "next/image";
+import { Markdown } from "./Markdown";
+
+export interface FooterServiceLink {
+  label: string;
+  href: string;
+}
 
 export interface FooterProps {
   servicePhone: string;
   email: string;
   address: string;
+  description: string;
+  servicesTitle: string;
+  servicesItems: FooterServiceLink[];
+  contactsTitle: string;
+  copyright: string;
 }
 
 /** Public marketing footer. Other layers (portal, admin) don't render this. */
-export function Footer({ servicePhone, email, address }: FooterProps): React.ReactElement {
+export function Footer({
+  servicePhone,
+  email,
+  address,
+  description,
+  servicesTitle,
+  servicesItems,
+  contactsTitle,
+  copyright,
+}: FooterProps): React.ReactElement {
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--background-secondary)]">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -18,22 +38,27 @@ export function Footer({ servicePhone, email, address }: FooterProps): React.Rea
               <Image src="/images/logo.svg" alt="" width={28} height={28} />
               <span className="text-display text-lg font-bold text-[var(--color-accent)]">Geleoteka</span>
             </div>
-            <p className="text-sm text-[var(--foreground-muted)] max-w-md">
-              Специализированный сервис Mercedes-Benz. Опыт работы более 15 лет,
-              сертифицированные мастера, оригинальные запчасти.
-            </p>
+            <div className="text-sm text-[var(--foreground-muted)] max-w-md">
+              <Markdown source={description} />
+            </div>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Услуги</h4>
+            <h4 className="text-sm font-semibold mb-3">{servicesTitle}</h4>
             <ul className="space-y-2 text-sm text-[var(--foreground-muted)]">
-              <li><Link href="/services/to" className="hover:text-[var(--foreground)] transition-colors">Техобслуживание</Link></li>
-              <li><Link href="/services/diagnostic" className="hover:text-[var(--foreground)] transition-colors">Диагностика</Link></li>
-              <li><Link href="/services/repair" className="hover:text-[var(--foreground)] transition-colors">Ремонт</Link></li>
-              <li><Link href="/services" className="hover:text-[var(--foreground)] transition-colors">Все услуги →</Link></li>
+              {servicesItems.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className="hover:text-[var(--foreground)] transition-colors"
+                  >
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
             </ul>
           </div>
           <div>
-            <h4 className="text-sm font-semibold mb-3">Контакты</h4>
+            <h4 className="text-sm font-semibold mb-3">{contactsTitle}</h4>
             <ul className="space-y-2 text-sm text-[var(--foreground-muted)]">
               <li>
                 <a
@@ -53,7 +78,7 @@ export function Footer({ servicePhone, email, address }: FooterProps): React.Rea
           </div>
         </div>
         <div className="mt-8 pt-8 border-t border-[var(--border)] flex flex-col gap-2 text-center text-xs text-[var(--foreground-muted)]">
-          <p>© {new Date().getFullYear()} Geleoteka. Все права защищены.</p>
+          <p>© {new Date().getFullYear()} {copyright}</p>
         </div>
       </div>
     </footer>

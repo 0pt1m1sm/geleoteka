@@ -4,6 +4,8 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
+import { Markdown } from "@/components/shared/Markdown";
+import { getCMSText, getCMSRichtext } from "@/lib/cms";
 
 interface ServiceData {
   id: string;
@@ -14,25 +16,25 @@ interface ServiceData {
   priceMax: number | null;
 }
 
-export default async function ServicesPage() {
-  const services: ServiceData[] = await db.service.findMany({
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-      description: true,
-      priceMin: true,
-      priceMax: true,
-    },
-  });
+export default async function ServicesPage(): Promise<React.ReactElement> {
+  const [services, eyebrow, title, description, ctaText, ctaButton] = await Promise.all([
+    db.service.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, slug: true, name: true, description: true, priceMin: true, priceMax: true },
+    }) as Promise<ServiceData[]>,
+    getCMSText("services.eyebrow"),
+    getCMSText("services.title"),
+    getCMSText("services.description"),
+    getCMSRichtext("services.cta.text"),
+    getCMSText("services.cta.button"),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <PageHeader
-        eyebrow="Сервис"
-        title="Услуги"
-        description="Полный спектр работ по обслуживанию и ремонту автомобилей Mercedes-Benz"
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
         align="center"
         className="mb-12"
       />
@@ -62,11 +64,11 @@ export default async function ServicesPage() {
       </div>
 
       <div className="text-center mt-16">
-        <p className="text-[var(--foreground-muted)] mb-4">
-          Не нашли нужную услугу? Свяжитесь с нами.
-        </p>
+        <div className="text-[var(--foreground-muted)] mb-4">
+          <Markdown source={ctaText} />
+        </div>
         <Link href="/contacts" className="btn btn-secondary">
-          Контакты
+          {ctaButton}
         </Link>
       </div>
     </div>

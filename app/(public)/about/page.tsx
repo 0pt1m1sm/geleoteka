@@ -2,6 +2,8 @@ export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
+import { Markdown } from "@/components/shared/Markdown";
+import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
 
 interface MasterData {
   id: string;
@@ -12,11 +14,22 @@ interface MasterData {
   certifications: string[];
 }
 
-export default async function AboutPage() {
-  const users = await db.user.findMany({
-    where: { isMaster: true, masterProfile: { isActive: true } },
-    include: { masterProfile: true },
-  });
+export default async function AboutPage(): Promise<React.ReactElement> {
+  const [users, eyebrow, title, description, historyTitle, historyItems, teamTitle, certTitle, certBody] =
+    await Promise.all([
+      db.user.findMany({
+        where: { isMaster: true, masterProfile: { isActive: true } },
+        include: { masterProfile: true },
+      }),
+      getCMSText("about.eyebrow"),
+      getCMSText("about.title"),
+      getCMSText("about.description"),
+      getCMSText("about.history.title"),
+      getCMSList("about.history.items"),
+      getCMSText("about.team.title"),
+      getCMSText("about.certificates.title"),
+      getCMSRichtext("about.certificates.body"),
+    ]);
 
   const masters: MasterData[] = users
     .map((u: Record<string, unknown>) => {
@@ -42,55 +55,27 @@ export default async function AboutPage() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <PageHeader
-        eyebrow="О компании"
-        title="О нас"
-        description="Специализированный сервис Mercedes-Benz с 2009 года. Сертифицированные мастера, оригинальные запчасти, прозрачное ценообразование."
+        eyebrow={eyebrow}
+        title={title}
+        description={description}
         align="center"
         className="mb-16"
       />
 
       {/* Timeline */}
       <div className="max-w-3xl mx-auto mb-20">
-        <h2 className="text-display text-2xl font-bold mb-8 text-center">
-          История
-        </h2>
+        <h2 className="text-display text-2xl font-bold mb-8 text-center">{historyTitle}</h2>
         <div className="space-y-8">
-          {[
-            {
-              year: "2009",
-              title: "Основание",
-              text: "Открытие первого сервисного поста. Два мастера, одна мечта — лучший сервис для Mercedes.",
-            },
-            {
-              year: "2014",
-              title: "Расширение",
-              text: "Переезд в новый цех на 6 постов. Получение сертификации STAR Diagnostics.",
-            },
-            {
-              year: "2018",
-              title: "AMG-сертификация",
-              text: "Первые в регионе получили сертификацию на обслуживание линейки AMG.",
-            },
-            {
-              year: "2022",
-              title: "EQ-направление",
-              text: "Оборудование для обслуживания электрических моделей EQ. Сертификация по электробезопасности.",
-            },
-            {
-              year: "2026",
-              title: "Цифровая платформа",
-              text: "Запуск онлайн-платформы: личный кабинет, отслеживание статуса, онлайн-запись.",
-            },
-          ].map((item, i) => (
+          {historyItems.map((item, i) => (
             <div key={i} className="flex gap-6">
               <div className="text-display text-2xl font-bold text-[var(--color-accent)] w-16 shrink-0 text-right">
                 {item.year}
               </div>
               <div className="border-l-2 border-[var(--border)] pl-6 pb-2">
                 <h3 className="font-semibold mb-1">{item.title}</h3>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  {item.text}
-                </p>
+                <div className="text-sm text-[var(--foreground-muted)]">
+                  <Markdown source={item.text ?? ""} />
+                </div>
               </div>
             </div>
           ))}
@@ -99,41 +84,29 @@ export default async function AboutPage() {
 
       {/* Team */}
       <div className="mb-16">
-        <h2 className="text-display text-2xl font-bold mb-8 text-center">
-          Команда
-        </h2>
+        <h2 className="text-display text-2xl font-bold mb-8 text-center">{teamTitle}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {masters.map((master) => (
             <div key={master.id} className="card text-center">
               <div className="w-20 h-20 rounded-full bg-[var(--color-secondary)] mx-auto mb-4 flex items-center justify-center">
                 <span className="text-2xl font-bold text-[var(--foreground-muted)]">
-                  {master.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {master.name.split(" ").map((n) => n[0]).join("")}
                 </span>
               </div>
               <h3 className="font-semibold">{master.name}</h3>
-              <p className="text-sm text-[var(--color-accent)] mb-2">
-                {master.role}
-              </p>
+              <p className="text-sm text-[var(--color-accent)] mb-2">{master.role}</p>
               {master.experience && (
                 <p className="text-xs text-[var(--foreground-muted)] mb-3">
                   Опыт: {master.experience} лет
                 </p>
               )}
               {master.bio && (
-                <p className="text-xs text-[var(--foreground-muted)] mb-3 line-clamp-3">
-                  {master.bio}
-                </p>
+                <p className="text-xs text-[var(--foreground-muted)] mb-3 line-clamp-3">{master.bio}</p>
               )}
               {master.certifications.length > 0 && (
                 <div className="flex flex-wrap gap-1 justify-center">
                   {master.certifications.map((cert: string) => (
-                    <span
-                      key={cert}
-                      className="badge badge-silver text-[10px]"
-                    >
+                    <span key={cert} className="badge badge-silver text-[10px]">
                       {cert}
                     </span>
                   ))}
@@ -146,14 +119,10 @@ export default async function AboutPage() {
 
       {/* Certificates */}
       <div className="text-center">
-        <h2 className="text-display text-2xl font-bold mb-4">
-          Сертификаты и лицензии
-        </h2>
-        <p className="text-[var(--foreground-muted)] max-w-xl mx-auto">
-          Все мастера проходят регулярное обучение и сертификацию. Мы
-          используем только оригинальное диагностическое оборудование
-          Mercedes-Benz.
-        </p>
+        <h2 className="text-display text-2xl font-bold mb-4">{certTitle}</h2>
+        <div className="text-[var(--foreground-muted)] max-w-xl mx-auto">
+          <Markdown source={certBody} />
+        </div>
       </div>
     </div>
   );

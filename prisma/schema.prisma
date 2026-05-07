@@ -494,9 +494,16 @@ model UploadedImage {
 // CMS & BLOG
 // ============================================
 
+// `type` controls how `content` is shaped and how the public site renders it:
+//   "text"     → content is { value: string }            — single-line strings
+//   "richtext" → content is { markdown: string }         — markdown source
+//   "list"     → content is { items: Array<Record<string,string>> } — repeating rows
+// The set of keys, their `type`, and the per-list row shape are defined in
+// `lib/cms-schema.ts`. The server action validates writes against that schema.
 model CMSBlock {
   id        String   @id @default(cuid())
   key       String   @unique
+  type      String   @default("text")
   content   Json
   updatedAt DateTime @updatedAt
 

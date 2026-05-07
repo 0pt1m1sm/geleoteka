@@ -1,18 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 interface FAQItem {
   question: string;
-  answer: string;
+  /** Pre-rendered answer node (e.g. markdown rendered server-side). */
+  answerNode: ReactNode;
 }
 
 /**
  * Accordion using the modern grid-template-rows 0fr → 1fr trick for smooth
- * height transitions without measuring. The answer paragraph stays in the DOM;
- * the wrapper grid row collapses/expands. Padding is on the inner element so
- * collapsed state has no leftover spacing.
+ * height transitions without measuring. The answer node stays in the DOM;
+ * the wrapper grid row collapses/expands.
  */
 export function FAQAccordion({ items }: { items: FAQItem[] }): React.ReactElement {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -46,11 +46,7 @@ export function FAQAccordion({ items }: { items: FAQItem[] }): React.ReactElemen
               }}
               aria-hidden={!isOpen}
             >
-              <div className="min-h-0">
-                <p className="pt-3 text-sm text-[var(--foreground-muted)] leading-relaxed">
-                  {item.answer}
-                </p>
-              </div>
+              <div className="min-h-0">{item.answerNode}</div>
             </div>
           </div>
         );

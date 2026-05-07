@@ -9,7 +9,8 @@
     "lint": "eslint",
     "migrate-static-photos": "tsx scripts/migrate-static-photos.ts",
     "verify-vehicle-catalog": "tsx scripts/verify-vehicle-catalog.ts",
-    "verify-vehicle-trims": "tsx scripts/verify-vehicle-trims.ts"
+    "verify-vehicle-trims": "tsx scripts/verify-vehicle-trims.ts",
+    "verify-cms": "tsx scripts/verify-cms.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
