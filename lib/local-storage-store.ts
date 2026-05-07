@@ -17,14 +17,14 @@ import { useSyncExternalStore } from "react";
  * Cross-tab updates fire a `storage` event; same-tab updates fire a custom
  * `geleoteka:store-change:<key>` event. Both are subscribed.
  *
- * **Validator gotcha:** when `validator` returns `null`, the helper treats
- * the stored value as bad-shape and self-heals (removes the entry, returns
- * `initial`). This makes `null` an unsuitable sentinel for a *legitimate*
- * value when `T` includes `null`. The current `MyCar | null` consumer is
- * fine because it wraps the validator: `(parsed) => parsed === null ? null
- * : validateMyCar(parsed)` — the outer null short-circuits before validation.
- * If you need a store where `null` is a legitimate distinct-from-initial
- * value, omit the validator and rely on `JSON.parse` round-tripping it.
+ * **Validator contract:**
+ *   `(parsed: unknown) => { ok: T } | null`
+ *
+ * Returning `{ ok: <value> }` provides the validated value (which may itself
+ * be `null` if `T` includes null — no ambiguity). Returning `null` from the
+ * validator is the self-heal sentinel: helper removes the bad entry and
+ * returns `initial`. The factory's `result == null` check (note `==` not
+ * `===`) defends against a buggy validator returning `undefined`.
  */
 
 export interface LocalStorageStore<T> {
@@ -41,7 +41,7 @@ export interface LocalStorageStore<T> {
 export function createLocalStorageStore<T>(
   key: string,
   initial: T,
-  validator?: (parsed: unknown) => T | null,
+  validator?: (parsed: unknown) => { ok: T } | null,
 ): LocalStorageStore<T> {
   const eventName = `geleoteka:store-change:${key}`;
   let cachedRaw: string | null | undefined = undefined; // undefined = not yet read
@@ -64,8 +64,9 @@ export function createLocalStorageStore<T>(
     try {
       const parsed: unknown = JSON.parse(raw);
       if (validator) {
-        const validated = validator(parsed);
-        if (validated === null) {
+        const result = validator(parsed);
+        // == null catches both null and a buggy-undefined return.
+        if (result == null) {
           // Self-heal: bad shape → clear and return initial.
           try {
             localStorage.removeItem(key);
@@ -74,7 +75,7 @@ export function createLocalStorageStore<T>(
           cachedValue = initial;
           return cachedValue;
         }
-        cachedValue = validated;
+        cachedValue = result.ok;
       } else {
         cachedValue = parsed as T;
       }
