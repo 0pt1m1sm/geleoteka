@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { Button, Card, PageHeader } from "@/components/ui";
 
 export default async function CarsPage() {
   const session = await getSession();
@@ -16,26 +18,29 @@ export default async function CarsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Мои автомобили</h1>
-        <Link href="/cabinet/cars/add" className="btn btn-primary text-sm">
-          + Добавить
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Кабинет"
+        title="Мои автомобили"
+        actions={
+          <Link href="/cabinet/cars/add">
+            <Button leftIcon={<Plus size={16} />}>Добавить</Button>
+          </Link>
+        }
+      />
 
       {cars.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)] mb-4">
             Вы ещё не добавили ни одного автомобиля
           </p>
           <Link href="/cabinet/cars/add" className="btn btn-primary">
             Добавить автомобиль
           </Link>
-        </div>
+        </Card>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {cars.map((car: Record<string, unknown>) => (
-            <div key={car.id as string} className="card">
+            <Card key={car.id as string} hover>
               <h3 className="font-semibold text-lg">
                 Mercedes-Benz {car.model as string}
               </h3>
@@ -52,7 +57,7 @@ export default async function CarsPage() {
                   Номер: {car.plate as string}
                 </p>
               ) : null}
-            </div>
+            </Card>
           ))}
         </div>
       )}

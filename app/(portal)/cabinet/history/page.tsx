@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
+import { Card, PageHeader } from "@/components/ui";
 
 export default async function HistoryPage() {
   const session = await getSession();
@@ -21,14 +22,12 @@ export default async function HistoryPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">
-        История обслуживания
-      </h1>
+      <PageHeader eyebrow="Кабинет" title="История обслуживания" />
 
       {repairOrders.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Заказ-нарядов пока нет</p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-4">
           {repairOrders.map((ro: Record<string, unknown>) => {

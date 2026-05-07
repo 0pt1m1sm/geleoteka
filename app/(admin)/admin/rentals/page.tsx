@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { Button, PageHeader } from "@/components/ui";
 
 export default async function AdminRentalsPage() {
   const session = await getSession();
@@ -20,17 +22,20 @@ export default async function AdminRentalsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Аренда — Автопарк</h1>
-        <div className="flex gap-2">
-          <Link href="/admin/rentals/bookings" className="btn btn-secondary text-sm">
-            Бронирования
-          </Link>
-          <Link href="/admin/rentals/new" className="btn btn-primary text-sm">
-            + Добавить авто
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Аренда"
+        title="Автопарк"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/admin/rentals/bookings">
+              <Button variant="secondary" size="sm">Бронирования</Button>
+            </Link>
+            <Link href="/admin/rentals/new">
+              <Button size="sm" leftIcon={<Plus size={14} />}>Добавить авто</Button>
+            </Link>
+          </div>
+        }
+      />
 
       {cars.length === 0 ? (
         <div className="card text-center py-12">

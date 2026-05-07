@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 interface FAQItem {
   question: string;
@@ -31,19 +32,10 @@ export function FAQAccordion({ items }: { items: FAQItem[] }): React.ReactElemen
               aria-controls={panelId}
             >
               <span className="font-medium pr-4">{item.question}</span>
-              <svg
+              <ChevronDown
                 className={`w-5 h-5 shrink-0 text-[var(--foreground-muted)] transition-transform duration-300 ${isOpen ? "rotate-180" : ""}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={2}
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19 9l-7 7-7-7"
-                />
-              </svg>
+                aria-hidden
+              />
             </button>
             <div
               id={panelId}

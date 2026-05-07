@@ -4,8 +4,10 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formatPrice, formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import { startOfDay, endOfDay, addDays } from "date-fns";
+import { Card, MetricCard, PageHeader } from "@/components/ui";
+import { UpcomingOrdersTable, type UpcomingOrderRow } from "./UpcomingOrdersTable";
 
 export default async function AdminDashboard() {
   const session = await getSession();
@@ -54,70 +56,43 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Дашборд</h1>
+      <PageHeader eyebrow="Админ" title="Дашборд" />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="card">
-          <p className="text-sm text-[var(--foreground-muted)]">Записей сегодня</p>
-          <p className="text-3xl font-bold">{todayCount}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-[var(--foreground-muted)]">В работе</p>
-          <p className="text-3xl font-bold text-[var(--color-warning)]">{activeCount}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-[var(--foreground-muted)]">Завершено сегодня</p>
-          <p className="text-3xl font-bold text-[var(--color-success)]">{completedToday.length}</p>
-        </div>
-        <div className="card">
-          <p className="text-sm text-[var(--foreground-muted)]">Выручка за день</p>
-          <p className="text-3xl font-bold text-[var(--color-accent)]">
-            {formatPrice(dailyRevenue)}
-          </p>
-        </div>
+        <MetricCard label="Записей сегодня" value={todayCount} />
+        <MetricCard label="В работе" value={activeCount} variant="warning" />
+        <MetricCard label="Завершено сегодня" value={completedToday.length} variant="success" />
+        <MetricCard label="Выручка за день" value={formatPrice(dailyRevenue)} variant="accent" />
       </div>
 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold">Ближайшие записи (7 дней)</h2>
-        <Link href="/admin/repair-orders" className="text-sm text-[var(--color-accent)]">
+        <Link href="/admin/repair-orders" className="text-sm text-[var(--color-accent)] hover:underline">
           Все записи →
         </Link>
       </div>
 
       {upcoming.length === 0 ? (
-        <div className="card text-center py-8">
+        <Card className="text-center py-8">
           <p className="text-[var(--foreground-muted)]">Нет записей на ближайшую неделю</p>
-        </div>
+        </Card>
       ) : (
-        <div className="space-y-3">
-          {upcoming.map((ro: Record<string, unknown>) => {
-            const user = ro.user as Record<string, string>;
-            const vehicle = ro.vehicle as Record<string, string>;
+        <UpcomingOrdersTable
+          rows={upcoming.map((ro: Record<string, unknown>): UpcomingOrderRow => {
+            const user = ro.user as { name: string; phone: string | null };
+            const vehicle = ro.vehicle as { model: string };
             const jobs = ro.jobLines as Array<{ description: string }>;
-            return (
-              <div key={ro.id as string} className="card">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="font-medium">{user.name}</p>
-                    <p className="text-sm text-[var(--foreground-muted)]">
-                      {vehicle.model} · {formatDate(ro.dateTime as Date)}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {jobs.map((j, i) => (
-                        <span key={i} className="badge badge-silver text-xs">
-                          {j.description}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <span className={`badge text-xs status-${(ro.status as string).toLowerCase()}`}>
-                    {REPAIR_ORDER_STATUS_LABELS[ro.status as string] ?? ro.status}
-                  </span>
-                </div>
-              </div>
-            );
+            return {
+              id: ro.id as string,
+              customerName: user.name,
+              customerPhone: user.phone,
+              vehicleModel: vehicle.model,
+              dateTime: (ro.dateTime as Date).toISOString(),
+              status: ro.status as string,
+              jobs: jobs.map((j) => j.description),
+            };
           })}
-        </div>
+        />
       )}
     </div>
   );

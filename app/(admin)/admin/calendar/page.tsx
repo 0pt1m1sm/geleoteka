@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { AdminCalendar } from "@/components/admin/AdminCalendar";
+import { PageHeader } from "@/components/ui";
 
 export default async function CalendarPage() {
   const session = await getSession();
@@ -35,7 +36,7 @@ export default async function CalendarPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Календарь записей</h1>
+      <PageHeader eyebrow="Сервис" title="Календарь записей" />
       <AdminCalendar repairOrders={serialized} />
     </div>
   );

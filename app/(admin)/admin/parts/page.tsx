@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { Button, Card, PageHeader } from "@/components/ui";
 
 export default async function AdminPartsPage() {
   await requireRole(["ADMIN", "MANAGER"]);
@@ -15,26 +17,26 @@ export default async function AdminPartsPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Запчасти</h1>
-        <div className="flex gap-2">
-          <Link href="/admin/parts/import" className="btn btn-secondary text-sm">
-            Импорт CSV
-          </Link>
-          <Link href="/admin/parts/new" className="btn btn-primary text-sm">
-            + Добавить
-          </Link>
-        </div>
-      </div>
-
-      <div className="text-sm text-[var(--foreground-muted)] mb-4">
-        Всего: {parts.length} | В наличии: {parts.filter((p: Record<string, unknown>) => (p.quantity as number) > 0).length}
-      </div>
+      <PageHeader
+        eyebrow="Запчасти"
+        title="Каталог"
+        description={`Всего: ${parts.length} · В наличии: ${parts.filter((p: Record<string, unknown>) => (p.quantity as number) > 0).length}`}
+        actions={
+          <div className="flex gap-2">
+            <Link href="/admin/parts/import">
+              <Button variant="secondary" size="sm">Импорт CSV</Button>
+            </Link>
+            <Link href="/admin/parts/new">
+              <Button size="sm" leftIcon={<Plus size={14} />}>Добавить</Button>
+            </Link>
+          </div>
+        }
+      />
 
       {parts.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Запчастей пока нет</p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {parts.map((part: Record<string, unknown>) => {

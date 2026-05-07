@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, X } from "lucide-react";
 import {
   createGeneration,
   updateGeneration,
   deleteGeneration,
 } from "@/app/actions/vehicle-catalog";
 import { useFormAction } from "@/lib/use-form-action";
+import { Alert, Button } from "@/components/ui";
 import { TrimManager } from "./TrimManager";
 import type { FuelType } from "@/lib/vehicle-catalog-types";
 
@@ -109,11 +111,7 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-          {error}
-        </div>
-      )}
+      {error && <Alert variant="error">{error}</Alert>}
 
       <div className="space-y-2">
         {generations.length === 0 && (
@@ -175,10 +173,10 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
                 type="button"
                 onClick={() => handleDelete(g)}
                 disabled={pending}
-                className="text-xs text-[var(--color-error)] hover:opacity-80"
+                className="text-[var(--color-error)] hover:opacity-80 disabled:opacity-50"
                 aria-label={`Удалить ${g.code}`}
               >
-                ×
+                <X size={16} aria-hidden />
               </button>
             </div>
             <TrimManager generationId={g.id} generationCode={g.code} trims={g.trims} />
@@ -217,14 +215,17 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
           placeholder="н.в."
           aria-label="Год окончания"
         />
-        <button
+        <Button
           type="button"
+          variant="primary"
+          size="sm"
           onClick={handleAdd}
           disabled={pending}
-          className="btn btn-primary text-xs ml-auto disabled:opacity-50"
+          leftIcon={<Plus size={14} />}
+          className="ml-auto"
         >
-          + Добавить
-        </button>
+          Добавить
+        </Button>
       </div>
     </div>
   );

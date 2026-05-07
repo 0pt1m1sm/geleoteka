@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import Image from "next/image";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
@@ -167,10 +168,12 @@ export default async function PartsPage({ searchParams }: Props) {
                     {/* Part image */}
                     <div className="aspect-square bg-[var(--background-secondary)] rounded-lg mb-3 flex flex-col items-center justify-center overflow-hidden relative">
                       {(part.photos as string[])?.length > 0 ? (
-                        <img
+                        <Image
                           src={(part.photos as string[])[0]}
                           alt={part.name as string}
-                          className="w-full h-full object-cover"
+                          fill
+                          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                          className="object-cover"
                         />
                       ) : (
                         <>

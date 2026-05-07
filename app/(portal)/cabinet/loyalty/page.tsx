@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { LOYALTY_TIERS, getNextTier, formatDate } from "@/lib/utils";
 import type { LoyaltyTier } from "@/lib/utils";
+import { Badge, Card, PageHeader } from "@/components/ui";
 
 export default async function LoyaltyPage() {
   const session = await getSession();
@@ -23,12 +24,12 @@ export default async function LoyaltyPage() {
   if (!account) {
     return (
       <div>
-        <h1 className="text-display text-2xl font-bold mb-6">Программа лояльности</h1>
-        <div className="card text-center py-12">
+        <PageHeader eyebrow="Кабинет" title="Программа лояльности" />
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">
             Аккаунт лояльности будет создан после первого визита
           </p>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -40,18 +41,14 @@ export default async function LoyaltyPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">
-        Программа лояльности
-      </h1>
+      <PageHeader eyebrow="Кабинет" title="Программа лояльности" />
 
       {/* Tier card */}
-      <div className="card mb-8">
+      <Card className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <span className={`badge badge-${tier === "AMG_CLUB" ? "amg" : tier.toLowerCase()} text-sm`}>
-              {tierInfo.label}
-            </span>
-          </div>
+          <Badge variant={tier === "AMG_CLUB" ? "amg" : tier === "GOLD" ? "gold" : "silver"}>
+            {tierInfo.label}
+          </Badge>
           <p className="text-3xl font-bold text-[var(--color-accent)]">
             {account.points} баллов
           </p>
@@ -63,9 +60,16 @@ export default async function LoyaltyPage() {
               <span>{tierInfo.label}</span>
               <span>{LOYALTY_TIERS[nextTier.tier].label}</span>
             </div>
-            <div className="w-full bg-[var(--border)] rounded-full h-2">
+            <div
+              className="w-full bg-[var(--border)] rounded-full h-2 overflow-hidden"
+              role="progressbar"
+              aria-valuenow={Math.min(100, (account.points / nextTier.pointsNeeded) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={`Прогресс до ${LOYALTY_TIERS[nextTier.tier].label}`}
+            >
               <div
-                className="bg-[var(--color-accent)] h-2 rounded-full transition-all"
+                className="bg-[var(--color-accent)] h-2 rounded-full transition-[width] duration-500"
                 style={{
                   width: `${Math.min(100, (account.points / nextTier.pointsNeeded) * 100)}%`,
                 }}
@@ -76,10 +80,10 @@ export default async function LoyaltyPage() {
             </p>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Referral */}
-      <div className="card mb-8">
+      <Card className="mb-8">
         <h2 className="text-lg font-semibold mb-2">Реферальная ссылка</h2>
         <p className="text-sm text-[var(--foreground-muted)] mb-3">
           Приглашайте друзей — получайте бонусные баллы за каждый их визит
@@ -90,23 +94,24 @@ export default async function LoyaltyPage() {
             readOnly
             value={`${typeof window !== "undefined" ? window.location.origin : ""}/register?ref=${account.referralCode}`}
             className="input flex-1 text-sm"
+            aria-label="Реферальная ссылка"
           />
         </div>
-      </div>
+      </Card>
 
       {/* Transaction history */}
       <div>
         <h2 className="text-lg font-semibold mb-4">История операций</h2>
         {transactions.length === 0 ? (
-          <div className="card text-center py-8">
+          <Card className="text-center py-8">
             <p className="text-[var(--foreground-muted)]">Операций пока нет</p>
-          </div>
+          </Card>
         ) : (
           <div className="space-y-2">
             {transactions.map((tx) => (
-              <div
+              <Card
                 key={tx.id as string}
-                className="card flex items-center justify-between py-3"
+                className="flex items-center justify-between py-3"
               >
                 <div>
                   <p className="text-sm font-medium">
@@ -126,7 +131,7 @@ export default async function LoyaltyPage() {
                   {(tx.amount as number) > 0 ? "+" : ""}
                   {tx.amount as number}
                 </span>
-              </div>
+              </Card>
             ))}
           </div>
         )}

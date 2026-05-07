@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MessageCircle, X } from "lucide-react";
 
 interface Channel {
   name: string;
@@ -8,6 +9,9 @@ interface Channel {
   color: string;
   icon: React.ReactNode;
 }
+
+/* Brand iconography — lucide-react does not ship messenger brand icons by design.
+   Inline SVG paths are kept as canonical brand glyphs. */
 
 const TelegramIcon = (
   <svg width={26} height={26} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -21,7 +25,6 @@ const WhatsAppIcon = (
   </svg>
 );
 
-// Max messenger (VK Tech, 2025) — stylized "M" wordmark on the brand red disc.
 const MaxIcon = (
   <svg width={26} height={26} viewBox="0 0 24 24" aria-hidden>
     <text
@@ -79,7 +82,7 @@ export function FloatingButtons(): React.ReactElement {
               style={{ animationDelay: `${i * 50}ms` }}
               onClick={() => setOpen(false)}
             >
-              <span className="rounded-md border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] shadow-md">
+              <span className="rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] px-3 py-1.5 text-sm font-medium text-[var(--foreground)] shadow-md">
                 {c.name}
               </span>
               <span
@@ -100,15 +103,7 @@ export function FloatingButtons(): React.ReactElement {
         aria-expanded={open}
         className="flex size-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-lg transition-transform hover:scale-105 focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)]"
       >
-        {open ? (
-          <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" aria-hidden>
-            <path d="M6 6l12 12M18 6L6 18" />
-          </svg>
-        ) : (
-          <svg width={26} height={26} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-            <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z" />
-          </svg>
-        )}
+        {open ? <X size={24} aria-hidden /> : <MessageCircle size={24} aria-hidden />}
       </button>
     </div>
   );

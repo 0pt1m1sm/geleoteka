@@ -1,12 +1,14 @@
 "use client";
 
+import { Check } from "lucide-react";
+
 const STEPS = [
   "Услуги и авто",
   "Дата и время",
   "Контакты",
 ];
 
-export function StepIndicator({ current }: { current: number }) {
+export function StepIndicator({ current }: { current: number }): React.ReactElement {
   return (
     <div className="flex items-center justify-center gap-2 mb-8">
       {STEPS.map((label, i) => {
@@ -24,13 +26,7 @@ export function StepIndicator({ current }: { current: number }) {
                     : "bg-[var(--color-secondary)] text-[var(--foreground-muted)]"
               }`}
             >
-              {isDone ? (
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                step
-              )}
+              {isDone ? <Check className="w-4 h-4" aria-hidden /> : step}
             </div>
             <span
               className={`text-xs hidden sm:block ${

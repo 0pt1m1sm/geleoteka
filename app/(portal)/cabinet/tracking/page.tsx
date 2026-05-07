@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { StatusBoard } from "@/components/portal/StatusBoard";
+import { Card, PageHeader } from "@/components/ui";
 
 interface ActiveRepairOrder {
   id: string;
@@ -43,13 +44,11 @@ export default async function TrackingPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">
-        Статус ремонта
-      </h1>
+      <PageHeader eyebrow="Кабинет" title="Статус ремонта" />
       {active.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Нет активных заказ-нарядов</p>
-        </div>
+        </Card>
       ) : (
         <StatusBoard initial={active} />
       )}

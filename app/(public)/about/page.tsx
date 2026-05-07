@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/db";
+import { PageHeader } from "@/components/ui";
 
 interface MasterData {
   id: string;
@@ -40,16 +41,13 @@ export default async function AboutPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="text-center mb-16">
-        <h1 className="text-display text-4xl sm:text-5xl font-bold mb-4">
-          О нас
-        </h1>
-        <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto text-lg">
-          Специализированный сервис Mercedes-Benz с 2009 года.
-          Сертифицированные мастера, оригинальные запчасти, прозрачное
-          ценообразование.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="О компании"
+        title="О нас"
+        description="Специализированный сервис Mercedes-Benz с 2009 года. Сертифицированные мастера, оригинальные запчасти, прозрачное ценообразование."
+        align="center"
+        className="mb-16"
+      />
 
       {/* Timeline */}
       <div className="max-w-3xl mx-auto mb-20">

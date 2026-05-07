@@ -2,21 +2,20 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getActiveModels, generationLabel } from "@/lib/vehicle-catalog";
+import { PageHeader } from "@/components/ui";
 
 export default async function ModelsPage(): Promise<React.ReactElement> {
   const models = await getActiveModels();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="text-center mb-12">
-        <h1 className="text-display text-4xl sm:text-5xl font-bold mb-4">
-          Модели Mercedes-Benz
-        </h1>
-        <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto text-lg">
-          Обслуживаем весь модельный ряд — от A-Class до AMG GT и электрических EQ.
-          Выберите свою модель, чтобы посмотреть доступные услуги.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Каталог"
+        title="Модели Mercedes-Benz"
+        description="Обслуживаем весь модельный ряд — от A-Class до AMG GT и электрических EQ. Выберите свою модель, чтобы посмотреть доступные услуги."
+        align="center"
+        className="mb-12"
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {models.map((model) => (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateCMSBlock } from "@/app/actions/cms";
+import { Button, Card, CardContent, Input } from "@/components/ui";
 
 interface CMSBlock {
   id: string;
@@ -24,18 +25,21 @@ const KEY_LABELS: Record<string, string> = {
   "contacts.hours.parts": "Контакты — часы запчастей",
 };
 
-export function CMSEditor({ blocks }: { blocks: CMSBlock[] }) {
+export function CMSEditor({ blocks }: { blocks: CMSBlock[] }): React.ReactElement {
   const [saving, setSaving] = useState<string | null>(null);
   const [values, setValues] = useState<Record<string, string>>(
     Object.fromEntries(
-      blocks.map((b) => [b.key, b.content.text ?? b.content.value ?? ""])
-    )
+      blocks.map((b) => [b.key, b.content.text ?? b.content.value ?? ""]),
+    ),
   );
 
-  async function save(key: string) {
+  async function save(key: string): Promise<void> {
     setSaving(key);
     const block = blocks.find((b) => b.key === key);
-    if (!block) return;
+    if (!block) {
+      setSaving(null);
+      return;
+    }
 
     const contentKey = block.content.text !== undefined ? "text" : "value";
     await updateCMSBlock(key, { [contentKey]: values[key] });
@@ -44,36 +48,41 @@ export function CMSEditor({ blocks }: { blocks: CMSBlock[] }) {
 
   return (
     <div className="space-y-4">
-      {blocks.map((block) => (
-        <div key={block.id} className="card">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">
-                {KEY_LABELS[block.key] ?? block.key}
-              </label>
-              <p className="text-[10px] text-[var(--foreground-muted)] mb-2 font-mono">
-                {block.key}
-              </p>
-              <input
-                type="text"
-                value={values[block.key] ?? ""}
-                onChange={(e) =>
-                  setValues({ ...values, [block.key]: e.target.value })
-                }
-                className="input"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={() => save(block.key)}
-              disabled={saving === block.key}
-              className="btn btn-primary text-xs py-1 px-3 mt-6"
-            >
-              {saving === block.key ? "..." : "Сохранить"}
-            </button>
-          </div>
-        </div>
-      ))}
+      {blocks.map((block) => {
+        const fieldId = `cms-${block.id}`;
+        return (
+          <Card key={block.id}>
+            <CardContent className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <label htmlFor={fieldId} className="block text-sm font-medium mb-1">
+                  {KEY_LABELS[block.key] ?? block.key}
+                </label>
+                <p className="text-[10px] text-[var(--foreground-muted)] mb-2 font-mono">
+                  {block.key}
+                </p>
+                <Input
+                  id={fieldId}
+                  type="text"
+                  value={values[block.key] ?? ""}
+                  onChange={(e) =>
+                    setValues({ ...values, [block.key]: e.target.value })
+                  }
+                />
+              </div>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => save(block.key)}
+                isLoading={saving === block.key}
+                className="mt-6"
+              >
+                {saving === block.key ? "..." : "Сохранить"}
+              </Button>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

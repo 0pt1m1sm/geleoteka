@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { X } from "lucide-react";
+import { Alert, Button } from "@/components/ui";
 
 interface Props {
   name: string;
@@ -16,7 +18,7 @@ export function PhotoUploader({
   initial,
   maxPhotos = 10,
   accept = DEFAULT_ACCEPT,
-}: Props) {
+}: Props): React.ReactElement {
   const [urls, setUrls] = useState<string[]>(initial);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +129,7 @@ export function PhotoUploader({
                     : "border-transparent"
                 }`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary upload-server URL, not statically optimizable */}
                 <img
                   src={url}
                   alt={`Фото ${idx + 1}`}
@@ -142,9 +144,9 @@ export function PhotoUploader({
                   type="button"
                   onClick={() => handleRemove(idx)}
                   aria-label="Удалить фото"
-                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white text-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--color-error)]"
+                  className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/70 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--color-error)]"
                 >
-                  ×
+                  <X size={14} aria-hidden />
                 </button>
               </div>
             );
@@ -153,14 +155,16 @@ export function PhotoUploader({
       )}
 
       <div className="flex items-center gap-3 mb-2">
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
           disabled={triggerDisabled}
-          className="btn btn-secondary text-sm"
+          isLoading={isUploading}
         >
           {isUploading ? "Загрузка..." : "Загрузить фото"}
-        </button>
+        </Button>
         <span className="text-xs text-[var(--foreground-muted)]">
           {urls.length} / {maxPhotos} · JPG, PNG, WebP, AVIF · до 5 МБ
         </span>
@@ -181,11 +185,7 @@ export function PhotoUploader({
         </p>
       )}
 
-      {error && (
-        <div className="text-sm text-[var(--color-error)] bg-[var(--color-error-bg)] px-3 py-2 rounded-lg">
-          {error}
-        </div>
-      )}
+      {error && <Alert variant="error">{error}</Alert>}
 
       {urls.length > 1 && (
         <p className="text-xs text-[var(--foreground-muted)] mt-2">

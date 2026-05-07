@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { Check } from "lucide-react";
 
 interface SuccessCardProps {
   /** Bold heading shown below the checkmark icon. */
@@ -18,15 +19,7 @@ export function SuccessCard({ heading, message, children }: SuccessCardProps): R
   return (
     <div className="card text-center py-12">
       <div className="w-16 h-16 rounded-full bg-[var(--color-success-bg)] mx-auto mb-6 flex items-center justify-center">
-        <svg
-          className="w-8 h-8 text-[var(--color-success)]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
+        <Check className="w-8 h-8 text-[var(--color-success)]" aria-hidden />
       </div>
       <h2 className="text-display text-2xl font-bold mb-2">{heading}</h2>
       {message && <p className="text-[var(--foreground-muted)] mb-6">{message}</p>}

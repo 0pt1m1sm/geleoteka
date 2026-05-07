@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
+import { Card, PageHeader } from "@/components/ui";
 
 export default async function AppointmentsPage() {
   const session = await getSession();
@@ -31,12 +32,12 @@ export default async function AppointmentsPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Все записи</h1>
+      <PageHeader eyebrow="Сервис" title="Все записи" />
 
       {repairOrders.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Записей пока нет</p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {repairOrders.map((ro: Record<string, unknown>) => {

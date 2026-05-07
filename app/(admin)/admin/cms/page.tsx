@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { CMSEditor } from "@/components/admin/CMSEditor";
+import { PageHeader } from "@/components/ui";
 
 export default async function CMSPage() {
   await requireRole(["ADMIN", "MANAGER"]);
@@ -19,9 +20,7 @@ export default async function CMSPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">
-        Управление контентом
-      </h1>
+      <PageHeader eyebrow="Сайт" title="Управление контентом" />
       <CMSEditor blocks={serialized} />
     </div>
   );

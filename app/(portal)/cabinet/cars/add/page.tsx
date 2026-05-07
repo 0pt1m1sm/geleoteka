@@ -1,5 +1,6 @@
 import { getActiveModels } from "@/lib/vehicle-catalog";
 import { AddCarForm } from "@/components/portal/AddCarForm";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +10,7 @@ export default async function AddCarPage(): Promise<React.ReactElement> {
 
   return (
     <div className="max-w-lg">
-      <h1 className="text-display text-2xl font-bold mb-6">
-        Добавить автомобиль
-      </h1>
+      <PageHeader eyebrow="Кабинет" title="Добавить автомобиль" />
       <AddCarForm modelNames={modelNames} />
     </div>
   );

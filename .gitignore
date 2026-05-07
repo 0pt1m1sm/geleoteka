@@ -40,6 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+/app/generated
 /app/generated/prisma
 .codegraph/
 .playwright-cli/

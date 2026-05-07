@@ -5,14 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { OrderStatusChanger } from "@/components/admin/OrderStatusChanger";
-
-const STATUS_COLORS: Record<string, string> = {
-  PENDING: "bg-[var(--color-warning-bg)] text-[var(--color-warning)]",
-  CONFIRMED: "bg-[var(--color-info-bg)] text-[var(--color-info)]",
-  SHIPPED: "bg-[var(--color-info-bg)] text-[var(--color-info)]",
-  COMPLETED: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
-  CANCELLED: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
-};
+import { Card, PageHeader } from "@/components/ui";
 
 export default async function AdminOrdersPage() {
   const session = await getSession();
@@ -38,17 +31,16 @@ export default async function AdminOrdersPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Заказы запчастей</h1>
-        <div className="text-sm text-[var(--foreground-muted)]">
-          Всего: {total} · Ожидают: {pending}
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Запчасти"
+        title="Заказы запчастей"
+        description={`Всего: ${total} · Ожидают: ${pending}`}
+      />
 
       {orders.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Заказов пока нет</p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-4">
           {orders.map((order: Record<string, unknown>) => {

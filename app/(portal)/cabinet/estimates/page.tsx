@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { EstimateReview } from "@/components/portal/EstimateReview";
+import { Card, PageHeader } from "@/components/ui";
 
 export default async function EstimatesPage() {
   const session = await getSession();
@@ -65,13 +66,11 @@ export default async function EstimatesPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Сметы</h1>
+      <PageHeader eyebrow="Кабинет" title="Сметы" />
       {serialized.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-[var(--foreground-muted)]">
-            Нет смет на согласование
-          </p>
-        </div>
+        <Card className="text-center py-12">
+          <p className="text-[var(--foreground-muted)]">Нет смет на согласование</p>
+        </Card>
       ) : (
         <EstimateReview repairOrders={serialized} />
       )}

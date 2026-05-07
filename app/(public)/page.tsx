@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { getCMSMany } from "@/lib/cms";
@@ -69,10 +70,13 @@ export default async function HomePage() {
         {/* Background photo spans full hero. Overlays add depth (atmospheric vignette
             via radial spotlight) and respect light/dark theme through hero-overlay. */}
         <div className="absolute inset-0">
-          <img
+          <Image
             src="/images/hero/g-class-4k.jpg"
             alt=""
-            className="size-full object-cover"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
           />
           <div className="absolute inset-0 bg-black/55 hero-overlay" />
           <div className="hero-spotlight" />

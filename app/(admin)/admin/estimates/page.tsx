@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate, JOB_LINE_STATUS_LABELS } from "@/lib/utils";
+import { Button, PageHeader } from "@/components/ui";
 
 export default async function AdminEstimatesPage() {
   const session = await getSession();
@@ -25,12 +27,15 @@ export default async function AdminEstimatesPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Сметы</h1>
-        <Link href="/admin/estimates/new" className="btn btn-primary text-sm">
-          + Создать смету
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Сервис"
+        title="Сметы"
+        actions={
+          <Link href="/admin/estimates/new">
+            <Button size="sm" leftIcon={<Plus size={14} />}>Создать смету</Button>
+          </Link>
+        }
+      />
 
       {estimates.length === 0 ? (
         <div className="card text-center py-12">

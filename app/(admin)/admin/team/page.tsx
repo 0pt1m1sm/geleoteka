@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { PageHeader } from "@/components/ui";
 
 export default async function TeamPage() {
   const session = await getSession();
@@ -24,7 +25,7 @@ export default async function TeamPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Команда</h1>
+      <PageHeader eyebrow="Сервис" title="Команда" />
 
       <div className="space-y-4">
         {masters.map((m: Record<string, unknown>) => {

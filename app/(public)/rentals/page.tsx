@@ -1,8 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import Image from "next/image";
+import { Zap, Activity } from "lucide-react";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { PageHeader } from "@/components/ui";
 
 export default async function RentalsPage() {
   const cars = await db.vehicle.findMany({
@@ -12,14 +15,13 @@ export default async function RentalsPage() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="text-center mb-12">
-        <h1 className="text-display text-4xl sm:text-5xl font-bold mb-4">
-          Аренда G-Class
-        </h1>
-        <p className="text-[var(--foreground-muted)] max-w-xl mx-auto text-lg">
-          Арендуйте легендарный Mercedes-Benz G-Class на любой срок
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Аренда"
+        title="Аренда G-Class"
+        description="Арендуйте легендарный Mercedes-Benz G-Class на любой срок"
+        align="center"
+        className="mb-12"
+      />
 
       {cars.length === 0 ? (
         <div className="card text-center py-12">
@@ -33,9 +35,15 @@ export default async function RentalsPage() {
               href={`/rentals/${car.id as string}`}
               className="card card-hover group flex flex-col"
             >
-              <div className="aspect-video bg-[var(--background-secondary)] rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+              <div className="relative aspect-video bg-[var(--background-secondary)] rounded-lg mb-4 flex items-center justify-center overflow-hidden">
                 {(car.photos as string[])?.length > 0 ? (
-                  <img src={(car.photos as string[])[0]} alt={`Mercedes-Benz ${car.model as string}`} className="w-full h-full object-contain" />
+                  <Image
+                    src={(car.photos as string[])[0]}
+                    alt={`Mercedes-Benz ${car.model as string}`}
+                    fill
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                    className="object-contain"
+                  />
                 ) : (
                   <span className="text-4xl text-[var(--foreground-muted)]/30">G</span>
                 )}
@@ -52,17 +60,13 @@ export default async function RentalsPage() {
                 <div className="flex flex-wrap gap-x-3 gap-y-1 mb-4 text-xs text-[var(--foreground-muted)]">
                   {car.engine ? (
                     <span className="flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
+                      <Zap size={14} aria-hidden />
                       {car.engine as string}
                     </span>
                   ) : null}
                   {car.horsepower ? (
                     <span className="flex items-center gap-1">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
+                      <Activity size={14} aria-hidden />
                       {car.horsepower as number} л.с.
                     </span>
                   ) : null}

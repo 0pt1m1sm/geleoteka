@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { useBooking } from "./BookingProvider";
 import { formatPrice } from "@/lib/utils";
 import { generationLabel, trimLabel, type VehicleModel } from "@/lib/vehicle-catalog-types";
@@ -102,11 +103,7 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
                       selected ? "bg-accent border-accent" : "border-[var(--border)]"
                     }`}
                   >
-                    {selected && (
-                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+                    {selected && <Check className="w-3 h-3 text-white" strokeWidth={3} aria-hidden />}
                   </div>
                 </div>
               </button>

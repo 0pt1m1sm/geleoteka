@@ -1,20 +1,17 @@
+import { Star as LucideStar } from "lucide-react";
 import { YANDEX_PROFILE_URL } from "@/lib/yandex";
 import { fetchYandexReviews, type YandexReview } from "@/lib/yandex-reviews";
 
 function Star({ filled }: { filled: boolean }): React.ReactElement {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      width="14"
-      height="14"
+    <LucideStar
+      size={14}
+      strokeWidth={1.25}
       fill={filled ? "var(--color-accent)" : "transparent"}
       stroke="var(--color-accent)"
-      strokeWidth={1.25}
       aria-hidden
       className="shrink-0"
-    >
-      <path d="M10 1.8l2.47 5.43 5.94.78-4.39 4.13 1.13 5.96L10 15.2l-5.15 2.9 1.13-5.96L1.59 8.01l5.94-.78L10 1.8z" />
-    </svg>
+    />
   );
 }
 

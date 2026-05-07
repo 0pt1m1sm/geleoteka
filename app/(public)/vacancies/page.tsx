@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui";
 
 const VACANCIES = [
   {
@@ -39,15 +40,13 @@ const VACANCIES = [
 export default function VacanciesPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="text-center mb-12">
-        <h1 className="text-display text-4xl sm:text-5xl font-bold mb-4">
-          Вакансии
-        </h1>
-        <p className="text-[var(--foreground-muted)] max-w-xl mx-auto text-lg">
-          Присоединяйтесь к команде Geleoteka — работайте с лучшими
-          автомобилями в мире
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Карьера"
+        title="Вакансии"
+        description="Присоединяйтесь к команде Geleoteka — работайте с лучшими автомобилями в мире"
+        align="center"
+        className="mb-12"
+      />
 
       <div className="space-y-6 mb-12">
         {VACANCIES.map((vacancy, i) => (

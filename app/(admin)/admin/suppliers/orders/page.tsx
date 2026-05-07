@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { Button, Card, PageHeader } from "@/components/ui";
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Черновик",
@@ -54,22 +56,21 @@ export default async function SupplierOrdersListPage() {
       >
         ← Поставщики
       </Link>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-display text-2xl font-bold">Заказы поставщикам</h1>
-          <p className="text-sm text-[var(--foreground-muted)] mt-1">
-            Всего: {orders.length} · В пути: {inTransit} · Оборот: {formatPrice(total)}
-          </p>
-        </div>
-        <Link href="/admin/suppliers/orders/new" className="btn btn-primary text-sm">
-          + Новый заказ
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Запчасти"
+        title="Заказы поставщикам"
+        description={`Всего: ${orders.length} · В пути: ${inTransit} · Оборот: ${formatPrice(total)}`}
+        actions={
+          <Link href="/admin/suppliers/orders/new">
+            <Button size="sm" leftIcon={<Plus size={14} />}>Новый заказ</Button>
+          </Link>
+        }
+      />
 
       {orders.length === 0 ? (
-        <div className="card text-center py-12">
+        <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Заказов пока нет</p>
-        </div>
+        </Card>
       ) : (
         <div className="space-y-3">
           {orders.map((o: Record<string, unknown>) => {

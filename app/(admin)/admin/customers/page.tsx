@@ -4,6 +4,7 @@ import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { PageHeader } from "@/components/ui";
 
 export default async function CustomersPage() {
   const session = await getSession();
@@ -26,7 +27,7 @@ export default async function CustomersPage() {
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-6">Клиенты</h1>
+      <PageHeader eyebrow="CRM" title="Клиенты" />
 
       <div className="space-y-3">
         {customers.map((c: Record<string, unknown>) => {

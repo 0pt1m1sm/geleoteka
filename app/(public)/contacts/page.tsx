@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCMSMany } from "@/lib/cms";
+import { PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -31,14 +32,13 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-      <div className="text-center mb-12">
-        <h1 className="text-display text-4xl sm:text-5xl font-bold mb-4">
-          Контакты
-        </h1>
-        <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto text-lg">
-          Свяжитесь с нами или приезжайте — мы всегда рады помочь
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Контакты"
+        title="Свяжитесь с нами"
+        description="Свяжитесь с нами или приезжайте — мы всегда рады помочь"
+        align="center"
+        className="mb-12"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
         <div className="space-y-6">

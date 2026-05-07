@@ -2,8 +2,10 @@
 
 import { useState, useActionState } from "react";
 import Link from "next/link";
+import { Plus, X } from "lucide-react";
 import { addJobLines } from "@/app/actions/admin";
 import { formatPrice } from "@/lib/utils";
+import { Alert, Button, Card, Select } from "@/components/ui";
 
 interface JobRow {
   description: string;
@@ -29,22 +31,20 @@ export function EstimateBuilder({
   repairOrders,
 }: {
   repairOrders: { id: string; label: string }[];
-}) {
+}): React.ReactElement {
   const [state, formAction, isPending] = useActionState(addJobLines, null);
   const [jobs, setJobs] = useState<JobRow[]>([{ ...EMPTY_JOB }]);
 
-  function addJob() {
+  function addJob(): void {
     setJobs([...jobs, { ...EMPTY_JOB }]);
   }
 
-  function removeJob(index: number) {
+  function removeJob(index: number): void {
     setJobs(jobs.filter((_, i) => i !== index));
   }
 
-  function updateJob(index: number, field: keyof JobRow, value: string) {
-    setJobs(
-      jobs.map((j, i) => (i === index ? { ...j, [field]: value } : j))
-    );
+  function updateJob(index: number, field: keyof JobRow, value: string): void {
+    setJobs(jobs.map((j, i) => (i === index ? { ...j, [field]: value } : j)));
   }
 
   const total = jobs.reduce((sum, j) => {
@@ -55,40 +55,36 @@ export function EstimateBuilder({
 
   return (
     <form action={formAction}>
-      <div className="card space-y-4 mb-6">
-        {state?.error && (
-          <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-            {state.error}
-          </div>
-        )}
+      <Card className="space-y-4 mb-6">
+        {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
 
-        <div>
-          <label htmlFor="repairOrderId" className="block text-sm font-medium mb-2">
-            Заказ-наряд *
-          </label>
-          <select id="repairOrderId" name="repairOrderId" required className="input">
-            <option value="">Выберите заказ-наряд</option>
-            {repairOrders.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label="Заказ-наряд *"
+          id="repairOrderId"
+          name="repairOrderId"
+          required
+        >
+          <option value="">Выберите заказ-наряд</option>
+          {repairOrders.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.label}
+            </option>
+          ))}
+        </Select>
 
         <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-medium">Работы</h3>
-            <button type="button" onClick={addJob} className="btn btn-secondary text-xs py-1 px-3">
-              + Добавить работу
-            </button>
+            <Button type="button" onClick={addJob} variant="secondary" size="sm" leftIcon={<Plus size={14} />}>
+              Добавить работу
+            </Button>
           </div>
 
           <div className="space-y-3">
             {jobs.map((job, i) => (
               <div
                 key={i}
-                className="space-y-2 p-3 rounded-lg bg-[var(--background-secondary)]"
+                className="space-y-2 p-3 rounded-[var(--radius-lg)] bg-[var(--background-secondary)]"
               >
                 <div className="flex items-start justify-between gap-2">
                   <input
@@ -98,15 +94,17 @@ export function EstimateBuilder({
                     className="input flex-1 text-sm"
                     placeholder="Описание работы (например, замена колодок)"
                   />
-                  {jobs.length > 1 && (
-                    <button
+                  {jobs.length > 1 ? (
+                    <Button
                       type="button"
                       onClick={() => removeJob(i)}
-                      className="text-[var(--color-error)] text-xs mt-2"
+                      variant="ghost"
+                      size="sm"
+                      aria-label="Удалить работу"
                     >
-                      ×
-                    </button>
-                  )}
+                      <X size={14} />
+                    </Button>
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -118,6 +116,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "laborHours", e.target.value)}
                     className="input text-sm"
                     placeholder="Часы"
+                    aria-label="Часы работы"
                   />
                   <input
                     name="laborRate"
@@ -126,6 +125,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "laborRate", e.target.value)}
                     className="input text-sm"
                     placeholder="Ставка ₽/ч"
+                    aria-label="Ставка работы"
                   />
                   <input
                     name="partDescription"
@@ -133,6 +133,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "partDescription", e.target.value)}
                     className="input text-sm col-span-2"
                     placeholder="Запчасть (опционально)"
+                    aria-label="Описание запчасти"
                   />
                   <input
                     name="partQty"
@@ -141,6 +142,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "partQty", e.target.value)}
                     className="input text-sm"
                     placeholder="Кол-во"
+                    aria-label="Количество"
                   />
                   <input
                     name="partUnitCost"
@@ -149,6 +151,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "partUnitCost", e.target.value)}
                     className="input text-sm"
                     placeholder="Себестоимость ₽"
+                    aria-label="Себестоимость"
                   />
                   <input
                     name="partUnitPrice"
@@ -157,6 +160,7 @@ export function EstimateBuilder({
                     onChange={(e) => updateJob(i, "partUnitPrice", e.target.value)}
                     className="input text-sm col-span-2"
                     placeholder="Цена для клиента ₽"
+                    aria-label="Цена для клиента"
                   />
                 </div>
               </div>
@@ -170,15 +174,15 @@ export function EstimateBuilder({
             {formatPrice(total)}
           </span>
         </div>
-      </div>
+      </Card>
 
       <div className="flex gap-4">
-        <Link href="/admin/estimates" className="btn btn-secondary">
-          Отмена
+        <Link href="/admin/estimates">
+          <Button type="button" variant="secondary">Отмена</Button>
         </Link>
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <Button type="submit" isLoading={isPending}>
           {isPending ? "Сохранение..." : "Добавить и отправить клиенту"}
-        </button>
+        </Button>
       </div>
     </form>
   );

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { createRentalBooking } from "@/app/actions/rentals";
 import { formatPrice } from "@/lib/utils";
 
@@ -45,9 +46,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
     return (
       <div className="text-center py-8">
         <div className="w-12 h-12 rounded-full bg-[var(--color-success-bg)] mx-auto mb-4 flex items-center justify-center">
-          <svg className="w-6 h-6 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+          <Check className="w-6 h-6 text-[var(--color-success)]" aria-hidden />
         </div>
         <h3 className="font-bold text-lg mb-2">Заявка отправлена!</h3>
         <p className="text-sm text-[var(--foreground-muted)] mb-4">

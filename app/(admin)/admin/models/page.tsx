@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generationLabel } from "@/lib/vehicle-catalog";
+import { Button, PageHeader } from "@/components/ui";
 
 interface ModelRow {
   id: string;
@@ -30,12 +32,15 @@ export default async function AdminModelsPage(): Promise<React.ReactElement> {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-display text-2xl font-bold">Модели и поколения</h1>
-        <Link href="/admin/models/new" className="btn btn-primary text-sm">
-          + Новая модель
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Сайт"
+        title="Модели и поколения"
+        actions={
+          <Link href="/admin/models/new">
+            <Button size="sm" leftIcon={<Plus size={14} />}>Новая модель</Button>
+          </Link>
+        }
+      />
 
       <p className="text-sm text-[var(--foreground-muted)] mb-6">
         Каталог автомобилей, доступных в выпадающих списках бронирования и каталога запчастей. Модель = марка и название (например, Mercedes-Benz G-Class). Поколение = шасси-код и годы выпуска (например, W463A, 2018–н.в.).
