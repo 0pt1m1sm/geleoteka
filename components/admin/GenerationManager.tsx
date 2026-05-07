@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createGeneration,
   updateGeneration,
   deleteGeneration,
 } from "@/app/actions/vehicle-catalog";
+import { useFormAction } from "@/lib/use-form-action";
 import { TrimManager } from "./TrimManager";
 import type { FuelType } from "@/lib/vehicle-catalog-types";
 
@@ -47,8 +48,7 @@ const EMPTY_DRAFT: DraftRow = { code: "", yearFrom: "", yearTo: "" };
 
 export function GenerationManager({ modelId, generations }: Props): React.ReactElement {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, setError, runAction } = useFormAction();
   const [draft, setDraft] = useState<DraftRow>(EMPTY_DRAFT);
 
   function handleAdd(): void {
@@ -70,14 +70,10 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
       return;
     }
 
-    startTransition(async () => {
-      try {
-        await createGeneration({ modelId, code, yearFrom, yearTo });
-        setDraft(EMPTY_DRAFT);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка создания");
-      }
+    runAction(async () => {
+      await createGeneration({ modelId, code, yearFrom, yearTo });
+      setDraft(EMPTY_DRAFT);
+      router.refresh();
     });
   }
 
@@ -86,36 +82,28 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
     field: "code" | "yearFrom" | "yearTo" | "isActive",
     value: string | boolean,
   ): void {
-    startTransition(async () => {
-      try {
-        if (field === "isActive") {
-          await updateGeneration(id, { isActive: value as boolean });
-        } else if (field === "code") {
-          await updateGeneration(id, { code: value as string });
-        } else if (field === "yearFrom") {
-          const n = parseInt(value as string);
-          if (Number.isFinite(n)) await updateGeneration(id, { yearFrom: n });
-        } else if (field === "yearTo") {
-          const v = value as string;
-          const n = v.trim() === "" ? null : parseInt(v);
-          await updateGeneration(id, { yearTo: n });
-        }
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка обновления");
+    runAction(async () => {
+      if (field === "isActive") {
+        await updateGeneration(id, { isActive: value as boolean });
+      } else if (field === "code") {
+        await updateGeneration(id, { code: value as string });
+      } else if (field === "yearFrom") {
+        const n = parseInt(value as string);
+        if (Number.isFinite(n)) await updateGeneration(id, { yearFrom: n });
+      } else if (field === "yearTo") {
+        const v = value as string;
+        const n = v.trim() === "" ? null : parseInt(v);
+        await updateGeneration(id, { yearTo: n });
       }
+      router.refresh();
     });
   }
 
   function handleDelete(g: Generation): void {
     if (!confirm(`Удалить поколение "${g.code} (${g.yearFrom}–${g.yearTo ?? "н.в."})"?`)) return;
-    startTransition(async () => {
-      try {
-        await deleteGeneration(g.id);
-        router.refresh();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка удаления");
-      }
+    runAction(async () => {
+      await deleteGeneration(g.id);
+      router.refresh();
     });
   }
 

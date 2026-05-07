@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   createModel,
   updateModel,
   deleteModel,
 } from "@/app/actions/vehicle-catalog";
+import { useFormAction } from "@/lib/use-form-action";
 
 interface ModelInitial {
   id: string;
@@ -27,8 +28,7 @@ interface Props {
 
 export function ModelEditForm({ mode, initial, manufacturers }: Props): React.ReactElement {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
+  const { pending, error, setError, runAction } = useFormAction();
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -50,33 +50,29 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
       .map((f) => f.trim())
       .filter(Boolean);
 
-    startTransition(async () => {
-      try {
-        if (mode === "create") {
-          const res = await createModel({
-            slug,
-            name,
-            description,
-            engines,
-            features,
-            manufacturerId,
-            isActive,
-          });
-          router.push(`/admin/models/${res.id}`);
-        } else if (initial) {
-          await updateModel(initial.id, {
-            slug,
-            name,
-            description,
-            engines,
-            features,
-            manufacturerId,
-            isActive,
-          });
-          router.refresh();
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка сохранения");
+    runAction(async () => {
+      if (mode === "create") {
+        const res = await createModel({
+          slug,
+          name,
+          description,
+          engines,
+          features,
+          manufacturerId,
+          isActive,
+        });
+        router.push(`/admin/models/${res.id}`);
+      } else if (initial) {
+        await updateModel(initial.id, {
+          slug,
+          name,
+          description,
+          engines,
+          features,
+          manufacturerId,
+          isActive,
+        });
+        router.refresh();
       }
     });
   }
@@ -84,13 +80,9 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
   function handleDelete(): void {
     if (!initial) return;
     if (!confirm(`Удалить модель "${initial.name}"? Это удалит все её поколения. Запчасти останутся.`)) return;
-    startTransition(async () => {
-      try {
-        await deleteModel(initial.id);
-        router.push("/admin/models");
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "Ошибка удаления");
-      }
+    runAction(async () => {
+      await deleteModel(initial.id);
+      router.push("/admin/models");
     });
   }
 
