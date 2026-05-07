@@ -83,7 +83,7 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
                 key={service.id}
                 type="button"
                 onClick={() => toggleService(service)}
-                className={`card text-left transition-all ${
+                className={`card text-left transition-all active:scale-[0.98] ${
                   selected
                     ? "border-accent bg-accent/5"
                     : "hover:border-[var(--border-hover)]"

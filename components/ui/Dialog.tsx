@@ -43,10 +43,7 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         >
           {children}
           {hideCloseButton ? null : (
-            <DialogPrimitive.Close
-              className="absolute top-3 right-3 p-2 rounded-[var(--radius-md)] text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)] transition-colors focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)]"
-              aria-label="Закрыть"
-            >
+            <DialogPrimitive.Close className="btn-icon absolute top-3 right-3" aria-label="Закрыть">
               <X size={18} aria-hidden />
             </DialogPrimitive.Close>
           )}

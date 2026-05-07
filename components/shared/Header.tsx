@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ShoppingCart } from "lucide-react";
+import { Menu, ShoppingCart } from "lucide-react";
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "./Drawer";
 import { ThemeToggle } from "./ThemeToggle";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
@@ -72,11 +74,7 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
               {item.label}
             </Link>
           ))}
-          <Link
-            href="/parts/cart"
-            className="p-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
-            aria-label="Корзина"
-          >
+          <Link href="/parts/cart" className="btn-icon" aria-label="Корзина">
             <ShoppingCart size={20} aria-hidden />
           </Link>
           <ThemeToggle />
@@ -87,12 +85,8 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
             Записаться
           </Link>
         </nav>
-        <div className="md:hidden flex items-center gap-2">
-          <Link
-            href="/parts/cart"
-            className="p-2 text-[var(--foreground-muted)]"
-            aria-label="Корзина"
-          >
+        <div className="md:hidden flex items-center gap-1">
+          <Link href="/parts/cart" className="btn-icon" aria-label="Корзина">
             <ShoppingCart size={20} aria-hidden />
           </Link>
           <PublicMobileMenu cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
@@ -109,9 +103,16 @@ function PublicMobileMenu({
   cabinetHref: string;
   cabinetLabel: string;
 }): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  const close = (): void => setOpen(false);
+
   return (
-    <MobileNav title="Geleoteka" ariaTitle="Главное меню">
-      {(close) => (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger className="btn-icon" aria-label="Открыть меню">
+        <Menu size={22} aria-hidden />
+      </DrawerTrigger>
+      <DrawerContent side="right">
+        <DrawerTitle className="sr-only">Главное меню</DrawerTitle>
         <div className="flex flex-col h-full">
           <div className="flex-1 overflow-y-auto p-4 space-y-1">
             {PUBLIC_MOBILE_NAV.map((item) => (
@@ -119,7 +120,7 @@ function PublicMobileMenu({
                 key={item.href}
                 href={item.href}
                 onClick={close}
-                className="block px-3 py-3 rounded-[var(--radius-lg)] text-sm hover:bg-[var(--card-hover)] transition-colors"
+                className="block px-3 py-3 rounded-[var(--radius-lg)] text-sm hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors"
               >
                 {item.label}
               </Link>
@@ -137,8 +138,8 @@ function PublicMobileMenu({
             </div>
           </div>
         </div>
-      )}
-    </MobileNav>
+      </DrawerContent>
+    </Drawer>
   );
 }
 

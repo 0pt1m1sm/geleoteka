@@ -27,7 +27,7 @@ export function FAQAccordion({ items }: { items: FAQItem[] }): React.ReactElemen
             <button
               type="button"
               onClick={() => setOpenIndex(isOpen ? null : i)}
-              className="w-full flex items-center justify-between text-left"
+              className="w-full flex items-center justify-between text-left active:opacity-70 transition-opacity"
               aria-expanded={isOpen}
               aria-controls={panelId}
             >

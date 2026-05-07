@@ -86,7 +86,7 @@ export function TabsTrigger({ value, children, disabled, className = "" }: TabsT
       tabIndex={isActive ? 0 : -1}
       disabled={disabled}
       onClick={() => onValueChange(value)}
-      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+      className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px active:opacity-70 ${
         isActive
           ? "border-[var(--color-accent)] text-[var(--color-accent)]"
           : "border-transparent text-[var(--foreground-muted)] hover:text-[var(--foreground)]"

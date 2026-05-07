@@ -86,7 +86,7 @@ export function FloatingButtons(): React.ReactElement {
                 {c.name}
               </span>
               <span
-                className="flex size-12 items-center justify-center rounded-full text-white shadow-lg"
+                className="flex size-12 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-110 active:scale-95"
                 style={{ backgroundColor: c.color }}
               >
                 {c.icon}
@@ -101,7 +101,7 @@ export function FloatingButtons(): React.ReactElement {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Закрыть меню связи" : "Связаться с нами"}
         aria-expanded={open}
-        className="flex size-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-lg transition-transform hover:scale-105 focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)]"
+        className="flex size-14 items-center justify-center rounded-full bg-[var(--color-accent)] text-[var(--color-accent-foreground)] shadow-lg transition-transform hover:scale-105 active:scale-95 focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)]"
       >
         {open ? <X size={24} aria-hidden /> : <MessageCircle size={24} aria-hidden />}
       </button>

@@ -72,7 +72,7 @@ export function CalendarSlotPicker() {
               key={day.toISOString()}
               type="button"
               onClick={() => setSelectedDate(day)}
-              className={`flex flex-col items-center px-3 py-2 rounded-lg shrink-0 min-w-[60px] transition-colors ${
+              className={`flex flex-col items-center px-3 py-2 rounded-lg shrink-0 min-w-[60px] transition-all active:scale-95 ${
                 isSelected
                   ? "bg-[var(--color-accent)] text-white"
                   : "bg-[var(--card)] border border-[var(--border)] hover:border-[var(--border-hover)]"
@@ -101,7 +101,7 @@ export function CalendarSlotPicker() {
                 type="button"
                 disabled={!slot.available}
                 onClick={() => selectSlot(slot.time)}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 disabled:active:scale-100 ${
                   selectedTime === slot.time
                     ? "bg-[var(--color-accent)] text-white"
                     : slot.available

@@ -88,13 +88,13 @@ export function Sidebar({
             <Link
               href="/"
               onClick={onNavigate}
-              className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] transition-colors"
+              className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors"
             >
               ← На сайт
             </Link>
           ) : null}
           {showLogout ? (
-            <LogoutButton className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] transition-colors w-full text-left" />
+            <LogoutButton className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors w-full text-left" />
           ) : null}
         </div>
       )}
@@ -117,7 +117,7 @@ function SidebarLink({ href, label, isActive, indent = false, onNavigate }: Side
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       data-active={isActive ? "true" : undefined}
-      className={`block ${indent ? "pl-8 pr-3" : "px-3"} py-2 rounded-[var(--radius-lg)] text-sm transition-colors ${
+      className={`block ${indent ? "pl-8 pr-3" : "px-3"} py-2 rounded-[var(--radius-lg)] text-sm transition-colors active:bg-[var(--color-secondary)] ${
         isActive
           ? "bg-[var(--card-hover)] text-[var(--color-accent)] font-medium"
           : "hover:bg-[var(--card-hover)]"
@@ -145,7 +145,7 @@ function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, onNavigat
         onClick={onToggle}
         aria-expanded={isOpen}
         aria-controls={group.id}
-        className="flex items-center justify-between w-full px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] transition-colors"
+        className="flex items-center justify-between w-full px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors"
       >
         <span className="font-medium uppercase tracking-wider text-[11px]">
           {group.label}

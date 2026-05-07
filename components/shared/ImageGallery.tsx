@@ -48,7 +48,7 @@ export function ImageGallery({ images, alt, aspectRatio = "4/3" }: Props): React
               key={i}
               type="button"
               onClick={() => setSelected(i)}
-              className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-colors ${
+              className={`relative w-16 h-16 rounded-lg overflow-hidden shrink-0 border-2 transition-all active:scale-95 ${
                 i === selected
                   ? "border-[var(--color-accent)]"
                   : "border-transparent hover:border-[var(--border-hover)]"

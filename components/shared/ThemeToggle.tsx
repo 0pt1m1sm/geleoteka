@@ -45,7 +45,7 @@ export function ThemeToggle(): React.ReactElement {
     <button
       type="button"
       onClick={toggle}
-      className="p-2 transition-colors text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+      className="btn-icon"
       aria-label={theme === "dark" ? "Переключить на светлую тему" : "Переключить на тёмную тему"}
       title={theme === "dark" ? "Светлая тема" : "Тёмная тема"}
     >

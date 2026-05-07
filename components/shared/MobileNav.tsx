@@ -24,10 +24,7 @@ export function MobileNav({ title, children, ariaTitle = "Меню" }: MobileNav
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <header className="md:hidden sticky top-0 z-40 flex items-center justify-between px-4 h-14 bg-[var(--card)] border-b border-[var(--border)]">
-        <DrawerTrigger
-          className="p-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors focus:outline-2 focus:outline-offset-2 focus:outline-[var(--color-accent)] rounded-[var(--radius-md)]"
-          aria-label="Открыть меню"
-        >
+        <DrawerTrigger className="btn-icon" aria-label="Открыть меню">
           <Menu size={22} aria-hidden />
         </DrawerTrigger>
         <span className="text-sm font-semibold text-[var(--color-accent)]">{title}</span>

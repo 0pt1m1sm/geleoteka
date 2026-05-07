@@ -23,7 +23,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     border-radius: var(--radius-lg);
-    transition: all var(--transition-base);
+    transition: background var(--transition-base), border-color var(--transition-base), color var(--transition-base), transform var(--transition-fast), filter var(--transition-fast);
     cursor: pointer;
     border: none;
     outline: none;
@@ -33,12 +33,21 @@
     outline: 2px solid var(--color-accent);
     outline-offset: 2px;
   }
+  .btn:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+  .btn:disabled,
+  .btn[data-loading="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 
   .btn-primary {
     background: var(--color-accent);
     color: var(--color-accent-foreground);
   }
   .btn-primary:hover { background: var(--color-accent-hover); }
+  .btn-primary:active:not(:disabled) { filter: brightness(0.9); }
 
   .btn-secondary {
     background: var(--color-secondary);
@@ -49,12 +58,16 @@
     background: var(--color-secondary-hover);
     border-color: var(--border-hover);
   }
+  .btn-secondary:active:not(:disabled) {
+    background: var(--card-hover);
+  }
 
   .btn-ghost {
     background: transparent;
     color: var(--foreground);
   }
   .btn-ghost:hover { background: var(--card); }
+  .btn-ghost:active:not(:disabled) { background: var(--card-hover); }
 
   .btn-outline {
     background: transparent;
@@ -64,6 +77,39 @@
   .btn-outline:hover {
     border-color: var(--border-hover);
     background: var(--card);
+  }
+  .btn-outline:active:not(:disabled) { background: var(--card-hover); }
+
+  /* Icon-only button — header chrome, drawer/dialog close, FAB triggers, etc.
+     Provides consistent hover/active/focus feedback on small touch targets. */
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    color: var(--foreground-muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    outline: none;
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  }
+  .btn-icon:hover {
+    background: var(--card-hover);
+    color: var(--foreground);
+  }
+  .btn-icon:active:not(:disabled) {
+    background: var(--color-secondary);
+    transform: scale(0.94);
+  }
+  .btn-icon:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  .btn-icon:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   /* Card */
