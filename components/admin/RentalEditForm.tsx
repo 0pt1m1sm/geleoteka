@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { updateRentalCar, deleteRentalCar } from "@/app/actions/rentals";
+import { AdminFormShell } from "./AdminFormShell";
 import { PhotoUploader } from "./PhotoUploader";
 
 interface CarData {
@@ -37,11 +38,7 @@ export function RentalEditForm({ car }: { car: CarData }) {
 
   return (
     <form action={formAction} className="card space-y-4">
-      {state?.error && (
-        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-          {state.error}
-        </div>
-      )}
+      <AdminFormShell error={state?.error}>
 
       <div>
         <label htmlFor="model" className="block text-sm font-medium mb-2">Модель *</label>
@@ -128,6 +125,7 @@ export function RentalEditForm({ car }: { car: CarData }) {
           {isPending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>
+      </AdminFormShell>
     </form>
   );
 }

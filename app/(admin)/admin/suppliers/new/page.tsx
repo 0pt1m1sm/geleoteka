@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { createSupplier } from "@/app/actions/suppliers";
+import { AdminFormShell } from "@/components/admin/AdminFormShell";
 
 export default function NewSupplierPage() {
   const [state, formAction, isPending] = useActionState(createSupplier, null);
@@ -12,11 +13,7 @@ export default function NewSupplierPage() {
       <h1 className="text-display text-2xl font-bold mb-6">Добавить поставщика</h1>
 
       <form action={formAction} className="card space-y-4">
-        {state?.error && (
-          <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-            {state.error}
-          </div>
-        )}
+        <AdminFormShell error={state?.error}>
 
         <div>
           <label htmlFor="name" className="block text-sm font-medium mb-2">Название *</label>
@@ -60,6 +57,7 @@ export default function NewSupplierPage() {
             {isPending ? "Сохранение..." : "Добавить"}
           </button>
         </div>
+        </AdminFormShell>
       </form>
     </div>
   );

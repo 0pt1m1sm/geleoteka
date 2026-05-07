@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { updateSupplier, deleteSupplier } from "@/app/actions/suppliers";
+import { AdminFormShell } from "./AdminFormShell";
 
 interface SupplierData {
   id: string;
@@ -28,11 +29,7 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
 
   return (
     <form action={formAction} className="card space-y-4">
-      {state?.error && (
-        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-          {state.error}
-        </div>
-      )}
+      <AdminFormShell error={state?.error}>
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-2">Название *</label>
@@ -79,6 +76,7 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
           {isPending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>
+      </AdminFormShell>
     </form>
   );
 }

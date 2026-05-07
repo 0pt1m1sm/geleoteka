@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { createPart } from "@/app/actions/parts";
+import { AdminFormShell } from "./AdminFormShell";
 import { PartTrimPicker } from "./PartTrimPicker";
 import { PhotoUploader } from "./PhotoUploader";
 import type { VehicleModel } from "@/lib/vehicle-catalog-types";
@@ -17,11 +18,7 @@ export function PartForm({ categories, models }: Props) {
 
   return (
     <form action={formAction} className="card space-y-4">
-      {state?.error && (
-        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
-          {state.error}
-        </div>
-      )}
+      <AdminFormShell error={state?.error}>
 
       <div className="grid grid-cols-2 gap-4">
         <div>
@@ -85,6 +82,7 @@ export function PartForm({ categories, models }: Props) {
           {isPending ? "Сохранение..." : "Добавить"}
         </button>
       </div>
+      </AdminFormShell>
     </form>
   );
 }
