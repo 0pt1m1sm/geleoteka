@@ -12,7 +12,7 @@
  * CRM (customer master), Сайт (public content).
  */
 
-export interface AdminNavLink {
+interface AdminNavLink {
   kind: "link";
   href: string;
   label: string;

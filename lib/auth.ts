@@ -6,12 +6,12 @@ import { db } from "./db";
 const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 const JWT_EXPIRES_IN: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"];
 
-export interface JWTPayload {
+interface JWTPayload {
   userId: string;
   permissionRole: string;
 }
 
-export interface SessionUser {
+interface SessionUser {
   id: string;
   email: string;
   phone: string;
