@@ -58,18 +58,18 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--color-accent)]/20 bg-[var(--background)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--background)]/80">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 shrink-0">
           <Image src="/images/logo.svg" alt="" width={32} height={32} priority />
-          <span className="text-display text-lg font-black tracking-[0.1em] uppercase text-[var(--color-accent)] hidden sm:inline">
+          <span className="text-display text-lg font-black tracking-[0.1em] uppercase text-[var(--color-accent)] hidden lg:inline">
             Geleoteka
           </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-6" aria-label="Главная навигация">
+        <nav className="hidden md:flex items-center gap-4 lg:gap-6" aria-label="Главная навигация">
           {PUBLIC_NAV.map((item) => (
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors"
+              className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap"
             >
               {item.label}
             </Link>
@@ -78,10 +78,10 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
             <ShoppingCart size={20} aria-hidden />
           </Link>
           <ThemeToggle />
-          <Link href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors">
+          <Link href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap">
             {cabinetLabel}
           </Link>
-          <Link href="/booking" className="btn btn-primary text-sm">
+          <Link href="/booking" className="btn btn-primary text-sm whitespace-nowrap">
             Записаться
           </Link>
         </nav>

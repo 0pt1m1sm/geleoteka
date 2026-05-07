@@ -28,7 +28,7 @@ export default async function PublicLayout({
   ]);
   const isStaff = session?.permissionRole === "ADMIN" || session?.permissionRole === "MANAGER";
   const cabinetHref = isStaff ? "/admin" : "/cabinet";
-  const cabinetLabel = isStaff ? "Админ-панель" : "Кабинет";
+  const cabinetLabel = isStaff ? "Админ" : "Кабинет";
 
   return (
     <>
