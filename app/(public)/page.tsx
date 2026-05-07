@@ -101,7 +101,7 @@ export default async function HomePage() {
               <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
                 Сервис
               </div>
-              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display md:flex md:min-h-24 md:items-end md:justify-center">
+              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
                 Сервис в&nbsp;Москве
               </h2>
               <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg sm:min-h-[3.5rem] flex items-center">
@@ -148,8 +148,8 @@ export default async function HomePage() {
               <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
                 Запчасти
               </div>
-              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display md:flex md:min-h-24 md:items-end md:justify-center">
-                Запчасти Mercedes-Benz
+              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+                Магазин запчастей
               </h2>
               <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg sm:min-h-[3.5rem] flex items-center">
                 Оригинал. Подбор по&nbsp;вашему автомобилю.
