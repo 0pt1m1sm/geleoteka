@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-
-function slugify(text: string): string {
-  return text.toLowerCase().replace(/[^\w\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").trim();
-}
+import { slugify } from "@/lib/slug";
 
 /**
  * Resolves a CSV "compatible models" cell to a set of trim ids. Each token can
