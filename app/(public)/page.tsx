@@ -104,18 +104,24 @@ export default async function HomePage() {
               <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
                 Сервис в&nbsp;Москве
               </h2>
-              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg sm:min-h-[3.5rem] flex items-center">
                 ТО, диагностика, ремонт. Прозрачные цены, гарантия&nbsp;на&nbsp;работы&nbsp;12&nbsp;месяцев.<sup className="ml-0.5 text-[10px] text-accent/80">*</sup>
               </p>
               <Link
                 href="/booking"
-                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover active:brightness-90 focus:outline-2 focus:outline-offset-2 focus:outline-accent"
               >
                 Записаться на&nbsp;сервис
               </Link>
+            </div>
+
+            {/* Secondary content (price link + disclaimer) — absolute-bottom so it
+                doesn't shift the centered cluster above. Both halves share an
+                identical centered cluster → CTAs align across the split. */}
+            <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center px-6 text-center sm:bottom-10">
               <Link
                 href="/services"
-                className="mt-4 text-sm text-accent/80 transition-colors hover:text-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
+                className="text-sm text-accent/80 transition-colors hover:text-accent-hover active:opacity-70 focus:outline-2 focus:outline-offset-2 focus:outline-accent rounded"
               >
                 Прайс на&nbsp;работы →
               </Link>
@@ -145,12 +151,12 @@ export default async function HomePage() {
               <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
                 Запчасти Mercedes-Benz
               </h2>
-              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg">
+              <p className="mb-8 max-w-md text-base text-white/70 sm:text-lg sm:min-h-[3.5rem] flex items-center">
                 Оригинал. Подбор по&nbsp;вашему автомобилю.
               </p>
               <Link
                 href="/parts"
-                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover focus:outline-2 focus:outline-offset-2 focus:outline-accent"
+                className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-accent-foreground transition-colors hover:bg-accent-hover active:brightness-90 focus:outline-2 focus:outline-offset-2 focus:outline-accent"
               >
                 В&nbsp;каталог запчастей
               </Link>
