@@ -1,0 +1,40 @@
+name: Verify
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Generate Prisma client
+        # Required so tsc can resolve `@/app/generated/prisma/client` imports.
+        # No DATABASE_URL needed for `prisma generate`; it reads the schema only.
+        run: npx prisma generate
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      # Note: `verify-vehicle-trims` is NOT run here — it requires a live
+      # DATABASE_URL. Run manually before deploy. A future scheduled workflow
+      # against a staging DB could close this gap.
+      # `npm run build` is also skipped — Next.js cold build is ~2 min and
+      # tsc + lint catch most issues for a per-PR gate.
