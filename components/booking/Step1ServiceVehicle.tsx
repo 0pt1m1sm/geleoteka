@@ -153,7 +153,9 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
             />
             {showChassisHelper && (
               <p className="text-xs text-foreground-muted mt-1">
-                Кузов: {generations.map(generationLabel).join(" · ")}
+                Кузов: {matchedGeneration
+                  ? generationLabel(matchedGeneration)
+                  : "год вне известных поколений"}
               </p>
             )}
           </div>

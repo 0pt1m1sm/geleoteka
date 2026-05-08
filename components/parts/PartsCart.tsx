@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { formatPrice } from "@/lib/utils";
+import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
+  PHONE_PATTERN,
+  PHONE_TITLE,
+  formatPrice,
+} from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { createLocalStorageStore } from "@/lib/local-storage-store";
 import { SuccessCard } from "@/components/shared/SuccessCard";
@@ -171,15 +177,49 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
         </div>
         <div>
           <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-          <input id="name" name="name" required className="input" placeholder="Иван Иванов" defaultValue={defaultContact?.name ?? ""} />
+          <input
+            id="name"
+            name="name"
+            required
+            minLength={2}
+            maxLength={120}
+            autoComplete="name"
+            className="input"
+            placeholder="Иван Иванов"
+            defaultValue={defaultContact?.name ?? ""}
+          />
         </div>
         <div>
           <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-          <input id="phone" name="phone" type="tel" required className="input" placeholder="+7 (999) 123-45-67" defaultValue={defaultContact?.phone ?? ""} />
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            required
+            pattern={PHONE_PATTERN}
+            title={PHONE_TITLE}
+            className="input"
+            placeholder="+7 (999) 123-45-67"
+            defaultValue={defaultContact?.phone ?? ""}
+          />
         </div>
         <div>
           <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-          <input id="email" name="email" type="email" required className="input" placeholder="your@email.com" defaultValue={defaultContact?.email ?? ""} />
+          <input
+            id="email"
+            name="email"
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            required
+            pattern={EMAIL_PATTERN}
+            title={EMAIL_TITLE}
+            className="input"
+            placeholder="your@email.com"
+            defaultValue={defaultContact?.email ?? ""}
+          />
         </div>
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>

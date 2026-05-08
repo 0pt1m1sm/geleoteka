@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { createCustomer } from "@/app/actions/customers";
 import { AdminFormShell } from "@/components/admin/AdminFormShell";
+import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 function CreateForm(): React.ReactElement {
   const [state, formAction, isPending] = useActionState(createCustomer, null);
@@ -15,7 +16,7 @@ function CreateForm(): React.ReactElement {
           <label htmlFor="name" className="block text-sm font-medium mb-2">
             Имя *
           </label>
-          <input id="name" name="name" required maxLength={120} className="input" />
+          <input id="name" name="name" required minLength={2} maxLength={120} className="input" />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -23,13 +24,33 @@ function CreateForm(): React.ReactElement {
             <label htmlFor="phone" className="block text-sm font-medium mb-2">
               Телефон *
             </label>
-            <input id="phone" name="phone" type="tel" required className="input" />
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              required
+              pattern={PHONE_PATTERN}
+              title={PHONE_TITLE}
+              className="input"
+              placeholder="+7 (999) 123-45-67"
+            />
           </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-2">
               Email *
             </label>
-            <input id="email" name="email" type="email" required className="input" />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              required
+              pattern={EMAIL_PATTERN}
+              title={EMAIL_TITLE}
+              className="input"
+              placeholder="name@example.com"
+            />
           </div>
         </div>
 

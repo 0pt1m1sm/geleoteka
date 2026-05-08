@@ -6,6 +6,12 @@ import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
+import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
+  PHONE_PATTERN,
+  PHONE_TITLE,
+} from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -97,7 +103,7 @@ export function Step3ContactConfirm({
       <div className="space-y-6">
         <SuccessCard
           heading="Запись подтверждена!"
-          message="Мы отправим SMS с подтверждением. Ждём вас!"
+          message="Мы свяжемся с вами для подтверждения. Ждём вас!"
         >
           <Link href="/" className="btn btn-secondary">На главную</Link>
           <Link href="/cabinet" className="btn btn-primary">Личный кабинет</Link>
@@ -119,8 +125,13 @@ export function Step3ContactConfirm({
     ? format(parseISO(data.dateTime), "d MMMM yyyy, HH:mm", { locale: ru })
     : "—";
 
+  function onFormSubmit(e: React.FormEvent<HTMLFormElement>): void {
+    e.preventDefault();
+    void handleSubmit();
+  }
+
   return (
-    <div className="space-y-6">
+    <form onSubmit={onFormSubmit} className="space-y-6" noValidate={false}>
       {/* Contact form */}
       <div className="card space-y-4">
         <div className="flex items-baseline justify-between gap-3">
@@ -139,6 +150,9 @@ export function Step3ContactConfirm({
             onChange={(e) => update({ name: e.target.value })}
             className="input"
             placeholder="Иван Иванов"
+            required
+            minLength={2}
+            maxLength={120}
           />
         </div>
 
@@ -151,6 +165,11 @@ export function Step3ContactConfirm({
             onChange={(e) => update({ phone: e.target.value })}
             className="input"
             placeholder="+7 (999) 123-45-67"
+            inputMode="tel"
+            autoComplete="tel"
+            required
+            pattern={PHONE_PATTERN}
+            title={PHONE_TITLE}
           />
         </div>
 
@@ -163,6 +182,11 @@ export function Step3ContactConfirm({
             onChange={(e) => update({ email: e.target.value })}
             className="input"
             placeholder="your@email.com"
+            inputMode="email"
+            autoComplete="email"
+            required
+            pattern={EMAIL_PATTERN}
+            title={EMAIL_TITLE}
           />
         </div>
 
@@ -248,14 +272,13 @@ export function Step3ContactConfirm({
       <div className="flex justify-between">
         <Link href="/booking/step-2" className="btn btn-secondary">← Назад</Link>
         <button
-          type="button"
-          onClick={handleSubmit}
+          type="submit"
           disabled={!canSubmit || submitting}
           className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? "Отправка..." : "Записаться"}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
