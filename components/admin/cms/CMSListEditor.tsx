@@ -21,6 +21,28 @@ function emptyRowFor(fields: readonly CMSListField[]): Record<string, string> {
   return out;
 }
 
+/**
+ * Content-based equality of two row arrays — key-order-insensitive. PostgreSQL
+ * jsonb may reorder keys on round-trip, so a JSON.stringify comparison can
+ * spuriously report dirty after a successful save when the only difference is
+ * key order.
+ */
+function rowsEqual(
+  a: Array<Record<string, string>>,
+  b: Array<Record<string, string>>,
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const ak = Object.keys(a[i]);
+    const bk = Object.keys(b[i]);
+    if (ak.length !== bk.length) return false;
+    for (const k of ak) {
+      if (a[i][k] !== b[i][k]) return false;
+    }
+  }
+  return true;
+}
+
 export function CMSListEditor({
   schemaKey,
   label,
@@ -35,12 +57,16 @@ export function CMSListEditor({
   const { pending, error, runAction } = useFormAction();
   const section = useCMSSaveSection();
 
-  const dirty = JSON.stringify(rows) !== JSON.stringify(initial);
+  // Content-based comparison — JSON.stringify is key-order-sensitive, but
+  // PostgreSQL's jsonb storage doesn't preserve key order, so a round-trip
+  // through the DB can change `{title, body}` → `{body, title}` even though
+  // the values are identical. Compare by sorted keys to avoid spurious dirty.
+  const dirty = !rowsEqual(rows, initial);
 
   useEffect(() => {
     if (!section) return;
     const saver = async (): Promise<SaveResult> => {
-      if (JSON.stringify(rows) === JSON.stringify(initial)) return { ok: true, saved: false };
+      if (rowsEqual(rows, initial)) return { ok: true, saved: false };
       const res = await updateCMSBlock(schemaKey, { items: rows });
       if (!res.ok) return { ok: false, saved: false, error: res.error };
       return { ok: true, saved: true };
