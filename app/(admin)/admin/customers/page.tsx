@@ -1,79 +1,71 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
+import { parseCustomerListFilter, serializeCustomerListFilter } from "@/lib/customer-filters";
+import { getAllCustomerTags, loadCustomersForList } from "@/lib/customer-queries";
+import { CustomerListFilters } from "@/components/admin/customers/CustomerListFilters";
+import { CustomerListRow } from "@/components/admin/customers/CustomerListRow";
 
-export default async function CustomersPage() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function CustomersPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
-  const customers = await db.user.findMany({
-    where: { isCustomer: true, permissionRole: { in: ["CLIENT", "NONE"] } },
-    include: {
-      vehicles: {
-        where: { ownershipType: "CUSTOMER" },
-        select: { model: true },
-      },
-      loyaltyAccount: { select: { points: true, tier: true } },
-      _count: { select: { repairOrders: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const sp = await searchParams;
+  const filter = parseCustomerListFilter(sp);
+
+  const [customers, availableTags] = await Promise.all([
+    loadCustomersForList(filter),
+    getAllCustomerTags(),
+  ]);
+
+  const exportQs = serializeCustomerListFilter(filter).toString();
+  const exportHref = exportQs
+    ? `/api/admin/customers/export?${exportQs}`
+    : "/api/admin/customers/export";
+
+  const isFiltered =
+    filter.q !== "" || filter.tagId !== null || filter.blacklist !== "all";
 
   return (
     <div>
-      <PageHeader eyebrow="CRM" title="Клиенты" />
+      <PageHeader
+        eyebrow="CRM"
+        title="Клиенты"
+        actions={
+          <>
+            <Link href="/admin/customers/new" className="btn btn-primary">
+              Создать клиента
+            </Link>
+            <a href={exportHref} className="btn btn-secondary">
+              Скачать CSV
+            </a>
+          </>
+        }
+      />
+
+      <CustomerListFilters initial={filter} availableTags={availableTags} />
 
       <div className="space-y-3">
-        {customers.map((c: Record<string, unknown>) => {
-          const vehicles = c.vehicles as Array<{ model: string }>;
-          const loyalty = c.loyaltyAccount as { points: number; tier: string } | null;
-          const count = c._count as { repairOrders: number };
-          return (
-            <Link
-              key={c.id as string}
-              href={`/admin/customers/${c.id as string}`}
-              className="card card-hover flex items-center justify-between gap-4"
-            >
-              <div>
-                <p className="font-medium">{c.name as string}</p>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  {c.phone as string} · {c.email as string}
-                </p>
-                {vehicles.length > 0 && (
-                  <p className="text-xs text-[var(--foreground-muted)] mt-1">
-                    {vehicles.map((v) => v.model).join(", ")}
-                  </p>
-                )}
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-sm font-medium">{count.repairOrders} визитов</p>
-                {loyalty && (
-                  <span
-                    className={`badge text-[10px] badge-${
-                      loyalty.tier === "AMG_CLUB"
-                        ? "amg"
-                        : loyalty.tier.toLowerCase()
-                    }`}
-                  >
-                    {loyalty.points} б.
-                  </span>
-                )}
-              </div>
-            </Link>
-          );
-        })}
+        {customers.map((c) => (
+          <CustomerListRow key={c.id} customer={c} />
+        ))}
 
-        {customers.length === 0 && (
+        {customers.length === 0 ? (
           <div className="card text-center py-12">
-            <p className="text-[var(--foreground-muted)]">Клиентов пока нет</p>
+            <p className="text-[var(--foreground-muted)]">
+              {isFiltered ? "Клиенты не найдены" : "Клиентов пока нет"}
+            </p>
           </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

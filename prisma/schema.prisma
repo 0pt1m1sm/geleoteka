@@ -154,6 +154,11 @@ model User {
   partOrders     PartOrder[]
   rentalBookings RentalBooking[]
 
+  // CRM — manager timeline notes about this customer + tag assignments
+  customerNotes        CustomerNote[]            @relation("CustomerNoteCustomer")
+  authoredCustomerNotes CustomerNote[]           @relation("CustomerNoteAuthor")
+  tagAssignments       CustomerTagAssignment[]
+
   // Relations — as master/technician
   assignedRepairOrders RepairOrder[] @relation("RepairOrderMaster")
   assignedLaborLines   LaborLine[]   @relation("LaborLineTechnician")
@@ -175,6 +180,7 @@ model User {
   @@index([isMaster])
   @@index([isSupplier])
   @@index([permissionRole])
+  @@index([isCustomer, permissionRole])
 }
 
 model CustomerProfile {
@@ -184,6 +190,50 @@ model CustomerProfile {
   notes                 String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// CRM — manager-authored timeline notes attached to a customer User.
+// Distinct from CustomerProfile.notes (a single free-form scratchpad).
+// Body holds raw markdown source; rendered with react-markdown in the UI.
+model CustomerNote {
+  id             String   @id @default(cuid())
+  customerUserId String
+  authorUserId   String?
+  body           String
+  createdAt      DateTime @default(now())
+
+  customer User  @relation("CustomerNoteCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  author   User? @relation("CustomerNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId])
+  @@index([authorUserId])
+}
+
+// CRM segment label. Color is a slug from the fixed 8-color palette
+// (lib/customer-tags.ts → TAG_COLOR_PALETTE) — never a free-form hex.
+model CustomerTag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  colorSlug String
+  createdAt DateTime @default(now())
+
+  assignments CustomerTagAssignment[]
+
+  @@index([name])
+}
+
+// Many-to-many between User (isCustomer=true) and CustomerTag.
+// Composite primary key on (customerUserId, tagId) prevents duplicate assignments.
+model CustomerTagAssignment {
+  customerUserId String
+  tagId          String
+  createdAt      DateTime @default(now())
+
+  customer User        @relation(fields: [customerUserId], references: [id], onDelete: Cascade)
+  tag      CustomerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([customerUserId, tagId])
+  @@index([tagId])
 }
 
 model MasterProfile {

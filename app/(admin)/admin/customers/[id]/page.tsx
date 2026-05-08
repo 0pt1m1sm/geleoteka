@@ -4,9 +4,42 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
+import { getAllCustomerTags } from "@/lib/customer-queries";
+import { getTagBadgeClass } from "@/lib/customer-tags";
+import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
+import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
+import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+interface RawCustomer {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
+  loyaltyAccount: { points: number } | null;
+  customerProfile: { blacklisted: boolean; notes: string | null } | null;
+  repairOrders: Array<{
+    id: string;
+    dateTime: Date;
+    status: string;
+    total: number;
+    vehicle: { model: string };
+    jobLines: Array<{ description: string; status: string }>;
+  }>;
+  customerNotes: Array<{
+    id: string;
+    body: string;
+    createdAt: Date;
+    authorUserId: string | null;
+    author: { id: string; name: string } | null;
+  }>;
+  tagAssignments: Array<{
+    tag: { id: string; name: string; colorSlug: string };
+  }>;
 }
 
 export default async function CustomerDetailPage({ params }: Props) {
@@ -16,90 +49,152 @@ export default async function CustomerDetailPage({ params }: Props) {
   }
   const { id } = await params;
 
-  const customer = await db.user.findUnique({
-    where: { id },
-    include: {
-      vehicles: { where: { ownershipType: "CUSTOMER" } },
-      loyaltyAccount: true,
-      repairOrders: {
-        include: {
-          vehicle: { select: { model: true } },
-          jobLines: { select: { description: true, status: true } },
+  const [customerRaw, availableTags] = await Promise.all([
+    db.user.findUnique({
+      where: { id },
+      include: {
+        vehicles: { where: { ownershipType: "CUSTOMER" } },
+        loyaltyAccount: true,
+        customerProfile: true,
+        repairOrders: {
+          include: {
+            vehicle: { select: { model: true } },
+            jobLines: { select: { description: true, status: true } },
+          },
+          orderBy: { dateTime: "desc" },
+          take: 20,
         },
-        orderBy: { dateTime: "desc" },
-        take: 20,
+        customerNotes: {
+          orderBy: { createdAt: "desc" },
+          take: 50,
+          include: { author: { select: { id: true, name: true } } },
+        },
+        tagAssignments: {
+          include: { tag: { select: { id: true, name: true, colorSlug: true } } },
+        },
       },
-    },
-  });
+    }),
+    getAllCustomerTags(),
+  ]);
 
-  if (!customer) notFound();
+  if (!customerRaw) notFound();
 
-  const c = customer as Record<string, unknown>;
-  const loyalty = c.loyaltyAccount as { points: number } | null;
-  const vehicles = c.vehicles as Array<Record<string, unknown>>;
-  const repairOrders = c.repairOrders as Array<Record<string, unknown>>;
+  const customer = customerRaw as unknown as RawCustomer;
+  const blacklisted = customer.customerProfile?.blacklisted ?? false;
+  const profileNotes = customer.customerProfile?.notes ?? "";
+  const assignedTags = customer.tagAssignments.map((a) => a.tag);
+  const points = customer.loyaltyAccount?.points ?? 0;
+
+  const timelineNotes: TimelineNote[] = customer.customerNotes.map((n) => ({
+    id: n.id,
+    body: n.body,
+    createdAt: n.createdAt,
+    authorUserId: n.authorUserId,
+    authorName: n.author?.name ?? null,
+  }));
 
   return (
     <div>
-      <h1 className="text-display text-2xl font-bold mb-2">{c.name as string}</h1>
-      <p className="text-[var(--foreground-muted)] mb-6">
-        {c.phone as string} · {c.email as string}
-      </p>
+      <div className="mb-6">
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <h1 className="text-display text-2xl font-bold">{customer.name}</h1>
+          {blacklisted ? (
+            <span className="badge customer-blacklist-badge text-xs">ЧС</span>
+          ) : null}
+          {assignedTags.map((tag) => (
+            <span key={tag.id} className={`badge text-xs ${getTagBadgeClass(tag.colorSlug)}`}>
+              {tag.name}
+            </span>
+          ))}
+        </div>
+        <p className="text-[var(--foreground-muted)]">
+          {customer.phone} · {customer.email}
+        </p>
+      </div>
+
+      <div className="space-y-6 mb-8">
+        <CustomerEditForm
+          customerUserId={customer.id}
+          initial={{
+            name: customer.name,
+            phone: customer.phone,
+            email: customer.email,
+            notes: profileNotes,
+            blacklisted,
+          }}
+        />
+
+        <CustomerTagsManager
+          customerUserId={customer.id}
+          assigned={assignedTags}
+          availableTags={availableTags}
+        />
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Автомобили</p>
-          <p className="text-2xl font-bold">{vehicles.length}</p>
+          <p className="text-2xl font-bold">{customer.vehicles.length}</p>
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Визиты</p>
-          <p className="text-2xl font-bold">{repairOrders.length}</p>
+          <p className="text-2xl font-bold">{customer.repairOrders.length}</p>
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Баллы</p>
-          <p className="text-2xl font-bold">{loyalty?.points ?? 0}</p>
+          <p className="text-2xl font-bold">{points}</p>
         </div>
+      </div>
+
+      <div className="mb-8">
+        <CustomerNotesTimeline
+          customerUserId={customer.id}
+          sessionUserId={session.id}
+          sessionRole={session.permissionRole}
+          notes={timelineNotes}
+        />
       </div>
 
       <h2 className="text-lg font-semibold mb-3">Автомобили</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-        {vehicles.map((v) => (
-          <div key={v.id as string} className="card">
+        {customer.vehicles.map((v) => (
+          <div key={v.id} className="card">
             <p className="font-medium">
-              {v.model as string}, {v.year as number}
+              {v.model}, {v.year}
             </p>
             {v.vin ? (
               <p className="text-xs text-[var(--foreground-muted)] font-mono">
-                VIN: {v.vin as string}
+                VIN: {v.vin}
               </p>
             ) : null}
           </div>
         ))}
+        {customer.vehicles.length === 0 ? (
+          <div className="card text-sm text-[var(--foreground-muted)]">— нет —</div>
+        ) : null}
       </div>
 
       <h2 className="text-lg font-semibold mb-3">История заказ-нарядов</h2>
       <div className="space-y-3">
-        {repairOrders.map((ro) => {
-          const vehicle = ro.vehicle as { model: string };
-          return (
-            <div key={ro.id as string} className="card">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-medium">{formatDate(ro.dateTime as Date)}</p>
-                  <p className="text-sm text-[var(--foreground-muted)]">{vehicle.model}</p>
-                </div>
-                <span className={`badge text-xs status-${(ro.status as string).toLowerCase()}`}>
-                  {REPAIR_ORDER_STATUS_LABELS[ro.status as string] ?? ro.status}
-                </span>
+        {customer.repairOrders.map((ro) => (
+          <div key={ro.id} className="card">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium">{formatDate(ro.dateTime)}</p>
+                <p className="text-sm text-[var(--foreground-muted)]">{ro.vehicle.model}</p>
               </div>
-              {(ro.total as number) > 0 && (
-                <p className="text-sm mt-2">
-                  Стоимость: {formatPrice(ro.total as number)}
-                </p>
-              )}
+              <span className={`badge text-xs status-${ro.status.toLowerCase()}`}>
+                {REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status}
+              </span>
             </div>
-          );
-        })}
+            {ro.total > 0 ? (
+              <p className="text-sm mt-2">Стоимость: {formatPrice(ro.total)}</p>
+            ) : null}
+          </div>
+        ))}
+        {customer.repairOrders.length === 0 ? (
+          <div className="card text-sm text-[var(--foreground-muted)]">— нет —</div>
+        ) : null}
       </div>
     </div>
   );

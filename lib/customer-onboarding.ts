@@ -103,6 +103,7 @@ export async function findOrCreateGuestCustomer(input: {
         isTempPassword: true,
         permissionRole: "CLIENT",
         isCustomer: true,
+        customerProfile: { create: {} },
       },
     })) as { id: string };
     await db.loyaltyAccount.create({ data: { userId: created.id } });
