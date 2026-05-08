@@ -579,8 +579,8 @@ export const CMS_SCHEMA = {
   "contacts.map.url": {
     type: "text",
     group: "contacts",
-    label: "Ссылка на точку в Яндекс.Картах",
-    defaultValue: "https://yandex.com/maps/org/geleoteka/211932722600/",
+    label: "Ссылка на точку в Яндекс.Картах (или iframe SRC из «Поделиться → HTML-код»)",
+    defaultValue: "https://yandex.com/map-widget/v1/?ll=37.4357%2C55.8951&z=17&pt=37.4357%2C55.8951%2Cpm2rdm",
   },
   "contacts.howto.title": {
     type: "text",
