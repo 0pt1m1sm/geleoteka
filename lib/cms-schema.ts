@@ -580,7 +580,7 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Ссылка на точку в Яндекс.Картах (или iframe SRC из «Поделиться → HTML-код»)",
-    defaultValue: "https://yandex.com/map-widget/v1/?ll=37.4357%2C55.8951&mode=search&oid=211932722600&ol=biz&z=17",
+    defaultValue: "https://yandex.com/map-widget/v1/?ll=37.438592%2C55.894556&mode=poi&poi%5Bpoint%5D=37.438592%2C55.894556&poi%5Buri%5D=ymapsbm1%3A%2F%2Forg%3Foid%3D211932722600&z=17",
   },
   "contacts.howto.title": {
     type: "text",
