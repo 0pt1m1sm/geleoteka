@@ -17,7 +17,7 @@ interface ServiceData {
 }
 
 export default async function ServicesPage(): Promise<React.ReactElement> {
-  const [services, eyebrow, title, description, ctaText, ctaButton] = await Promise.all([
+  const [servicesRaw, eyebrow, title, description, ctaText, ctaButton] = await Promise.all([
     db.service.findMany({
       orderBy: { name: "asc" },
       select: { id: true, slug: true, name: true, description: true, priceMin: true, priceMax: true },
@@ -28,6 +28,14 @@ export default async function ServicesPage(): Promise<React.ReactElement> {
     getCMSRichtext("services.cta.text"),
     getCMSText("services.cta.button"),
   ]);
+
+  // Pin "Другое" (slug: other) to the bottom — it's the catch-all for users
+  // who don't see their need in the list and want to leave a free-form note.
+  const services = servicesRaw.slice().sort((a, b) => {
+    if (a.slug === "other") return 1;
+    if (b.slug === "other") return -1;
+    return 0;
+  });
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
