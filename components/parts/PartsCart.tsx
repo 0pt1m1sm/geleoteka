@@ -6,6 +6,7 @@ import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { createLocalStorageStore } from "@/lib/local-storage-store";
 import { SuccessCard } from "@/components/shared/SuccessCard";
+import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 
 interface CartItem {
   partId: string;
@@ -24,10 +25,26 @@ interface DefaultContact {
   email?: string;
 }
 
-export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact } = {}) {
+interface PartsCartProps {
+  defaultContact?: DefaultContact;
+  /** When set, the visitor is already logged in — post-checkout auth panel is hidden. */
+  currentUserId?: string;
+}
+
+interface OrderResultState {
+  success: boolean;
+  orderId?: string;
+  userId?: string;
+  isReturningCustomer?: boolean;
+  claimToken?: string | null;
+  error?: string;
+}
+
+export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}) {
   const items = cartStore.useStore();
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; orderId?: string; error?: string } | null>(null);
+  const [result, setResult] = useState<OrderResultState | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
 
@@ -45,29 +62,48 @@ export function PartsCart({ defaultContact }: { defaultContact?: DefaultContact 
 
   async function handleCheckout(formData: FormData) {
     setSubmitting(true);
+    const emailAtSubmit = (formData.get("email") as string) ?? "";
     const res = await createPartOrder({
       items: items.map((i) => ({ partId: i.partId, quantity: i.qty })),
       contactName: formData.get("name") as string,
       contactPhone: formData.get("phone") as string,
-      contactEmail: formData.get("email") as string,
+      contactEmail: emailAtSubmit,
       notes: (formData.get("notes") as string) || "",
     });
     setResult(res);
     setSubmitting(false);
     if (res.success) {
+      setSubmittedEmail(emailAtSubmit);
       cartStore.setStore(EMPTY_CART);
     }
   }
 
   if (result?.success) {
+    const showPanel =
+      !currentUserId &&
+      result.userId &&
+      result.claimToken &&
+      submittedEmail &&
+      result.orderId;
     return (
-      <SuccessCard
-        heading="Заказ оформлен!"
-        message="Мы свяжемся с вами для подтверждения. Оплата при получении или по реквизитам."
-      >
-        <Link href="/parts" className="btn btn-secondary">Продолжить покупки</Link>
-        <Link href="/cabinet/orders" className="btn btn-primary">Мои заказы</Link>
-      </SuccessCard>
+      <div className="space-y-6">
+        <SuccessCard
+          heading="Заказ оформлен!"
+          message="Мы свяжемся с вами для подтверждения. Оплата при получении или по реквизитам."
+        >
+          <Link href="/parts" className="btn btn-secondary">Продолжить покупки</Link>
+          <Link href="/cabinet/orders" className="btn btn-primary">Мои заказы</Link>
+        </SuccessCard>
+        {showPanel ? (
+          <PostCheckoutAuthPanel
+            kind="cart"
+            orderId={result.orderId!}
+            claimToken={result.claimToken!}
+            email={submittedEmail!.trim().toLowerCase()}
+            isReturning={result.isReturningCustomer ?? false}
+          />
+        ) : null}
+      </div>
     );
   }
 

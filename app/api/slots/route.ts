@@ -2,12 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
-
-const WORK_HOURS = [
-  "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00",
-  "17:00", "18:00", "19:00",
-];
+import { WORK_HOURS } from "@/lib/booking-slots";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const dateParam = request.nextUrl.searchParams.get("date");

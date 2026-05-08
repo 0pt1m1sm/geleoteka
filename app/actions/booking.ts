@@ -3,6 +3,10 @@
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { normalizePhone } from "@/lib/utils";
+import {
+  findOrCreateGuestCustomer,
+  generateClaimToken,
+} from "@/lib/customer-onboarding";
 
 interface BookingInput {
   serviceIds: string[];
@@ -24,6 +28,12 @@ interface BookingInput {
 interface BookingResult {
   success: boolean;
   repairOrderId?: string;
+  /** Set when success=true. Identifies the customer the order was attached to. */
+  userId?: string;
+  /** True only when matched an existing user with a real password. UI uses this to choose initial tab. */
+  isReturningCustomer?: boolean;
+  /** One-shot claim secret. Returned only for guest creates (no session). null when user was already logged in. */
+  claimToken?: string | null;
   error?: string;
 }
 
@@ -47,36 +57,17 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
 
   try {
     const session = await getSession();
-    let user = session
-      ? await db.user.findUnique({ where: { id: session.id } })
-      : null;
-
-    if (!user) {
-      user = await db.user.findUnique({ where: { email } });
+    const guestResult = await findOrCreateGuestCustomer({
+      sessionUserId: session?.id ?? null,
+      name,
+      email,
+      phone: normalizedPhone,
+    });
+    if (!guestResult.ok) {
+      return { success: false, error: guestResult.error };
     }
-
-    if (!user) {
-      user = await db.user.findUnique({ where: { phone: normalizedPhone } });
-    }
-
-    if (!user) {
-      const bcrypt = await import("bcryptjs");
-      const tempPasswordHash = await bcrypt.hash(Math.random().toString(36), 10);
-      user = await db.user.create({
-        data: {
-          email,
-          phone: normalizedPhone,
-          name,
-          passwordHash: tempPasswordHash,
-          permissionRole: "CLIENT",
-          isCustomer: true,
-        },
-      });
-
-      await db.loyaltyAccount.create({
-        data: { userId: user.id },
-      });
-    }
+    const userId = guestResult.userId;
+    const claimToken = !session ? generateClaimToken() : null;
 
     let vehicle = vin
       ? await db.vehicle.findUnique({ where: { vin } })
@@ -86,7 +77,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       vehicle = await db.vehicle.create({
         data: {
           ownershipType: "CUSTOMER",
-          ownerUserId: user.id,
+          ownerUserId: userId,
           vin: vin || null,
           model,
           year: parseInt(year),
@@ -117,11 +108,12 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
     const repairOrder = await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
       const ro = await tx.repairOrder.create({
         data: {
-          userId: user!.id,
+          userId,
           vehicleId: vehicle!.id,
           trimId: validatedTrimId,
           dateTime: appointmentDate,
           status: "ESTIMATE",
+          claimToken,
           notes: notes || null,
           jobLines: {
             create: services.map((s: { id: string; name: string; priceMin: number | null }, idx: number) => ({
@@ -140,7 +132,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
 
     await db.notification.create({
       data: {
-        userId: user.id,
+        userId,
         type: "BOOKING_CONFIRMATION",
         message: `Запись подтверждена на ${appointmentDate.toLocaleDateString("ru-RU")} в ${appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`,
         metadata: { repairOrderId: repairOrder.id },
@@ -167,7 +159,13 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       notes: notes || undefined,
     });
 
-    return { success: true, repairOrderId: repairOrder.id };
+    return {
+      success: true,
+      repairOrderId: repairOrder.id,
+      userId,
+      isReturningCustomer: guestResult.isReturning && guestResult.hasRealPassword,
+      claimToken,
+    };
   } catch (err) {
     if (err instanceof Error && err.message.includes("Unique constraint")) {
       return { success: false, error: "Этот слот уже занят. Выберите другое время." };

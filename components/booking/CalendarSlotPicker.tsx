@@ -5,17 +5,12 @@ import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { format, addDays, isSameDay } from "date-fns";
 import { ru } from "date-fns/locale";
+import { WORK_HOURS, SLOT_HOURS } from "@/lib/booking-slots";
 
 interface Slot {
   time: string;
   available: boolean;
 }
-
-const WORK_HOURS = [
-  "09:00", "10:00", "11:00", "12:00",
-  "13:00", "14:00", "15:00", "16:00",
-  "17:00", "18:00", "19:00",
-];
 
 export function CalendarSlotPicker() {
   const { data, update } = useBooking();
@@ -94,24 +89,29 @@ export function CalendarSlotPicker() {
         {loading ? (
           <p className="text-[var(--foreground-muted)] text-sm">Загрузка...</p>
         ) : (
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-            {slots.map((slot) => (
-              <button
-                key={slot.time}
-                type="button"
-                disabled={!slot.available}
-                onClick={() => selectSlot(slot.time)}
-                className={`py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 disabled:active:scale-100 ${
-                  selectedTime === slot.time
-                    ? "bg-[var(--color-accent)] text-white"
-                    : slot.available
-                      ? "bg-[var(--background-secondary)] hover:bg-[var(--card-hover)] border border-[var(--border)]"
-                      : "bg-[var(--background-secondary)] text-[var(--foreground-muted)] opacity-40 cursor-not-allowed line-through"
-                }`}
-              >
-                {slot.time}
-              </button>
-            ))}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {slots.map((slot) => {
+              const startHour = parseInt(slot.time.split(":")[0], 10);
+              const endHour = startHour + SLOT_HOURS;
+              const endLabel = `${endHour.toString().padStart(2, "0")}:00`;
+              return (
+                <button
+                  key={slot.time}
+                  type="button"
+                  disabled={!slot.available}
+                  onClick={() => selectSlot(slot.time)}
+                  className={`py-2 px-3 rounded-lg text-sm font-medium transition-all active:scale-95 disabled:active:scale-100 ${
+                    selectedTime === slot.time
+                      ? "bg-[var(--color-accent)] text-white"
+                      : slot.available
+                        ? "bg-[var(--background-secondary)] hover:bg-[var(--card-hover)] border border-[var(--border)]"
+                        : "bg-[var(--background-secondary)] text-[var(--foreground-muted)] opacity-40 cursor-not-allowed line-through"
+                  }`}
+                >
+                  {slot.time} — {endLabel}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

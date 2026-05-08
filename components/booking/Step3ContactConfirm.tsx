@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SuccessCard } from "@/components/shared/SuccessCard";
+import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
 import { format, parseISO } from "date-fns";
@@ -14,6 +15,21 @@ interface DefaultContact {
   email?: string;
 }
 
+interface Step3ContactConfirmProps {
+  defaultContact?: DefaultContact;
+  /** When set, the visitor is already logged in — post-checkout auth panel is hidden. */
+  currentUserId?: string;
+}
+
+interface BookingResultState {
+  success: boolean;
+  repairOrderId?: string;
+  userId?: string;
+  isReturningCustomer?: boolean;
+  claimToken?: string | null;
+  error?: string;
+}
+
 /**
  * Step 3 of the booking wizard — combined Contact form + Summary card + Submit.
  * Replaces the previous separate `step-4` (Contact) and `step-5` (Confirmation) pages.
@@ -21,6 +37,7 @@ interface DefaultContact {
  * - Top: Contact form (Name + Phone + Email all required, Notes + checkboxes optional)
  * - Bottom: Summary card with services + vehicle + datetime, each row links back to the relevant step
  * - Single "Записаться" primary button. On success: confirmation state with "На главную" / "Личный кабинет" links
+ *   plus a PostCheckoutAuthPanel for guests (hidden when `currentUserId` is set).
  *
  * `defaultContact` is provided by the page server-side from getSession() for
  * logged-in users. We seed BookingProvider's name/phone/email ONCE on mount,
@@ -28,14 +45,12 @@ interface DefaultContact {
  */
 export function Step3ContactConfirm({
   defaultContact,
-}: { defaultContact?: DefaultContact } = {}): React.ReactElement {
+  currentUserId,
+}: Step3ContactConfirmProps = {}): React.ReactElement {
   const { data, update, reset } = useBooking();
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{
-    success: boolean;
-    repairOrderId?: string;
-    error?: string;
-  } | null>(null);
+  const [result, setResult] = useState<BookingResultState | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   const prefilledRef = useRef(false);
   useEffect(() => {
@@ -61,21 +76,42 @@ export function Step3ContactConfirm({
 
   async function handleSubmit(): Promise<void> {
     setSubmitting(true);
+    const emailAtSubmit = data.email; // capture BEFORE action+reset
     const res = await createRepairOrder(data);
     setResult(res);
     setSubmitting(false);
-    if (res.success) reset();
+    if (res.success) {
+      setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
+      reset();
+    }
   }
 
   if (result?.success) {
+    const showPanel =
+      !currentUserId &&
+      result.userId &&
+      result.claimToken &&
+      submittedEmail &&
+      result.repairOrderId;
     return (
-      <SuccessCard
-        heading="Запись подтверждена!"
-        message="Мы отправим SMS с подтверждением. Ждём вас!"
-      >
-        <Link href="/" className="btn btn-secondary">На главную</Link>
-        <Link href="/cabinet" className="btn btn-primary">Личный кабинет</Link>
-      </SuccessCard>
+      <div className="space-y-6">
+        <SuccessCard
+          heading="Запись подтверждена!"
+          message="Мы отправим SMS с подтверждением. Ждём вас!"
+        >
+          <Link href="/" className="btn btn-secondary">На главную</Link>
+          <Link href="/cabinet" className="btn btn-primary">Личный кабинет</Link>
+        </SuccessCard>
+        {showPanel ? (
+          <PostCheckoutAuthPanel
+            kind="booking"
+            orderId={result.repairOrderId!}
+            claimToken={result.claimToken!}
+            email={submittedEmail!}
+            isReturning={result.isReturningCustomer ?? false}
+          />
+        ) : null}
+      </div>
     );
   }
 

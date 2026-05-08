@@ -3,6 +3,10 @@
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { normalizePhone } from "@/lib/utils";
+import {
+  findOrCreateGuestCustomer,
+  generateClaimToken,
+} from "@/lib/customer-onboarding";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -15,6 +19,12 @@ interface OrderInput {
 interface OrderResult {
   success: boolean;
   orderId?: string;
+  /** Set when success=true. Customer the order was attached to. */
+  userId?: string;
+  /** True only when matched an existing user with a real password. */
+  isReturningCustomer?: boolean;
+  /** One-shot claim secret. Returned only for guest creates (no session). null when user was already logged in. */
+  claimToken?: string | null;
   error?: string;
 }
 
@@ -27,6 +37,16 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
 
   try {
     const session = await getSession();
+    const guestResult = await findOrCreateGuestCustomer({
+      sessionUserId: session?.id ?? null,
+      name: contactName,
+      email: contactEmail,
+      phone: contactPhone,
+    });
+    if (!guestResult.ok) {
+      return { success: false, error: guestResult.error };
+    }
+    const claimToken = !session ? generateClaimToken() : null;
 
     // Fetch parts to get prices and check stock
     const partIds = items.map((i) => i.partId);
@@ -56,11 +76,12 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     const order = await db.$transaction(async (tx) => {
       const created = await tx.partOrder.create({
         data: {
-          userId: session?.id ?? null,
+          userId: guestResult.userId,
           total,
           contactName,
           contactPhone: normalizePhone(contactPhone),
-          contactEmail,
+          contactEmail: contactEmail.trim().toLowerCase(),
+          claimToken,
           notes: notes || null,
           items: { create: orderItems },
         },
@@ -77,7 +98,13 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       return created;
     });
 
-    return { success: true, orderId: (order as Record<string, unknown>).id as string };
+    return {
+      success: true,
+      orderId: (order as Record<string, unknown>).id as string,
+      userId: guestResult.userId,
+      isReturningCustomer: guestResult.isReturning && guestResult.hasRealPassword,
+      claimToken,
+    };
   } catch (err) {
     console.error("Part order error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };
