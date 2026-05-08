@@ -85,10 +85,10 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
       <p className="text-sm text-[var(--foreground-muted)] -mt-2">
         Нажмите на поле, чтобы выбрать дату.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-3">
         <div className="min-w-0 w-full">
           <label htmlFor="startDate" className="block text-sm font-medium mb-2">С *</label>
-          <div className="relative w-full min-w-0">
+          <div className="relative w-full min-w-0 max-w-full">
             <input
               id="startDate"
               type="date"
@@ -116,7 +116,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
         </div>
         <div className="min-w-0 w-full">
           <label htmlFor="endDate" className="block text-sm font-medium mb-2">По *</label>
-          <div className="relative w-full min-w-0">
+          <div className="relative w-full min-w-0 max-w-full">
             <input
               id="endDate"
               type="date"
