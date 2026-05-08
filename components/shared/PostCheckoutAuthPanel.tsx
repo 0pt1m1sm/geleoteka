@@ -117,20 +117,30 @@ function CreateTab({ orderId, orderKind, claimToken, email, router }: TabProps):
     e.preventDefault();
     setError(null);
     setPending(true);
-    const res = await setPasswordForGuestUser({
-      orderId,
-      orderKind,
-      claimToken,
-      email,
-      password,
-    });
-    setPending(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
+    try {
+      const res = await setPasswordForGuestUser({
+        orderId,
+        orderKind,
+        claimToken,
+        email,
+        password,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setSuccess(true);
+      router.push(res.redirectTo);
+    } catch (err) {
+      console.error("setPasswordForGuestUser failed", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Не удалось создать пароль. Попробуйте ещё раз.",
+      );
+    } finally {
+      setPending(false);
     }
-    setSuccess(true);
-    router.push(res.redirectTo);
   }
 
   if (success) {
@@ -153,9 +163,10 @@ function CreateTab({ orderId, orderKind, claimToken, email, router }: TabProps):
         onChange={(e) => setPassword(e.target.value)}
         autoComplete="new-password"
         required
+        minLength={6}
       />
       {error ? <Alert variant="error">{error}</Alert> : null}
-      <Button type="submit" variant="primary" isLoading={pending} disabled={pending || !password}>
+      <Button type="submit" variant="primary" isLoading={pending} disabled={pending || password.length < 6}>
         {pending ? "Создаём…" : "Создать аккаунт"}
       </Button>
     </form>
@@ -172,20 +183,30 @@ function LoginTab({ orderId, orderKind, claimToken, email, router }: TabProps): 
     e.preventDefault();
     setError(null);
     setPending(true);
-    const res = await loginAndAttachOrder({
-      orderId,
-      orderKind,
-      claimToken,
-      email,
-      password,
-    });
-    setPending(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
+    try {
+      const res = await loginAndAttachOrder({
+        orderId,
+        orderKind,
+        claimToken,
+        email,
+        password,
+      });
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setSuccess(true);
+      router.push(res.redirectTo);
+    } catch (err) {
+      console.error("loginAndAttachOrder failed", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Не удалось войти. Попробуйте ещё раз.",
+      );
+    } finally {
+      setPending(false);
     }
-    setSuccess(true);
-    router.push(res.redirectTo);
   }
 
   if (success) {
