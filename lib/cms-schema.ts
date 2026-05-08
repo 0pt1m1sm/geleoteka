@@ -576,6 +576,12 @@ export const CMS_SCHEMA = {
     label: "Контакты (страница) — описание",
     defaultValue: "Свяжитесь с нами или приезжайте — мы всегда рады помочь",
   },
+  "contacts.map.src": {
+    type: "text",
+    group: "contacts",
+    label: "Карта — URL встраиваемого iframe",
+    defaultValue: "",
+  },
   "contacts.howto.title": {
     type: "text",
     group: "contacts",

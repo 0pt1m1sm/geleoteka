@@ -19,15 +19,43 @@ function telHref(display: string): string {
   return `tel:${display.replace(/[^+\d]/g, "")}`;
 }
 
+/**
+ * Allow only iframe embeds from Yandex's Constructor and Google Maps. The CMS
+ * field stores the iframe `src` URL the manager copies from the embed code;
+ * we whitelist hosts to avoid an admin pasting an arbitrary URL that loads a
+ * cross-origin page in our chrome.
+ */
+function isTrustedMapEmbed(src: string): boolean {
+  if (!src) return false;
+  try {
+    const u = new URL(src);
+    if (u.protocol !== "https:") return false;
+    return (
+      u.hostname === "yandex.ru"
+      || u.hostname.endsWith(".yandex.ru")
+      || u.hostname === "yandex.com"
+      || u.hostname.endsWith(".yandex.com")
+      || u.hostname === "google.com"
+      || u.hostname === "www.google.com"
+      || u.hostname === "maps.google.com"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export default async function ContactsPage(): Promise<React.ReactElement> {
-  const [cms, eyebrow, title, description, howtoTitle, howtoItems] = await Promise.all([
+  const [cms, eyebrow, title, description, howtoTitle, howtoItems, mapSrc] = await Promise.all([
     getCMSMany(CMS_KEYS),
     getCMSText("contacts.eyebrow"),
     getCMSText("contacts.title"),
     getCMSText("contacts.description"),
     getCMSText("contacts.howto.title"),
     getCMSList("contacts.howto.items"),
+    getCMSText("contacts.map.src"),
   ]);
+
+  const trustedMap = isTrustedMapEmbed(mapSrc);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -103,30 +131,52 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
           </Link>
         </div>
 
-        <div className="card flex items-center justify-center min-h-[400px]">
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full bg-[var(--color-secondary)] mx-auto mb-4 flex items-center justify-center">
-              <svg
-                className="w-8 h-8 text-[var(--foreground-muted)]"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                strokeWidth={1.5}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z"
-                />
-              </svg>
-            </div>
-            <p className="text-[var(--foreground-muted)] text-sm">Яндекс Карта</p>
-            <p className="text-xs text-[var(--foreground-muted)] mt-1">
-              Подключается после получения API-ключа
-            </p>
+        {trustedMap ? (
+          <div className="card overflow-hidden p-0 min-h-[400px]">
+            <iframe
+              src={mapSrc}
+              title={`Карта — ${cms["contacts.address"]}`}
+              loading="lazy"
+              allowFullScreen
+              referrerPolicy="no-referrer-when-downgrade"
+              className="w-full h-[400px] border-0 block"
+            />
           </div>
-        </div>
+        ) : (
+          <div className="card flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-full bg-[var(--color-secondary)] mx-auto mb-4 flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-[var(--foreground-muted)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 0115 0z"
+                  />
+                </svg>
+              </div>
+              <p className="text-[var(--foreground-muted)] text-sm">Карта</p>
+              <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                Вставьте URL iframe из{" "}
+                <a
+                  href="https://yandex.ru/map-constructor"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:text-[var(--foreground)]"
+                >
+                  Яндекс.Конструктора Карт
+                </a>
+                {" "}в админке (поле «Карта — URL встраиваемого iframe»)
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="card">
