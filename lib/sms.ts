@@ -49,7 +49,7 @@ export async function sendBookingConfirmation(
 ): Promise<SmsSendResult> {
   return sendSms(
     phone,
-    `Geleoteka: Ваша запись подтверждена на ${dateStr} в ${timeStr}. Ждём вас! Тел: +7(495)123-45-67`
+    `Geleoteka: Ваша запись подтверждена на ${dateStr} в ${timeStr}. Ждём вас! Тел: +7(963)768-06-42`
   );
 }
 
@@ -81,6 +81,6 @@ export async function sendReminder(
   const prefix = daysBefore === 0 ? "Сегодня" : "Завтра";
   return sendSms(
     phone,
-    `Geleoteka: ${prefix} у вас запись на ${timeStr}. Ждём вас по адресу: ул. Примерная, 15. Тел: +7(495)123-45-67`
+    `Geleoteka: ${prefix} у вас запись на ${timeStr}. Ждём вас по адресу: Химки, Пролетарская ул., 18к1. Тел: +7(963)768-06-42`
   );
 }

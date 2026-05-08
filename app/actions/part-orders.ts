@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
   findOrCreateGuestCustomer,
   generateClaimToken,
@@ -35,13 +35,18 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     return { success: false, error: "Заполните все обязательные поля" };
   }
 
+  const normalizedPhone = normalizePhone(contactPhone);
+  if (!isValidRussianPhone(normalizedPhone)) {
+    return { success: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
+  }
+
   try {
     const session = await getSession();
     const guestResult = await findOrCreateGuestCustomer({
       sessionUserId: session?.id ?? null,
       name: contactName,
       email: contactEmail,
-      phone: contactPhone,
+      phone: normalizedPhone,
     });
     if (!guestResult.ok) {
       return { success: false, error: guestResult.error };

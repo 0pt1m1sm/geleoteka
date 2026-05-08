@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 
 interface VehicleFormData {
@@ -138,6 +138,10 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
 
   if (!carId || !startDate || !endDate || !contactName || !contactPhone || !contactEmail) {
     return { success: false, error: "Заполните все обязательные поля" };
+  }
+
+  if (!isValidRussianPhone(normalizePhone(contactPhone))) {
+    return { success: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
   }
 
   const start = new Date(startDate);

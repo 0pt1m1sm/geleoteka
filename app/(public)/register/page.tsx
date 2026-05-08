@@ -58,7 +58,7 @@ export default function RegisterPage(): React.ReactElement {
             required
             pattern={PHONE_PATTERN}
             title={PHONE_TITLE}
-            placeholder="+7 (999) 123-45-67"
+            placeholder="+79991234567"
             autoComplete="tel"
           />
           <Input

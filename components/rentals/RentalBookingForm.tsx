@@ -127,7 +127,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
           pattern={PHONE_PATTERN}
           title={PHONE_TITLE}
           className="input"
-          placeholder="+7 (999) 123-45-67"
+          placeholder="+79991234567"
           defaultValue={draft.phone}
           onChange={(e) => persistDraft("phone", e.target.value)}
         />

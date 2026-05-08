@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
   isValidColorSlug,
   normalizeTagName,
@@ -74,6 +74,9 @@ export async function createCustomer(
   }
 
   const phone = normalizePhone(phoneRaw);
+  if (!isValidRussianPhone(phone)) {
+    return { ok: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
+  }
 
   const existing = await db.user.findFirst({
     where: { OR: [{ email: emailRaw }, { phone }] },
@@ -158,6 +161,9 @@ export async function updateCustomer(
   }
 
   const phone = normalizePhone(phoneRaw);
+  if (!isValidRussianPhone(phone)) {
+    return { ok: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
+  }
   const profileNotesValue = profileNotes.trim() === "" ? null : profileNotes;
 
   try {

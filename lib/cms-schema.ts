@@ -526,13 +526,13 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Телефон — сервис",
-    defaultValue: "+7 (495) 123-45-67",
+    defaultValue: "+7 (963) 768-06-42",
   },
   "contacts.phone.parts": {
     type: "text",
     group: "contacts",
     label: "Телефон — запчасти",
-    defaultValue: "+7 (495) 123-45-68",
+    defaultValue: "+7 (963) 768-06-42",
   },
   "contacts.email": {
     type: "text",
@@ -544,19 +544,19 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Адрес",
-    defaultValue: "Москва, ул. Примерная, 15",
+    defaultValue: "Московская область, Химки, Пролетарская улица, 18к1",
   },
   "contacts.hours.service": {
     type: "text",
     group: "contacts",
     label: "Часы работы — сервис",
-    defaultValue: "Пн–Пт: 9:00–20:00, Сб: 10:00–18:00",
+    defaultValue: "Пн–Сб: 9:00–21:00, Вс: выходной",
   },
   "contacts.hours.parts": {
     type: "text",
     group: "contacts",
     label: "Часы работы — запчасти",
-    defaultValue: "Пн–Пт: 9:00–19:00, Сб: 10:00–17:00",
+    defaultValue: "Пн–Сб: 9:00–21:00, Вс: выходной",
   },
   "contacts.eyebrow": {
     type: "text",
@@ -580,7 +580,7 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Ссылка на точку в Яндекс.Картах (или iframe SRC из «Поделиться → HTML-код»)",
-    defaultValue: "https://yandex.com/map-widget/v1/?ll=37.4357%2C55.8951&z=17&pt=37.4357%2C55.8951%2Cpm2rdm",
+    defaultValue: "https://yandex.com/map-widget/v1/?ll=37.4357%2C55.8951&mode=search&oid=211932722600&ol=biz&z=17",
   },
   "contacts.howto.title": {
     type: "text",

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
 /** Reset password with SMS code */
 export async function confirmResetPasswordAction(_prevState: { error: string | null } | null, formData: FormData) {
@@ -14,6 +14,10 @@ export async function confirmResetPasswordAction(_prevState: { error: string | n
 
   if (!phone || !code || !newPassword) {
     return { error: "Все поля обязательны" };
+  }
+
+  if (!isValidRussianPhone(phone)) {
+    return { error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
   }
 
   if (newPassword.length < 6) {

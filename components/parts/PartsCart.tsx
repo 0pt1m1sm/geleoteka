@@ -215,7 +215,7 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             pattern={PHONE_PATTERN}
             title={PHONE_TITLE}
             className="input"
-            placeholder="+7 (999) 123-45-67"
+            placeholder="+79991234567"
             defaultValue={initialPhone}
             onChange={(e) => persistDraft("phone", e.target.value)}
           />

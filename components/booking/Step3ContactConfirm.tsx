@@ -164,7 +164,7 @@ export function Step3ContactConfirm({
             value={data.phone}
             onChange={(e) => update({ phone: e.target.value })}
             className="input"
-            placeholder="+7 (999) 123-45-67"
+            placeholder="+79991234567"
             inputMode="tel"
             autoComplete="tel"
             required

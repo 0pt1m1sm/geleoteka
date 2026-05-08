@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
   findOrCreateGuestCustomer,
   generateClaimToken,
@@ -45,6 +45,9 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
   }
 
   const normalizedPhone = normalizePhone(phone);
+  if (!isValidRussianPhone(normalizedPhone)) {
+    return { success: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
+  }
   const appointmentDate = new Date(dateTime);
 
   if (isNaN(appointmentDate.getTime())) {

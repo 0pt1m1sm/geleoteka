@@ -33,7 +33,7 @@ function CreateForm(): React.ReactElement {
               pattern={PHONE_PATTERN}
               title={PHONE_TITLE}
               className="input"
-              placeholder="+7 (999) 123-45-67"
+              placeholder="+79991234567"
             />
           </div>
           <div>

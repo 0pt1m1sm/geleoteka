@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
 type ActionState =
   | { error: string | null }
@@ -14,6 +14,9 @@ export async function requestPasswordResetAction(_prevState: ActionState, formDa
 
   if (!phone) {
     return { error: "Телефон обязателен" };
+  }
+  if (!isValidRussianPhone(phone)) {
+    return { error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
   }
 
   const user = await db.user.findUnique({ where: { phone } });

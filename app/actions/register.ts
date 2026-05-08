@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
-import { normalizePhone } from "@/lib/utils";
+import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
 /** Register a new user */
 export async function registerAction(_prevState: { error: string | null } | null, formData: FormData) {
@@ -15,6 +15,10 @@ export async function registerAction(_prevState: { error: string | null } | null
 
   if (!email || !phone || !password || !name) {
     return { error: "Все поля обязательны" };
+  }
+
+  if (!isValidRussianPhone(phone)) {
+    return { error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX (только российские номера)" };
   }
 
   if (password.length < 6) {

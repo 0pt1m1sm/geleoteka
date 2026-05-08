@@ -29,13 +29,23 @@ export function formatDateTime(date: Date | string): string {
 }
 
 /**
- * HTML5 pattern that accepts the common Russian phone shapes —
- *   +7 (999) 123-45-67 / 8(999)1234567 / +79991234567
- * — by allowing digits, spaces, +, parentheses, and dashes, with a
- * digit count between 10 and 12. Use together with `PHONE_TITLE`.
+ * Strict HTML5 pattern for Russian phone numbers — exactly +7 followed by
+ * 10 digits, or 8 followed by 10 digits. No spaces, parentheses, or dashes
+ * allowed. Server normalizes both shapes to canonical +7XXXXXXXXXX before
+ * storage; the client-side pattern is the gate.
  */
-export const PHONE_PATTERN = "[\\d\\s+()\\-]{10,20}";
-export const PHONE_TITLE = "Введите телефон, например +7 (999) 123-45-67";
+export const PHONE_PATTERN = "(\\+7|8)\\d{10}";
+export const PHONE_TITLE = "Только российские номера: +7XXXXXXXXXX или 8XXXXXXXXXX (10 цифр после +7 или 8, без пробелов и скобок)";
+
+/**
+ * Validates that a phone string already passed `normalizePhone` lands at
+ * the canonical `+7XXXXXXXXXX` shape (12 chars, +7 + 10 digits). Use as a
+ * server-side gate after `normalizePhone()` — invalid input will keep its
+ * original raw form, which this guard catches.
+ */
+export function isValidRussianPhone(normalizedPhone: string): boolean {
+  return /^\+7\d{10}$/.test(normalizedPhone);
+}
 
 /**
  * Stricter HTML5 pattern for emails — ensures non-empty local part,
