@@ -26,15 +26,15 @@ export function PageHeader({
 }: PageHeaderProps): React.ReactElement {
   const alignClass = align === "center" ? "text-center mx-auto" : "";
   return (
-    <header className={`mb-8 ${className}`.trim()}>
-      <div className={`flex flex-wrap items-end justify-between gap-4 ${align === "center" ? "flex-col items-center" : ""}`.trim()}>
-        <div className={`flex flex-col gap-2 max-w-2xl ${alignClass}`.trim()}>
+    <header className={`mb-8 min-w-0 max-w-full ${className}`.trim()}>
+      <div className={`flex flex-wrap items-end justify-between gap-4 min-w-0 ${align === "center" ? "flex-col items-center" : ""}`.trim()}>
+        <div className={`flex flex-col gap-2 max-w-2xl min-w-0 ${alignClass}`.trim()}>
           {eyebrow ? (
             <span className="text-xs uppercase tracking-[0.3em] text-[var(--color-accent)]">{eyebrow}</span>
           ) : null}
-          <h1 className="text-display text-3xl sm:text-4xl font-bold leading-tight">{title}</h1>
+          <h1 className="text-display text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight break-words">{title}</h1>
           {description ? (
-            <p className="text-base text-[var(--foreground-muted)]">{description}</p>
+            <p className="text-base text-[var(--foreground-muted)] break-words">{description}</p>
           ) : null}
         </div>
         {actions ? <div className="flex items-center gap-3 shrink-0">{actions}</div> : null}
