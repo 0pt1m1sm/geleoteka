@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomer } from "@/app/actions/customers";
 import { useFormAction } from "@/lib/use-form-action";
+import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 interface InitialValues {
   name: string;
@@ -116,9 +117,13 @@ export function CustomerEditForm({ customerUserId, initial }: Props): React.Reac
           <input
             id="edit-phone"
             type="tel"
+            inputMode="tel"
+            autoComplete="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             required
+            pattern={PHONE_PATTERN}
+            title={PHONE_TITLE}
             className="input"
           />
         </div>
@@ -127,9 +132,13 @@ export function CustomerEditForm({ customerUserId, initial }: Props): React.Reac
           <input
             id="edit-email"
             type="email"
+            inputMode="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            pattern={EMAIL_PATTERN}
+            title={EMAIL_TITLE}
             className="input"
           />
         </div>

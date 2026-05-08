@@ -5,6 +5,7 @@ import Link from "next/link";
 import { requestPasswordResetAction } from "@/app/actions/request-password-reset";
 import { NarrowFormPage } from "@/components/shared/NarrowFormPage";
 import { Alert, Button, Card, Input } from "@/components/ui";
+import { PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 type ActionState = { error?: string; success?: true } | null;
 
@@ -33,7 +34,10 @@ export default function ResetPasswordPage(): React.ReactElement {
             id="phone"
             name="phone"
             type="tel"
+            inputMode="tel"
             required
+            pattern={PHONE_PATTERN}
+            title={PHONE_TITLE}
             placeholder="+7 (999) 123-45-67"
             autoComplete="tel"
           />

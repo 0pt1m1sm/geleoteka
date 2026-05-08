@@ -4,7 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { createRentalBooking } from "@/app/actions/rentals";
-import { formatPrice } from "@/lib/utils";
+import {
+  EMAIL_PATTERN,
+  EMAIL_TITLE,
+  PHONE_PATTERN,
+  PHONE_TITLE,
+  formatPrice,
+} from "@/lib/utils";
+import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 
 interface Props {
   carId: string;
@@ -12,6 +19,7 @@ interface Props {
 }
 
 export function RentalBookingForm({ carId, dailyRate }: Props) {
+  const draft = contactDraftStore.useStore();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -21,6 +29,10 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
     tomorrow.setDate(tomorrow.getDate() + 1);
     return tomorrow.toISOString().split("T")[0];
   });
+
+  function persistDraft(field: keyof typeof draft, value: string): void {
+    contactDraftStore.setStore({ ...contactDraftStore.getStore(), [field]: value });
+  }
 
   const days = startDate && endDate
     ? Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)))
@@ -40,6 +52,9 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
     });
     setResult(res);
     setSubmitting(false);
+    if (res.success) {
+      clearContactDraft();
+    }
   }
 
   if (result?.success) {
@@ -87,19 +102,63 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-        <input id="name" name="name" required className="input" placeholder="Иван Иванов" />
+        <input
+          id="name"
+          name="name"
+          required
+          minLength={2}
+          maxLength={120}
+          autoComplete="name"
+          className="input"
+          placeholder="Иван Иванов"
+          defaultValue={draft.name}
+          onChange={(e) => persistDraft("name", e.target.value)}
+        />
       </div>
       <div>
         <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-        <input id="phone" name="phone" type="tel" required className="input" placeholder="+7 (999) 123-45-67" />
+        <input
+          id="phone"
+          name="phone"
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          required
+          pattern={PHONE_PATTERN}
+          title={PHONE_TITLE}
+          className="input"
+          placeholder="+7 (999) 123-45-67"
+          defaultValue={draft.phone}
+          onChange={(e) => persistDraft("phone", e.target.value)}
+        />
       </div>
       <div>
         <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-        <input id="email" name="email" type="email" required className="input" placeholder="your@email.com" />
+        <input
+          id="email"
+          name="email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          required
+          pattern={EMAIL_PATTERN}
+          title={EMAIL_TITLE}
+          className="input"
+          placeholder="your@email.com"
+          defaultValue={draft.email}
+          onChange={(e) => persistDraft("email", e.target.value)}
+        />
       </div>
       <div>
         <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>
-        <textarea id="notes" name="notes" className="input min-h-[60px] resize-y" placeholder="Пожелания..." />
+        <textarea
+          id="notes"
+          name="notes"
+          className="input min-h-[60px] resize-y"
+          placeholder="Пожелания..."
+          defaultValue={draft.notes}
+          onChange={(e) => persistDraft("notes", e.target.value)}
+        />
       </div>
 
       <button type="submit" disabled={submitting || days === 0} className="btn btn-primary w-full">

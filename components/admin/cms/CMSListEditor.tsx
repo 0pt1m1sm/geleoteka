@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronUp, ChevronDown, Trash2, Plus } from "lucide-react";
 import { updateCMSBlock } from "@/app/actions/cms";
 import { Button, Input, Textarea, Alert, Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui";
 import { useFormAction } from "@/lib/use-form-action";
 import type { CMSListField } from "@/lib/cms-schema";
+import { useCMSSaveSection, type SaveResult } from "./CMSSaveContext";
 
 interface CMSListEditorProps {
   schemaKey: string;
@@ -32,8 +33,25 @@ export function CMSListEditor({
   const [pendingDelete, setPendingDelete] = useState<number | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const { pending, error, runAction } = useFormAction();
+  const section = useCMSSaveSection();
 
   const dirty = JSON.stringify(rows) !== JSON.stringify(initial);
+
+  useEffect(() => {
+    if (!section) return;
+    const saver = async (): Promise<SaveResult> => {
+      if (JSON.stringify(rows) === JSON.stringify(initial)) return { ok: true, saved: false };
+      const res = await updateCMSBlock(schemaKey, { items: rows });
+      if (!res.ok) return { ok: false, saved: false, error: res.error };
+      return { ok: true, saved: true };
+    };
+    return section.registerSaver(schemaKey, saver);
+  }, [section, schemaKey, rows, initial]);
+
+  useEffect(() => {
+    if (!section) return;
+    section.reportDirty(schemaKey, dirty);
+  }, [section, schemaKey, dirty]);
 
   function move(index: number, dir: -1 | 1): void {
     const target = index + dir;
@@ -177,20 +195,27 @@ export function CMSListEditor({
           <Plus size={14} className="mr-1.5" aria-hidden />
           Добавить
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          onClick={save}
-          isLoading={pending}
-          disabled={!dirty}
-        >
-          {pending ? "Сохраняем..." : "Сохранить"}
-        </Button>
-        {savedAt && !dirty && !error ? (
+        {section ? null : (
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={save}
+            isLoading={pending}
+            disabled={!dirty}
+          >
+            {pending ? "Сохраняем..." : "Сохранить"}
+          </Button>
+        )}
+        {section && dirty ? (
+          <span className="text-[10px] uppercase tracking-wider text-[var(--color-warning,#f59e0b)]">
+            Не сохранено
+          </span>
+        ) : null}
+        {!section && savedAt && !dirty && !error ? (
           <span className="text-xs text-[var(--color-success,#16a34a)]">Сохранено</span>
         ) : null}
-        {error ? <Alert variant="error">{error}</Alert> : null}
+        {!section && error ? <Alert variant="error">{error}</Alert> : null}
       </div>
 
       <Dialog

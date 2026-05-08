@@ -141,6 +141,21 @@
     outline: none;
     border-color: var(--color-accent);
   }
+  /* Native HTML5 invalid feedback — only after user has interacted (focus + blur)
+     so empty-on-mount required fields don't render red. The :user-invalid pseudo
+     handles this in modern Chrome/Safari/Firefox. Falls back to :invalid on older
+     browsers, but we accept the tradeoff: required fields show red until filled. */
+  .input:user-invalid,
+  .input[aria-invalid="true"] {
+    border-color: var(--color-error);
+    background: var(--color-error-bg);
+  }
+  .input:user-invalid:focus,
+  .input[aria-invalid="true"]:focus {
+    outline: 2px solid var(--color-error);
+    outline-offset: -1px;
+    border-color: var(--color-error);
+  }
   .input::placeholder { color: var(--foreground-muted); }
 
   /* Select */

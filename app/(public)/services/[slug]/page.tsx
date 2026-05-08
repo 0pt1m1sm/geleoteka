@@ -59,18 +59,6 @@ export default async function ServicePage({ params }: Props) {
         </p>
       </div>
 
-      {service.durationMinutes && (
-        <div className="card mb-8">
-          <h2 className="text-lg font-semibold mb-2">Время выполнения</h2>
-          <p className="text-[var(--foreground-muted)]">
-            Ориентировочно{" "}
-            {service.durationMinutes >= 60
-              ? `${Math.floor(service.durationMinutes / 60)} ч${service.durationMinutes % 60 > 0 ? ` ${service.durationMinutes % 60} мин` : ""}`
-              : `${service.durationMinutes} мин`}
-          </p>
-        </div>
-      )}
-
       {service.applicableModels.length > 0 && (
         <div className="card mb-8">
           <h2 className="text-lg font-semibold mb-4">Применимые модели</h2>

@@ -91,7 +91,7 @@ export function PostCheckoutAuthPanel({
       )}
 
       <p className="text-xs text-[var(--foreground-muted)]">
-        <a href="/forgot-password" className="underline hover:text-[var(--foreground)]">
+        <a href="/reset-password" className="underline hover:text-[var(--foreground)]">
           Не помню пароль — восстановить по SMS
         </a>
       </p>

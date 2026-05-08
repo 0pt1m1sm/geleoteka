@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { updateSupplier, deleteSupplier } from "@/app/actions/suppliers";
 import { AdminFormShell } from "./AdminFormShell";
+import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 interface SupplierData {
   id: string;
@@ -44,11 +45,29 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
-          <input id="email" name="email" type="email" defaultValue={supplier.email} className="input" />
+          <input
+            id="email"
+            name="email"
+            type="email"
+            inputMode="email"
+            pattern={EMAIL_PATTERN}
+            title={EMAIL_TITLE}
+            defaultValue={supplier.email}
+            className="input"
+          />
         </div>
         <div>
           <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон</label>
-          <input id="phone" name="phone" type="tel" defaultValue={supplier.phone} className="input" />
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            inputMode="tel"
+            pattern={PHONE_PATTERN}
+            title={PHONE_TITLE}
+            defaultValue={supplier.phone}
+            className="input"
+          />
         </div>
       </div>
 

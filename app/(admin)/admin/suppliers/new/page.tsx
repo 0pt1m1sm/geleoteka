@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { createSupplier } from "@/app/actions/suppliers";
 import { AdminFormShell } from "@/components/admin/AdminFormShell";
+import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 export default function NewSupplierPage() {
   const [state, formAction, isPending] = useActionState(createSupplier, null);
@@ -28,11 +29,27 @@ export default function NewSupplierPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label htmlFor="email" className="block text-sm font-medium mb-2">Email</label>
-            <input id="email" name="email" type="email" className="input" />
+            <input
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              pattern={EMAIL_PATTERN}
+              title={EMAIL_TITLE}
+              className="input"
+            />
           </div>
           <div>
             <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон</label>
-            <input id="phone" name="phone" type="tel" className="input" />
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              pattern={PHONE_PATTERN}
+              title={PHONE_TITLE}
+              className="input"
+            />
           </div>
         </div>
 

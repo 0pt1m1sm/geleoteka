@@ -27,9 +27,12 @@ export function AddCarForm({ modelNames }: Props): React.ReactElement {
           id="vin"
           name="vin"
           type="text"
-          className="input font-mono tracking-wider"
+          className="input font-mono tracking-wider uppercase"
           placeholder="WDD1690231J123456"
+          minLength={17}
           maxLength={17}
+          pattern="[A-HJ-NPR-Z0-9]{17}"
+          title="VIN — 17 символов латиницей и цифрами (без I, O, Q)"
         />
       </div>
 
@@ -72,6 +75,9 @@ export function AddCarForm({ modelNames }: Props): React.ReactElement {
             id="mileage"
             name="mileage"
             type="number"
+            min={0}
+            max={2000000}
+            step={1}
             className="input"
             placeholder="45000"
           />

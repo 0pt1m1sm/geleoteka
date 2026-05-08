@@ -5,6 +5,7 @@ import Link from "next/link";
 import { loginAction } from "@/app/actions/login";
 import { NarrowFormPage } from "@/components/shared/NarrowFormPage";
 import { Alert, Button, Card, Input } from "@/components/ui";
+import { EMAIL_PATTERN, EMAIL_TITLE } from "@/lib/utils";
 
 export default function LoginPage(): React.ReactElement {
   const [state, formAction, isPending] = useActionState(loginAction, null);
@@ -30,7 +31,10 @@ export default function LoginPage(): React.ReactElement {
             id="email"
             name="email"
             type="email"
+            inputMode="email"
             required
+            pattern={EMAIL_PATTERN}
+            title={EMAIL_TITLE}
             placeholder="your@email.com"
             autoComplete="email"
           />
@@ -41,6 +45,7 @@ export default function LoginPage(): React.ReactElement {
             name="password"
             type="password"
             required
+            minLength={6}
             placeholder="Введите пароль"
             autoComplete="current-password"
           />

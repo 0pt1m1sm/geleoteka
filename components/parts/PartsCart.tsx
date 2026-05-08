@@ -11,6 +11,7 @@ import {
 } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { createLocalStorageStore } from "@/lib/local-storage-store";
+import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 
@@ -48,11 +49,22 @@ interface OrderResultState {
 
 export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}) {
   const items = cartStore.useStore();
+  const draft = contactDraftStore.useStore();
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<OrderResultState | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
+  // Pre-fill order: explicit visitor draft > session profile > empty
+  const initialName = draft.name || defaultContact?.name || "";
+  const initialPhone = draft.phone || defaultContact?.phone || "";
+  const initialEmail = draft.email || defaultContact?.email || "";
+  const initialNotes = draft.notes || "";
+
   const total = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+  function persistDraft(field: keyof typeof draft, value: string): void {
+    contactDraftStore.setStore({ ...contactDraftStore.getStore(), [field]: value });
+  }
 
   function updateQty(partId: string, qty: number) {
     if (qty <= 0) {
@@ -81,6 +93,7 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
     if (res.success) {
       setSubmittedEmail(emailAtSubmit);
       cartStore.setStore(EMPTY_CART);
+      clearContactDraft();
     }
   }
 
@@ -186,7 +199,8 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             autoComplete="name"
             className="input"
             placeholder="Иван Иванов"
-            defaultValue={defaultContact?.name ?? ""}
+            defaultValue={initialName}
+            onChange={(e) => persistDraft("name", e.target.value)}
           />
         </div>
         <div>
@@ -202,7 +216,8 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             title={PHONE_TITLE}
             className="input"
             placeholder="+7 (999) 123-45-67"
-            defaultValue={defaultContact?.phone ?? ""}
+            defaultValue={initialPhone}
+            onChange={(e) => persistDraft("phone", e.target.value)}
           />
         </div>
         <div>
@@ -218,12 +233,20 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             title={EMAIL_TITLE}
             className="input"
             placeholder="your@email.com"
-            defaultValue={defaultContact?.email ?? ""}
+            defaultValue={initialEmail}
+            onChange={(e) => persistDraft("email", e.target.value)}
           />
         </div>
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>
-          <textarea id="notes" name="notes" className="input min-h-[60px] resize-y" placeholder="Доставка, самовывоз..." />
+          <textarea
+            id="notes"
+            name="notes"
+            className="input min-h-[60px] resize-y"
+            placeholder="Доставка, самовывоз..."
+            defaultValue={initialNotes}
+            onChange={(e) => persistDraft("notes", e.target.value)}
+          />
         </div>
         <button type="submit" disabled={submitting} className="btn btn-primary w-full">
           {submitting ? "Оформление..." : `Оформить заказ — ${formatPrice(total)}`}

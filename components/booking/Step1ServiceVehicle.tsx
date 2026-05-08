@@ -166,6 +166,9 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
             <input
               id="mileage"
               type="number"
+              min={0}
+              max={2000000}
+              step={1}
               value={data.mileage}
               onChange={(e) => update({ mileage: e.target.value })}
               className="input"
@@ -183,9 +186,12 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
             type="text"
             value={data.vin}
             onChange={(e) => update({ vin: e.target.value.toUpperCase() })}
-            className="input font-mono tracking-wider"
+            className="input font-mono tracking-wider uppercase"
             placeholder="WDD1690231J123456"
+            minLength={17}
             maxLength={17}
+            pattern="[A-HJ-NPR-Z0-9]{17}"
+            title="VIN — 17 символов латиницей и цифрами (без I, O, Q)"
           />
           <p className="text-xs text-foreground-muted mt-1">
             17 символов. Помогает точнее определить комплектацию.
