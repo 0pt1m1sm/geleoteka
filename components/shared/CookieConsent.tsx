@@ -1,26 +1,7 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
-
-const CONSENT_KEY = "cookie-consent";
-
-let listeners: Array<() => void> = [];
-
-function subscribe(cb: () => void): () => void {
-  listeners.push(cb);
-  return () => {
-    listeners = listeners.filter((l) => l !== cb);
-  };
-}
-
-function getSnapshot(): boolean {
-  return !localStorage.getItem(CONSENT_KEY);
-}
-
-function getServerSnapshot(): boolean {
-  return false;
-}
+import { acceptCookieConsent, useCookieConsentVisible } from "@/lib/cookie-consent";
 
 interface CookieConsentProps {
   text: string;
@@ -34,13 +15,7 @@ const INLINE_COMPONENTS: Components = {
 };
 
 export function CookieConsent({ text, buttonLabel }: CookieConsentProps): React.ReactElement | null {
-  const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  const accept = useCallback(() => {
-    localStorage.setItem(CONSENT_KEY, "accepted");
-    listeners.forEach((l) => l());
-  }, []);
-
+  const visible = useCookieConsentVisible();
   if (!visible) return null;
 
   return (
@@ -51,7 +26,7 @@ export function CookieConsent({ text, buttonLabel }: CookieConsentProps): React.
         </div>
         <button
           type="button"
-          onClick={accept}
+          onClick={acceptCookieConsent}
           className="btn btn-primary text-sm shrink-0"
         >
           {buttonLabel}

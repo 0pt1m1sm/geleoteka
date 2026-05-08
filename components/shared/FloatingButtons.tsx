@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, X } from "lucide-react";
+import { useCookieConsentVisible } from "@/lib/cookie-consent";
 
 export interface FloatingChannel {
   name: string;
@@ -58,6 +59,7 @@ function iconFor(key: string): React.ReactNode {
 export function FloatingButtons({ channels }: FloatingButtonsProps): React.ReactElement {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const cookieBannerVisible = useCookieConsentVisible();
 
   useEffect(() => {
     if (!open) return;
@@ -80,7 +82,12 @@ export function FloatingButtons({ channels }: FloatingButtonsProps): React.React
   }
 
   return (
-    <div ref={ref} className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+    <div
+      ref={ref}
+      className={`fixed right-6 z-50 flex flex-col items-end gap-3 transition-[bottom] duration-200 ${
+        cookieBannerVisible ? "bottom-32 sm:bottom-24" : "bottom-6"
+      }`}
+    >
       {open && (
         <div className="flex flex-col items-end gap-3" role="menu" aria-label="Способы связи">
           {channels.map((c, i) => (

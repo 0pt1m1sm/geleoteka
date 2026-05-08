@@ -82,14 +82,30 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="min-w-0">
           <label htmlFor="startDate" className="block text-sm font-medium mb-2">С *</label>
-          <input id="startDate" type="date" required min={minDate} value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input" />
+          <input
+            id="startDate"
+            type="date"
+            required
+            min={minDate}
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+            className="input w-full min-w-0"
+          />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="endDate" className="block text-sm font-medium mb-2">По *</label>
-          <input id="endDate" type="date" required min={startDate || minDate} value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input" />
+          <input
+            id="endDate"
+            type="date"
+            required
+            min={startDate || minDate}
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+            className="input w-full min-w-0"
+          />
         </div>
       </div>
 
