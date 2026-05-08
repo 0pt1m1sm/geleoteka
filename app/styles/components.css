@@ -228,27 +228,24 @@
     padding: 0 1px;
     min-width: 0;
   }
-  /* Indicator (the calendar picker icon iOS adds) — hide it; we render our own */
-  input[type="date"].input::-webkit-calendar-picker-indicator {
-    opacity: 0;
-    width: 0;
-    margin: 0;
-    padding: 0;
+  /* Indicator (the native calendar picker icon Chrome/Safari add) — fully
+     remove via display:none so it doesn't reserve any layout width. The
+     input is still tappable / focuses the picker on click. We render our
+     own gold calendar icon overlay instead. */
+  input[type="date"].input::-webkit-calendar-picker-indicator,
+  input[type="time"].input::-webkit-calendar-picker-indicator,
+  input[type="datetime-local"].input::-webkit-calendar-picker-indicator {
+    display: none !important;
+    -webkit-appearance: none;
+    appearance: none;
   }
   html.light input[type="date"].input,
   html.light input[type="time"].input,
   html.light input[type="datetime-local"].input {
     color-scheme: light;
   }
-  input[type="date"].input::-webkit-calendar-picker-indicator,
-  input[type="time"].input::-webkit-calendar-picker-indicator {
-    filter: invert(0.5);
-    cursor: pointer;
-  }
-  html.light input[type="date"].input::-webkit-calendar-picker-indicator,
-  html.light input[type="time"].input::-webkit-calendar-picker-indicator {
-    filter: none;
-  }
+  /* Native picker indicator hidden globally above (display:none !important);
+     the deprecated filter rules that used to recolor it are no longer needed. */
 
   /* Checkbox */
   input[type="checkbox"] {
