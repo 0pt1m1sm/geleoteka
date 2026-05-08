@@ -20,15 +20,71 @@ function telHref(display: string): string {
 }
 
 /**
- * Convert a regular Yandex.Maps share URL into the embed-widget URL.
- * Accepts either format the admin might paste:
+ * Convert a Yandex.Maps URL the admin pasted into the iframe-embed widget URL.
+ * Accepts either format:
  *   - https://yandex.com/maps/org/<id>/...     → widget org card
  *   - https://yandex.com/map-widget/v1/...     → returned as-is
- * Anything else is returned untouched (the admin sees the result and can fix).
+ *
+ * Whatever the admin pastes, this function additionally **strips card-panel
+ * modes** (`mode=search&ol=biz`, `mode=poi`) — those overlay a giant org card
+ * on the iframe map that consumes most of the viewport on mobile. We render
+ * a clean pin-only embed and put a separate "Открыть на Яндекс.Картах" link
+ * below so the user still has one click to hours / route / taxi.
  */
 function toYandexWidgetSrc(url: string): string {
   if (!url) return "";
-  return url.replace("/maps/", "/map-widget/v1/");
+  const widgetUrl = url.replace("/maps/", "/map-widget/v1/");
+  try {
+    const u = new URL(widgetUrl);
+    // Pull coordinates from `ll` if present, fall back to `poi[point]`.
+    const ll = u.searchParams.get("ll") ?? u.searchParams.get("poi[point]");
+    const z = u.searchParams.get("z") ?? "17";
+    if (!ll) return widgetUrl;
+    // Build a clean pin-only widget URL: same coords, same zoom, red marker,
+    // no mode/card panel that would overlay the map on mobile.
+    const out = new URL("https://yandex.com/map-widget/v1/");
+    out.searchParams.set("ll", ll);
+    out.searchParams.set("z", z);
+    out.searchParams.set("pt", `${ll},pm2rdm`);
+    return out.toString();
+  } catch {
+    return widgetUrl;
+  }
+}
+
+/**
+ * Convert the admin's CMS map URL into a "click-through" link that opens the
+ * full Yandex.Maps page (org card, hours, photos, reviews, route button) in
+ * a new tab. Shown next to the iframe so users always have one tap to full
+ * info regardless of viewport.
+ */
+function toYandexFullMapsUrl(url: string): string {
+  if (!url) return "https://yandex.com/maps";
+  try {
+    const widgetUrl = url.replace("/maps/", "/map-widget/v1/");
+    const u = new URL(widgetUrl);
+    // Prefer the org id when present — opens directly on the business page.
+    const oid = u.searchParams.get("oid")
+      ?? extractOidFromPoiUri(u.searchParams.get("poi[uri]") ?? "");
+    if (oid) {
+      return `https://yandex.com/maps/?oid=${oid}&ol=biz`;
+    }
+    // Fall back to a bare coordinate map on the public Yandex.Maps host.
+    const ll = u.searchParams.get("ll") ?? u.searchParams.get("poi[point]");
+    if (ll) {
+      const z = u.searchParams.get("z") ?? "17";
+      return `https://yandex.com/maps/?ll=${encodeURIComponent(ll)}&z=${z}`;
+    }
+  } catch {
+    // fall through
+  }
+  return url;
+}
+
+function extractOidFromPoiUri(uri: string): string | null {
+  // "ymapsbm1://org?oid=211932722600" → "211932722600"
+  const m = uri.match(/oid=(\d+)/);
+  return m ? m[1] : null;
 }
 
 export default async function ContactsPage(): Promise<React.ReactElement> {
@@ -43,6 +99,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
   ]);
 
   const mapWidgetSrc = toYandexWidgetSrc(mapUrl);
+  const fullMapsHref = toYandexFullMapsUrl(mapUrl);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -118,15 +175,23 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
           </Link>
         </div>
 
-        <div className="card overflow-hidden p-0 min-h-[400px]">
+        <div className="card overflow-hidden p-0 flex flex-col">
           <iframe
             src={mapWidgetSrc}
             title={`Карта — ${cms["contacts.address"]}`}
             loading="lazy"
             allowFullScreen
             referrerPolicy="no-referrer-when-downgrade"
-            className="w-full h-[400px] border-0 block"
+            className="w-full h-[360px] sm:h-[400px] border-0 block"
           />
+          <a
+            href={fullMapsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block px-4 py-3 text-sm font-medium text-center bg-[var(--background-secondary)] hover:bg-[var(--card-hover)] border-t border-[var(--border)] text-[var(--color-accent)] transition-colors"
+          >
+            Открыть на Яндекс.Картах →
+          </a>
         </div>
       </div>
 
