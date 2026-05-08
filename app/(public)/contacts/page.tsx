@@ -19,18 +19,30 @@ function telHref(display: string): string {
   return `tel:${display.replace(/[^+\d]/g, "")}`;
 }
 
-/** Yandex Maps widget URL for the Geleoteka business listing in Khimki. */
-const YANDEX_MAP_SRC = "https://yandex.com/map-widget/v1/org/211932722600/";
+/**
+ * Convert a regular Yandex.Maps share URL into the embed-widget URL.
+ * Accepts either format the admin might paste:
+ *   - https://yandex.com/maps/org/<id>/...     → widget org card
+ *   - https://yandex.com/map-widget/v1/...     → returned as-is
+ * Anything else is returned untouched (the admin sees the result and can fix).
+ */
+function toYandexWidgetSrc(url: string): string {
+  if (!url) return "";
+  return url.replace("/maps/", "/map-widget/v1/");
+}
 
 export default async function ContactsPage(): Promise<React.ReactElement> {
-  const [cms, eyebrow, title, description, howtoTitle, howtoItems] = await Promise.all([
+  const [cms, eyebrow, title, description, howtoTitle, howtoItems, mapUrl] = await Promise.all([
     getCMSMany(CMS_KEYS),
     getCMSText("contacts.eyebrow"),
     getCMSText("contacts.title"),
     getCMSText("contacts.description"),
     getCMSText("contacts.howto.title"),
     getCMSList("contacts.howto.items"),
+    getCMSText("contacts.map.url"),
   ]);
+
+  const mapWidgetSrc = toYandexWidgetSrc(mapUrl);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
@@ -108,7 +120,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
 
         <div className="card overflow-hidden p-0 min-h-[400px]">
           <iframe
-            src={YANDEX_MAP_SRC}
+            src={mapWidgetSrc}
             title={`Карта — ${cms["contacts.address"]}`}
             loading="lazy"
             allowFullScreen

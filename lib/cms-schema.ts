@@ -576,6 +576,12 @@ export const CMS_SCHEMA = {
     label: "Контакты (страница) — описание",
     defaultValue: "Свяжитесь с нами или приезжайте — мы всегда рады помочь",
   },
+  "contacts.map.url": {
+    type: "text",
+    group: "contacts",
+    label: "Ссылка на точку в Яндекс.Картах",
+    defaultValue: "https://yandex.com/maps/org/geleoteka/211932722600/",
+  },
   "contacts.howto.title": {
     type: "text",
     group: "contacts",
