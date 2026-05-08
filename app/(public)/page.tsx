@@ -93,7 +93,7 @@ export default async function HomePage(): Promise<React.ReactElement> {
             fill
             priority
             sizes="100vw"
-            className="object-cover"
+            className="hero-image object-cover"
           />
           <div className="absolute inset-0 bg-black/55 hero-overlay" />
           <div className="hero-spotlight" />

@@ -1,24 +1,19 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Playfair_Display, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
 import { Providers } from "./providers";
 import { ThemeInit } from "@/components/shared/ThemeInit";
 import { MyCarInit } from "@/components/shared/MyCarInit";
 
-const fontDisplay = Playfair_Display({
+// Single variable family for both headings and body. The variable axis
+// (200–800) covers light body weight + heavy display weight from one woff2.
+const fontManrope = Manrope({
   subsets: ["latin", "cyrillic"],
   weight: "variable",
   display: "swap",
-  variable: "--font-playfair-display",
-});
-
-const fontBody = IBM_Plex_Sans({
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-  variable: "--font-ibm-plex-sans",
+  variable: "--font-manrope",
 });
 
 const fontMono = JetBrains_Mono({
@@ -53,7 +48,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>): React.ReactElement {
-  const fontClasses = `${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`;
+  const fontClasses = `${fontManrope.variable} ${fontMono.variable}`;
   return (
     <html lang="ru" className={`${fontClasses} h-full antialiased`} suppressHydrationWarning>
       <head>

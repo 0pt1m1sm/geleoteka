@@ -347,9 +347,17 @@
 /* Hero — split layout, spotlight overlay, corner ticks, mobile divider.
    Kept outside @layer components to ensure precedence over utility hover states. */
 
-/* Light hero overlay tweak — slightly less dark for brighter feel */
+/* Light hero overlay — softer wash so the photo reads warm/editorial
+   rather than as a pure-black void. Paired with the .hero-image filter below. */
 html.light .hero-overlay {
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.30);
+}
+
+/* Light theme: warm sepia treatment on the hero photo so it integrates with
+   the cream chrome instead of feeling like a black void underneath the
+   header banner. Filter applied directly to the next/image-rendered <img>. */
+html.light .hero-image {
+  filter: sepia(0.15) saturate(0.85) brightness(1.05);
 }
 
 /* Floating contact menu rows fade up with staggered delay (set inline). */

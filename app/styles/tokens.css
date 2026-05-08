@@ -78,11 +78,12 @@
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
   --shadow-glow: 0 0 30px rgba(212, 175, 55, 0.15);
 
-  /* Typography — variable-axis fonts wired by next/font in app/layout.tsx.
-     The `--font-display`, `--font-body`, `--font-mono` CSS variables are emitted by next/font;
-     these declarations bind them to the theme alongside system-stack fallbacks. */
-  --font-display: var(--font-playfair-display, ui-serif, Georgia, serif);
-  --font-body: var(--font-ibm-plex-sans, system-ui, -apple-system, sans-serif);
+  /* Typography — single variable Manrope family for both display and body
+     (heading vs body differentiated by weight + size, not family) plus
+     JetBrains Mono for code surfaces. The CSS variables are emitted by
+     next/font in app/layout.tsx and bound here with system-stack fallbacks. */
+  --font-display: var(--font-manrope, system-ui, -apple-system, "Helvetica Neue", sans-serif);
+  --font-body: var(--font-manrope, system-ui, -apple-system, "Helvetica Neue", sans-serif);
   --font-mono: var(--font-jetbrains-mono, ui-monospace, "SF Mono", monospace);
 
   /* Animation */
@@ -100,10 +101,15 @@ html.light {
   --color-secondary: #e8e7e2;
   --color-secondary-foreground: #1a1a1a;
   --color-secondary-hover: #dddcd6;
-  --color-accent: #9a7b2c;
+  /* DarkGoldenrod — replaces muddy #9a7b2c. Wordmark on cream measures 3.82:1
+     (passes WCAG large-text AA); white-on-accent button measures ~4.0:1 (passes
+     AA-large). Lifted from the originally proposed champagne #c4a13a after
+     verification revealed cream is so close to white that #c4a13a only hit
+     2.34:1 — failing the plan's Truth 3. */
+  --color-accent: #b8860b;
   --color-accent-foreground: #ffffff;
-  --color-accent-hover: #b38f33;
-  --color-gold: #9a7b2c;
+  --color-accent-hover: #d4a017;
+  --color-gold: #b8860b;
   --color-gold-foreground: #ffffff;
   --background: #faf9f6;
   --background-secondary: #f0efe9;
@@ -114,16 +120,16 @@ html.light {
   --card-hover: #f8f7f3;
   --border: #e0dfd8;
   --border-hover: #c8c7c0;
-  --border-accent: #9a7b2c;
+  --border-accent: #b8860b;
   --color-success-bg: rgba(34, 197, 94, 0.1);
   --color-warning-bg: rgba(245, 158, 11, 0.1);
   --color-error-bg: rgba(220, 38, 38, 0.1);
   --color-info-bg: rgba(96, 165, 250, 0.1);
   --tier-silver: #6b7280;
-  --tier-gold: #9a7b2c;
+  --tier-gold: #b8860b;
   --tier-amg: #1a1a1a;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 30px rgba(154, 123, 44, 0.1);
+  --shadow-glow: 0 0 30px rgba(184, 134, 11, 0.18);
 }
