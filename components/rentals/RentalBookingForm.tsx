@@ -85,10 +85,10 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
       <p className="text-sm text-[var(--foreground-muted)] -mt-2">
         Нажмите на поле, чтобы выбрать дату.
       </p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="min-w-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="min-w-0 w-full">
           <label htmlFor="startDate" className="block text-sm font-medium mb-2">С *</label>
-          <div className="relative">
+          <div className="relative w-full min-w-0">
             <input
               id="startDate"
               type="date"
@@ -96,7 +96,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
               min={minDate}
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="input w-full min-w-0 pr-10 cursor-pointer"
+              className="input w-full min-w-0 max-w-full pr-10 cursor-pointer date-input"
               data-empty={!startDate || undefined}
             />
             <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]">
@@ -114,9 +114,9 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
             )}
           </div>
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 w-full">
           <label htmlFor="endDate" className="block text-sm font-medium mb-2">По *</label>
-          <div className="relative">
+          <div className="relative w-full min-w-0">
             <input
               id="endDate"
               type="date"
@@ -124,7 +124,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
               min={startDate || minDate}
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              className="input w-full min-w-0 pr-10 cursor-pointer"
+              className="input w-full min-w-0 max-w-full pr-10 cursor-pointer date-input"
               data-empty={!endDate || undefined}
             />
             <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]">

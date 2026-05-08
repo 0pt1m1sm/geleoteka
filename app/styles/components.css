@@ -179,6 +179,30 @@
   input[type="datetime-local"].input {
     color-scheme: dark;
     cursor: pointer;
+    min-width: 0;
+    /* iOS Safari forces an intrinsic min-width on date pickers based on the
+       formatted date string. min-width:0 + the constrained native value
+       below let the input shrink to its container on narrow viewports. */
+    -webkit-min-logical-width: 0;
+  }
+  /* iOS-Safari + Chrome native pseudo-elements for the date display. Force
+     them to participate in the width constraint instead of overflowing. */
+  input[type="date"].input::-webkit-date-and-time-value,
+  input[type="time"].input::-webkit-date-and-time-value,
+  input[type="datetime-local"].input::-webkit-date-and-time-value {
+    text-align: left;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  input[type="date"].input::-webkit-datetime-edit,
+  input[type="time"].input::-webkit-datetime-edit,
+  input[type="datetime-local"].input::-webkit-datetime-edit {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
   }
   html.light input[type="date"].input,
   html.light input[type="time"].input,
