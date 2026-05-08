@@ -111,7 +111,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
         className="mb-12"
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         <div className="space-y-6">
           <div className="card">
             <h2 className="text-lg font-semibold mb-4">Отдел сервиса</h2>
@@ -175,14 +175,14 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
           </Link>
         </div>
 
-        <div className="card overflow-hidden p-0 flex flex-col">
+        <div className="card overflow-hidden p-0 flex flex-col lg:h-full">
           <iframe
             src={mapWidgetSrc}
             title={`Карта — ${cms["contacts.address"]}`}
             loading="lazy"
             allowFullScreen
             referrerPolicy="no-referrer-when-downgrade"
-            className="w-full h-[360px] sm:h-[400px] border-0 block"
+            className="w-full h-[420px] sm:h-[450px] lg:flex-1 lg:min-h-[450px] border-0 block"
           />
           <a
             href={fullMapsHref}
