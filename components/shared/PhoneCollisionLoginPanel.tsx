@@ -13,14 +13,12 @@ interface Props {
 
 /**
  * Shown above the checkout form when findOrCreateGuestCustomer reports
- * a phone-collision (telephone already attached to a different email).
- * Asks for the email + password tied to that phone — does not reveal
- * the registered email. On success the page is refreshed so server
- * components pick up the new session and the form re-renders with
- * LoggedInContactSummary.
+ * a phone-collision. The phone is already known (it's the colliding one
+ * the user just typed), so we only ask for the password. On success the
+ * page is refreshed so server components pick up the new session and the
+ * form re-renders with LoggedInContactSummary.
  */
 export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.ReactElement {
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,11 +29,7 @@ export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.Re
     setError(null);
     setSubmitting(true);
     try {
-      const res = await loginInlineForCheckout({
-        email,
-        password,
-        expectedPhone: phone,
-      });
+      const res = await loginInlineForCheckout({ phone, password });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -53,26 +47,10 @@ export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.Re
     <div className="card border border-[var(--color-warning,#f59e0b)]/40 bg-[var(--color-warning-bg,rgba(245,158,11,0.08))]">
       <h3 className="font-semibold mb-1">У вас уже есть аккаунт</h3>
       <p className="text-sm text-[var(--foreground-muted)] mb-3">
-        Этот телефон ({phone}) уже привязан к существующему аккаунту. Войдите —
-        и заказ автоматически свяжется с вашей историей.
+        Этот телефон ({phone}) уже привязан к существующему аккаунту. Введите
+        пароль — и заказ автоматически свяжется с вашей историей.
       </p>
       <form onSubmit={submit} className="space-y-3">
-        <div>
-          <label htmlFor="collision-email" className="block text-sm font-medium mb-2">
-            Email от вашего аккаунта *
-          </label>
-          <input
-            id="collision-email"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
-            required
-            className="input"
-            placeholder="your@email.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
         <div>
           <label htmlFor="collision-password" className="block text-sm font-medium mb-2">
             Пароль *

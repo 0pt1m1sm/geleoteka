@@ -5,7 +5,6 @@ import Link from "next/link";
 import { loginAction } from "@/app/actions/login";
 import { NarrowFormPage } from "@/components/shared/NarrowFormPage";
 import { Alert, Button, Card, Input } from "@/components/ui";
-import { EMAIL_PATTERN, EMAIL_TITLE } from "@/lib/utils";
 
 export default function LoginPage(): React.ReactElement {
   const [state, formAction, isPending] = useActionState(loginAction, null);
@@ -27,16 +26,14 @@ export default function LoginPage(): React.ReactElement {
           {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
 
           <Input
-            label="Email"
-            id="email"
-            name="email"
-            type="email"
-            inputMode="email"
+            label="Email или телефон"
+            id="identifier"
+            name="identifier"
+            type="text"
             required
-            pattern={EMAIL_PATTERN}
-            title={EMAIL_TITLE}
-            placeholder="your@email.com"
-            autoComplete="email"
+            placeholder="your@email.com или +79991234567"
+            autoComplete="username"
+            helperText="Войдите по любому из контактов, указанных при регистрации."
           />
 
           <Input
