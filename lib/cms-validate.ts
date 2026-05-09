@@ -75,5 +75,11 @@ export function validateCMSContent(
       }
       return { ok: true, type: "list", normalized: { items: validatedRows } };
     }
+    case "image": {
+      if (typeof c.url !== "string") {
+        return { ok: false, error: "Expected { url: string }" };
+      }
+      return { ok: true, type: "image", normalized: { url: c.url } };
+    }
   }
 }

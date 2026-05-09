@@ -3,7 +3,7 @@ import Image from "next/image";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { Markdown } from "@/components/shared/Markdown";
-import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
+import { getCMSText, getCMSRichtext, getCMSList, getCMSImage } from "@/lib/cms";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +37,7 @@ export default async function HomePage(): Promise<React.ReactElement> {
     ctaTitle,
     ctaSubtitle,
     ctaButton,
+    heroImage,
   ] = await Promise.all([
     getCMSText("home.hero.left.eyebrow"),
     getCMSText("home.hero.left.title"),
@@ -66,6 +67,7 @@ export default async function HomePage(): Promise<React.ReactElement> {
     getCMSText("home.cta.title"),
     getCMSRichtext("home.cta.subtitle"),
     getCMSText("home.cta.button"),
+    getCMSImage("home.hero.image"),
   ]);
 
   const statsList = [
@@ -88,12 +90,13 @@ export default async function HomePage(): Promise<React.ReactElement> {
       <section className="relative overflow-hidden md:min-h-[600px] md:max-h-[90vh] md:h-screen">
         <div className="absolute inset-0">
           <Image
-            src="/images/hero/g-class-4k.jpg"
+            src={heroImage}
             alt=""
             fill
             priority
             sizes="100vw"
             className="hero-image object-cover"
+            unoptimized={!heroImage.startsWith("/")}
           />
           <div className="absolute inset-0 bg-black/55 hero-overlay" />
           <div className="hero-spotlight" />

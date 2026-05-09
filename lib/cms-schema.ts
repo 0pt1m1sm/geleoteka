@@ -13,7 +13,7 @@
  * site rendering even before the seed runs.
  */
 
-export type CMSBlockType = "text" | "richtext" | "list";
+export type CMSBlockType = "text" | "richtext" | "list" | "image";
 
 export type CMSGroup =
   | "home"
@@ -54,7 +54,15 @@ interface CMSListDef {
   defaultValue: ReadonlyArray<Record<string, string>>;
 }
 
-export type CMSDef = CMSTextDef | CMSRichtextDef | CMSListDef;
+interface CMSImageDef {
+  type: "image";
+  group: CMSGroup;
+  label: string;
+  defaultValue: string;
+  helperText?: string;
+}
+
+export type CMSDef = CMSTextDef | CMSRichtextDef | CMSListDef | CMSImageDef;
 
 export const GROUP_LABELS: Record<CMSGroup, string> = {
   home: "Главная",
@@ -416,6 +424,14 @@ export const CMS_SCHEMA = {
     defaultValue: "Онлайн-запись",
   },
 
+  "home.hero.image": {
+    type: "image",
+    group: "home",
+    label: "Hero — фоновое изображение",
+    helperText: "Полноэкранный фон главной. Рекомендуется 4К landscape, JPG/WebP.",
+    defaultValue: "/images/hero/g-class-4k.jpg",
+  },
+
   // ── HOME — legacy hero text/subtitle keys (kept for back-compat with seed history)
   "home.hero.title": {
     type: "text",
@@ -733,7 +749,9 @@ export type CMSValue<K extends CMSKey> = (typeof CMS_SCHEMA)[K] extends {
     ? string
     : (typeof CMS_SCHEMA)[K] extends { type: "list" }
       ? Array<Record<string, string>>
-      : never;
+      : (typeof CMS_SCHEMA)[K] extends { type: "image" }
+        ? string
+        : never;
 
 /** Group → ordered list of keys belonging to that group. */
 export function keysByGroup(group: CMSGroup): CMSKey[] {

@@ -5,6 +5,7 @@ import { Alert, Button } from "@/components/ui";
 import { CMSTextEditor } from "./CMSTextEditor";
 import { CMSRichtextEditor } from "./CMSRichtextEditor";
 import { CMSListEditor } from "./CMSListEditor";
+import { CMSImageEditor } from "./CMSImageEditor";
 import { CMSSaveSectionProvider, useCMSSectionStatus } from "./CMSSaveContext";
 
 export interface CMSCurrentValues {
@@ -55,6 +56,15 @@ function readList(values: CMSCurrentValues, key: CMSKey): Array<Record<string, s
   return def.defaultValue as Array<Record<string, string>>;
 }
 
+function readImage(values: CMSCurrentValues, key: CMSKey): string {
+  const def = CMS_SCHEMA[key];
+  if (def.type !== "image") return "";
+  const row = values.byKey.get(key);
+  const url = row?.content.url;
+  if (typeof url === "string" && url.length > 0) return url;
+  return def.defaultValue;
+}
+
 interface SectionFieldsProps {
   keys: readonly CMSKey[];
   values: CMSCurrentValues;
@@ -84,6 +94,17 @@ function SectionFields({ keys, values }: SectionFieldsProps): React.ReactElement
                 schemaKey={key}
                 label={def.label}
                 initial={readText(values, key)}
+              />
+            );
+          }
+          if (def.type === "image") {
+            return (
+              <CMSImageEditor
+                key={key}
+                schemaKey={key}
+                label={def.label}
+                helperText={def.helperText}
+                initial={readImage(values, key)}
               />
             );
           }

@@ -12,6 +12,7 @@ interface CMSContentLegacy {
   value?: string;
   markdown?: string;
   items?: unknown;
+  url?: string;
 }
 
 interface CMSRow {
@@ -131,16 +132,31 @@ export async function getCMSList<
   return CMS_SCHEMA[key].defaultValue as Array<Record<string, string>>;
 }
 
+/** Read an `image` key as a URL string. TS error if not image. */
+export async function getCMSImage<
+  K extends CMSKey & {
+    [P in CMSKey]: (typeof CMS_SCHEMA)[P] extends { type: "image" } ? P : never;
+  }[CMSKey],
+>(key: K): Promise<string> {
+  const map = await loadAllCMS();
+  const row = map.get(key);
+  if (row && typeof row.content.url === "string" && row.content.url.length > 0) {
+    return row.content.url;
+  }
+  return CMS_SCHEMA[key].defaultValue as string;
+}
+
 /** Discriminated reader — picks the right shape based on the key's schema type. */
 export async function getCMSTyped<K extends CMSKey>(key: K): Promise<CMSValue<K>> {
   const def = CMS_SCHEMA[key];
-  if (def.type === "text" || def.type === "richtext") {
-    // The two helpers above narrow the key generic, but we already know `key`
-    // matches def.type at runtime — cast safely.
-    if (def.type === "text") {
-      return (await getCMSText(key as never)) as CMSValue<K>;
-    }
+  if (def.type === "text") {
+    return (await getCMSText(key as never)) as CMSValue<K>;
+  }
+  if (def.type === "richtext") {
     return (await getCMSRichtext(key as never)) as CMSValue<K>;
+  }
+  if (def.type === "image") {
+    return (await getCMSImage(key as never)) as CMSValue<K>;
   }
   return (await getCMSList(key as never)) as CMSValue<K>;
 }
