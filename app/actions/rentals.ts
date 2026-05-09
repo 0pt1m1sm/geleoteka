@@ -5,6 +5,7 @@ import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
+import { findOrCreateGuestCustomer } from "@/lib/customer-onboarding";
 
 interface VehicleFormData {
   model: string;
@@ -184,17 +185,26 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
     const totalCost = days * vehicle.dailyRate;
 
     const session = await getSession();
+    const guestResult = await findOrCreateGuestCustomer({
+      sessionUserId: session?.id ?? null,
+      name: contactName,
+      email: contactEmail,
+      phone: normalizePhone(contactPhone),
+    });
+    if (!guestResult.ok) {
+      return { success: false, error: guestResult.error };
+    }
 
     const booking = await db.rentalBooking.create({
       data: {
         vehicleId: carId,
-        userId: session?.id ?? null,
+        userId: guestResult.userId,
         startDate: start,
         endDate: end,
         totalCost,
         contactName,
         contactPhone: normalizePhone(contactPhone),
-        contactEmail,
+        contactEmail: contactEmail.trim().toLowerCase(),
         notes: notes || null,
       },
     });

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
+import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
 import {
@@ -57,6 +58,7 @@ export function Step3ContactConfirm({
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<BookingResultState | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [editingContact, setEditingContact] = useState(false);
 
   const prefilledRef = useRef(false);
   useEffect(() => {
@@ -134,61 +136,67 @@ export function Step3ContactConfirm({
     <form onSubmit={onFormSubmit} className="space-y-6" noValidate={false}>
       {/* Contact form */}
       <div className="card space-y-4">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-lg font-semibold">Ваши контакты</h2>
-          {defaultContact?.email && (
-            <p className="text-xs text-foreground-muted">Заполнено из профиля</p>
-          )}
-        </div>
+        <h2 className="text-lg font-semibold">Ваши контакты</h2>
 
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-          <input
-            id="name"
-            type="text"
-            value={data.name}
-            onChange={(e) => update({ name: e.target.value })}
-            className="input"
-            placeholder="Иван Иванов"
-            required
-            minLength={2}
-            maxLength={120}
+        {defaultContact?.email && !editingContact ? (
+          <LoggedInContactSummary
+            name={data.name || defaultContact.name || ""}
+            phone={data.phone || defaultContact.phone || ""}
+            email={data.email || defaultContact.email || ""}
+            onEdit={() => setEditingContact(true)}
           />
-        </div>
+        ) : (
+          <>
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
+              <input
+                id="name"
+                type="text"
+                value={data.name}
+                onChange={(e) => update({ name: e.target.value })}
+                className="input"
+                placeholder="Иван Иванов"
+                required
+                minLength={2}
+                maxLength={120}
+              />
+            </div>
 
-        <div>
-          <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-          <input
-            id="phone"
-            type="tel"
-            value={data.phone}
-            onChange={(e) => update({ phone: e.target.value })}
-            className="input"
-            placeholder="+79991234567"
-            inputMode="tel"
-            autoComplete="tel"
-            required
-            pattern={PHONE_PATTERN}
-            title={PHONE_TITLE}
-          />
-        </div>
+            <div>
+              <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
+              <input
+                id="phone"
+                type="tel"
+                value={data.phone}
+                onChange={(e) => update({ phone: e.target.value })}
+                className="input"
+                placeholder="+79991234567"
+                inputMode="tel"
+                autoComplete="tel"
+                required
+                pattern={PHONE_PATTERN}
+                title={PHONE_TITLE}
+              />
+            </div>
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-          <input
-            id="email"
-            type="email"
-            value={data.email}
-            onChange={(e) => update({ email: e.target.value })}
-            className="input"
-            placeholder="your@email.com"
-            inputMode="email"
-            autoComplete="email"
-            required
-            pattern={EMAIL_PATTERN}
-            title={EMAIL_TITLE}
-          />
-        </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
+              <input
+                id="email"
+                type="email"
+                value={data.email}
+                onChange={(e) => update({ email: e.target.value })}
+                className="input"
+                placeholder="your@email.com"
+                inputMode="email"
+                autoComplete="email"
+                required
+                pattern={EMAIL_PATTERN}
+                title={EMAIL_TITLE}
+              />
+            </div>
+          </>
+        )}
 
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-2">Примечания</label>

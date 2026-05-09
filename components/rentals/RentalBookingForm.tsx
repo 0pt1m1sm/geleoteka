@@ -12,6 +12,7 @@ import {
   formatPrice,
 } from "@/lib/utils";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
+import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
 import { DateField } from "./DateField";
 
 interface OccupiedRange {
@@ -50,6 +51,7 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [editingContact, setEditingContact] = useState(false);
   const [minDate] = useState(() => {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -145,55 +147,67 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
         </div>
       )}
 
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-        <input
-          id="name"
-          name="name"
-          required
-          minLength={2}
-          maxLength={120}
-          autoComplete="name"
-          className="input"
-          placeholder="Иван Иванов"
-          defaultValue={initialName}
-          onChange={(e) => persistDraft("name", e.target.value)}
+      {prefill && !editingContact ? (
+        <LoggedInContactSummary
+          name={prefill.name}
+          phone={prefill.phone}
+          email={prefill.email}
+          onEdit={() => setEditingContact(true)}
+          asFormData
         />
-      </div>
-      <div>
-        <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-        <input
-          id="phone"
-          name="phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          required
-          pattern={PHONE_PATTERN}
-          title={PHONE_TITLE}
-          className="input"
-          placeholder="+79991234567"
-          defaultValue={initialPhone}
-          onChange={(e) => persistDraft("phone", e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          inputMode="email"
-          autoComplete="email"
-          required
-          pattern={EMAIL_PATTERN}
-          title={EMAIL_TITLE}
-          className="input"
-          placeholder="your@email.com"
-          defaultValue={initialEmail}
-          onChange={(e) => persistDraft("email", e.target.value)}
-        />
-      </div>
+      ) : (
+        <>
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
+            <input
+              id="name"
+              name="name"
+              required
+              minLength={2}
+              maxLength={120}
+              autoComplete="name"
+              className="input"
+              placeholder="Иван Иванов"
+              defaultValue={initialName}
+              onChange={(e) => persistDraft("name", e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+              pattern={PHONE_PATTERN}
+              title={PHONE_TITLE}
+              className="input"
+              placeholder="+79991234567"
+              defaultValue={initialPhone}
+              onChange={(e) => persistDraft("phone", e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              required
+              pattern={EMAIL_PATTERN}
+              title={EMAIL_TITLE}
+              className="input"
+              placeholder="your@email.com"
+              defaultValue={initialEmail}
+              onChange={(e) => persistDraft("email", e.target.value)}
+            />
+          </div>
+        </>
+      )}
       <div>
         <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>
         <textarea
