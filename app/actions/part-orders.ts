@@ -26,6 +26,8 @@ interface OrderResult {
   /** One-shot claim secret. Returned only for guest creates (no session). null when user was already logged in. */
   claimToken?: string | null;
   error?: string;
+  /** Discriminator for error UX. "phone_collision" → render inline login panel. */
+  errorKind?: "phone_collision" | "other";
 }
 
 export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
@@ -49,7 +51,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       phone: normalizedPhone,
     });
     if (!guestResult.ok) {
-      return { success: false, error: guestResult.error };
+      return { success: false, error: guestResult.error, errorKind: guestResult.kind };
     }
     const claimToken = !session ? generateClaimToken() : null;
 

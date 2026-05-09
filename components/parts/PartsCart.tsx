@@ -10,6 +10,7 @@ import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
 import { GuestContactFields } from "@/components/shared/GuestContactFields";
+import { PhoneCollisionLoginPanel } from "@/components/shared/PhoneCollisionLoginPanel";
 
 interface DefaultContact {
   name?: string;
@@ -30,6 +31,7 @@ interface OrderResultState {
   isReturningCustomer?: boolean;
   claimToken?: string | null;
   error?: string;
+  errorKind?: "phone_collision" | "other";
 }
 
 export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}) {
@@ -38,6 +40,7 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<OrderResultState | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [submittedPhone, setSubmittedPhone] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState(false);
 
   // Pre-fill order: explicit visitor draft > session profile > empty
@@ -67,10 +70,12 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
   async function handleCheckout(formData: FormData) {
     setSubmitting(true);
     const emailAtSubmit = (formData.get("email") as string) ?? "";
+    const phoneAtSubmit = (formData.get("phone") as string) ?? "";
+    setSubmittedPhone(phoneAtSubmit);
     const res = await createPartOrder({
       items: items.map((i) => ({ partId: i.partId, quantity: i.qty })),
       contactName: formData.get("name") as string,
-      contactPhone: formData.get("phone") as string,
+      contactPhone: phoneAtSubmit,
       contactEmail: emailAtSubmit,
       notes: (formData.get("notes") as string) || "",
     });
@@ -159,11 +164,15 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
         </div>
       </div>
 
-      {result?.error && (
+      {result?.errorKind === "phone_collision" ? (
+        <div className="mb-6">
+          <PhoneCollisionLoginPanel phone={submittedPhone ?? ""} />
+        </div>
+      ) : result?.error ? (
         <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm mb-6">
           {result.error}
         </div>
-      )}
+      ) : null}
 
       <form action={handleCheckout} className="card space-y-4">
         <h2 className="font-semibold">Контактные данные</h2>

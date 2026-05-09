@@ -6,6 +6,7 @@ import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
 import { GuestContactFields } from "@/components/shared/GuestContactFields";
+import { PhoneCollisionLoginPanel } from "@/components/shared/PhoneCollisionLoginPanel";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
 import { format, parseISO } from "date-fns";
@@ -30,6 +31,7 @@ interface BookingResultState {
   isReturningCustomer?: boolean;
   claimToken?: string | null;
   error?: string;
+  errorKind?: "phone_collision" | "other";
 }
 
 /**
@@ -223,11 +225,13 @@ export function Step3ContactConfirm({
         </div>
       </div>
 
-      {result?.error && (
+      {result?.errorKind === "phone_collision" ? (
+        <PhoneCollisionLoginPanel phone={data.phone} />
+      ) : result?.error ? (
         <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
           {result.error}
         </div>
-      )}
+      ) : null}
 
       <div className="flex justify-between">
         <Link href="/booking/step-2" className="btn btn-secondary">← Назад</Link>

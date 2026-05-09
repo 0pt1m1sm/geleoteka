@@ -35,6 +35,8 @@ interface BookingResult {
   /** One-shot claim secret. Returned only for guest creates (no session). null when user was already logged in. */
   claimToken?: string | null;
   error?: string;
+  /** Discriminator for error UX. "phone_collision" → render inline login panel. */
+  errorKind?: "phone_collision" | "other";
 }
 
 export async function createRepairOrder(input: BookingInput): Promise<BookingResult> {
@@ -67,7 +69,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       phone: normalizedPhone,
     });
     if (!guestResult.ok) {
-      return { success: false, error: guestResult.error };
+      return { success: false, error: guestResult.error, errorKind: guestResult.kind };
     }
     const userId = guestResult.userId;
     const claimToken = !session ? generateClaimToken() : null;

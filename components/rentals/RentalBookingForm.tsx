@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createRentalBooking } from "@/app/actions/rentals";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
+import { PhoneCollisionLoginPanel } from "@/components/shared/PhoneCollisionLoginPanel";
 import { formatPrice } from "@/lib/utils";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
@@ -48,6 +49,7 @@ interface RentalResultState {
   isReturningCustomer?: boolean;
   claimToken?: string | null;
   error?: string;
+  errorKind?: "phone_collision" | "other";
 }
 
 export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefill = null }: Props) {
@@ -57,6 +59,7 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<RentalResultState | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [submittedPhone, setSubmittedPhone] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState(false);
   const [minDate] = useState(() => {
     const tomorrow = new Date();
@@ -83,12 +86,14 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
     const emailAtSubmit = (formData.get("email") as string) ?? "";
+    const phoneAtSubmit = (formData.get("phone") as string) ?? "";
+    setSubmittedPhone(phoneAtSubmit);
     const res = await createRentalBooking({
       carId,
       startDate,
       endDate,
       contactName: formData.get("name") as string,
-      contactPhone: formData.get("phone") as string,
+      contactPhone: phoneAtSubmit,
       contactEmail: emailAtSubmit,
       notes: (formData.get("notes") as string) || "",
     });
@@ -131,11 +136,13 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
 
   return (
     <form action={handleSubmit} className="space-y-4">
-      {result?.error && (
+      {result?.errorKind === "phone_collision" ? (
+        <PhoneCollisionLoginPanel phone={submittedPhone ?? ""} />
+      ) : result?.error ? (
         <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-4 py-3 rounded-lg text-sm">
           {result.error}
         </div>
-      )}
+      ) : null}
 
       <p className="text-sm text-[var(--foreground-muted)] -mt-2">
         Нажмите на поле, чтобы выбрать дату.

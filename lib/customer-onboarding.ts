@@ -3,6 +3,8 @@ import crypto from "node:crypto";
 import { db } from "@/lib/db";
 import { normalizePhone } from "@/lib/utils";
 
+export type GuestCustomerErrorKind = "phone_collision" | "other";
+
 export type GuestCustomerResult =
   | {
       ok: true;
@@ -11,7 +13,7 @@ export type GuestCustomerResult =
       hasRealPassword: boolean;
       matchedBy: "session" | "email" | "phone" | "created";
     }
-  | { ok: false; error: string };
+  | { ok: false; kind: GuestCustomerErrorKind; error: string };
 
 export const PHONE_COLLISION_ERROR =
   "Этот телефон уже зарегистрирован на другой email. Войдите в существующий аккаунт или используйте другой телефон.";
@@ -81,7 +83,7 @@ export async function findOrCreateGuestCustomer(input: {
   })) as { id: string; email: string; isTempPassword: boolean } | null;
   if (byPhone) {
     if (byPhone.email !== email) {
-      return { ok: false, error: PHONE_COLLISION_ERROR };
+      return { ok: false, kind: "phone_collision", error: PHONE_COLLISION_ERROR };
     }
     return {
       ok: true,
