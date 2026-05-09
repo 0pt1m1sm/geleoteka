@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
 import { RentalBookingForm } from "@/components/rentals/RentalBookingForm";
@@ -23,6 +24,29 @@ export default async function RentalCarPage({ params }: Props) {
   const c = car as Record<string, unknown>;
   const photos = (c.photos as string[]) || [];
   const features = (c.features as string[]) || [];
+
+  // Active bookings ending today or later — those occupy future dates.
+  // Cancelled/returned bookings free the vehicle.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const bookings = (await db.rentalBooking.findMany({
+    where: {
+      vehicleId: id,
+      status: { notIn: ["CANCELLED", "RETURNED"] },
+      endDate: { gte: today },
+    },
+    select: { startDate: true, endDate: true },
+    orderBy: { startDate: "asc" },
+  })) as Array<{ startDate: Date; endDate: Date }>;
+  const occupiedRanges = bookings.map((b) => ({
+    start: b.startDate.toISOString().slice(0, 10),
+    end: b.endDate.toISOString().slice(0, 10),
+  }));
+
+  const session = await getSession();
+  const prefill = session
+    ? { name: session.name, phone: session.phone, email: session.email }
+    : null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
@@ -299,6 +323,8 @@ export default async function RentalCarPage({ params }: Props) {
             <RentalBookingForm
               carId={c.id as string}
               dailyRate={(c.dailyRate as number) ?? 0}
+              occupiedRanges={occupiedRanges}
+              prefill={prefill}
             />
 
             {/* Trust signals */}

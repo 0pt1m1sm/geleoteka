@@ -14,12 +14,37 @@ import {
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { DateField } from "./DateField";
 
+interface OccupiedRange {
+  start: string; // YYYY-MM-DD
+  end: string;
+}
+
+interface Prefill {
+  name: string;
+  phone: string;
+  email: string;
+}
+
 interface Props {
   carId: string;
   dailyRate: number;
+  occupiedRanges?: OccupiedRange[];
+  prefill?: Prefill | null;
 }
 
-export function RentalBookingForm({ carId, dailyRate }: Props) {
+function formatRange(r: OccupiedRange): string {
+  const fmt = (iso: string) => {
+    const [y, m, d] = iso.split("-");
+    return `${d}.${m}.${y}`;
+  };
+  return r.start === r.end ? fmt(r.start) : `${fmt(r.start)} – ${fmt(r.end)}`;
+}
+
+function rangesOverlap(aStart: string, aEnd: string, occupied: OccupiedRange[]): boolean {
+  return occupied.some((r) => aStart <= r.end && aEnd >= r.start);
+}
+
+export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefill = null }: Props) {
   const draft = contactDraftStore.useStore();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -35,10 +60,17 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
     contactDraftStore.setStore({ ...contactDraftStore.getStore(), [field]: value });
   }
 
+  // Prefill priority: existing draft (current edits) → session prefill (logged-in user)
+  const initialName = draft.name || prefill?.name || "";
+  const initialPhone = draft.phone || prefill?.phone || "";
+  const initialEmail = draft.email || prefill?.email || "";
+
   const days = startDate && endDate
     ? Math.max(1, Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)))
     : 0;
   const total = days * dailyRate;
+  const conflictsWithOccupied =
+    startDate && endDate ? rangesOverlap(startDate, endDate, occupiedRanges) : false;
 
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
@@ -86,10 +118,25 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
       <p className="text-sm text-[var(--foreground-muted)] -mt-2">
         Нажмите на поле, чтобы выбрать дату.
       </p>
+      {occupiedRanges.length > 0 && (
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)] p-3 text-xs">
+          <p className="font-medium text-[var(--foreground)] mb-1.5">Занятые даты:</p>
+          <ul className="space-y-0.5 text-[var(--foreground-muted)]">
+            {occupiedRanges.map((r) => (
+              <li key={`${r.start}-${r.end}`}>· {formatRange(r)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="space-y-3">
         <DateField label="С *" value={startDate} onChange={setStartDate} min={minDate} required />
         <DateField label="По *" value={endDate} onChange={setEndDate} min={startDate || minDate} required />
       </div>
+      {conflictsWithOccupied && (
+        <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-3 py-2 rounded-lg text-xs">
+          Выбранный период пересекается с занятыми датами. Выберите другой диапазон.
+        </div>
+      )}
 
       {days > 0 && (
         <div className="bg-[var(--background-secondary)] rounded-lg p-3 text-center">
@@ -109,7 +156,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
           autoComplete="name"
           className="input"
           placeholder="Иван Иванов"
-          defaultValue={draft.name}
+          defaultValue={initialName}
           onChange={(e) => persistDraft("name", e.target.value)}
         />
       </div>
@@ -126,7 +173,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
           title={PHONE_TITLE}
           className="input"
           placeholder="+79991234567"
-          defaultValue={draft.phone}
+          defaultValue={initialPhone}
           onChange={(e) => persistDraft("phone", e.target.value)}
         />
       </div>
@@ -143,7 +190,7 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
           title={EMAIL_TITLE}
           className="input"
           placeholder="your@email.com"
-          defaultValue={draft.email}
+          defaultValue={initialEmail}
           onChange={(e) => persistDraft("email", e.target.value)}
         />
       </div>
@@ -159,8 +206,18 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
         />
       </div>
 
-      <button type="submit" disabled={submitting || days === 0} className="btn btn-primary w-full">
-        {submitting ? "Отправка..." : days > 0 ? `Забронировать — ${formatPrice(total)}` : "Выберите даты"}
+      <button
+        type="submit"
+        disabled={submitting || days === 0 || conflictsWithOccupied}
+        className="btn btn-primary w-full"
+      >
+        {submitting
+          ? "Отправка..."
+          : conflictsWithOccupied
+          ? "Даты заняты"
+          : days > 0
+          ? `Забронировать — ${formatPrice(total)}`
+          : "Выберите даты"}
       </button>
     </form>
   );
