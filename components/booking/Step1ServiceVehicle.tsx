@@ -63,7 +63,6 @@ export function Step1ServiceVehicle({ services, models }: Props): React.ReactEle
         (g) => yearNum >= g.yearFrom && (g.yearTo === null || yearNum <= g.yearTo),
       )
     : [];
-  const matchedGeneration = matchedGenerations[0]; // first match — used as a singular reference for the chassis label fallback
   const trims = matchedGenerations.flatMap((g) => g.trims ?? []);
   const showTrimPicker = matchedGenerations.length > 0 && trims.length > 0;
   const selectedTrim = trims.find((t) => t.id === data.trim);

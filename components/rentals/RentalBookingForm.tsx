@@ -12,6 +12,7 @@ import {
   formatPrice,
 } from "@/lib/utils";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
+import { DateField } from "./DateField";
 
 interface Props {
   carId: string;
@@ -86,62 +87,8 @@ export function RentalBookingForm({ carId, dailyRate }: Props) {
         Нажмите на поле, чтобы выбрать дату.
       </p>
       <div className="space-y-3">
-        <div className="min-w-0 w-full">
-          <label htmlFor="startDate" className="block text-sm font-medium mb-2">С *</label>
-          <div className="relative w-full min-w-0 max-w-full">
-            <input
-              id="startDate"
-              type="date"
-              required
-              min={minDate}
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="input w-full min-w-0 max-w-full pr-10 cursor-pointer date-input"
-              data-empty={!startDate || undefined}
-            />
-            <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </span>
-            {!startDate && (
-              <span aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--foreground-muted)]">
-                дд.мм.гггг
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="min-w-0 w-full">
-          <label htmlFor="endDate" className="block text-sm font-medium mb-2">По *</label>
-          <div className="relative w-full min-w-0 max-w-full">
-            <input
-              id="endDate"
-              type="date"
-              required
-              min={startDate || minDate}
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="input w-full min-w-0 max-w-full pr-10 cursor-pointer date-input"
-              data-empty={!endDate || undefined}
-            />
-            <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-accent)]">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-            </span>
-            {!endDate && (
-              <span aria-hidden className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-[var(--foreground-muted)]">
-                дд.мм.гггг
-              </span>
-            )}
-          </div>
-        </div>
+        <DateField label="С *" value={startDate} onChange={setStartDate} min={minDate} required />
+        <DateField label="По *" value={endDate} onChange={setEndDate} min={startDate || minDate} required />
       </div>
 
       {days > 0 && (
