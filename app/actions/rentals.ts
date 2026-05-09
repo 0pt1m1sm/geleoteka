@@ -5,7 +5,7 @@ import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
-import { findOrCreateGuestCustomer } from "@/lib/customer-onboarding";
+import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
 
 interface VehicleFormData {
   model: string;
@@ -131,6 +131,12 @@ interface RentalBookingInput {
 interface RentalBookingResult {
   success: boolean;
   bookingId?: string;
+  /** Set when success=true. User the booking was attached to. */
+  userId?: string;
+  /** True only when matched an existing user with a real password. */
+  isReturningCustomer?: boolean;
+  /** One-shot claim secret. Returned only for guest creates (no session). null when user was already logged in. */
+  claimToken?: string | null;
   error?: string;
 }
 
@@ -194,6 +200,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
     if (!guestResult.ok) {
       return { success: false, error: guestResult.error };
     }
+    const claimToken = !session ? generateClaimToken() : null;
 
     const booking = await db.rentalBooking.create({
       data: {
@@ -205,11 +212,18 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
         contactName,
         contactPhone: normalizePhone(contactPhone),
         contactEmail: contactEmail.trim().toLowerCase(),
+        claimToken,
         notes: notes || null,
       },
     });
 
-    return { success: true, bookingId: booking.id };
+    return {
+      success: true,
+      bookingId: booking.id,
+      userId: guestResult.userId,
+      isReturningCustomer: guestResult.isReturning && guestResult.hasRealPassword,
+      claimToken,
+    };
   } catch (err) {
     console.error("Rental booking error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };

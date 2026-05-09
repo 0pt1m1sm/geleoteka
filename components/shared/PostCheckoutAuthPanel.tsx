@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/Button";
 import { Alert } from "@/components/ui/Alert";
 
 interface PostCheckoutAuthPanelProps {
-  kind: "booking" | "cart";
+  kind: "booking" | "cart" | "rental";
   orderId: string;
   /** One-shot claim secret captured from the order-creation result. */
   claimToken: string;
@@ -101,7 +101,7 @@ export function PostCheckoutAuthPanel({
 
 interface TabProps {
   orderId: string;
-  orderKind: "booking" | "cart";
+  orderKind: "booking" | "cart" | "rental";
   claimToken: string;
   email: string;
   router: ReturnType<typeof useRouter>;

@@ -690,6 +690,11 @@ model RentalBooking {
   contactPhone String
   contactEmail String
   notes        String?
+  // One-shot claim secret for guest checkouts. Mirrors RepairOrder.claimToken
+  // and PartOrder.claimToken — lets a guest who just booked a rental set a
+  // password and merge into the soft-account created at submit time. Cleared
+  // (set to NULL) once the guest claims the account.
+  claimToken   String?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
@@ -699,6 +704,7 @@ model RentalBooking {
   @@index([vehicleId])
   @@index([userId])
   @@index([status])
+  @@index([claimToken])
 }
 
 // ============================================

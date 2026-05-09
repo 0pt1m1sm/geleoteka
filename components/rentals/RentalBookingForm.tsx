@@ -2,17 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Check } from "lucide-react";
 import { createRentalBooking } from "@/app/actions/rentals";
-import {
-  EMAIL_PATTERN,
-  EMAIL_TITLE,
-  PHONE_PATTERN,
-  PHONE_TITLE,
-  formatPrice,
-} from "@/lib/utils";
+import { SuccessCard } from "@/components/shared/SuccessCard";
+import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
+import { formatPrice } from "@/lib/utils";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
+import { GuestContactFields } from "@/components/shared/GuestContactFields";
 import { DateField } from "./DateField";
 
 interface OccupiedRange {
@@ -45,12 +41,22 @@ function rangesOverlap(aStart: string, aEnd: string, occupied: OccupiedRange[]):
   return occupied.some((r) => aStart <= r.end && aEnd >= r.start);
 }
 
+interface RentalResultState {
+  success: boolean;
+  bookingId?: string;
+  userId?: string;
+  isReturningCustomer?: boolean;
+  claimToken?: string | null;
+  error?: string;
+}
+
 export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefill = null }: Props) {
   const draft = contactDraftStore.useStore();
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [result, setResult] = useState<RentalResultState | null>(null);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [editingContact, setEditingContact] = useState(false);
   const [minDate] = useState(() => {
     const tomorrow = new Date();
@@ -76,35 +82,49 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
 
   async function handleSubmit(formData: FormData) {
     setSubmitting(true);
+    const emailAtSubmit = (formData.get("email") as string) ?? "";
     const res = await createRentalBooking({
       carId,
       startDate,
       endDate,
       contactName: formData.get("name") as string,
       contactPhone: formData.get("phone") as string,
-      contactEmail: formData.get("email") as string,
+      contactEmail: emailAtSubmit,
       notes: (formData.get("notes") as string) || "",
     });
     setResult(res);
     setSubmitting(false);
     if (res.success) {
+      setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
       clearContactDraft();
     }
   }
 
   if (result?.success) {
+    const showPanel =
+      !prefill &&
+      result.userId &&
+      result.claimToken &&
+      submittedEmail &&
+      result.bookingId;
     return (
-      <div className="text-center py-8">
-        <div className="w-12 h-12 rounded-full bg-[var(--color-success-bg)] mx-auto mb-4 flex items-center justify-center">
-          <Check className="w-6 h-6 text-[var(--color-success)]" aria-hidden />
-        </div>
-        <h3 className="font-bold text-lg mb-2">Заявка отправлена!</h3>
-        <p className="text-sm text-[var(--foreground-muted)] mb-4">
-          Мы свяжемся для подтверждения бронирования.
-        </p>
-        <Link href="/rentals" className="btn btn-secondary text-sm">
-          К каталогу
-        </Link>
+      <div className="space-y-6">
+        <SuccessCard
+          heading="Заявка отправлена!"
+          message="Мы свяжемся для подтверждения бронирования."
+        >
+          <Link href="/rentals" className="btn btn-secondary">К каталогу</Link>
+          <Link href="/cabinet/rentals" className="btn btn-primary">Мои аренды</Link>
+        </SuccessCard>
+        {showPanel ? (
+          <PostCheckoutAuthPanel
+            kind="rental"
+            orderId={result.bookingId!}
+            claimToken={result.claimToken!}
+            email={submittedEmail!}
+            isReturning={result.isReturningCustomer ?? false}
+          />
+        ) : null}
       </div>
     );
   }
@@ -156,57 +176,13 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
           asFormData
         />
       ) : (
-        <>
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-            <input
-              id="name"
-              name="name"
-              required
-              minLength={2}
-              maxLength={120}
-              autoComplete="name"
-              className="input"
-              placeholder="Иван Иванов"
-              defaultValue={initialName}
-              onChange={(e) => persistDraft("name", e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-            <input
-              id="phone"
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              autoComplete="tel"
-              required
-              pattern={PHONE_PATTERN}
-              title={PHONE_TITLE}
-              className="input"
-              placeholder="+79991234567"
-              defaultValue={initialPhone}
-              onChange={(e) => persistDraft("phone", e.target.value)}
-            />
-          </div>
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              required
-              pattern={EMAIL_PATTERN}
-              title={EMAIL_TITLE}
-              className="input"
-              placeholder="your@email.com"
-              defaultValue={initialEmail}
-              onChange={(e) => persistDraft("email", e.target.value)}
-            />
-          </div>
-        </>
+        <GuestContactFields
+          mode="uncontrolled"
+          initialName={initialName}
+          initialPhone={initialPhone}
+          initialEmail={initialEmail}
+          onDraftChange={persistDraft}
+        />
       )}
       <div>
         <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>

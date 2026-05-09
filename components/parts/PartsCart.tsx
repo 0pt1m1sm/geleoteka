@@ -2,19 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import {
-  EMAIL_PATTERN,
-  EMAIL_TITLE,
-  PHONE_PATTERN,
-  PHONE_TITLE,
-  formatPrice,
-} from "@/lib/utils";
+import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { createLocalStorageStore } from "@/lib/local-storage-store";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
+import { GuestContactFields } from "@/components/shared/GuestContactFields";
 
 interface CartItem {
   partId: string;
@@ -192,57 +187,13 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             asFormData
           />
         ) : (
-          <>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-              <input
-                id="name"
-                name="name"
-                required
-                minLength={2}
-                maxLength={120}
-                autoComplete="name"
-                className="input"
-                placeholder="Иван Иванов"
-                defaultValue={initialName}
-                onChange={(e) => persistDraft("name", e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-              <input
-                id="phone"
-                name="phone"
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                required
-                pattern={PHONE_PATTERN}
-                title={PHONE_TITLE}
-                className="input"
-                placeholder="+79991234567"
-                defaultValue={initialPhone}
-                onChange={(e) => persistDraft("phone", e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                inputMode="email"
-                autoComplete="email"
-                required
-                pattern={EMAIL_PATTERN}
-                title={EMAIL_TITLE}
-                className="input"
-                placeholder="your@email.com"
-                defaultValue={initialEmail}
-                onChange={(e) => persistDraft("email", e.target.value)}
-              />
-            </div>
-          </>
+          <GuestContactFields
+            mode="uncontrolled"
+            initialName={initialName}
+            initialPhone={initialPhone}
+            initialEmail={initialEmail}
+            onDraftChange={persistDraft}
+          />
         )}
         <div>
           <label htmlFor="notes" className="block text-sm font-medium mb-2">Комментарий</label>

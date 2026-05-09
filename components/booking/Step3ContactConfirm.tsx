@@ -5,14 +5,9 @@ import Link from "next/link";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
+import { GuestContactFields } from "@/components/shared/GuestContactFields";
 import { useBooking } from "./BookingProvider";
 import { createRepairOrder } from "@/app/actions/booking";
-import {
-  EMAIL_PATTERN,
-  EMAIL_TITLE,
-  PHONE_PATTERN,
-  PHONE_TITLE,
-} from "@/lib/utils";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
@@ -146,56 +141,13 @@ export function Step3ContactConfirm({
             onEdit={() => setEditingContact(true)}
           />
         ) : (
-          <>
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium mb-2">Имя *</label>
-              <input
-                id="name"
-                type="text"
-                value={data.name}
-                onChange={(e) => update({ name: e.target.value })}
-                className="input"
-                placeholder="Иван Иванов"
-                required
-                minLength={2}
-                maxLength={120}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="phone" className="block text-sm font-medium mb-2">Телефон *</label>
-              <input
-                id="phone"
-                type="tel"
-                value={data.phone}
-                onChange={(e) => update({ phone: e.target.value })}
-                className="input"
-                placeholder="+79991234567"
-                inputMode="tel"
-                autoComplete="tel"
-                required
-                pattern={PHONE_PATTERN}
-                title={PHONE_TITLE}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium mb-2">Email *</label>
-              <input
-                id="email"
-                type="email"
-                value={data.email}
-                onChange={(e) => update({ email: e.target.value })}
-                className="input"
-                placeholder="your@email.com"
-                inputMode="email"
-                autoComplete="email"
-                required
-                pattern={EMAIL_PATTERN}
-                title={EMAIL_TITLE}
-              />
-            </div>
-          </>
+          <GuestContactFields
+            mode="controlled"
+            name={data.name}
+            phone={data.phone}
+            email={data.email}
+            onChange={(field, value) => update({ [field]: value })}
+          />
         )}
 
         <div>

@@ -6,11 +6,13 @@ import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { isValidPassword } from "@/lib/customer-onboarding";
 
-type OrderKind = "booking" | "cart";
+type OrderKind = "booking" | "cart" | "rental";
 
 function destinationFor(orderKind: OrderKind, role: string): string {
   if (role === "ADMIN" || role === "MANAGER") return "/admin";
-  return orderKind === "booking" ? "/cabinet" : "/cabinet/orders";
+  if (orderKind === "booking") return "/cabinet";
+  if (orderKind === "rental") return "/cabinet/rentals";
+  return "/cabinet/orders";
 }
 
 function tokensMatch(a: string | null | undefined, b: string | null | undefined): boolean {
@@ -48,6 +50,14 @@ export async function setPasswordForGuestUser(input: {
     if (!ro) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = ro.claimToken;
     userIdOnOrder = ro.userId;
+  } else if (input.orderKind === "rental") {
+    const rb = (await db.rentalBooking.findUnique({
+      where: { id: input.orderId },
+      select: { claimToken: true, userId: true },
+    })) as { claimToken: string | null; userId: string | null } | null;
+    if (!rb) return { ok: false, error: "Неверная или истекшая ссылка claim" };
+    storedToken = rb.claimToken;
+    userIdOnOrder = rb.userId;
   } else {
     const po = (await db.partOrder.findUnique({
       where: { id: input.orderId },
@@ -80,20 +90,27 @@ export async function setPasswordForGuestUser(input: {
   }
 
   const passwordHash = await bcrypt.hash(input.password, 12);
-  await db.$transaction([
-    db.user.update({
-      where: { id: user.id },
-      data: { passwordHash, isTempPassword: false },
-    }),
+  const clearTokenOp =
     input.orderKind === "booking"
       ? db.repairOrder.update({
+          where: { id: input.orderId },
+          data: { claimToken: null },
+        })
+      : input.orderKind === "rental"
+      ? db.rentalBooking.update({
           where: { id: input.orderId },
           data: { claimToken: null },
         })
       : db.partOrder.update({
           where: { id: input.orderId },
           data: { claimToken: null },
-        }),
+        });
+  await db.$transaction([
+    db.user.update({
+      where: { id: user.id },
+      data: { passwordHash, isTempPassword: false },
+    }),
+    clearTokenOp,
   ]);
 
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
@@ -135,6 +152,17 @@ export async function loginAndAttachOrder(input: {
     storedToken = ro.claimToken;
     orderEmail = ro.user.email;
     orderUserId = ro.userId;
+  } else if (input.orderKind === "rental") {
+    const rb = (await db.rentalBooking.findUnique({
+      where: { id: input.orderId },
+      select: { claimToken: true, userId: true, contactEmail: true },
+    })) as
+      | { claimToken: string | null; userId: string | null; contactEmail: string }
+      | null;
+    if (!rb) return { ok: false, error: "Неверная или истекшая ссылка claim" };
+    storedToken = rb.claimToken;
+    orderEmail = rb.contactEmail;
+    orderUserId = rb.userId;
   } else {
     const po = (await db.partOrder.findUnique({
       where: { id: input.orderId },
@@ -185,6 +213,17 @@ export async function loginAndAttachOrder(input: {
       return { ok: false, error: "Заказ привязан к другому аккаунту." };
     }
     await db.partOrder.update({
+      where: { id: input.orderId },
+      data:
+        orderUserId === null
+          ? { userId: user.id, claimToken: null }
+          : { claimToken: null },
+    });
+  } else if (input.orderKind === "rental") {
+    if (orderUserId !== null && orderUserId !== user.id) {
+      return { ok: false, error: "Заказ привязан к другому аккаунту." };
+    }
+    await db.rentalBooking.update({
       where: { id: input.orderId },
       data:
         orderUserId === null
