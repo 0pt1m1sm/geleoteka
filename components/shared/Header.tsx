@@ -3,11 +3,12 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Menu, ShoppingCart } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "./Drawer";
 import { ThemeToggle } from "./ThemeToggle";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
+import { CartIconLink } from "./CartIconLink";
 import type { AdminNavEntry } from "@/lib/admin-nav";
 
 export interface PublicHeaderProps {
@@ -74,9 +75,7 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
               {item.label}
             </Link>
           ))}
-          <Link href="/parts/cart" className="btn-icon" aria-label="Корзина">
-            <ShoppingCart size={20} aria-hidden />
-          </Link>
+          <CartIconLink />
           <ThemeToggle />
           <Link href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap">
             {cabinetLabel}
@@ -86,9 +85,7 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
           </Link>
         </nav>
         <div className="md:hidden flex items-center gap-1">
-          <Link href="/parts/cart" className="btn-icon" aria-label="Корзина">
-            <ShoppingCart size={20} aria-hidden />
-          </Link>
+          <CartIconLink />
           <PublicMobileMenu cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
         </div>
       </div>

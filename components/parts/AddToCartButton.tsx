@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { Check } from "lucide-react";
+import { addToCart } from "@/lib/parts-cart-store";
 
 interface PartInfo {
   id: string;
@@ -12,31 +15,36 @@ interface PartInfo {
 }
 
 export function AddToCartButton({ part }: { part: PartInfo }) {
-  function addToCart() {
-    const CART_KEY = "parts-cart";
-    const stored = localStorage.getItem(CART_KEY);
-    const items: Array<{ partId: string; name: string; article: string; price: number; qty: number }> =
-      stored ? JSON.parse(stored) : [];
+  const [justAdded, setJustAdded] = useState(false);
 
-    const existing = items.find((i) => i.partId === part.id);
-    if (existing) {
-      existing.qty += 1;
-    } else {
-      items.push({ partId: part.id, name: part.name, article: part.article, price: part.price, qty: 1 });
-    }
-
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-    alert("Добавлено в корзину!");
+  function handleClick(): void {
+    addToCart({
+      partId: part.id,
+      name: part.name,
+      article: part.article,
+      price: part.price,
+    });
+    setJustAdded(true);
+    window.setTimeout(() => setJustAdded(false), 1500);
   }
 
   return (
     <div className="space-y-3">
       <button
         type="button"
-        onClick={addToCart}
-        className="btn btn-primary w-full text-center"
+        onClick={handleClick}
+        aria-live="polite"
+        className={`btn w-full text-center transition-colors ${
+          justAdded ? "btn-secondary" : "btn-primary"
+        }`}
       >
-        В корзину
+        {justAdded ? (
+          <span className="inline-flex items-center justify-center gap-2">
+            <Check size={16} aria-hidden /> Добавлено в корзину
+          </span>
+        ) : (
+          "В корзину"
+        )}
       </button>
       <Link href="/parts/cart" className="btn btn-secondary w-full text-center">
         Перейти в корзину

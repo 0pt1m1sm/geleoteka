@@ -4,23 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
-import { createLocalStorageStore } from "@/lib/local-storage-store";
+import { cartStore, EMPTY_PARTS_CART } from "@/lib/parts-cart-store";
 import { contactDraftStore, clearContactDraft } from "@/lib/contact-draft";
 import { SuccessCard } from "@/components/shared/SuccessCard";
 import { PostCheckoutAuthPanel } from "@/components/shared/PostCheckoutAuthPanel";
 import { LoggedInContactSummary } from "@/components/shared/LoggedInContactSummary";
 import { GuestContactFields } from "@/components/shared/GuestContactFields";
-
-interface CartItem {
-  partId: string;
-  name: string;
-  article: string;
-  price: number;
-  qty: number;
-}
-
-const EMPTY_CART: CartItem[] = [];
-const cartStore = createLocalStorageStore<CartItem[]>("parts-cart", EMPTY_CART);
 
 interface DefaultContact {
   name?: string;
@@ -89,7 +78,7 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
     setSubmitting(false);
     if (res.success) {
       setSubmittedEmail(emailAtSubmit);
-      cartStore.setStore(EMPTY_CART);
+      cartStore.setStore(EMPTY_PARTS_CART);
       clearContactDraft();
     }
   }
