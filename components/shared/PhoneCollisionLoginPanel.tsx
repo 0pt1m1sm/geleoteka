@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { loginInlineForCheckout } from "@/app/actions/login";
 
 interface Props {
-  /** Phone the user typed that already belongs to another account. */
+  /** Phone the user typed that already belongs to another account — shown for context. */
   phone: string;
   /** Called after successful login so the host form can re-submit using the new session. */
   onLoggedIn?: () => void;
@@ -13,12 +13,14 @@ interface Props {
 
 /**
  * Shown above the checkout form when findOrCreateGuestCustomer reports
- * a phone-collision. The phone is already known (it's the colliding one
- * the user just typed), so we only ask for the password. On success the
- * page is refreshed so server components pick up the new session and the
- * form re-renders with LoggedInContactSummary.
+ * a phone-collision. Accepts either email or phone — visitor may want
+ * to log into a different existing account (e.g. registered under
+ * another phone they own). On success the page refreshes so server
+ * components pick up the new session and the form re-renders with
+ * LoggedInContactSummary.
  */
 export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.ReactElement {
+  const [identifier, setIdentifier] = useState(phone);
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +31,7 @@ export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.Re
     setError(null);
     setSubmitting(true);
     try {
-      const res = await loginInlineForCheckout({ phone, password });
+      const res = await loginInlineForCheckout({ identifier, password });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -47,10 +49,25 @@ export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.Re
     <div className="card border border-[var(--color-warning,#f59e0b)]/40 bg-[var(--color-warning-bg,rgba(245,158,11,0.08))]">
       <h3 className="font-semibold mb-1">У вас уже есть аккаунт</h3>
       <p className="text-sm text-[var(--foreground-muted)] mb-3">
-        Этот телефон ({phone}) уже привязан к существующему аккаунту. Введите
-        пароль — и заказ автоматически свяжется с вашей историей.
+        Этот телефон ({phone}) уже привязан к существующему аккаунту. Войдите
+        — и заказ автоматически свяжется с вашей историей.
       </p>
       <form onSubmit={submit} className="space-y-3">
+        <div>
+          <label htmlFor="collision-identifier" className="block text-sm font-medium mb-2">
+            Email или телефон *
+          </label>
+          <input
+            id="collision-identifier"
+            type="text"
+            autoComplete="username"
+            required
+            className="input"
+            placeholder="your@email.com или +79991234567"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+          />
+        </div>
         <div>
           <label htmlFor="collision-password" className="block text-sm font-medium mb-2">
             Пароль *

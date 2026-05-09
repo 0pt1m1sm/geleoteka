@@ -51,51 +51,32 @@ async function findUserByIdentifier(identifierRaw: string): Promise<MinimalUser 
 }
 
 /**
- * Non-redirecting login used by inline checkout collision UX. The phone is
- * already known (it's the colliding one from the checkout form), so we
- * look up the user by phone and only ask for the password. Returns
- * ok/error so the caller can render the result inline.
+ * Non-redirecting login used by inline checkout collision UX. Accepts
+ * either email or phone — the visitor may have an existing account
+ * registered under a different phone than the one they're trying to use
+ * in checkout, and we want to let them log into THAT account rather than
+ * forcing them to use the colliding phone. Returns ok/error so the
+ * caller can render the result inline.
  */
 export async function loginInlineForCheckout(input: {
+  identifier: string;
   password: string;
-  /** Phone the checkout form tried — used as the user lookup key. */
-  phone: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const phone = normalizePhone(input.phone);
-
-  if (!phone || !input.password) {
-    return { ok: false, error: "Телефон и пароль обязательны" };
-  }
-  if (!/^\+7\d{10}$/.test(phone)) {
-    return { ok: false, error: "Некорректный телефон" };
+  if (!input.identifier || !input.password) {
+    return { ok: false, error: "Email/телефон и пароль обязательны" };
   }
 
-  const user = (await db.user.findUnique({
-    where: { phone },
-    select: {
-      id: true,
-      passwordHash: true,
-      permissionRole: true,
-      isTempPassword: true,
-    },
-  })) as
-    | {
-        id: string;
-        passwordHash: string | null;
-        permissionRole: string;
-        isTempPassword: boolean;
-      }
-    | null;
+  const user = await findUserByIdentifier(input.identifier);
 
   if (!user || !user.passwordHash || user.permissionRole === "NONE") {
-    return { ok: false, error: "Неверный пароль" };
+    return { ok: false, error: "Неверный email/телефон или пароль" };
   }
   if (user.isTempPassword) {
     return { ok: false, error: "Пароль не задан. Восстановите его по SMS." };
   }
 
   const valid = await bcrypt.compare(input.password, user.passwordHash);
-  if (!valid) return { ok: false, error: "Неверный пароль" };
+  if (!valid) return { ok: false, error: "Неверный email/телефон или пароль" };
 
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
