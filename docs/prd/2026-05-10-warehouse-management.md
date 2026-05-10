@@ -8,7 +8,14 @@ Research: Light
 
 ## Problem Statement
 
-Geleoteka has a parts catalog (`Part`) with a single `quantity Int` column and inbound (`SupplierOrder`) / outbound (`PartLine`) flows that don't write back to that quantity. Today the manager filling an estimate has no way to know whether the part is in stock, and there's no audit trail when stock changes — which means no defensible reconciliation against Splus, the external accounting system that holds the source-of-truth quantity.
+Geleoteka has a parts catalog (`Part`) with a single `quantity Int` column and inbound (`SupplierOrder`) / outbound (`PartLine`, future `DealLine{type: PART}`) flows that don't write back to that quantity. Today the manager filling a deal has no way to know whether the part is in stock, and there's no audit trail when stock changes — which means no defensible reconciliation against Splus, the external accounting system that holds the source-of-truth quantity.
+
+> **Depends on:** `2026-05-10-deal-fulfillment-architecture.md`. After
+> that lands, "outbound stock movement" originates from a Deal (with a
+> linked fulfillment — RepairOrder for installed parts, PartShipment
+> for retail/wholesale). This PRD's references below to RepairOrder /
+> PartOrder should be read as Deal+Fulfillment after the foundational
+> migration.
 
 Two near-term needs make this a blocker:
 
@@ -53,21 +60,31 @@ model StockMovement {
   resultingQty    Int                 // Part.quantity after this movement applied
   reason          StockMovementReason
   actorUserId     String?             // who triggered (null = system, e.g. SPLUS_SYNC)
-  repairOrderId   String?             // origin link
-  partOrderId     String?
-  supplierOrderId String?
+
+  // Origin links — Deal is the commercial root; the specific fulfillment
+  // is recorded for ops drill-down. SupplierOrder remains a non-Deal
+  // origin (inbound). Exactly one of these (or none, for ADJUSTMENT /
+  // SPLUS_SYNC / COUNT) should be set.
+  dealId          String?
+  repairOrderId   String?             // RO that consumed the part
+  partShipmentId  String?             // shipment that fulfilled a parts order
+  supplierOrderId String?             // inbound receipt origin
+
   notes           String?
   createdAt       DateTime            @default(now())
 
   part           Part           @relation(fields: [partId], references: [id], onDelete: Cascade)
   actor          User?          @relation("StockMovementActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  deal           Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   repairOrder    RepairOrder?   @relation(fields: [repairOrderId], references: [id], onDelete: SetNull)
-  partOrder      PartOrder?     @relation(fields: [partOrderId], references: [id], onDelete: SetNull)
+  partShipment   PartShipment?  @relation(fields: [partShipmentId], references: [id], onDelete: SetNull)
   supplierOrder  SupplierOrder? @relation(fields: [supplierOrderId], references: [id], onDelete: SetNull)
 
   @@index([partId, createdAt])
   @@index([reason])
+  @@index([dealId])
   @@index([repairOrderId])
+  @@index([partShipmentId])
   @@index([supplierOrderId])
 }
 ```
@@ -94,19 +111,25 @@ model SplusSyncRun {
 
 | Action | Purpose | Auth |
 |---|---|---|
-| `applyStockMovement(partId, delta, reason, refs)` | Single mutation gate. Writes movement + updates `Part.quantity` in a tx. | ADMIN/MANAGER (CONSUMPTION/SALE), ADMIN (ADJUSTMENT) |
+| `applyStockMovement(partId, delta, reason, refs)` | Single mutation gate. Writes movement + updates `Part.quantity` in a tx. `refs` accepts `{dealId, repairOrderId, partShipmentId, supplierOrderId}`. | ADMIN/MANAGER (CONSUMPTION/SALE), ADMIN (ADJUSTMENT) |
 | `recordSupplierReceipt(supplierOrderId)` | On `SupplierOrder.status=RECEIVED`, walks items, writes RECEIPT movements. | ADMIN/MANAGER |
-| `consumePartsForRepairOrder(repairOrderId)` | On RO `CLOSED`, walks PartLines, writes CONSUMPTION. | ADMIN/MANAGER |
+| `consumePartsForRepairOrder(repairOrderId)` | On RO `CLOSED`, walks PartLines (installed parts), writes CONSUMPTION movements with `dealId` from `RepairOrder.dealId`. | ADMIN/MANAGER |
+| `consumePartsForShipment(partShipmentId)` | On `PartShipment.status=DELIVERED` or `SHIPPED`, walks line items, writes SALE movements with `dealId`. | ADMIN/MANAGER |
 | `runSplusSync()` | Background job; pull from Splus, diff each part, write SPLUS_SYNC adjustments. | system / cron |
 | `GET /api/stock/lookup?code=...` | Scanner endpoint. Resolves barcode/article/gtin → Part with current stock. | ADMIN/MANAGER |
+| `lookupPartForDealLine(query)` | Public read API consumed by CRM DealLine editor. | ADMIN/MANAGER |
 
-## Estimate Flow Integration
+## Deal Flow Integration
 
-`JobLineEditor` parts panel gains a picker:
+The CRM `DealLine` editor (and historically the EstimateBuilder before
+the Deal+Fulfillment refactor) gains a part picker for `DealLine{type: PART}` rows:
+
 - Search input with debounced lookup against Part (article + name + barcode).
-- Selected Part fills `partDescription`, `partUnitPrice`, locks qty cap to `quantity`.
-- "Свободный текст" toggle preserves the current free-text path for non-catalog parts.
+- Selected Part fills `description`, `unitPrice`, populates `partId` on the DealLine, and surfaces current `quantity`.
+- Manager can override price (the picker pre-fills `Part.price` but doesn't lock it — DealLine.unitPrice wins).
+- "Свободный текст" toggle preserves the path for non-catalog parts (DealLine without `partId`).
 - Stock chip per result: green ≥ qty, yellow 1..qty-1, red 0 (still selectable with warning).
+- Picker calls `lookupPartForDealLine(query)` from `lib/parts/public/`; CRM never reaches into Parts internals.
 
 ## Splus Sync Strategy
 
@@ -117,11 +140,11 @@ model SplusSyncRun {
 
 ## Modularity
 
-This module lives at `components/parts/warehouse/`, `lib/warehouse/`, `app/actions/warehouse.ts`. Imports from the Service module are forbidden by the existing module-boundaries ESLint rule; the Service module imports the **public surface** only:
-- `applyStockMovement` (write contract)
-- `lookupPartForJobLine(query)` (read contract for the picker)
+This module lives at `components/parts/warehouse/`, `lib/parts/warehouse/`, `app/actions/parts/warehouse.ts`. Imports from CRM / Service / Rentals are forbidden by the existing module-boundaries ESLint rule; those modules import the **public surface** only:
+- `applyStockMovement(...)` (write contract — used by CRM on Deal stage transitions, Service on RO close)
+- `lookupPartForDealLine(query)` (read contract for the picker)
 
-Splus integration goes in `lib/integrations/splus/` (already partially scaffolded). It depends on warehouse, never the reverse.
+Splus integration goes in `lib/integrations/splus/` (partially scaffolded). It depends on warehouse, never the reverse.
 
 ## RFID / Barcode Roadmap (informational)
 
@@ -136,10 +159,11 @@ No schema changes when scanner ships — the model already supports it.
 ## Acceptance Criteria
 
 - [ ] `StockMovement` migration applied; `Part.quantity` writes go through `applyStockMovement`.
-- [ ] Estimate part picker filters on stock and shows quantity per result.
+- [ ] CRM DealLine part picker filters on stock and shows quantity per result.
 - [ ] Receiving a `SupplierOrder` increments stock and writes RECEIPT movements.
-- [ ] Closing a `RepairOrder` decrements stock for its `PartLine`s and writes CONSUMPTION movements.
-- [ ] `/admin/parts/[id]` has a "История движений" tab listing all movements.
+- [ ] Closing a `RepairOrder` decrements stock for its `PartLine`s, writes CONSUMPTION movements with `dealId`.
+- [ ] Delivering a `PartShipment` writes SALE movements with `dealId`.
+- [ ] `/admin/parts/[id]` has a "История движений" tab listing all movements with deal / fulfillment links.
 - [ ] Splus sync stub exists with the contract shape (real Splus credentials separate task).
 - [ ] `GET /api/stock/lookup?code=...` returns a part by article OR barcode.
 - [ ] Module boundaries: warehouse code is in its own dir, ESLint forbids inverse imports.
