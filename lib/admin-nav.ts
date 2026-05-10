@@ -70,6 +70,14 @@ export const adminNav: AdminNavEntry[] = [
   },
   {
     kind: "group",
+    id: "admin-group-iam",
+    label: "Доступы",
+    items: [
+      { href: "/admin/users", label: "Пользователи" },
+    ],
+  },
+  {
+    kind: "group",
     id: "admin-group-site",
     label: "Сайт",
     items: [

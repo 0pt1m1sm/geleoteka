@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -109,6 +110,14 @@ export default async function CustomerDetailPage({ params }: Props) {
         </div>
         <p className="text-[var(--foreground-muted)]">
           {customer.phone} · {customer.email}
+        </p>
+        <p className="mt-2 text-xs">
+          <Link
+            href={`/admin/users/${customer.id}`}
+            className="text-[var(--color-accent)] hover:underline"
+          >
+            Управление аккаунтом (пароль, роль, блокировка) →
+          </Link>
         </p>
       </div>
 
