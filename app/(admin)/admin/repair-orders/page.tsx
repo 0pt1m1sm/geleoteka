@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
@@ -135,6 +135,13 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                       repairOrderId={ro.id as string}
                       currentStatus={ro.status as string}
                     />
+                    <Link
+                      href={`/admin/repair-orders/${ro.id as string}`}
+                      className="inline-flex items-center gap-1 text-xs text-[var(--color-accent)] hover:underline"
+                    >
+                      Открыть
+                      <ChevronRight size={12} aria-hidden />
+                    </Link>
                     {isAdmin && (
                       <DeleteRepairOrderButton
                         repairOrderId={ro.id as string}

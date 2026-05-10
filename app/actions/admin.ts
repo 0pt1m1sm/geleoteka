@@ -204,7 +204,7 @@ export async function addJobLines(
     });
   }
 
-  redirect("/admin/repair-orders");
+  redirect(`/admin/repair-orders/${repairOrderId}`);
 }
 
 interface UpdateRepairOrderDetailsResult {

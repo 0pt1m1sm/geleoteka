@@ -188,7 +188,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
             href={fullMapsHref}
             target="_blank"
             rel="noopener noreferrer"
-            className="block px-4 py-3 text-sm font-medium text-center bg-[var(--card)] hover:bg-[var(--card-hover)] border-t border-[var(--border)] text-[var(--color-accent)] transition-colors"
+            className="block px-4 py-3 text-sm font-medium text-center bg-[var(--background-secondary)] hover:bg-[var(--card-hover)] border-t border-[var(--border)] text-[var(--color-accent)] transition-colors"
           >
             Открыть на Яндекс.Картах →
           </a>

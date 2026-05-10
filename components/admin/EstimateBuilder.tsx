@@ -177,7 +177,7 @@ function JobRowFields({
   onRemove,
 }: JobRowFieldsProps): React.ReactElement {
   return (
-    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-secondary)]">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
       <div className="flex items-start gap-2 p-3 border-b border-[var(--border)]">
         <span
           className="shrink-0 mt-2 text-xs font-mono text-[var(--foreground-muted)]"
@@ -207,8 +207,8 @@ function JobRowFields({
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--border)]">
-        <fieldset className="bg-[var(--card)] p-3 space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-y md:divide-y-0 divide-[var(--border)]">
+        <fieldset className="p-3 space-y-3">
           <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
             Работы
           </legend>
@@ -243,7 +243,7 @@ function JobRowFields({
           </div>
         </fieldset>
 
-        <fieldset className="bg-[var(--card)] p-3 space-y-3">
+        <fieldset className="p-3 space-y-3">
           <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
             Запчасти (опционально)
           </legend>
@@ -294,7 +294,7 @@ function JobRowFields({
         </fieldset>
       </div>
 
-      <div className="flex justify-between items-center px-3 py-2 border-t border-[var(--border)] text-sm">
+      <div className="flex justify-between items-center px-3 py-2 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
         <span className="text-[var(--foreground-muted)]">Итого по работе</span>
         <span className="font-bold text-[var(--color-accent)]">
           {formatPrice(rowTotal.total)}

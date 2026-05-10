@@ -51,7 +51,7 @@ export function Sidebar({
         <Link
           href="/"
           onClick={onNavigate}
-          className="text-display text-xl font-bold text-[var(--color-accent)]"
+          className="text-display text-lg font-bold text-[var(--color-accent)]"
         >
           Geleoteka
         </Link>
