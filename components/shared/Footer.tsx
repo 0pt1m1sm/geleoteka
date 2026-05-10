@@ -36,7 +36,7 @@ export function Footer({
           <div className="md:col-span-2">
             <div className="flex items-center gap-2 mb-3">
               <Image src="/images/logo.svg" alt="" width={28} height={28} />
-              <span className="text-display text-lg font-bold text-[var(--color-accent)]">Geleoteka</span>
+              <span className="text-display text-xl font-bold text-[var(--color-accent)]">Geleoteka</span>
             </div>
             <div className="text-sm text-[var(--foreground-muted)] max-w-md">
               <Markdown source={description} />

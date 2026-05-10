@@ -12,6 +12,8 @@ import {
 } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { WorkPhotosManager } from "@/components/admin/WorkPhotosManager";
+import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsForm";
+import { JobLineEditor } from "@/components/admin/JobLineEditor";
 
 interface RepairOrderDetail {
   id: string;
@@ -19,8 +21,22 @@ interface RepairOrderDetail {
   status: string;
   dateTime: Date;
   total: number;
+  concern: string | null;
+  notes: string | null;
+  mileageIn: number | null;
+  mileageOut: number | null;
+  promisedAt: Date | null;
+  masterUserId: string | null;
   user: { id: string; name: string; phone: string; email: string };
   vehicle: { model: string | null; year: number | null; vin: string | null };
+  jobLines: Array<{
+    id: string;
+    description: string;
+    status: string;
+    laborTotal: number;
+    partsTotal: number;
+    total: number;
+  }>;
   workPhotos: Array<{
     id: string;
     url: string;
@@ -30,8 +46,20 @@ interface RepairOrderDetail {
   }>;
 }
 
+interface MasterUser {
+  id: string;
+  name: string;
+}
+
 interface Props {
   params: Promise<{ id: string }>;
+}
+
+function toLocalInputValue(d: Date | null): string {
+  if (!d) return "";
+  // Format as "yyyy-MM-ddTHH:mm" in local time for <input type="datetime-local">.
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export default async function AdminRepairOrderDetailPage({ params }: Props) {
@@ -46,8 +74,25 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
       status: true,
       dateTime: true,
       total: true,
+      concern: true,
+      notes: true,
+      mileageIn: true,
+      mileageOut: true,
+      promisedAt: true,
+      masterUserId: true,
       user: { select: { id: true, name: true, phone: true, email: true } },
       vehicle: { select: { model: true, year: true, vin: true } },
+      jobLines: {
+        select: {
+          id: true,
+          description: true,
+          status: true,
+          laborTotal: true,
+          partsTotal: true,
+          total: true,
+        },
+        orderBy: { sortOrder: "asc" },
+      },
       workPhotos: {
         select: {
           id: true,
@@ -61,6 +106,12 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
     },
   })) as RepairOrderDetail | null;
   if (!ro) notFound();
+
+  const masters = (await db.user.findMany({
+    where: { isMaster: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  })) as MasterUser[];
 
   const statusLabel = REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status;
 
@@ -81,12 +132,64 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-        <Card>
-          <WorkPhotosManager
-            repairOrderId={ro.id}
-            initialPhotos={ro.workPhotos}
-          />
-        </Card>
+        <div className="space-y-4">
+          <details open className="card group">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
+              <span className="text-lg font-semibold">Работы и стоимость</span>
+              <span className="text-xs text-[var(--foreground-muted)]">
+                {ro.jobLines.length === 0
+                  ? "Нет работ"
+                  : `${ro.jobLines.length} · ${formatPrice(ro.total)}`}
+              </span>
+            </summary>
+            <div className="mt-4">
+              <JobLineEditor
+                repairOrderId={ro.id}
+                initialJobs={ro.jobLines}
+              />
+            </div>
+          </details>
+
+          <details open className="card group">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
+              <span className="text-lg font-semibold">Параметры заказ-наряда</span>
+              <span className="text-xs text-[var(--foreground-muted)]">
+                Жалоба, заметки, пробег, мастер
+              </span>
+            </summary>
+            <div className="mt-4">
+              <RepairOrderDetailsForm
+                repairOrderId={ro.id}
+                initial={{
+                  concern: ro.concern ?? "",
+                  notes: ro.notes ?? "",
+                  mileageIn: ro.mileageIn?.toString() ?? "",
+                  mileageOut: ro.mileageOut?.toString() ?? "",
+                  promisedAt: toLocalInputValue(ro.promisedAt),
+                  masterUserId: ro.masterUserId ?? "",
+                }}
+                masters={masters}
+              />
+            </div>
+          </details>
+
+          <details className="card group">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
+              <span className="text-lg font-semibold">Фотографии работ</span>
+              <span className="text-xs text-[var(--foreground-muted)]">
+                {ro.workPhotos.length === 0
+                  ? "Нет фото"
+                  : `${ro.workPhotos.length} шт.`}
+              </span>
+            </summary>
+            <div className="mt-4">
+              <WorkPhotosManager
+                repairOrderId={ro.id}
+                initialPhotos={ro.workPhotos}
+              />
+            </div>
+          </details>
+        </div>
 
         <aside className="space-y-4">
           <Card>

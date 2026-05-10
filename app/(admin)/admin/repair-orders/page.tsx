@@ -1,22 +1,33 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formatDate } from "@/lib/utils";
+import { formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
-import { Card, PageHeader } from "@/components/ui";
+import { Button, Card, PageHeader } from "@/components/ui";
 
-export default async function AppointmentsPage() {
+const VALID_STATUSES = new Set(Object.keys(REPAIR_ORDER_STATUS_LABELS));
+
+interface Props {
+  searchParams: Promise<{ status?: string }>;
+}
+
+export default async function AppointmentsPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
 
   const isAdmin = session.permissionRole === "ADMIN";
+  const { status } = await searchParams;
+  const filterStatus = status && VALID_STATUSES.has(status) ? status : null;
 
   const repairOrders = await db.repairOrder.findMany({
+    where: filterStatus ? { status: filterStatus as never } : undefined,
     include: {
       user: { select: { name: true, phone: true } },
       vehicle: { select: { model: true, year: true, vin: true, plate: true } },
@@ -30,13 +41,35 @@ export default async function AppointmentsPage() {
     take: 100,
   });
 
+  const isEstimateView = filterStatus === "ESTIMATE";
+  const title = isEstimateView ? "Сметы" : "Все записи";
+  const eyebrow = isEstimateView ? "Сервис · Сметы" : "Сервис";
+
   return (
     <div>
-      <PageHeader eyebrow="Сервис" title="Все записи" />
+      <PageHeader
+        eyebrow={eyebrow}
+        title={title}
+        actions={
+          isEstimateView ? (
+            <Link href="/admin/estimates/new">
+              <Button size="sm" leftIcon={<Plus size={14} />}>
+                Создать смету
+              </Button>
+            </Link>
+          ) : null
+        }
+      />
+
+      <StatusFilter active={filterStatus} />
 
       {repairOrders.length === 0 ? (
         <Card className="text-center py-12">
-          <p className="text-[var(--foreground-muted)]">Записей пока нет</p>
+          <p className="text-[var(--foreground-muted)]">
+            {filterStatus
+              ? `Нет записей со статусом «${REPAIR_ORDER_STATUS_LABELS[filterStatus]}»`
+              : "Записей пока нет"}
+          </p>
         </Card>
       ) : (
         <div className="space-y-3">
@@ -50,11 +83,16 @@ export default async function AppointmentsPage() {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0 space-y-2">
                     <div>
-                      <p className="font-medium">{user.name}</p>
+                      <Link
+                        href={`/admin/repair-orders/${ro.id as string}`}
+                        className="font-medium hover:text-[var(--color-accent)]"
+                      >
+                        {user.name}
+                      </Link>
                       {user.phone && (
                         <a
                           href={`tel:${user.phone}`}
-                          className="text-xs text-[var(--foreground-muted)] hover:text-[var(--color-accent)] font-mono"
+                          className="block text-xs text-[var(--foreground-muted)] hover:text-[var(--color-accent)] font-mono"
                         >
                           {user.phone}
                         </a>
@@ -110,6 +148,38 @@ export default async function AppointmentsPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function StatusFilter({ active }: { active: string | null }): React.ReactElement {
+  const presets: Array<{ key: string | null; label: string }> = [
+    { key: null, label: "Все" },
+    { key: "ESTIMATE", label: REPAIR_ORDER_STATUS_LABELS.ESTIMATE },
+    { key: "APPROVED", label: REPAIR_ORDER_STATUS_LABELS.APPROVED },
+    { key: "IN_PROGRESS", label: REPAIR_ORDER_STATUS_LABELS.IN_PROGRESS },
+    { key: "READY", label: REPAIR_ORDER_STATUS_LABELS.READY },
+    { key: "CLOSED", label: REPAIR_ORDER_STATUS_LABELS.CLOSED },
+  ];
+  return (
+    <div className="flex flex-wrap gap-2 mb-4">
+      {presets.map((p) => {
+        const isActive = active === p.key;
+        const href = p.key ? `/admin/repair-orders?status=${p.key}` : "/admin/repair-orders";
+        return (
+          <Link
+            key={p.label}
+            href={href}
+            className={
+              isActive
+                ? "badge bg-[var(--color-accent)] text-[var(--color-accent-foreground)] border border-[var(--color-accent)]"
+                : "badge bg-[var(--background-secondary)] text-[var(--foreground)] border border-[var(--border)] hover:border-[var(--border-hover)]"
+            }
+          >
+            {p.label}
+          </Link>
+        );
+      })}
     </div>
   );
 }

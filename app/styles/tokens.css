@@ -26,7 +26,7 @@
   --background: #0a0a0a;
   --background-secondary: #111111;
   --foreground: #e8e6e1;
-  --foreground-muted: #7a7a74;
+  --foreground-muted: #8a8a82;
 
   /* Cards / Surfaces — dark with subtle warmth */
   --card: #141414;
@@ -101,15 +101,17 @@ html.light {
   --color-secondary: #e8e7e2;
   --color-secondary-foreground: #1a1a1a;
   --color-secondary-hover: #dddcd6;
-  /* DarkGoldenrod — replaces muddy #9a7b2c. Wordmark on cream measures 3.82:1
-     (passes WCAG large-text AA); white-on-accent button measures ~4.0:1 (passes
-     AA-large). Lifted from the originally proposed champagne #c4a13a after
-     verification revealed cream is so close to white that #c4a13a only hit
-     2.34:1 — failing the plan's Truth 3. */
-  --color-accent: #b8860b;
+  /* Goldenrod-9 — full WCAG AA pass on cream (#faf9f6) AND white (#fff)
+     for both small text (≥4.5:1) and white-on-accent CTAs. Replaces the
+     prior #b8860b which only hit 3.09:1 on cream and 3.25:1 reversed on
+     primary buttons (passing AA-large only). The earlier champagne #c4a13a
+     attempt failed at 2.34:1 — cream is too near white to support a bright
+     gold for body-size text. White-on-#9a6800 ≈ 4.91:1, #9a6800-on-cream
+     ≈ 4.91:1. */
+  --color-accent: #9a6800;
   --color-accent-foreground: #ffffff;
-  --color-accent-hover: #d4a017;
-  --color-gold: #b8860b;
+  --color-accent-hover: #b8860b;
+  --color-gold: #9a6800;
   --color-gold-foreground: #ffffff;
   --background: #faf9f6;
   --background-secondary: #f0efe9;
@@ -118,18 +120,29 @@ html.light {
   --card: #ffffff;
   --card-foreground: #1a1a1a;
   --card-hover: #f8f7f3;
-  --border: #e0dfd8;
-  --border-hover: #c8c7c0;
-  --border-accent: #b8860b;
-  --color-success-bg: rgba(34, 197, 94, 0.1);
-  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  /* Border: 3:1 vs both card (#fff) and body (#faf9f6) per WCAG 1.4.11
+     (UI component identity). Inputs and cards are surfaces with near-zero
+     fill contrast on cream; without a 3:1 border they're indistinguishable
+     from background. #909088 lands at ~3.26:1. */
+  --border: #909088;
+  --border-hover: #6a6a64;
+  --border-accent: #9a6800;
+  /* Status colors — light-theme-darker variants for AA on white/cream.
+     Bright defaults (#22c55e, #f59e0b, #60a5fa) read at 2.0–2.5:1 on cream
+     for 14px body text. Switching to Tailwind 700 / amber-700 / blue-600
+     equivalents lands every status at ≥4.5:1. */
+  --color-success: #15803d;
+  --color-warning: #b45309;
+  --color-info: #2563eb;
+  --color-success-bg: rgba(21, 128, 61, 0.1);
+  --color-warning-bg: rgba(180, 83, 9, 0.1);
   --color-error-bg: rgba(220, 38, 38, 0.1);
-  --color-info-bg: rgba(96, 165, 250, 0.1);
+  --color-info-bg: rgba(37, 99, 235, 0.1);
   --tier-silver: #6b7280;
-  --tier-gold: #b8860b;
+  --tier-gold: #9a6800;
   --tier-amg: #1a1a1a;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-  --shadow-glow: 0 0 30px rgba(184, 134, 11, 0.18);
+  --shadow-glow: 0 0 30px rgba(154, 104, 0, 0.18);
 }

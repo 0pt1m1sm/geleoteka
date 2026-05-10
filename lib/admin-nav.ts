@@ -36,7 +36,7 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/repair-orders", label: "Записи" },
       { href: "/admin/calendar", label: "Календарь" },
-      { href: "/admin/estimates", label: "Сметы" },
+      { href: "/admin/repair-orders?status=ESTIMATE", label: "Сметы" },
       { href: "/admin/team", label: "Команда" },
     ],
   },
@@ -89,11 +89,13 @@ export const adminNav: AdminNavEntry[] = [
   },
 ];
 
-/** Pathname → href match. Exact match OR pathname is a sub-route of href. */
+/** Pathname → href match. Exact match OR pathname is a sub-route of href.
+ *  Query strings on `href` are ignored — pathname comes without them. */
 export function matchesHref(pathname: string, href: string): boolean {
-  if (pathname === href) return true;
-  if (href === "/admin") return false;
-  return pathname.startsWith(href + "/");
+  const path = href.split("?")[0];
+  if (pathname === path) return true;
+  if (path === "/admin") return false;
+  return pathname.startsWith(path + "/");
 }
 
 /**
@@ -106,14 +108,16 @@ export function findActiveHref(
   nav: readonly AdminNavEntry[],
 ): string | null {
   let bestMatch: string | null = null;
+  let bestPathLen = -1;
   for (const entry of nav) {
     const candidates =
       entry.kind === "link" ? [entry.href] : entry.items.map((i) => i.href);
     for (const href of candidates) {
-      if (matchesHref(pathname, href)) {
-        if (!bestMatch || href.length > bestMatch.length) {
-          bestMatch = href;
-        }
+      if (!matchesHref(pathname, href)) continue;
+      const pathLen = href.split("?")[0].length;
+      if (pathLen > bestPathLen) {
+        bestMatch = href;
+        bestPathLen = pathLen;
       }
     }
   }
