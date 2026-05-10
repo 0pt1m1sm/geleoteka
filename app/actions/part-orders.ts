@@ -7,6 +7,7 @@ import {
   findOrCreateGuestCustomer,
   generateClaimToken,
 } from "@/lib/customer-onboarding";
+import { createDeal } from "@/lib/crm/public";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -79,11 +80,33 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       orderItems.push({ partId: item.partId, quantity: item.quantity, unitPrice: price });
     }
 
+    // Originate the Deal first. Retail parts checkout is point-of-sale —
+    // stage starts at APPROVED so the deal is on the books immediately.
+    const deal = await createDeal({
+      customerUserId: guestResult.userId,
+      channel: "PARTS_RETAIL",
+      source: "parts-cart",
+      initialStage: "APPROVED",
+      claimToken,
+      notes: notes || null,
+      lines: orderItems.map((item) => {
+        const part = partMap.get(item.partId) as Record<string, unknown> | undefined;
+        return {
+          type: "PART" as const,
+          description: (part?.name as string) ?? "Запчасть",
+          qty: item.quantity,
+          unitPrice: item.unitPrice,
+          partId: item.partId,
+        };
+      }),
+    });
+
     // Create order + decrement stock in transaction
     const order = await db.$transaction(async (tx) => {
       const created = await tx.partOrder.create({
         data: {
           userId: guestResult.userId,
+          dealId: deal.id,
           total,
           contactName,
           contactPhone: normalizePhone(contactPhone),

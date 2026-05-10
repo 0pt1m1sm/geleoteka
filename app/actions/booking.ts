@@ -7,6 +7,7 @@ import {
   findOrCreateGuestCustomer,
   generateClaimToken,
 } from "@/lib/customer-onboarding";
+import { createDeal } from "@/lib/crm/public";
 
 interface BookingInput {
   serviceIds: string[];
@@ -107,6 +108,19 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       if (found) validatedTrimId = (found as { id: string }).id;
     }
 
+    // Originate the commercial Deal first; the RO is its service fulfillment.
+    // Stage starts at QUOTED — booking-form flows always render an estimate
+    // step before approval (see Deal+Fulfillment PRD).
+    const deal = await createDeal({
+      customerUserId: userId,
+      vehicleId: vehicle!.id,
+      channel: "SERVICE",
+      source: "booking-form",
+      initialStage: "QUOTED",
+      claimToken,
+      notes: notes || null,
+    });
+
     // Slot reservation + RO creation in one transaction. The unique constraint on
     // Slot.dateTime is what actually prevents concurrent double-booking; if two
     // requests race, only one slot.create succeeds — the other rolls back its RO.
@@ -119,6 +133,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
           dateTime: appointmentDate,
           status: "ESTIMATE",
           claimToken,
+          dealId: deal.id,
           notes: notes || null,
           jobLines: {
             create: services.map((s: { id: string; name: string; priceMin: number | null }, idx: number) => ({

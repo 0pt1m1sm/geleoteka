@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
+import { createDeal } from "@/lib/crm/public";
 
 interface VehicleFormData {
   model: string;
@@ -171,7 +172,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
   try {
     const vehicle = await db.vehicle.findUnique({
       where: { id: carId },
-      select: { dailyRate: true, ownershipType: true },
+      select: { dailyRate: true, ownershipType: true, make: true, model: true },
     });
     if (!vehicle || vehicle.ownershipType !== "RENTAL" || !vehicle.dailyRate) {
       return { success: false, error: "Автомобиль не найден" };
@@ -204,10 +205,32 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
     }
     const claimToken = !session ? generateClaimToken() : null;
 
+    // Originate the Deal first. Rental booking is point-of-sale —
+    // stage starts at APPROVED so the deal is on the books immediately.
+    const deal = await createDeal({
+      customerUserId: guestResult.userId,
+      vehicleId: carId,
+      channel: "RENTAL",
+      source: "rentals-form",
+      initialStage: "APPROVED",
+      claimToken,
+      notes: notes || null,
+      lines: [
+        {
+          type: "RENTAL_DAY",
+          description: `Аренда: ${vehicle.make ?? "Mercedes-Benz"} ${vehicle.model}`,
+          qty: days,
+          unitPrice: vehicle.dailyRate,
+          vehicleId: carId,
+        },
+      ],
+    });
+
     const booking = await db.rentalBooking.create({
       data: {
         vehicleId: carId,
         userId: guestResult.userId,
+        dealId: deal.id,
         startDate: start,
         endDate: end,
         totalCost,

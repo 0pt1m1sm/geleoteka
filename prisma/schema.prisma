@@ -441,9 +441,12 @@ model RepairOrder {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
-  // backfill is verified (see docs/prd/2026-05-10-deal-fulfillment-architecture.md).
-  dealId String?
+  // Phase 0 of Deal+Fulfillment migration. Locked NOT NULL after the
+  // additive migration backfilled every existing RO with a Deal.
+  // (PartOrder.dealId and RentalBooking.dealId stay nullable for now —
+  // legacy guest orders without userId need a separate resolution
+  // pass before they can be locked.)
+  dealId String
 
   // Relations
   user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
@@ -451,7 +454,7 @@ model RepairOrder {
   master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
   trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
   slot    Slot?
-  deal    Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  deal    Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   jobLines            JobLine[]
   loyaltyTransactions LoyaltyTransaction[]
