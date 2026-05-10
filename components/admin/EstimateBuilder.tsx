@@ -208,11 +208,11 @@ function JobRowFields({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-y md:divide-y-0 divide-[var(--border)]">
-        <fieldset className="p-3 space-y-3">
+        <fieldset className="p-4 space-y-3">
           <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
             Работы
           </legend>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <Input
               label="Часы"
               name="laborHours"
@@ -243,7 +243,7 @@ function JobRowFields({
           </div>
         </fieldset>
 
-        <fieldset className="p-3 space-y-3">
+        <fieldset className="p-4 space-y-3">
           <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
             Запчасти (опционально)
           </legend>
@@ -254,7 +254,7 @@ function JobRowFields({
             onChange={(e) => onChange("partDescription", e.target.value)}
             placeholder="например: колодки Brembo P50047"
           />
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-3">
             <Input
               label="Кол-во"
               name="partQty"
@@ -294,7 +294,7 @@ function JobRowFields({
         </fieldset>
       </div>
 
-      <div className="flex justify-between items-center px-3 py-2 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
+      <div className="flex justify-between items-center px-4 py-2.5 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
         <span className="text-[var(--foreground-muted)]">Итого по работе</span>
         <span className="font-bold text-[var(--color-accent)]">
           {formatPrice(rowTotal.total)}

@@ -36,6 +36,8 @@ interface RepairOrderDetail {
     laborTotal: number;
     partsTotal: number;
     total: number;
+    laborLines: Array<{ bookHours: number; rate: number }>;
+    partLines: Array<{ description: string; qty: number; unitCost: number; unitPrice: number }>;
   }>;
   workPhotos: Array<{
     id: string;
@@ -90,6 +92,11 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
           laborTotal: true,
           partsTotal: true,
           total: true,
+          laborLines: { select: { bookHours: true, rate: true }, take: 1 },
+          partLines: {
+            select: { description: true, qty: true, unitCost: true, unitPrice: true },
+            take: 1,
+          },
         },
         orderBy: { sortOrder: "asc" },
       },

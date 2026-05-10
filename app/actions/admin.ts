@@ -270,6 +270,58 @@ interface JobLineMutationResult {
   success?: boolean;
 }
 
+interface JobLineFormInput {
+  description: string;
+  laborHours: number;
+  laborRate: number;
+  partDescription: string | null;
+  partQty: number | null;
+  partUnitCost: number | null;
+  partUnitPrice: number | null;
+  status: string;
+}
+
+function readJobLineFields(formData: FormData): JobLineFormInput {
+  const description = ((formData.get("description") as string | null) ?? "").trim();
+  const laborHours = Number.parseFloat((formData.get("laborHours") as string) ?? "") || 0;
+  const laborRate = Number.parseInt((formData.get("laborRate") as string) ?? "", 10) || 0;
+  const partDescriptionRaw = ((formData.get("partDescription") as string | null) ?? "").trim();
+  const partDescription = partDescriptionRaw || null;
+  const partQty = partDescription
+    ? Number.parseInt((formData.get("partQty") as string) ?? "1", 10) || 1
+    : null;
+  const partUnitCost = partDescription
+    ? Number.parseInt((formData.get("partUnitCost") as string) ?? "0", 10) || 0
+    : null;
+  const partUnitPrice = partDescription
+    ? Number.parseInt((formData.get("partUnitPrice") as string) ?? "0", 10) || 0
+    : null;
+  const status = ((formData.get("status") as string | null) ?? "PROPOSED").trim() || "PROPOSED";
+  return {
+    description,
+    laborHours,
+    laborRate,
+    partDescription,
+    partQty,
+    partUnitCost,
+    partUnitPrice,
+    status,
+  };
+}
+
+function computeJobLineTotals(input: JobLineFormInput): {
+  laborTotal: number;
+  partsTotal: number;
+  total: number;
+} {
+  const laborTotal = Math.round(input.laborHours * input.laborRate);
+  const partsTotal =
+    input.partDescription && input.partUnitPrice && input.partQty
+      ? input.partUnitPrice * input.partQty
+      : 0;
+  return { laborTotal, partsTotal, total: laborTotal + partsTotal };
+}
+
 export async function addJobLine(
   _prevState: JobLineMutationResult | null,
   formData: FormData,
@@ -277,14 +329,11 @@ export async function addJobLine(
   await requireRole(["ADMIN", "MANAGER"]);
 
   const repairOrderId = formData.get("repairOrderId") as string;
-  const description = ((formData.get("description") as string | null) ?? "").trim();
   if (!repairOrderId) return { error: "Не передан заказ-наряд" };
-  if (!description) return { error: "Введите описание работы" };
+  const input = readJobLineFields(formData);
+  if (!input.description) return { error: "Введите описание работы" };
 
-  const laborTotal = Number.parseInt((formData.get("laborTotal") as string) ?? "0", 10) || 0;
-  const partsTotal = Number.parseInt((formData.get("partsTotal") as string) ?? "0", 10) || 0;
-  const status = ((formData.get("status") as string | null) ?? "PROPOSED").trim();
-
+  const totals = computeJobLineTotals(input);
   const last = await db.jobLine.findFirst({
     where: { repairOrderId },
     orderBy: { sortOrder: "desc" },
@@ -296,11 +345,33 @@ export async function addJobLine(
     data: {
       repairOrderId,
       sortOrder,
-      description,
-      status: status as never,
-      laborTotal,
-      partsTotal,
-      total: laborTotal + partsTotal,
+      description: input.description,
+      status: input.status as never,
+      laborTotal: totals.laborTotal,
+      partsTotal: totals.partsTotal,
+      total: totals.total,
+      laborLines:
+        input.laborHours > 0 || input.laborRate > 0
+          ? {
+              create: [{
+                description: input.description,
+                bookHours: input.laborHours,
+                rate: input.laborRate,
+                total: totals.laborTotal,
+              }],
+            }
+          : undefined,
+      partLines:
+        input.partDescription
+          ? {
+              create: [{
+                description: input.partDescription,
+                qty: input.partQty ?? 1,
+                unitCost: input.partUnitCost ?? 0,
+                unitPrice: input.partUnitPrice ?? 0,
+              }],
+            }
+          : undefined,
     },
   });
 
@@ -325,20 +396,46 @@ export async function updateJobLine(
   if (!existing) return { error: "Работа не найдена" };
   const { repairOrderId } = existing as { repairOrderId: string };
 
-  const description = ((formData.get("description") as string | null) ?? "").trim();
-  if (!description) return { error: "Введите описание работы" };
-  const laborTotal = Number.parseInt((formData.get("laborTotal") as string) ?? "0", 10) || 0;
-  const partsTotal = Number.parseInt((formData.get("partsTotal") as string) ?? "0", 10) || 0;
-  const status = ((formData.get("status") as string | null) ?? "PROPOSED").trim();
+  const input = readJobLineFields(formData);
+  if (!input.description) return { error: "Введите описание работы" };
+  const totals = computeJobLineTotals(input);
+
+  // Replace labor + part children — single canonical row each. Keeps the
+  // edit form 1:1 with EstimateBuilder while staying simple. Sub-row IDs
+  // aren't surfaced anywhere yet, so churn here is harmless.
+  await db.laborLine.deleteMany({ where: { jobLineId } });
+  await db.partLine.deleteMany({ where: { jobLineId } });
 
   await db.jobLine.update({
     where: { id: jobLineId },
     data: {
-      description,
-      status: status as never,
-      laborTotal,
-      partsTotal,
-      total: laborTotal + partsTotal,
+      description: input.description,
+      status: input.status as never,
+      laborTotal: totals.laborTotal,
+      partsTotal: totals.partsTotal,
+      total: totals.total,
+      laborLines:
+        input.laborHours > 0 || input.laborRate > 0
+          ? {
+              create: [{
+                description: input.description,
+                bookHours: input.laborHours,
+                rate: input.laborRate,
+                total: totals.laborTotal,
+              }],
+            }
+          : undefined,
+      partLines:
+        input.partDescription
+          ? {
+              create: [{
+                description: input.partDescription,
+                qty: input.partQty ?? 1,
+                unitCost: input.partUnitCost ?? 0,
+                unitPrice: input.partUnitPrice ?? 0,
+              }],
+            }
+          : undefined,
     },
   });
 
