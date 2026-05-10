@@ -88,7 +88,6 @@ interface JobLineInput {
   laborRate: number;
   partDescription?: string;
   partQty?: number;
-  partUnitCost?: number;
   partUnitPrice?: number;
 }
 
@@ -106,7 +105,6 @@ export async function addJobLines(
   const laborRates = formData.getAll("laborRate") as string[];
   const partDescriptions = formData.getAll("partDescription") as string[];
   const partQtys = formData.getAll("partQty") as string[];
-  const partUnitCosts = formData.getAll("partUnitCost") as string[];
   const partUnitPrices = formData.getAll("partUnitPrice") as string[];
 
   if (descriptions.length === 0 || descriptions.every((d) => !d.trim())) {
@@ -120,7 +118,6 @@ export async function addJobLines(
       laborRate: parseInt(laborRates[i]) || 0,
       partDescription: partDescriptions[i]?.trim() || undefined,
       partQty: parseInt(partQtys[i]) || undefined,
-      partUnitCost: parseInt(partUnitCosts[i]) || undefined,
       partUnitPrice: parseInt(partUnitPrices[i]) || undefined,
     }))
     .filter((j) => j.description);
@@ -164,7 +161,7 @@ export async function addJobLines(
           create: [{
             description: job.partDescription,
             qty: job.partQty || 1,
-            unitCost: job.partUnitCost || 0,
+            unitCost: 0,
             unitPrice: job.partUnitPrice || 0,
           }],
         } : undefined,
@@ -276,7 +273,6 @@ interface JobLineFormInput {
   laborRate: number;
   partDescription: string | null;
   partQty: number | null;
-  partUnitCost: number | null;
   partUnitPrice: number | null;
   status: string;
 }
@@ -290,9 +286,6 @@ function readJobLineFields(formData: FormData): JobLineFormInput {
   const partQty = partDescription
     ? Number.parseInt((formData.get("partQty") as string) ?? "1", 10) || 1
     : null;
-  const partUnitCost = partDescription
-    ? Number.parseInt((formData.get("partUnitCost") as string) ?? "0", 10) || 0
-    : null;
   const partUnitPrice = partDescription
     ? Number.parseInt((formData.get("partUnitPrice") as string) ?? "0", 10) || 0
     : null;
@@ -303,7 +296,6 @@ function readJobLineFields(formData: FormData): JobLineFormInput {
     laborRate,
     partDescription,
     partQty,
-    partUnitCost,
     partUnitPrice,
     status,
   };
@@ -367,7 +359,7 @@ export async function addJobLine(
               create: [{
                 description: input.partDescription,
                 qty: input.partQty ?? 1,
-                unitCost: input.partUnitCost ?? 0,
+                unitCost: 0,
                 unitPrice: input.partUnitPrice ?? 0,
               }],
             }
@@ -431,7 +423,7 @@ export async function updateJobLine(
               create: [{
                 description: input.partDescription,
                 qty: input.partQty ?? 1,
-                unitCost: input.partUnitCost ?? 0,
+                unitCost: 0,
                 unitPrice: input.partUnitPrice ?? 0,
               }],
             }

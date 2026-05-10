@@ -158,6 +158,21 @@
   }
   .input::placeholder { color: var(--foreground-muted); }
 
+  /* Numeric inputs in dense forms (estimate builder, job-line editor):
+     hide the native browser spinner buttons so the value digits aren't
+     pushed offscreen by Chrome/WebKit's chevron arrows. Use the
+     `job-line-num` modifier rather than blanket-applying to all
+     number inputs — some surfaces (admin price editors) benefit from
+     the spinner. */
+  .input.job-line-num::-webkit-inner-spin-button,
+  .input.job-line-num::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .input.job-line-num {
+    -moz-appearance: textfield;
+  }
+
   /* Select */
   select.input {
     appearance: none;

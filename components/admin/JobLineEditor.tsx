@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { Alert, Button, Input, Select } from "@/components/ui";
+import { Alert, Button, Input } from "@/components/ui";
 import {
   addJobLine,
   deleteJobLine,
@@ -46,7 +46,6 @@ interface RowDraft {
   laborRate: string;
   partDescription: string;
   partQty: string;
-  partUnitCost: string;
   partUnitPrice: string;
   status: string;
 }
@@ -57,7 +56,6 @@ const EMPTY_DRAFT: RowDraft = {
   laborRate: "",
   partDescription: "",
   partQty: "1",
-  partUnitCost: "",
   partUnitPrice: "",
   status: "PROPOSED",
 };
@@ -73,10 +71,6 @@ function computeTotal(d: RowDraft): { labor: number; parts: number; total: numbe
 function draftFromJob(job: JobLineView): RowDraft {
   const labor = job.laborLines[0];
   const part = job.partLines[0];
-  // Legacy fallback: jobs created before granular hours/rate fields
-  // existed have laborTotal/partsTotal lump-sums but no sub-rows.
-  // Present those as "1 × total" so the row preview matches the
-  // persisted total; the manager can refine on save.
   const laborFallback = !labor && job.laborTotal > 0;
   const partFallback = !part && job.partsTotal > 0;
   return {
@@ -85,7 +79,6 @@ function draftFromJob(job: JobLineView): RowDraft {
     laborRate: labor ? String(labor.rate) : laborFallback ? String(job.laborTotal) : "",
     partDescription: part ? part.description : partFallback ? "Запчасть" : "",
     partQty: part ? String(part.qty) : "1",
-    partUnitCost: part ? String(part.unitCost) : "",
     partUnitPrice: part ? String(part.unitPrice) : partFallback ? String(job.partsTotal) : "",
     status: job.status,
   };
@@ -285,9 +278,9 @@ function RowFields({
   const ariaRemove = removeLabel ?? `Удалить работу #${index + 1}`;
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-      <div className="flex items-start gap-2 p-3 border-b border-[var(--border)]">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
         <span
-          className="shrink-0 mt-2.5 text-xs font-mono text-[var(--foreground-muted)]"
+          className="shrink-0 text-xs font-mono text-[var(--foreground-muted)]"
           aria-hidden
         >
           #{index + 1}
@@ -302,25 +295,25 @@ function RowFields({
           aria-label={`Описание работы #${index + 1}`}
           required
         />
-        <Select
+        <select
           name="status"
           value={draft.status}
           onChange={(e) => onChange("status", e.target.value)}
           aria-label={`Статус работы #${index + 1}`}
-          className="w-auto text-xs"
+          className="input w-auto text-xs py-2"
         >
           {STATUS_OPTIONS.map((s) => (
             <option key={s} value={s}>
               {JOB_LINE_STATUS_LABELS[s] ?? s}
             </option>
           ))}
-        </Select>
+        </select>
         {canRemove ? (
           <button
             type="button"
             onClick={onRemove}
             disabled={removeDisabled}
-            className="btn-icon mt-1"
+            className="btn-icon"
             aria-label={ariaRemove}
           >
             <RemoveIcon size={14} />
@@ -329,10 +322,7 @@ function RowFields({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-y md:divide-y-0 divide-[var(--border)]">
-        <fieldset className="p-4 space-y-3">
-          <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
-            Работы
-          </legend>
+        <RowSection title="Работы">
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Часы"
@@ -344,6 +334,7 @@ function RowFields({
               value={draft.laborHours}
               onChange={(e) => onChange("laborHours", e.target.value)}
               placeholder="0"
+              className="job-line-num"
             />
             <Input
               label="Ставка ₽/ч"
@@ -354,20 +345,13 @@ function RowFields({
               value={draft.laborRate}
               onChange={(e) => onChange("laborRate", e.target.value)}
               placeholder="0"
+              className="job-line-num"
             />
           </div>
-          <div className="text-xs text-[var(--foreground-muted)] flex justify-between">
-            <span>Сумма работ</span>
-            <span className="text-[var(--foreground)] font-medium">
-              {formatPrice(totals.labor)}
-            </span>
-          </div>
-        </fieldset>
+          <SectionTotal label="Сумма работ" value={totals.labor} />
+        </RowSection>
 
-        <fieldset className="p-4 space-y-3">
-          <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
-            Запчасти (опционально)
-          </legend>
+        <RowSection title="Запчасти (опционально)">
           <Input
             label="Наименование"
             name="partDescription"
@@ -375,7 +359,7 @@ function RowFields({
             onChange={(e) => onChange("partDescription", e.target.value)}
             placeholder="например: колодки Brembo P50047"
           />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Input
               label="Кол-во"
               name="partQty"
@@ -384,16 +368,7 @@ function RowFields({
               inputMode="numeric"
               value={draft.partQty}
               onChange={(e) => onChange("partQty", e.target.value)}
-            />
-            <Input
-              label="Себест. ₽"
-              name="partUnitCost"
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={draft.partUnitCost}
-              onChange={(e) => onChange("partUnitCost", e.target.value)}
-              placeholder="0"
+              className="job-line-num"
             />
             <Input
               label="Цена ₽"
@@ -404,23 +379,53 @@ function RowFields({
               value={draft.partUnitPrice}
               onChange={(e) => onChange("partUnitPrice", e.target.value)}
               placeholder="0"
+              className="job-line-num"
             />
           </div>
-          <div className="text-xs text-[var(--foreground-muted)] flex justify-between">
-            <span>Сумма запчастей</span>
-            <span className="text-[var(--foreground)] font-medium">
-              {formatPrice(totals.parts)}
-            </span>
-          </div>
-        </fieldset>
+          <SectionTotal label="Сумма запчастей" value={totals.parts} />
+        </RowSection>
       </div>
 
-      <div className="flex justify-between items-center px-4 py-2.5 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
+      <div className="flex justify-between items-center px-4 py-3 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
         <span className="text-[var(--foreground-muted)]">Итого по работе</span>
         <span className="font-bold text-[var(--color-accent)]">
           {formatPrice(totals.total)}
         </span>
       </div>
+    </div>
+  );
+}
+
+function RowSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}): React.ReactElement {
+  return (
+    <div className="p-4 space-y-3">
+      <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)]">
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SectionTotal({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}): React.ReactElement {
+  return (
+    <div className="flex items-baseline justify-between text-xs text-[var(--foreground-muted)]">
+      <span>{label}</span>
+      <span className="text-sm text-[var(--foreground)] font-medium tabular-nums">
+        {formatPrice(value)}
+      </span>
     </div>
   );
 }

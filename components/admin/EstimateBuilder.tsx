@@ -13,7 +13,6 @@ interface JobRow {
   laborRate: string;
   partDescription: string;
   partQty: string;
-  partUnitCost: string;
   partUnitPrice: string;
 }
 
@@ -23,7 +22,6 @@ const EMPTY_JOB: JobRow = {
   laborRate: "",
   partDescription: "",
   partQty: "1",
-  partUnitCost: "",
   partUnitPrice: "",
 };
 
@@ -178,9 +176,9 @@ function JobRowFields({
 }: JobRowFieldsProps): React.ReactElement {
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
-      <div className="flex items-start gap-2 p-3 border-b border-[var(--border)]">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
         <span
-          className="shrink-0 mt-2 text-xs font-mono text-[var(--foreground-muted)]"
+          className="shrink-0 text-xs font-mono text-[var(--foreground-muted)]"
           aria-hidden
         >
           #{index + 1}
@@ -208,10 +206,10 @@ function JobRowFields({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x divide-y md:divide-y-0 divide-[var(--border)]">
-        <fieldset className="p-4 space-y-3">
-          <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
+        <div className="p-4 space-y-3">
+          <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)]">
             Работы
-          </legend>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="Часы"
@@ -223,6 +221,7 @@ function JobRowFields({
               value={job.laborHours}
               onChange={(e) => onChange("laborHours", e.target.value)}
               placeholder="0"
+              className="job-line-num"
             />
             <Input
               label="Ставка ₽/ч"
@@ -233,20 +232,21 @@ function JobRowFields({
               value={job.laborRate}
               onChange={(e) => onChange("laborRate", e.target.value)}
               placeholder="0"
+              className="job-line-num"
             />
           </div>
-          <div className="text-xs text-[var(--foreground-muted)] flex justify-between">
+          <div className="flex items-baseline justify-between text-xs text-[var(--foreground-muted)]">
             <span>Сумма работ</span>
-            <span className="text-[var(--foreground)] font-medium">
+            <span className="text-sm text-[var(--foreground)] font-medium tabular-nums">
               {formatPrice(rowTotal.labor)}
             </span>
           </div>
-        </fieldset>
+        </div>
 
-        <fieldset className="p-4 space-y-3">
-          <legend className="px-1 text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
+        <div className="p-4 space-y-3">
+          <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--foreground-muted)]">
             Запчасти (опционально)
-          </legend>
+          </div>
           <Input
             label="Наименование"
             name="partDescription"
@@ -254,7 +254,7 @@ function JobRowFields({
             onChange={(e) => onChange("partDescription", e.target.value)}
             placeholder="например: колодки Brembo P50047"
           />
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Input
               label="Кол-во"
               name="partQty"
@@ -263,16 +263,6 @@ function JobRowFields({
               inputMode="numeric"
               value={job.partQty}
               onChange={(e) => onChange("partQty", e.target.value)}
-            />
-            <Input
-              label="Себест. ₽"
-              name="partUnitCost"
-              type="number"
-              min="0"
-              inputMode="numeric"
-              value={job.partUnitCost}
-              onChange={(e) => onChange("partUnitCost", e.target.value)}
-              placeholder="0"
             />
             <Input
               label="Цена ₽"
@@ -285,16 +275,16 @@ function JobRowFields({
               placeholder="0"
             />
           </div>
-          <div className="text-xs text-[var(--foreground-muted)] flex justify-between">
+          <div className="flex items-baseline justify-between text-xs text-[var(--foreground-muted)]">
             <span>Сумма запчастей</span>
-            <span className="text-[var(--foreground)] font-medium">
+            <span className="text-sm text-[var(--foreground)] font-medium tabular-nums">
               {formatPrice(rowTotal.parts)}
             </span>
           </div>
-        </fieldset>
+        </div>
       </div>
 
-      <div className="flex justify-between items-center px-4 py-2.5 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
+      <div className="flex justify-between items-center px-4 py-3 border-t border-[var(--border)] bg-[var(--background-secondary)] text-sm">
         <span className="text-[var(--foreground-muted)]">Итого по работе</span>
         <span className="font-bold text-[var(--color-accent)]">
           {formatPrice(rowTotal.total)}
