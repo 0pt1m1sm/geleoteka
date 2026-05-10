@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { LogoutButton } from "@/components/shared/LogoutButton";
 import {
@@ -40,7 +40,8 @@ export function Sidebar({
   className = "",
 }: SidebarProps): React.ReactElement {
   const pathname = usePathname();
-  const activeHref = findActiveHref(pathname, nav);
+  const searchParams = useSearchParams();
+  const activeHref = findActiveHref(pathname, searchParams, nav);
   const activeGroupLabel = findActiveGroupLabel(activeHref, nav);
   const [openGroup, toggleGroup] = useAccordionGroup(activeGroupLabel);
 
@@ -77,6 +78,7 @@ export function Sidebar({
               onToggle={() => toggleGroup(entry.label)}
               activeHref={activeHref}
               pathname={pathname}
+              searchParams={searchParams}
               onNavigate={onNavigate}
             />
           );
@@ -134,10 +136,11 @@ interface SidebarGroupProps {
   onToggle: () => void;
   activeHref: string | null;
   pathname: string;
+  searchParams: ReturnType<typeof useSearchParams>;
   onNavigate?: () => void;
 }
 
-function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, onNavigate }: SidebarGroupProps): React.ReactElement {
+function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, searchParams, onNavigate }: SidebarGroupProps): React.ReactElement {
   return (
     <div>
       <button
@@ -164,7 +167,7 @@ function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, onNavigat
             label={item.label}
             isActive={
               activeHref === item.href ||
-              (activeHref === null && matchesHref(pathname, item.href))
+              (activeHref === null && matchesHref(pathname, searchParams, item.href))
             }
             onNavigate={onNavigate}
             indent

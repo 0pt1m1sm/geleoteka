@@ -89,13 +89,34 @@ export const adminNav: AdminNavEntry[] = [
   },
 ];
 
-/** Pathname → href match. Exact match OR pathname is a sub-route of href.
- *  Query strings on `href` are ignored — pathname comes without them. */
-export function matchesHref(pathname: string, href: string): boolean {
-  const path = href.split("?")[0];
-  if (pathname === path) return true;
-  if (path === "/admin") return false;
-  return pathname.startsWith(path + "/");
+interface HrefSearch {
+  get(key: string): string | null;
+}
+
+function parseHref(href: string): { path: string; query: URLSearchParams | null } {
+  const [path, qs] = href.split("?");
+  return { path, query: qs ? new URLSearchParams(qs) : null };
+}
+
+/** Pathname + search → href match. A nav href without a query matches by
+ *  path only; a nav href with a query (e.g. `?status=ESTIMATE`) requires
+ *  every query parameter on the href to be present with the same value
+ *  on the current URL. Sub-route matching applies on the path portion. */
+export function matchesHref(
+  pathname: string,
+  search: HrefSearch | null,
+  href: string,
+): boolean {
+  const { path, query } = parseHref(href);
+  const pathMatches =
+    pathname === path || (path !== "/admin" && pathname.startsWith(path + "/"));
+  if (!pathMatches) return false;
+  if (!query) return true;
+  if (!search) return false;
+  for (const [k, v] of query) {
+    if (search.get(k) !== v) return false;
+  }
+  return true;
 }
 
 /**
@@ -105,19 +126,23 @@ export function matchesHref(pathname: string, href: string): boolean {
  */
 export function findActiveHref(
   pathname: string,
+  search: HrefSearch | null,
   nav: readonly AdminNavEntry[],
 ): string | null {
   let bestMatch: string | null = null;
-  let bestPathLen = -1;
+  let bestScore = -1;
   for (const entry of nav) {
     const candidates =
       entry.kind === "link" ? [entry.href] : entry.items.map((i) => i.href);
     for (const href of candidates) {
-      if (!matchesHref(pathname, href)) continue;
-      const pathLen = href.split("?")[0].length;
-      if (pathLen > bestPathLen) {
+      if (!matchesHref(pathname, search, href)) continue;
+      const { path, query } = parseHref(href);
+      // Prefer longer path; tiebreak on query-specificity so an entry
+      // with a matching `?status=…` wins over the same path without one.
+      const score = path.length * 2 + (query ? 1 : 0);
+      if (score > bestScore) {
         bestMatch = href;
-        bestPathLen = pathLen;
+        bestScore = score;
       }
     }
   }
