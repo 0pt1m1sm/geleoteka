@@ -36,7 +36,6 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/repair-orders", label: "Записи" },
       { href: "/admin/calendar", label: "Календарь" },
-      { href: "/admin/repair-orders?status=ESTIMATE", label: "Сметы" },
       { href: "/admin/team", label: "Команда" },
     ],
   },
@@ -65,6 +64,9 @@ export const adminNav: AdminNavEntry[] = [
     id: "admin-group-crm",
     label: "CRM",
     items: [
+      { href: "/admin/crm", label: "Дашборд CRM" },
+      { href: "/admin/crm/deals", label: "Сделки" },
+      { href: "/admin/crm/deals?stage=open&channel=SERVICE", label: "Сметы (сервис)" },
       { href: "/admin/customers", label: "Клиенты" },
     ],
   },

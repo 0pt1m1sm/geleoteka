@@ -1,14 +1,14 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
-import { Button, Card, PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 
 const VALID_STATUSES = new Set(Object.keys(REPAIR_ORDER_STATUS_LABELS));
 
@@ -41,24 +41,12 @@ export default async function AppointmentsPage({ searchParams }: Props) {
     take: 100,
   });
 
-  const isEstimateView = filterStatus === "ESTIMATE";
-  const title = isEstimateView ? "Сметы" : "Все записи";
-  const eyebrow = isEstimateView ? "Сервис · Сметы" : "Сервис";
-
   return (
     <div>
       <PageHeader
-        eyebrow={eyebrow}
-        title={title}
-        actions={
-          isEstimateView ? (
-            <Link href="/admin/estimates/new">
-              <Button size="sm" leftIcon={<Plus size={14} />}>
-                Создать смету
-              </Button>
-            </Link>
-          ) : null
-        }
+        eyebrow="Сервис"
+        title="Записи"
+        description="Операционная сторона: статус, мастер, фото. Цены и согласование клиента — в CRM."
       />
 
       <StatusFilter active={filterStatus} />
@@ -162,7 +150,6 @@ export default async function AppointmentsPage({ searchParams }: Props) {
 function StatusFilter({ active }: { active: string | null }): React.ReactElement {
   const presets: Array<{ key: string | null; label: string }> = [
     { key: null, label: "Все" },
-    { key: "ESTIMATE", label: REPAIR_ORDER_STATUS_LABELS.ESTIMATE },
     { key: "APPROVED", label: REPAIR_ORDER_STATUS_LABELS.APPROVED },
     { key: "IN_PROGRESS", label: REPAIR_ORDER_STATUS_LABELS.IN_PROGRESS },
     { key: "READY", label: REPAIR_ORDER_STATUS_LABELS.READY },

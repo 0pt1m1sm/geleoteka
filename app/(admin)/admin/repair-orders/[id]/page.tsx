@@ -13,7 +13,6 @@ import {
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { WorkPhotosManager } from "@/components/admin/WorkPhotosManager";
 import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsForm";
-import { JobLineEditor } from "@/components/admin/JobLineEditor";
 
 interface RepairOrderDetail {
   id: string;
@@ -27,6 +26,7 @@ interface RepairOrderDetail {
   mileageOut: number | null;
   promisedAt: Date | null;
   masterUserId: string | null;
+  dealId: string;
   user: { id: string; name: string; phone: string; email: string };
   vehicle: { model: string | null; year: number | null; vin: string | null };
   jobLines: Array<{
@@ -82,6 +82,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
       mileageOut: true,
       promisedAt: true,
       masterUserId: true,
+      dealId: true,
       user: { select: { id: true, name: true, phone: true, email: true } },
       vehicle: { select: { model: true, year: true, vin: true } },
       jobLines: {
@@ -140,22 +141,27 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-4">
-          <details open className="card group">
-            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
-              <span className="text-lg font-semibold">Работы и стоимость</span>
-              <span className="text-xs text-[var(--foreground-muted)]">
+          <div className="card flex items-center justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
+                Финансовая часть
+              </div>
+              <div className="mt-1 text-sm">
                 {ro.jobLines.length === 0
-                  ? "Нет работ"
-                  : `${ro.jobLines.length} · ${formatPrice(ro.total)}`}
-              </span>
-            </summary>
-            <div className="mt-4">
-              <JobLineEditor
-                repairOrderId={ro.id}
-                initialJobs={ro.jobLines}
-              />
+                  ? "Нет работ в смете"
+                  : `${ro.jobLines.length} работ · ${formatPrice(ro.total)}`}
+              </div>
+              <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+                Цены и согласование — в CRM. Эта страница отвечает за исполнение.
+              </p>
             </div>
-          </details>
+            <Link
+              href={`/admin/crm/deals/${ro.dealId}`}
+              className="btn btn-secondary text-sm shrink-0"
+            >
+              Открыть сделку →
+            </Link>
+          </div>
 
           <details open className="card group">
             <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
