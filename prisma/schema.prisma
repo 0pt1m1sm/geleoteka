@@ -108,6 +108,56 @@ enum RentalBookingStatus {
   CANCELLED
 }
 
+// ============================================
+// CRM — Deal aggregate + Estimate
+// ============================================
+// Deal is the commercial root: every transaction (workshop service,
+// parts purchase, rental) is a Deal. Operational fulfillments
+// (RepairOrder, PartOrder, RentalBooking) link back via dealId. See
+// docs/prd/2026-05-10-deal-fulfillment-architecture.md.
+
+enum DealStage {
+  DRAFT          // being assembled by sales (no estimate sent)
+  QUOTED         // estimate sent, awaiting customer
+  APPROVED       // customer accepted; fulfillment can start
+  IN_FULFILLMENT // any fulfillment is active
+  DELIVERED      // all fulfillments completed; awaiting payment / closure
+  WON            // closed-paid
+  LOST           // declined / cancelled
+}
+
+enum DealChannel {
+  SERVICE
+  PARTS_RETAIL
+  PARTS_WHOLESALE
+  RENTAL
+  WALK_IN
+}
+
+enum DealPaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum DealLineType {
+  LABOR
+  PART
+  RENTAL_DAY
+  DISCOUNT
+  FEE
+}
+
+enum EstimateStage {
+  DRAFT
+  SENT
+  APPROVED
+  DECLINED
+  EXPIRED
+  SUPERSEDED
+}
+
 enum FuelType {
   PETROL
   DIESEL
@@ -172,6 +222,11 @@ model User {
 
   // RepairOrder work photos uploaded by this user (master/admin/manager).
   uploadedRepairOrderPhotos RepairOrderPhoto[] @relation("RepairOrderPhotoUploader")
+
+  // CRM — Deal/Estimate relations
+  dealsAsCustomer    Deal[]     @relation("DealCustomer")
+  dealsAsOwner       Deal[]     @relation("DealOwner")
+  estimatesPrepared  Estimate[] @relation("EstimatePreparedBy")
 
   // Self-referential — referrals
   referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
@@ -323,6 +378,8 @@ model Vehicle {
   owner          User?           @relation("VehicleOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   repairOrders   RepairOrder[]
   rentalBookings RentalBooking[]
+  deals          Deal[]
+  dealLines      DealLine[]
 
   @@index([ownerUserId])
   @@index([ownershipType])
@@ -384,12 +441,17 @@ model RepairOrder {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
+  // backfill is verified (see docs/prd/2026-05-10-deal-fulfillment-architecture.md).
+  dealId String?
+
   // Relations
   user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
   vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
   trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
   slot    Slot?
+  deal    Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
   jobLines            JobLine[]
   loyaltyTransactions LoyaltyTransaction[]
@@ -402,6 +464,7 @@ model RepairOrder {
   @@index([status])
   @@index([dateTime])
   @@index([claimToken])
+  @@index([dealId])
 }
 
 /// Photo attached by a master/manager to a RepairOrder showing work
@@ -654,6 +717,8 @@ model Part {
   supplierOrderItems SupplierOrderItem[]
   partLines          PartLine[]
   partTrims          PartTrim[]
+  dealLines          DealLine[]
+  estimateLines      EstimateLine[]
 
   @@index([slug])
   @@index([article])
@@ -677,12 +742,19 @@ model PartOrder {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
+  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
+  // backfill is verified. PartOrder is renamed to PartShipment in a
+  // later migration; the route is preserved via @@map.
+  dealId String?
+
   user  User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deal  Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
   items PartOrderItem[]
 
   @@index([userId])
   @@index([status])
   @@index([claimToken])
+  @@index([dealId])
 }
 
 model PartOrderItem {
@@ -723,13 +795,19 @@ model RentalBooking {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
+  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
+  // backfill is verified.
+  dealId String?
+
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  deal    Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
   @@index([vehicleId])
   @@index([userId])
   @@index([status])
   @@index([claimToken])
+  @@index([dealId])
 }
 
 // ============================================
@@ -899,4 +977,151 @@ model PartTrim {
 
   @@id([partId, trimId])
   @@index([trimId])
+}
+
+// ============================================
+// CRM — Deal aggregate + Estimate
+// ============================================
+
+/// Deal is the unified commercial aggregate. Workshop service, parts
+/// purchases, rentals — everything that involves money commitment is a
+/// Deal. Operational fulfillments (RepairOrder, PartOrder, RentalBooking)
+/// link back via dealId. Money is denormalized from DealLine[] sums and
+/// is the source of truth for total revenue. See
+/// docs/prd/2026-05-10-deal-fulfillment-architecture.md.
+model Deal {
+  id              String              @id @default(cuid())
+  number          String?             @unique
+  customerUserId  String
+  vehicleId       String? // Optional — parts-only deal may not have one
+  ownerUserId     String? // Sales rep / deal owner
+  stage           DealStage           @default(DRAFT)
+  channel         DealChannel
+  source          String? // "booking-form" | "parts-cart" | "rentals-form" | "walk-in" | "phone"
+  paymentStatus   DealPaymentStatus   @default(UNPAID)
+
+  subtotalLabor  Int @default(0)
+  subtotalParts  Int @default(0)
+  subtotalRental Int @default(0)
+  discount       Int @default(0)
+  tax            Int @default(0)
+  total          Int @default(0)
+
+  quotedAt   DateTime?
+  approvedAt DateTime?
+  closedAt   DateTime?
+  lostReason String?
+
+  // Mirrors RepairOrder/PartOrder/RentalBooking.claimToken for the
+  // post-checkout guest auth panel — moves here as the Deal is now the
+  // commercial root, and one Deal may have multiple fulfillments.
+  claimToken String?
+
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  dealLines      DealLine[]
+  estimates      Estimate[]
+  repairOrders   RepairOrder[]
+  partOrders     PartOrder[]
+  rentalBookings RentalBooking[]
+
+  @@index([customerUserId])
+  @@index([vehicleId])
+  @@index([ownerUserId])
+  @@index([stage])
+  @@index([channel])
+  @@index([claimToken])
+  @@index([createdAt])
+}
+
+/// Polymorphic line item on a Deal. `type` discriminates LABOR / PART /
+/// RENTAL_DAY / DISCOUNT / FEE; `qty` is hours for LABOR, units for PART,
+/// days for RENTAL_DAY. `total` is signed (DISCOUNT is negative).
+/// DealLine is the source of truth for what was sold; fulfillment-side
+/// rows (JobLine, PartLine, RentalBooking pricing) denormalize.
+model DealLine {
+  id          String       @id @default(cuid())
+  dealId      String
+  sortOrder   Int          @default(0)
+  type        DealLineType
+  description String
+  qty         Float        @default(1)
+  unitPrice   Int          @default(0)
+  total       Int          @default(0)
+  partId      String?
+  vehicleId   String? // For RENTAL_DAY lines
+
+  createdAt DateTime @default(now())
+
+  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  part    Part?    @relation(fields: [partId], references: [id], onDelete: SetNull)
+  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([dealId, sortOrder])
+  @@index([type])
+  @@index([partId])
+}
+
+/// Estimate is a frozen sales document attached to a Deal. A Deal may have
+/// 0..N estimates (revisions chain via parentEstimateId). Money on an
+/// Estimate is captured at SENT time and is the historical contract; the
+/// Deal continues evolving independently.
+model Estimate {
+  id               String        @id @default(cuid())
+  number           String?       @unique
+  dealId           String
+  stage            EstimateStage @default(DRAFT)
+  preparedByUserId String?
+  validUntil       DateTime?
+  parentEstimateId String?
+  notes            String?
+  sentAt           DateTime?
+  approvedAt       DateTime?
+  declinedAt       DateTime?
+  declineReason    String?
+
+  subtotalLabor  Int @default(0)
+  subtotalParts  Int @default(0)
+  subtotalRental Int @default(0)
+  discount       Int @default(0)
+  tax            Int @default(0)
+  total          Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal          Deal           @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  preparedBy    User?          @relation("EstimatePreparedBy", fields: [preparedByUserId], references: [id], onDelete: SetNull)
+  parent        Estimate?      @relation("EstimateRevision", fields: [parentEstimateId], references: [id], onDelete: SetNull)
+  revisions     Estimate[]     @relation("EstimateRevision")
+  estimateLines EstimateLine[]
+
+  @@index([dealId])
+  @@index([stage])
+  @@index([number])
+}
+
+model EstimateLine {
+  id          String       @id @default(cuid())
+  estimateId  String
+  sortOrder   Int          @default(0)
+  type        DealLineType
+  description String
+  qty         Float        @default(1)
+  unitPrice   Int          @default(0)
+  total       Int          @default(0)
+  partId      String?
+
+  createdAt DateTime @default(now())
+
+  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  part     Part?    @relation(fields: [partId], references: [id], onDelete: SetNull)
+
+  @@index([estimateId, sortOrder])
+  @@index([partId])
 }
