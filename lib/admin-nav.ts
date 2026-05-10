@@ -7,9 +7,21 @@
  * Group ids are stable URL-safe slugs used as DOM ids for ARIA wiring
  * (header button aria-controls → sub-item container id).
  *
- * Groups are organised by business module: Сервис (service workshop),
- * Запчасти (parts inventory + procurement), Аренда (rental fleet),
- * CRM (customer master), Сайт (public content).
+ * Module taxonomy (see docs/research/2026-05-11-crm-vs-ops-overlap-policy.md):
+ *
+ *   FOUNDATIONAL (always available, included in base SaaS plan):
+ *     - Дашборд          platform overview
+ *     - CRM              deals, customers, communications (commerce)
+ *     - Сайт             marketing CMS + vacancies (public face)
+ *     - Доступы          user / role management
+ *
+ *   OPTIONAL (per-tenant licensed, sidebar group hidden when disabled):
+ *     - Сервис           workshop operations
+ *     - Запчасти         parts catalog + warehouse + procurement
+ *     - Аренда           rental fleet
+ *
+ * Future Tenant.licensedModules only enumerates the optional set;
+ * foundational groups don't need an entry there.
  */
 
 interface AdminNavLink {
@@ -37,6 +49,7 @@ export const adminNav: AdminNavEntry[] = [
       { href: "/admin/repair-orders", label: "Записи" },
       { href: "/admin/calendar", label: "Календарь" },
       { href: "/admin/team", label: "Команда" },
+      { href: "/admin/services", label: "Каталог услуг" },
     ],
   },
   {
@@ -48,6 +61,7 @@ export const adminNav: AdminNavEntry[] = [
       { href: "/admin/orders", label: "Заказы клиентов" },
       { href: "/admin/suppliers", label: "Поставщики" },
       { href: "/admin/suppliers/orders", label: "Заказы поставщикам" },
+      { href: "/admin/models", label: "Модели и поколения" },
     ],
   },
   {
@@ -84,9 +98,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Сайт",
     items: [
       { href: "/admin/cms", label: "Контент" },
-      { href: "/admin/services", label: "Услуги" },
       { href: "/admin/vacancies", label: "Вакансии" },
-      { href: "/admin/models", label: "Модели и поколения" },
     ],
   },
 ];

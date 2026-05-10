@@ -19,6 +19,48 @@ This document fixes ownership per field/concept so that:
 It is the **canonical rule set** referenced by the Deal+Fulfillment and
 CRM-expansion PRDs.
 
+## Module taxonomy: foundational vs. optional
+
+Modules are **not equal**. Two tiers, with different commercial
+treatment in the future SaaS pivot:
+
+### Foundational — always on, part of the base plan
+- **CRM** — Deal, DealLine, Estimate, Customer, CommunicationLog, Task.
+  Every customer transaction in every vertical creates a Deal. A tenant
+  cannot run a real business without a customer ledger and a way to
+  track who owes what. Cannot be disabled.
+- **Identity / IAM** — User, Role, Auth, Tenant. Platform plumbing.
+- **Site / CMS** — public marketing surface (CMS blocks, vacancies).
+  Every tenant needs a public face for online ordering.
+- **Платформенный дашборд** — KPI overview, top-level navigation.
+
+### Optional — per-tenant licensed verticals
+- **Service** — workshop ops. RepairOrder, JobLine, master/team,
+  calendar, service catalog (the workshop's offering).
+- **Parts** — parts catalog, warehouse, vehicle models/trims (used to
+  filter compatible parts), suppliers, supplier procurement, customer
+  shipments.
+- **Rentals** — fleet vehicles, rental bookings.
+
+Tenant types we anticipate:
+
+| Tenant | Foundational | Service | Parts | Rentals |
+|---|---|---|---|---|
+| Workshop-only (typical G-Class shop) | ✓ | ✓ | — | — |
+| Parts-shop only | ✓ | — | ✓ | — |
+| Rental-only | ✓ | — | — | ✓ |
+| Full-stack (e.g. Geleoteka itself) | ✓ | ✓ | ✓ | ✓ |
+
+`Tenant.licensedModules: string[]` (future) enumerates only the
+**optional** set — `"service" | "parts" | "rentals"`. Foundational
+modules are never in that list. Validation: `licensedModules.length ≥
+1` (an empty tenant has no business reason to exist).
+
+The Service module conceptually depends on CRM (every RO has a Deal),
+but CRM doesn't depend on Service. This is exactly the
+foundational/optional pattern: optional layers sit on top of
+foundational ones.
+
 ## Ownership matrix
 
 | Concept | Owner module | Surface | Cross-link |
@@ -67,11 +109,34 @@ CRM-expansion PRDs.
 ## Sidebar policy
 
 Single unified admin shell. CRM is a sidebar group, not a separate
-shell. Per-role hiding of groups is the long-term mechanism (see
-Ideas — Role-aware sidebar + per-tenant module licensing); not in
-this commit.
+shell. Per-role / per-license hiding of groups is the long-term
+mechanism (see Ideas — Role-aware sidebar + per-tenant module
+licensing); not in this commit.
 
-The CRM group currently exposes:
+Group → tier mapping (must match `lib/admin-nav.ts`):
+
+| Group | Tier | Routes |
+|---|---|---|
+| Дашборд | foundational | `/admin` |
+| Сервис | optional (`service`) | repair-orders, calendar, team, **services catalog** |
+| Запчасти | optional (`parts`) | catalog, customer orders, suppliers, supplier orders, **vehicle models/trims** |
+| Аренда | optional (`rentals`) | fleet, bookings |
+| CRM | foundational | dashboard, deals, estimates filter, customers |
+| Доступы | foundational | users |
+| Сайт | foundational | CMS, vacancies |
+
+Things relocated from `Сайт` to their owning operational module
+during the 2026-05-11 cleanup (so a tenant who disables the module
+loses the menu entry cleanly):
+- `Услуги` (`/admin/services`) → Сервис (it drives booking; not a
+  CMS surface).
+- `Модели и поколения` (`/admin/models`) → Запчасти (it's the trim
+  catalog used to filter parts; not a CMS surface).
+
+`Сайт` retains only true marketing/public-facing content (CMS
+blocks, vacancies).
+
+The CRM group exposes:
 - `/admin/crm` — CRM dashboard
 - `/admin/crm/deals` — deal list (default filter: open)
 - `/admin/crm/deals?stage=open&channel=SERVICE` — Сметы (manager's
