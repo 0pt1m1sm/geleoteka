@@ -26,6 +26,15 @@ export const DEAL_LINE_TYPE_LABELS: Record<string, string> = {
   FEE: "Сбор",
 };
 
+export const ESTIMATE_STAGE_LABELS: Record<string, string> = {
+  DRAFT: "Черновик",
+  SENT: "Отправлена",
+  APPROVED: "Согласована",
+  DECLINED: "Отклонена",
+  EXPIRED: "Истекла",
+  SUPERSEDED: "Пересмотрена",
+};
+
 const OPEN_STAGES = new Set(["DRAFT", "QUOTED", "APPROVED", "IN_FULFILLMENT", "DELIVERED"]);
 
 export function isOpenStage(stage: string): boolean {

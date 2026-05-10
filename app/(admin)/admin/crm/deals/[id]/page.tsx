@@ -12,6 +12,7 @@ import {
 } from "@/lib/deal-stage-labels";
 import { DealLineEditor } from "@/components/crm/DealLineEditor";
 import { DealStageChanger } from "@/components/crm/DealStageChanger";
+import { EstimatesSection } from "@/components/crm/EstimatesSection";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -47,6 +48,15 @@ interface DealDetail {
   repairOrders: Array<{ id: string; roNumber: string | null; status: string; dateTime: Date }>;
   partOrders: Array<{ id: string; status: string; total: number }>;
   rentalBookings: Array<{ id: string; status: string; startDate: Date; endDate: Date }>;
+  estimates: Array<{
+    id: string;
+    number: string | null;
+    stage: string;
+    total: number;
+    sentAt: Date | null;
+    validUntil: Date | null;
+    createdAt: Date;
+  }>;
 }
 
 export default async function CrmDealDetailPage({ params }: Props) {
@@ -100,6 +110,18 @@ export default async function CrmDealDetailPage({ params }: Props) {
         select: { id: true, status: true, startDate: true, endDate: true },
         orderBy: { startDate: "desc" },
       },
+      estimates: {
+        select: {
+          id: true,
+          number: true,
+          stage: true,
+          total: true,
+          sentAt: true,
+          validUntil: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      },
     },
   })) as DealDetail | null;
   if (!deal) notFound();
@@ -137,6 +159,14 @@ export default async function CrmDealDetailPage({ params }: Props) {
               editable={editable}
             />
             <DealTotals deal={deal} />
+          </Card>
+
+          <Card>
+            <EstimatesSection
+              dealId={deal.id}
+              estimates={deal.estimates}
+              canCreate={deal.stage === "DRAFT" || deal.stage === "QUOTED"}
+            />
           </Card>
 
           {deal.repairOrders.length > 0 ? (

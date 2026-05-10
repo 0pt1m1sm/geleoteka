@@ -80,7 +80,7 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/crm", label: "Дашборд CRM" },
       { href: "/admin/crm/deals", label: "Сделки" },
-      { href: "/admin/crm/deals?stage=open&channel=SERVICE", label: "Сметы (сервис)" },
+      { href: "/admin/crm/estimates", label: "Сметы" },
       { href: "/admin/customers", label: "Клиенты" },
     ],
   },
