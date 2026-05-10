@@ -30,7 +30,7 @@ function generateTempPassword(): string {
 type Ok<T extends object = object> = { ok: true } & T;
 type Fail = { ok: false; error: string };
 
-const ALLOWED_ROLES = ["NONE", "CLIENT", "MASTER", "MANAGER", "ADMIN"] as const;
+const ALLOWED_ROLES = ["NONE", "CLIENT", "MANAGER", "ADMIN"] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 function isAllowedRole(v: unknown): v is AllowedRole {

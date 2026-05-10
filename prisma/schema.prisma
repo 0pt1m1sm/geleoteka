@@ -170,6 +170,9 @@ model User {
   // Relations — as uploader (admin who uploaded an image)
   uploadedImages UploadedImage[] @relation("UploadedImageCreator")
 
+  // RepairOrder work photos uploaded by this user (master/admin/manager).
+  uploadedRepairOrderPhotos RepairOrderPhoto[] @relation("RepairOrderPhotoUploader")
+
   // Self-referential — referrals
   referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
   referredUsers User[]  @relation("Referral")
@@ -390,6 +393,7 @@ model RepairOrder {
 
   jobLines            JobLine[]
   loyaltyTransactions LoyaltyTransaction[]
+  workPhotos          RepairOrderPhoto[]
 
   @@index([userId])
   @@index([vehicleId])
@@ -398,6 +402,26 @@ model RepairOrder {
   @@index([status])
   @@index([dateTime])
   @@index([claimToken])
+}
+
+/// Photo attached by a master/manager to a RepairOrder showing work
+/// in progress or completed (e.g. "front brakes replaced", "oil 5W-40
+/// filled"). Visible to the customer in their tracking view and to
+/// admins in the order detail.
+model RepairOrderPhoto {
+  id            String   @id @default(cuid())
+  repairOrderId String
+  url           String
+  caption       String?
+  uploadedById  String?
+  createdAt     DateTime @default(now())
+
+  repairOrder RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  uploadedBy  User?       @relation("RepairOrderPhotoUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([repairOrderId])
+  @@index([uploadedById])
+  @@index([createdAt])
 }
 
 // Slot locking: one row per scheduled time. Non-nullable unique dateTime

@@ -29,7 +29,6 @@ interface Props {
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Администратор",
   MANAGER: "Менеджер",
-  MASTER: "Мастер",
   CLIENT: "Клиент",
   NONE: "Без доступа",
 };

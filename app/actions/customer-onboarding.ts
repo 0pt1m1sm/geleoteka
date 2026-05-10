@@ -10,7 +10,6 @@ type OrderKind = "booking" | "cart" | "rental";
 
 function destinationFor(orderKind: OrderKind, role: string): string {
   if (role === "ADMIN" || role === "MANAGER") return "/admin";
-  if (role === "MASTER") return "/master";
   if (orderKind === "booking") return "/cabinet";
   if (orderKind === "rental") return "/cabinet/rentals";
   return "/cabinet/orders";
