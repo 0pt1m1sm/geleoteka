@@ -14,7 +14,8 @@ datasource db {
 
 enum UserPermissionRole {
   NONE // Cannot log in (suppliers and other non-login entities)
-  CLIENT // Customer portal only
+  CLIENT // Customer portal only (/cabinet)
+  MASTER // Technician portal only (/master) — assigned RepairOrders queue
   MANAGER // Admin panel, day-to-day operations
   ADMIN // Full admin access including settings
 }

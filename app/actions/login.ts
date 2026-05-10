@@ -114,6 +114,9 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   if (user.permissionRole === "ADMIN" || user.permissionRole === "MANAGER") {
     redirect("/admin");
   }
+  if (user.permissionRole === "MASTER") {
+    redirect("/master");
+  }
 
   redirect("/cabinet");
 }

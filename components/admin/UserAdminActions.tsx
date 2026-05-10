@@ -20,6 +20,7 @@ interface Props {
 
 const ROLE_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "CLIENT", label: "Клиент" },
+  { value: "MASTER", label: "Мастер" },
   { value: "MANAGER", label: "Менеджер" },
   { value: "ADMIN", label: "Администратор" },
   { value: "NONE", label: "Без доступа" },

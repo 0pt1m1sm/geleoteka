@@ -27,14 +27,15 @@ const ROLE_FILTERS: Array<{ value: string; label: string }> = [
   { value: "all", label: "Все" },
   { value: "ADMIN", label: "Администраторы" },
   { value: "MANAGER", label: "Менеджеры" },
+  { value: "MASTER", label: "Мастера" },
   { value: "CLIENT", label: "Клиенты" },
-  { value: "MASTER", label: "Мастера" }, // virtual filter — uses isMaster flag
   { value: "NONE", label: "Заблокированы" },
 ];
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Администратор",
   MANAGER: "Менеджер",
+  MASTER: "Мастер",
   CLIENT: "Клиент",
   NONE: "Без доступа",
 };
@@ -42,6 +43,7 @@ const ROLE_LABEL: Record<string, string> = {
 const ROLE_BADGE_CLASS: Record<string, string> = {
   ADMIN: "bg-[var(--color-accent)]/15 text-[var(--color-accent)]",
   MANAGER: "bg-[var(--color-info-bg,rgba(59,130,246,0.12))] text-[var(--color-info,#3b82f6)]",
+  MASTER: "bg-[var(--color-warning-bg,rgba(245,158,11,0.12))] text-[var(--color-warning,#f59e0b)]",
   CLIENT: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
   NONE: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
 };
@@ -57,9 +59,7 @@ export default async function UsersAdminPage({ searchParams }: Props) {
   const q = (sp.q ?? "").trim();
 
   const where: Record<string, unknown> = {};
-  if (filter === "MASTER") {
-    where.isMaster = true;
-  } else if (filter !== "all") {
+  if (filter !== "all") {
     where.permissionRole = filter;
   }
   if (q) {
