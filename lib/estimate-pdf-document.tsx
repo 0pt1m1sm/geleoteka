@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Font,
   Svg,
-  Circle,
+  Rect,
 } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/utils";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
@@ -238,25 +238,22 @@ const styles = StyleSheet.create({
   totalsValue: { color: INK },
   grandRow: {
     marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: GOLD,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: CREAM_DEEP,
-    borderLeftWidth: 3,
-    borderLeftColor: GOLD,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    alignItems: "baseline",
   },
   grandLabel: {
-    fontSize: 8,
-    color: INK_MUTED,
-    letterSpacing: 1.8,
-    textTransform: "uppercase",
+    fontSize: 10,
+    color: INK,
+    fontWeight: 700,
   },
   grandValue: {
-    fontSize: 15,
-    fontWeight: 700,
-    color: GOLD,
+    fontSize: 16,
+    fontWeight: 800,
+    color: INK,
   },
   sectionHeader: {
     marginTop: 20,
@@ -355,13 +352,12 @@ export function EstimatePdfDocument({
         {/* Header */}
         <View style={styles.headerRow}>
           <Svg width={42} height={42} viewBox="0 0 64 64">
-            <Circle cx={32} cy={32} r={29.5} stroke={GOLD} strokeWidth={2.4} fill="none" />
-            <Circle cx={32} cy={32} r={24} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.4} />
+            <Rect x={2} y={2} width={60} height={60} rx={4} stroke={GOLD} strokeWidth={2} fill="none" />
             <Text
               x={32}
-              y={42.5}
+              y={46}
               fill={GOLD}
-              style={{ fontSize: 28, fontWeight: 800 }}
+              style={{ fontSize: 38, fontWeight: 800 }}
               textAnchor="middle"
             >
               G
@@ -586,14 +582,13 @@ export function EstimatePdfDocument({
             zIndex: -1,
           }}
         >
-          <Svg width={460} height={460} viewBox="0 0 100 100">
-            <Circle cx={50} cy={50} r={47} stroke={GOLD} strokeWidth={1.4} fill="none" opacity={0.08} />
-            <Circle cx={50} cy={50} r={40} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.06} />
+          <Svg width={440} height={440} viewBox="0 0 100 100">
+            <Rect x={5} y={5} width={90} height={90} rx={4} stroke={GOLD} strokeWidth={1.4} fill="none" opacity={0.08} />
             <Text
               x={50}
-              y={66}
+              y={68}
               fill={GOLD}
-              style={{ fontSize: 56, fontWeight: 800 }}
+              style={{ fontSize: 60, fontWeight: 800 }}
               textAnchor="middle"
               opacity={0.07}
             >
