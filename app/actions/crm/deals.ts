@@ -14,6 +14,25 @@ interface DealMutationResult {
 }
 
 /**
+ * DealLine.total is signed: DISCOUNT lines reduce the deal, every
+ * other type adds. Managers enter discount amounts as positive
+ * numbers (1 × 500 ₽ feels natural); the server normalises the
+ * stored total + unitPrice so accumulation in recomputeDealTotals
+ * is a straight SUM and the print view shows a real "minus" sign.
+ */
+function signedLineTotal(type: string, qty: number, unitPrice: number): {
+  total: number;
+  unitPrice: number;
+} {
+  const rawAbsPrice = Math.abs(unitPrice);
+  const signedPrice = type === "DISCOUNT" ? -rawAbsPrice : rawAbsPrice;
+  return {
+    unitPrice: signedPrice,
+    total: Math.round(qty * signedPrice),
+  };
+}
+
+/**
  * Manager-initiated deal creation (walk-in or phone). Picks a customer
  * + optional vehicle + channel and lands the user on the empty deal
  * detail page to add lines.
@@ -74,8 +93,10 @@ export async function addDealLine(
 
   const type = ((formData.get("type") as string | null) ?? "LABOR").trim();
   const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
-  const unitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
+  const rawUnitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
   const partId = ((formData.get("partId") as string | null) ?? "").trim() || null;
+
+  const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
 
   const last = await db.dealLine.findFirst({
     where: { dealId },
@@ -92,7 +113,7 @@ export async function addDealLine(
       description,
       qty,
       unitPrice,
-      total: Math.round(qty * unitPrice),
+      total,
       partId,
     },
   });
@@ -121,7 +142,8 @@ export async function updateDealLine(
   if (!description) return { error: "Введите описание" };
   const type = ((formData.get("type") as string | null) ?? "LABOR").trim();
   const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
-  const unitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
+  const rawUnitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
+  const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
 
   await db.dealLine.update({
     where: { id },
@@ -130,7 +152,7 @@ export async function updateDealLine(
       type: type as never,
       qty,
       unitPrice,
-      total: Math.round(qty * unitPrice),
+      total,
     },
   });
 

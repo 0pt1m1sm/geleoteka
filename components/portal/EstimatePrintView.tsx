@@ -89,7 +89,7 @@ export function EstimatePrintView({
 
   return (
     <div className="estimate-print bg-white text-black mx-auto max-w-[820px] print:max-w-none">
-      <div className="flex justify-end gap-2 px-8 pt-6 print:hidden">
+      <div className="flex justify-end gap-2 px-4 sm:px-8 pt-4 sm:pt-6 print:hidden">
         <button
           type="button"
           onClick={() => window.print()}
@@ -99,7 +99,7 @@ export function EstimatePrintView({
         </button>
       </div>
 
-      <article className="px-8 sm:px-12 py-10 print:px-0 print:py-0">
+      <article className="px-4 sm:px-8 lg:px-12 py-8 sm:py-10 print:px-0 print:py-0">
         {/* ---- Header ---- */}
         <header className="relative">
           <div
@@ -107,39 +107,38 @@ export function EstimatePrintView({
             className="absolute -top-2 left-0 right-0 h-[3px]"
             style={{ backgroundColor: GOLD }}
           />
-          <div className="pt-6 pb-6 grid grid-cols-[auto_1fr_auto] gap-6 items-start border-b border-black/15">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/images/logo.svg"
-                alt=""
-                width={56}
-                height={56}
-                priority
-              />
-            </div>
-            <div>
+          <div className="pt-6 pb-6 flex flex-wrap items-start gap-x-6 gap-y-4 border-b border-black/15">
+            <Image
+              src="/images/logo.svg"
+              alt=""
+              width={48}
+              height={48}
+              priority
+              className="shrink-0"
+            />
+            <div className="flex-1 min-w-[180px]">
               <div
-                className="text-3xl font-black tracking-[0.14em] uppercase"
+                className="text-2xl sm:text-3xl font-black tracking-[0.14em] uppercase leading-tight"
                 style={{ color: GOLD, fontFamily: "var(--font-display)" }}
               >
                 {requisites.shortName || "Geleoteka"}
               </div>
-              <div className="mt-1 text-[11px] uppercase tracking-[0.2em] text-black/60">
+              <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-black/60 leading-snug">
                 Специализированный сервис Mercedes-Benz G-Class
               </div>
               {requisites.legalName ? (
                 <div className="mt-2 text-xs text-black/70">{requisites.legalName}</div>
               ) : null}
             </div>
-            <div className="text-right text-[11px] text-black/70 leading-relaxed">
+            <div className="text-right text-[11px] text-black/70 leading-relaxed max-w-[180px] sm:max-w-[220px] ml-auto">
               {requisites.contactAddress ? (
-                <div className="max-w-[200px] ml-auto">{requisites.contactAddress}</div>
+                <div>{requisites.contactAddress}</div>
               ) : null}
               {requisites.contactPhone ? (
-                <div className="mt-1 font-mono">тел. {requisites.contactPhone}</div>
+                <div className="mt-1 font-mono whitespace-nowrap">тел. {requisites.contactPhone}</div>
               ) : null}
               {requisites.contactEmail ? (
-                <div className="font-mono">{requisites.contactEmail}</div>
+                <div className="font-mono break-all">{requisites.contactEmail}</div>
               ) : null}
             </div>
           </div>
@@ -192,19 +191,19 @@ export function EstimatePrintView({
         </section>
 
         {/* ---- Lines ---- */}
-        <section className="mb-6">
-          <table className="w-full text-sm border-collapse">
+        <section className="mb-6 -mx-4 sm:mx-0 print:mx-0 overflow-x-auto print:overflow-visible">
+          <table className="w-full min-w-[640px] sm:min-w-0 text-sm border-collapse">
             <thead>
               <tr
-                className="text-[10px] uppercase tracking-[0.15em] text-white"
+                className="text-[10px] uppercase tracking-[0.12em] text-white"
                 style={{ backgroundColor: "#111" }}
               >
-                <th className="text-left px-3 py-2.5 font-medium w-8">№</th>
-                <th className="text-left px-3 py-2.5 font-medium w-32">Тип</th>
-                <th className="text-left px-3 py-2.5 font-medium">Описание</th>
-                <th className="text-right px-3 py-2.5 font-medium w-16">Кол-во</th>
-                <th className="text-right px-3 py-2.5 font-medium w-24">Цена</th>
-                <th className="text-right px-3 py-2.5 font-medium w-28">Сумма</th>
+                <th className="text-left px-2 py-2 font-medium w-7">№</th>
+                <th className="text-left px-2 py-2 font-medium w-20 hidden sm:table-cell">Тип</th>
+                <th className="text-left px-2 py-2 font-medium">Описание</th>
+                <th className="text-right px-2 py-2 font-medium w-12">Кол-во</th>
+                <th className="text-right px-2 py-2 font-medium w-20">Цена</th>
+                <th className="text-right px-2 py-2 font-medium w-24">Сумма</th>
               </tr>
             </thead>
             <tbody>
@@ -213,20 +212,25 @@ export function EstimatePrintView({
                   key={line.id}
                   className={i % 2 === 0 ? "bg-white" : "bg-black/[0.025]"}
                 >
-                  <td className="px-3 py-2.5 align-top tabular-nums text-black/60">
+                  <td className="px-2 py-2 align-top tabular-nums text-black/60">
                     {i + 1}
                   </td>
-                  <td className="px-3 py-2.5 align-top text-[11px] uppercase tracking-wider text-black/60">
+                  <td className="px-2 py-2 align-top text-[11px] uppercase tracking-wider text-black/60 hidden sm:table-cell">
                     {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                   </td>
-                  <td className="px-3 py-2.5 align-top">{line.description}</td>
-                  <td className="px-3 py-2.5 align-top text-right tabular-nums">
+                  <td className="px-2 py-2 align-top break-words">
+                    <div>{line.description}</div>
+                    <div className="sm:hidden mt-0.5 text-[10px] uppercase tracking-wider text-black/50">
+                      {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
+                    </div>
+                  </td>
+                  <td className="px-2 py-2 align-top text-right tabular-nums">
                     {line.qty}
                   </td>
-                  <td className="px-3 py-2.5 align-top text-right tabular-nums">
+                  <td className="px-2 py-2 align-top text-right tabular-nums whitespace-nowrap">
                     {formatPrice(line.unitPrice)}
                   </td>
-                  <td className="px-3 py-2.5 align-top text-right tabular-nums font-medium">
+                  <td className="px-2 py-2 align-top text-right tabular-nums font-medium whitespace-nowrap">
                     {formatPrice(line.total)}
                   </td>
                 </tr>
@@ -253,13 +257,16 @@ export function EstimatePrintView({
             {estimate.tax ? <Row label="Налог" value={estimate.tax} /> : null}
           </div>
           <div
-            className="mt-3 flex items-baseline justify-between px-4 py-3 rounded-sm"
+            className="mt-3 flex items-baseline justify-between gap-3 px-4 py-3 rounded-sm"
             style={{ backgroundColor: "#111", color: "#fff" }}
           >
-            <span className="text-[11px] uppercase tracking-[0.2em]" style={{ color: GOLD }}>
+            <span
+              className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] shrink-0"
+              style={{ color: GOLD }}
+            >
               Итого к оплате
             </span>
-            <span className="text-2xl font-bold tabular-nums">
+            <span className="text-xl sm:text-2xl font-bold tabular-nums whitespace-nowrap">
               {formatPrice(estimate.total)}
             </span>
           </div>
@@ -407,7 +414,9 @@ function Req({
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
       <span className="text-black/50">{label}:</span>{" "}
-      <span className={mono ? "font-mono" : ""}>{value}</span>
+      <span className={(mono ? "font-mono " : "") + "break-words"}>
+        {value}
+      </span>
     </div>
   );
 }
