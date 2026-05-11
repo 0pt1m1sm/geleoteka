@@ -126,12 +126,12 @@ export default async function EstimateDetailPage({ params }: Props) {
         actions={
           <div className="flex items-center gap-4 text-xs">
             <a
-              href={`/admin/crm/estimates/${estimate.id}/print?auto=1`}
+              href={`/api/estimates/${estimate.id}/pdf`}
               target="_blank"
               rel="noopener"
               className="text-[var(--color-accent)] hover:underline"
             >
-              Печать ↗
+              Скачать PDF ↗
             </a>
             <Link
               href={`/admin/crm/deals/${estimate.deal.id}`}

@@ -122,7 +122,7 @@ export function CustomerEstimateView({
               rel="noopener"
               className="text-xs text-[var(--color-accent)] hover:underline"
             >
-              Распечатать ↗
+              Скачать PDF ↗
             </a>
           ) : null}
           <span

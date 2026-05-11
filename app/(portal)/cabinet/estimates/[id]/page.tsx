@@ -98,7 +98,7 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
           ...estimate,
           vehicle: estimate.deal.vehicle,
         }}
-        printHref={`/cabinet/estimates/${estimate.id}/print?auto=1`}
+        printHref={`/api/estimates/${estimate.id}/pdf`}
       />
     </div>
   );

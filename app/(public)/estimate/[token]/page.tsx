@@ -127,7 +127,7 @@ export default async function GuestEstimatePage({ params }: Props) {
               vehicle: deal.vehicle,
             }}
             claimToken={token}
-            printHref={`/estimate/${token}/print?estimate=${primary.id}&auto=1`}
+            printHref={`/api/estimates/${primary.id}/pdf?token=${token}`}
           />
 
           {ordered.length > 1 ? (
