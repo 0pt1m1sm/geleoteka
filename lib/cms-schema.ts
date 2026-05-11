@@ -23,7 +23,8 @@ export type CMSGroup =
   | "vacancies"
   | "footer"
   | "cookie"
-  | "fab";
+  | "fab"
+  | "requisites";
 
 export interface CMSListField {
   key: string;
@@ -73,6 +74,7 @@ export const GROUP_LABELS: Record<CMSGroup, string> = {
   footer: "Подвал",
   cookie: "Cookie-баннер",
   fab: "Плавающие кнопки",
+  requisites: "Реквизиты организации",
 };
 
 /** Display order for admin sections — keep stable so admin muscle memory works. */
@@ -81,6 +83,7 @@ export const GROUP_ORDER: readonly CMSGroup[] = [
   "about",
   "services",
   "contacts",
+  "requisites",
   "vacancies",
   "footer",
   "fab",
@@ -735,6 +738,84 @@ export const CMS_SCHEMA = {
       { key: "iconKey", label: "Иконка (telegram | whatsapp | max)", type: "text" },
     ],
     defaultValue: FAB_CHANNELS_DEFAULT,
+  },
+
+  // Юридические реквизиты — используются на печатной форме сметы,
+  // в подвале и в шапке заказ-наряда. Все поля свободные строки —
+  // если у организации нет какого-то реквизита (например, физлицо
+  // без расчётного счёта), оставить пустым.
+  "requisites.legal_name": {
+    type: "text",
+    group: "requisites",
+    label: "Юридическое наименование",
+    defaultValue: "ООО «Гелеотека»",
+  },
+  "requisites.short_name": {
+    type: "text",
+    group: "requisites",
+    label: "Сокращённое наименование (на бланке)",
+    defaultValue: "Geleoteka",
+  },
+  "requisites.inn": {
+    type: "text",
+    group: "requisites",
+    label: "ИНН",
+    defaultValue: "",
+  },
+  "requisites.kpp": {
+    type: "text",
+    group: "requisites",
+    label: "КПП",
+    defaultValue: "",
+  },
+  "requisites.ogrn": {
+    type: "text",
+    group: "requisites",
+    label: "ОГРН / ОГРНИП",
+    defaultValue: "",
+  },
+  "requisites.legal_address": {
+    type: "text",
+    group: "requisites",
+    label: "Юридический адрес",
+    defaultValue: "",
+  },
+  "requisites.bank_name": {
+    type: "text",
+    group: "requisites",
+    label: "Банк",
+    defaultValue: "",
+  },
+  "requisites.bank_bik": {
+    type: "text",
+    group: "requisites",
+    label: "БИК",
+    defaultValue: "",
+  },
+  "requisites.account": {
+    type: "text",
+    group: "requisites",
+    label: "Расчётный счёт",
+    defaultValue: "",
+  },
+  "requisites.corr_account": {
+    type: "text",
+    group: "requisites",
+    label: "Корреспондентский счёт",
+    defaultValue: "",
+  },
+  "requisites.director_name": {
+    type: "text",
+    group: "requisites",
+    label: "Руководитель (ФИО, должность)",
+    defaultValue: "",
+  },
+  "requisites.estimate_footer": {
+    type: "richtext",
+    group: "requisites",
+    label: "Подпись/примечание под сметой",
+    defaultValue:
+      "Смета действительна в течение указанного срока. По всем вопросам — отдел сервиса.",
   },
 } as const satisfies Record<string, CMSDef>;
 

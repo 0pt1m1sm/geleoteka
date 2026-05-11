@@ -58,20 +58,24 @@ export default async function PublicLayout({
 
   return (
     <>
-      <Header variant="public" cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
+      <div className="print:hidden">
+        <Header variant="public" cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
+      </div>
       <main className="flex-1">{children}</main>
-      <Footer
-        servicePhone={contacts["contacts.phone.service"]}
-        email={contacts["contacts.email"]}
-        address={contacts["contacts.address"]}
-        description={description}
-        servicesTitle={servicesTitle}
-        servicesItems={servicesItems.map((i) => ({ label: i.label ?? "", href: i.href ?? "#" }))}
-        contactsTitle={contactsTitle}
-        copyright={copyright}
-      />
-      <FloatingButtons channels={channels} />
-      <CookieConsent text={cookieText} buttonLabel={cookieButton} />
+      <div className="print:hidden">
+        <Footer
+          servicePhone={contacts["contacts.phone.service"]}
+          email={contacts["contacts.email"]}
+          address={contacts["contacts.address"]}
+          description={description}
+          servicesTitle={servicesTitle}
+          servicesItems={servicesItems.map((i) => ({ label: i.label ?? "", href: i.href ?? "#" }))}
+          contactsTitle={contactsTitle}
+          copyright={copyright}
+        />
+        <FloatingButtons channels={channels} />
+        <CookieConsent text={cookieText} buttonLabel={cookieButton} />
+      </div>
     </>
   );
 }

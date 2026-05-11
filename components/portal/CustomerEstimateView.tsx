@@ -45,6 +45,8 @@ interface Props {
   estimate: EstimateView;
   /** Guest claim token. When set, approve/decline run in guest mode. */
   claimToken?: string | null;
+  /** Where the "Распечатать" link points. Omit to hide the button. */
+  printHref?: string;
 }
 
 /**
@@ -56,6 +58,7 @@ interface Props {
 export function CustomerEstimateView({
   estimate,
   claimToken,
+  printHref,
 }: Props): React.ReactElement {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -111,18 +114,30 @@ export function CustomerEstimateView({
             </div>
           ) : null}
         </div>
-        <span
-          className={
-            "badge text-xs " +
-            (estimate.stage === "APPROVED"
-              ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
-              : estimate.stage === "DECLINED"
-                ? "bg-[var(--color-error-bg)] text-[var(--color-error)]"
-                : "bg-[var(--background-secondary)] border border-[var(--border)]")
-          }
-        >
-          {ESTIMATE_STAGE_LABELS[estimate.stage] ?? estimate.stage}
-        </span>
+        <div className="flex items-center gap-3">
+          {printHref ? (
+            <a
+              href={printHref}
+              target="_blank"
+              rel="noopener"
+              className="text-xs text-[var(--color-accent)] hover:underline"
+            >
+              Распечатать ↗
+            </a>
+          ) : null}
+          <span
+            className={
+              "badge text-xs " +
+              (estimate.stage === "APPROVED"
+                ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
+                : estimate.stage === "DECLINED"
+                  ? "bg-[var(--color-error-bg)] text-[var(--color-error)]"
+                  : "bg-[var(--background-secondary)] border border-[var(--border)]")
+            }
+          >
+            {ESTIMATE_STAGE_LABELS[estimate.stage] ?? estimate.stage}
+          </span>
+        </div>
       </div>
 
       <div className="card overflow-hidden p-0">
