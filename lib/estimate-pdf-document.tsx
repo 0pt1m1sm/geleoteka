@@ -655,11 +655,6 @@ export function EstimatePdfDocument({
             <Text style={styles.docMeta}>
               Дата: {formatDateRu(issueDate)}
             </Text>
-            {estimate.validUntil ? (
-              <Text style={styles.docMeta}>
-                Действительна до: {formatDateRu(estimate.validUntil)}
-              </Text>
-            ) : null}
           </View>
         </View>
 
