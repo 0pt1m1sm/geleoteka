@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   brandTag: {
     fontSize: 7.5,
     color: INK_MUTED,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     marginTop: 1,
   },
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   partyLabel: {
     fontSize: 7.5,
     color: INK_MUTED,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     marginBottom: 4,
   },
@@ -240,8 +240,8 @@ const styles = StyleSheet.create({
   },
   totalsValue: { color: INK },
   grandRow: {
-    marginTop: 6,
-    paddingTop: 8,
+    marginTop: 4,
+    paddingTop: 4,
     borderTopWidth: 1,
     borderTopColor: INK,
     flexDirection: "row",
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     marginTop: 26,
     fontSize: 7.5,
     color: INK_MUTED,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     marginBottom: 6,
   },
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   sigLabel: {
     fontSize: 7.5,
     color: INK_MUTED,
-    letterSpacing: 1,
+    letterSpacing: 0.6,
     textTransform: "uppercase",
     marginBottom: 4,
   },
@@ -365,12 +365,12 @@ export function EstimatePdfDocument({
           fixed
           style={{
             position: "absolute",
-            right: GUTTER - 6,
-            top: GUTTER + 320,
-            opacity: 0.05,
+            right: GUTTER,
+            bottom: GUTTER + 4,
+            opacity: 0.025,
           }}
         >
-          <Svg width={90} height={90} viewBox="0 0 64 64">
+          <Svg width={60} height={60} viewBox="0 0 64 64">
             <Rect
               x={4}
               y={4}
@@ -499,7 +499,7 @@ export function EstimatePdfDocument({
             ) : null}
             {estimate.mileage !== null && estimate.mileage > 0 ? (
               <Text>
-                <Text style={styles.factLabel}>Пробег:</Text>
+                <Text style={styles.factLabel}>Пробег: </Text>
                 <Text style={styles.factValue}>{formatMileage(estimate.mileage)}</Text>
               </Text>
             ) : null}
@@ -627,10 +627,14 @@ export function EstimatePdfDocument({
           </>
         ) : null}
 
-        {/* ---- Footer note ---- */}
-        {requisites.estimateFooter ? (
-          <Text style={styles.footerNote}>{requisites.estimateFooter}</Text>
-        ) : null}
+        {/* ---- Footer note — concrete validity date instead of the
+            generic "during the specified term" CMS placeholder. */}
+        <Text style={styles.footerNote}>
+          {estimate.validUntil
+            ? `Смета действительна до ${formatDateRu(estimate.validUntil)}. `
+            : ""}
+          По вопросам согласования — отдел сервиса.
+        </Text>
 
         {/* ---- Signatures pinned to bottom of last page ---- */}
         <View style={styles.signatures} fixed>
