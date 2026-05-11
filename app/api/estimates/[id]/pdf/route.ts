@@ -40,8 +40,18 @@ interface EstimateRow {
     customerUserId: string;
     claimToken: string | null;
     customer: { name: string; phone: string; email: string };
-    vehicle: { make: string; model: string; year: number; vin: string | null } | null;
+    vehicle: {
+      make: string;
+      model: string;
+      year: number;
+      vin: string | null;
+      plate: string | null;
+      mileage: number | null;
+    } | null;
+    owner: { name: string; phone: string; email: string } | null;
+    repairOrders: Array<{ mileageIn: number | null }>;
   };
+  preparedBy: { name: string } | null;
   estimateLines: Array<{
     id: string;
     type: string;
@@ -78,9 +88,25 @@ export async function GET(req: Request, { params }: RouteParams) {
           customerUserId: true,
           claimToken: true,
           customer: { select: { name: true, phone: true, email: true } },
-          vehicle: { select: { make: true, model: true, year: true, vin: true } },
+          vehicle: {
+            select: {
+              make: true,
+              model: true,
+              year: true,
+              vin: true,
+              plate: true,
+              mileage: true,
+            },
+          },
+          owner: { select: { name: true, phone: true, email: true } },
+          repairOrders: {
+            select: { mileageIn: true },
+            orderBy: { dateTime: "desc" },
+            take: 1,
+          },
         },
       },
+      preparedBy: { select: { name: true } },
       estimateLines: {
         orderBy: { sortOrder: "asc" },
         select: {
@@ -124,6 +150,16 @@ export async function GET(req: Request, { params }: RouteParams) {
     customer: estimate.deal.customer,
     vehicle: estimate.deal.vehicle,
     estimateLines: estimate.estimateLines,
+    mileage: estimate.deal.repairOrders[0]?.mileageIn ?? estimate.deal.vehicle?.mileage ?? null,
+    manager: estimate.deal.owner
+      ? {
+          name: estimate.deal.owner.name,
+          phone: estimate.deal.owner.phone,
+          email: estimate.deal.owner.email,
+        }
+      : estimate.preparedBy
+        ? { name: estimate.preparedBy.name, phone: "", email: "" }
+        : null,
   };
 
   // Import renderer at runtime — keeps the @react-pdf bundle out of
