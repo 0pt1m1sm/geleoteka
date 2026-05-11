@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -30,8 +31,30 @@ export interface SidebarProps {
  * Unified sidebar for portal & admin layers.
  * Single source of truth for navigation chrome — replaces AdminSidebar +
  * inline portal sidebar from app/(portal)/layout.tsx.
+ *
+ * `useSearchParams()` triggers Next.js's CSR-bailout warning when used
+ * inside a page that gets prerendered. Wrap in Suspense so the bailout
+ * is scoped to the sidebar only — pages stay statically generatable.
  */
-export function Sidebar({
+export function Sidebar(props: SidebarProps): React.ReactElement {
+  return (
+    <Suspense
+      fallback={
+        <SidebarShell
+          {...props}
+          pathname={null}
+          searchParams={null}
+          activeHref={null}
+          activeGroupLabel={null}
+        />
+      }
+    >
+      <SidebarInner {...props} />
+    </Suspense>
+  );
+}
+
+function SidebarInner({
   nav,
   brandLabel,
   showSiteLink = true,
@@ -43,6 +66,41 @@ export function Sidebar({
   const searchParams = useSearchParams();
   const activeHref = findActiveHref(pathname, searchParams, nav);
   const activeGroupLabel = findActiveGroupLabel(activeHref, nav);
+  return (
+    <SidebarShell
+      nav={nav}
+      brandLabel={brandLabel}
+      showSiteLink={showSiteLink}
+      showLogout={showLogout}
+      onNavigate={onNavigate}
+      className={className}
+      pathname={pathname}
+      searchParams={searchParams}
+      activeHref={activeHref}
+      activeGroupLabel={activeGroupLabel}
+    />
+  );
+}
+
+interface SidebarShellProps extends SidebarProps {
+  pathname: string | null;
+  searchParams: ReturnType<typeof useSearchParams> | null;
+  activeHref: string | null;
+  activeGroupLabel: string | null;
+}
+
+function SidebarShell({
+  nav,
+  brandLabel,
+  showSiteLink = true,
+  showLogout = true,
+  onNavigate,
+  className = "",
+  pathname,
+  searchParams,
+  activeHref,
+  activeGroupLabel,
+}: SidebarShellProps): React.ReactElement {
   const [openGroup, toggleGroup] = useAccordionGroup(activeGroupLabel);
 
   return (
@@ -135,8 +193,8 @@ interface SidebarGroupProps {
   isOpen: boolean;
   onToggle: () => void;
   activeHref: string | null;
-  pathname: string;
-  searchParams: ReturnType<typeof useSearchParams>;
+  pathname: string | null;
+  searchParams: ReturnType<typeof useSearchParams> | null;
   onNavigate?: () => void;
 }
 
@@ -167,7 +225,7 @@ function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, searchPar
             label={item.label}
             isActive={
               activeHref === item.href ||
-              (activeHref === null && matchesHref(pathname, searchParams, item.href))
+              (activeHref === null && pathname !== null && matchesHref(pathname, searchParams, item.href))
             }
             onNavigate={onNavigate}
             indent

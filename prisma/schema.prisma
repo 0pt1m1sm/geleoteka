@@ -158,6 +158,47 @@ enum EstimateStage {
   SUPERSEDED
 }
 
+// Communications log (CRM Phase 3) — every customer touch the team can
+// reference later. Channel covers phone, SMS, messengers, email,
+// in-person. See docs/prd/2026-05-10-crm-expansion.md.
+enum CommChannel {
+  PHONE_INBOUND
+  PHONE_OUTBOUND
+  SMS_OUTBOUND
+  SMS_INBOUND
+  WHATSAPP
+  TELEGRAM
+  EMAIL
+  IN_PERSON
+  OTHER
+}
+
+enum CommOutcome {
+  ANSWERED
+  VOICEMAIL
+  NO_ANSWER
+  REPLIED
+  DELIVERED
+  FAILED
+  N_A
+}
+
+// CRM tasks (CRM Phase 4) — manager reminders / follow-ups with
+// due-date, owner, optional deal/customer link.
+enum CrmTaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+enum CrmTaskKind {
+  CALLBACK
+  FOLLOW_UP
+  PAYMENT_REMINDER
+  SCHEDULED_CHECK_IN
+  GENERIC
+}
+
 enum FuelType {
   PETROL
   DIESEL
@@ -227,6 +268,14 @@ model User {
   dealsAsCustomer    Deal[]     @relation("DealCustomer")
   dealsAsOwner       Deal[]     @relation("DealOwner")
   estimatesPrepared  Estimate[] @relation("EstimatePreparedBy")
+
+  // CRM Phase 3 — Communications
+  commLogsAsCustomer CommunicationLog[] @relation("CommLogCustomer")
+  commLogsAuthored   CommunicationLog[] @relation("CommLogAuthor")
+
+  // CRM Phase 4 — Tasks
+  crmTasksOwned    CrmTask[] @relation("CrmTaskOwner")
+  crmTasksAsCustomer CrmTask[] @relation("CrmTaskCustomer")
 
   // Self-referential — referrals
   referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
@@ -1027,11 +1076,13 @@ model Deal {
   customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
   vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  dealLines      DealLine[]
-  estimates      Estimate[]
-  repairOrders   RepairOrder[]
-  partOrders     PartOrder[]
-  rentalBookings RentalBooking[]
+  dealLines        DealLine[]
+  estimates        Estimate[]
+  repairOrders     RepairOrder[]
+  partOrders       PartOrder[]
+  rentalBookings   RentalBooking[]
+  communicationLogs CommunicationLog[]
+  tasks            CrmTask[]
 
   @@index([customerUserId])
   @@index([vehicleId])
@@ -1127,4 +1178,61 @@ model EstimateLine {
 
   @@index([estimateId, sortOrder])
   @@index([partId])
+}
+
+// ============================================
+// CRM — Communications & Tasks
+// ============================================
+
+/// Communication touch with a customer. The manager logs phone calls /
+/// in-person visits manually; system events (smsc.ru delivery reports,
+/// future WhatsApp/Telegram webhooks) write here automatically. Always
+/// attached to a customer; optionally pinned to a specific Deal so
+/// per-deal timelines stay coherent.
+model CommunicationLog {
+  id             String      @id @default(cuid())
+  customerUserId String
+  authorUserId   String? // Manager who logged it; null = system / inbound webhook
+  dealId         String? // Optional deal context
+  channel        CommChannel
+  outcome        CommOutcome @default(N_A)
+  body           String? // Message text or call summary
+  durationSec    Int? // For calls
+  externalId     String? // smsc.ru msg id, future webhook id
+  createdAt      DateTime    @default(now())
+
+  customer User  @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  author   User? @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  deal     Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([customerUserId, createdAt])
+  @@index([dealId])
+  @@index([channel])
+}
+
+/// CRM task — a reminder/follow-up assigned to a manager. May be linked
+/// to a customer and/or a specific deal so the Customer 360 and Deal
+/// detail pages can show outstanding work.
+model CrmTask {
+  id             String        @id @default(cuid())
+  title          String
+  body           String?
+  kind           CrmTaskKind   @default(GENERIC)
+  status         CrmTaskStatus @default(OPEN)
+  dueAt          DateTime
+  ownerUserId    String
+  customerUserId String?
+  dealId         String?
+  completedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  owner    User  @relation("CrmTaskOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  customer User? @relation("CrmTaskCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  deal     Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+
+  @@index([ownerUserId, status, dueAt])
+  @@index([customerUserId])
+  @@index([dealId])
+  @@index([dueAt])
 }
