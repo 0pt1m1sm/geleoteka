@@ -58,11 +58,12 @@ interface Props {
   autoPrint?: boolean;
 }
 
-// Light brand palette — matches the cream/gold theme so the document
-// feels like part of the site, not a foreign black-on-white grid.
+// Document palette. White paper (the actual print medium) with
+// cream accents on cards / totals + gold for headings, dividers,
+// and brand wordmark. Browser preview and PDF render identically.
 const GOLD = "#b8860b";
-const CREAM = "#faf9f6";
-const CREAM_DEEP = "#f0efe9";
+const PAPER = "#ffffff";
+const CREAM_DEEP = "#f0efe9"; // soft surface for accent cards & totals
 const INK = "#1a1a1a";
 const INK_MUTED = "#6b6b64";
 const RULE = "#e0dfd8";
@@ -95,7 +96,7 @@ export function EstimatePrintView({
   return (
     <div
       className="estimate-print mx-auto max-w-[820px] print:max-w-none"
-      style={{ background: CREAM, color: INK }}
+      style={{ background: PAPER, color: INK }}
     >
       <div className="flex justify-end gap-2 px-4 sm:px-8 pt-4 sm:pt-6 print:hidden">
         <button
@@ -107,7 +108,31 @@ export function EstimatePrintView({
         </button>
       </div>
 
-      <article className="px-4 sm:px-8 lg:px-10 py-8 sm:py-10 print:px-0 print:py-0">
+      <article className="relative px-3 sm:px-8 lg:px-10 py-6 sm:py-10 print:px-0 print:py-0">
+        {/* Watermark — large translucent gold "G" behind content.
+            Light enough to print without darkening the paper but
+            visible enough to brand the document. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
+          style={{ zIndex: 0 }}
+        >
+          <span
+            className="font-black select-none"
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "min(60vw, 520px)",
+              lineHeight: 1,
+              color: GOLD,
+              opacity: 0.045,
+              letterSpacing: "-0.04em",
+              transform: "translateY(-4%)",
+            }}
+          >
+            G
+          </span>
+        </div>
+        <div className="relative" style={{ zIndex: 1 }}>
         {/* ---- Header ---- */}
         <header className="relative">
           <div
@@ -227,23 +252,17 @@ export function EstimatePrintView({
           ) : null}
         </section>
 
-        {/* ---- Lines: borderless rows with gold underline header ----
-            No min-width so it fits any viewport. Тип collapses inline
-            under the description on mobile. */}
+        {/* ---- Lines: borderless rows with gold underline header.
+            table-auto + whitespace-nowrap on number columns prevents
+            header wraps like "КОЛ-/ВО" and keeps prices on one line.
+            Description column absorbs remaining width and wraps. */}
         <section className="mb-7">
-          <table className="w-full text-sm border-collapse table-fixed">
-            <colgroup>
-              <col style={{ width: "2.5rem" }} />
-              <col />
-              <col style={{ width: "3rem" }} />
-              <col style={{ width: "5rem" }} />
-              <col style={{ width: "5.5rem" }} />
-            </colgroup>
+          <table className="w-full text-sm border-collapse">
             <thead>
               <tr style={{ borderBottom: `1.5px solid ${GOLD}` }}>
                 <th
-                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
-                  style={{ color: INK_MUTED }}
+                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
+                  style={{ color: INK_MUTED, width: "1.75rem" }}
                 >
                   №
                 </th>
@@ -254,19 +273,19 @@ export function EstimatePrintView({
                   Описание
                 </th>
                 <th
-                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  className="text-center px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Кол-во
                 </th>
                 <th
-                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Цена
                 </th>
                 <th
-                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Сумма
@@ -296,7 +315,7 @@ export function EstimatePrintView({
                       {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                     </div>
                   </td>
-                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums">
+                  <td className="px-1 sm:px-2 py-2.5 align-top text-center tabular-nums whitespace-nowrap">
                     {line.qty}
                   </td>
                   <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums whitespace-nowrap">
@@ -436,17 +455,18 @@ export function EstimatePrintView({
             </div>
           </div>
         </footer>
+        </div>
       </article>
 
       <style jsx global>{`
         @media print {
           @page {
             size: A4;
-            margin: 14mm;
+            margin: 12mm;
           }
           html,
           body {
-            background: ${CREAM} !important;
+            background: ${PAPER} !important;
             color: ${INK} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
