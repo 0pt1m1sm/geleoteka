@@ -7,6 +7,14 @@ import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { NewDealDialog } from "@/components/crm/NewDealDialog";
+
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone: string;
+  vehicles: Array<{ id: string; make: string; model: string; year: number }>;
+}
 
 const STAGE_GROUPS: Record<string, string[]> = {
   active: ["DRAFT", "SENT"],
@@ -46,32 +54,53 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
   const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "active";
   const stages = STAGE_GROUPS[stageKey];
 
-  const estimates = (await db.estimate.findMany({
-    where: { stage: { in: stages as never[] } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      number: true,
-      stage: true,
-      total: true,
-      validUntil: true,
-      sentAt: true,
-      createdAt: true,
-      deal: {
-        select: {
-          id: true,
-          channel: true,
-          customer: { select: { name: true } },
-          vehicle: { select: { make: true, model: true } },
+  const [estimates, customers] = await Promise.all([
+    db.estimate.findMany({
+      where: { stage: { in: stages as never[] } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        number: true,
+        stage: true,
+        total: true,
+        validUntil: true,
+        sentAt: true,
+        createdAt: true,
+        deal: {
+          select: {
+            id: true,
+            channel: true,
+            customer: { select: { name: true } },
+            vehicle: { select: { make: true, model: true } },
+          },
         },
       },
-    },
-  })) as unknown as EstimateRow[];
+    }) as unknown as Promise<EstimateRow[]>,
+    db.user.findMany({
+      where: { isCustomer: true },
+      orderBy: { name: "asc" },
+      take: 500,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        vehicles: {
+          where: { ownershipType: "CUSTOMER", isArchived: false },
+          select: { id: true, make: true, model: true, year: true },
+        },
+      },
+    }) as Promise<CustomerOption[]>,
+  ]);
 
   return (
     <div>
-      <PageHeader eyebrow="CRM · Коммерция" title="Сметы" />
+      <PageHeader
+        eyebrow="CRM · Коммерция"
+        title="Сметы"
+        description="Смета создаётся внутри сделки. Начните с новой сделки или откройте существующую."
+        actions={<NewDealDialog customers={customers} />}
+      />
 
       <div className="flex flex-wrap gap-2 mb-4">
         <Chip current={stageKey} value="active" label="Активные" />

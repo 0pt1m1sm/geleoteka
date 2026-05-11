@@ -10,6 +10,14 @@ import {
   DEAL_CHANNEL_LABELS,
   DEAL_STAGE_LABELS,
 } from "@/lib/deal-stage-labels";
+import { NewDealDialog } from "@/components/crm/NewDealDialog";
+
+interface CustomerOption {
+  id: string;
+  name: string;
+  phone: string;
+  vehicles: Array<{ id: string; make: string; model: string; year: number }>;
+}
 
 const STAGE_GROUPS: Record<string, string[]> = {
   all: ["DRAFT", "QUOTED", "APPROVED", "IN_FULFILLMENT", "DELIVERED", "WON", "LOST"],
@@ -47,26 +55,46 @@ export default async function CrmDealsPage({ searchParams }: Props) {
   const where: Record<string, unknown> = { stage: { in: stagesFilter } };
   if (channel) where.channel = channel;
 
-  const deals = (await db.deal.findMany({
-    where,
-    orderBy: { updatedAt: "desc" },
-    take: 100,
-    select: {
-      id: true,
-      number: true,
-      stage: true,
-      channel: true,
-      total: true,
-      createdAt: true,
-      updatedAt: true,
-      customer: { select: { id: true, name: true } },
-      vehicle: { select: { make: true, model: true } },
-    },
-  })) as DealRow[];
+  const [deals, customers] = (await Promise.all([
+    db.deal.findMany({
+      where,
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        number: true,
+        stage: true,
+        channel: true,
+        total: true,
+        createdAt: true,
+        updatedAt: true,
+        customer: { select: { id: true, name: true } },
+        vehicle: { select: { make: true, model: true } },
+      },
+    }),
+    db.user.findMany({
+      where: { isCustomer: true },
+      orderBy: { name: "asc" },
+      take: 500,
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        vehicles: {
+          where: { ownershipType: "CUSTOMER", isArchived: false },
+          select: { id: true, make: true, model: true, year: true },
+        },
+      },
+    }),
+  ])) as [DealRow[], CustomerOption[]];
 
   return (
     <div>
-      <PageHeader eyebrow="CRM · Коммерция" title="Сделки" />
+      <PageHeader
+        eyebrow="CRM · Коммерция"
+        title="Сделки"
+        actions={<NewDealDialog customers={customers} />}
+      />
 
       <div className="flex flex-wrap gap-2 mb-4">
         <StageChip current={stageKey} value="open" label="Открытые" />

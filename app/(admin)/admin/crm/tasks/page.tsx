@@ -31,7 +31,10 @@ export default async function CrmTasksPage({ searchParams }: Props) {
   }
 
   const { scope: scopeParam, owner: ownerParam } = await searchParams;
-  const scope = scopeParam ?? "today";
+  // Default scope is "open" (all my open tasks regardless of due date) so a
+  // freshly created task with a future due date is immediately visible.
+  // Use the "Сегодня" / "Просрочено" / "На неделе" chips to narrow down.
+  const scope = scopeParam ?? "open";
   const ownerScope = ownerParam ?? "mine";
 
   const now = new Date();

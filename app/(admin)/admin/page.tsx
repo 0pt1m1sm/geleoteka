@@ -155,7 +155,7 @@ export default async function AdminDashboard() {
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-semibold">Мои задачи</h3>
             <Link
-              href="/admin/crm/tasks?scope=today&owner=mine"
+              href="/admin/crm/tasks?scope=open&owner=mine"
               className="text-xs text-[var(--color-accent)] hover:underline"
             >
               Все →

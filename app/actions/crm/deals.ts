@@ -1,13 +1,63 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { recomputeDealTotals } from "@/lib/crm/internal/recompute-deal-totals";
+import { createDeal as createDealPublic } from "@/lib/crm/public/create-deal";
 
 interface DealMutationResult {
   error: string | null;
   success?: boolean;
+  dealId?: string;
+}
+
+/**
+ * Manager-initiated deal creation (walk-in or phone). Picks a customer
+ * + optional vehicle + channel and lands the user on the empty deal
+ * detail page to add lines.
+ */
+export async function createDealManually(
+  _prev: DealMutationResult | null,
+  formData: FormData,
+): Promise<DealMutationResult> {
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+
+  const customerUserId = ((formData.get("customerUserId") as string | null) ?? "").trim();
+  if (!customerUserId) return { error: "Выберите клиента" };
+  const channel = ((formData.get("channel") as string | null) ?? "WALK_IN").trim();
+  const source = ((formData.get("source") as string | null) ?? "manual").trim() || "manual";
+  const vehicleIdRaw = ((formData.get("vehicleId") as string | null) ?? "").trim();
+  const vehicleId = vehicleIdRaw || null;
+  const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
+
+  const customer = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { id: true },
+  })) as { id: string } | null;
+  if (!customer) return { error: "Клиент не найден" };
+
+  if (vehicleId) {
+    const veh = (await db.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { ownerUserId: true },
+    })) as { ownerUserId: string | null } | null;
+    if (!veh) return { error: "Автомобиль не найден" };
+  }
+
+  const deal = await createDealPublic({
+    customerUserId: customer.id,
+    vehicleId,
+    ownerUserId: session.id,
+    channel: channel as never,
+    source,
+    initialStage: "DRAFT",
+    notes,
+  });
+
+  revalidatePath("/admin/crm/deals");
+  redirect(`/admin/crm/deals/${deal.id}`);
 }
 
 export async function addDealLine(
