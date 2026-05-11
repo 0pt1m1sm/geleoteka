@@ -4,6 +4,7 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   Font,
   Svg,
@@ -64,12 +65,26 @@ export interface EstimatePdfRequisites {
   corrAccount: string;
   directorName: string;
   estimateFooter: string;
+  warranty: string;
+  paymentTerms: string;
   contactPhone: string;
   contactEmail: string;
   contactAddress: string;
 }
 
+export interface EstimatePdfExtras {
+  /** Optional PNG/base64 data URL of a QR pointing at the customer
+   *  review page. Rendered next to totals when present. */
+  qrDataUrl?: string | null;
+  /** Plain-text caption under the QR (e.g. "Согласовать смету"). */
+  qrCaption?: string | null;
+}
+
 const fontsDir = join(process.cwd(), "public", "fonts");
+// NOTE: @react-pdf/renderer does not expose OpenType feature toggles
+// on Font.register (no fontFeatureSettings on FontSource), so we can't
+// turn on `tnum` for Manrope at registration time. Tabular alignment
+// in the PDF is achieved via fixed column widths + right-aligned cells.
 Font.register({
   family: "Manrope",
   fonts: [
@@ -158,6 +173,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: INK_2,
   },
+  // Right column of the title row — fixed minWidth so long doc titles
+  // don't squeeze the Mercedes/validity stack onto a new line. The
+  // alignSelf:flex-end keeps it locked to the content gutter.
+  titleRightCol: {
+    minWidth: 180,
+    alignItems: "flex-end",
+  },
   titleRight: {
     marginTop: 4,
     textAlign: "right",
@@ -226,8 +248,29 @@ const styles = StyleSheet.create({
   cellSecondary: { marginTop: 1, fontSize: 8, color: INK_MUTED },
 
   // ---- Totals — strong final row ----
-  totals: {
+  // Bottom block: QR on the left, totals on the right.
+  totalsWrap: {
     marginTop: 12,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 24,
+  },
+  qrBlock: {
+    width: 110,
+    alignItems: "flex-start",
+  },
+  qrImage: {
+    width: 110,
+    height: 110,
+  },
+  qrCaption: {
+    marginTop: 6,
+    fontSize: 8,
+    color: INK_MUTED,
+    letterSpacing: 0.4,
+    lineHeight: 1.35,
+  },
+  totals: {
     marginLeft: "auto",
     width: 260,
   },
@@ -283,6 +326,22 @@ const styles = StyleSheet.create({
   },
   twoColItem: { flex: 1, fontSize: 9, color: INK },
 
+  // Warranty / payment-terms two-up panel.
+  termsRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    gap: 24,
+  },
+  termsCol: { flex: 1 },
+  termsHeader: {
+    fontSize: 7.5,
+    color: INK_MUTED,
+    letterSpacing: 0.6,
+    textTransform: "uppercase",
+    marginBottom: 4,
+  },
+  termsBody: { fontSize: 9, color: INK_2, lineHeight: 1.45 },
+
   footerNote: {
     marginTop: 18,
     fontSize: 8.5,
@@ -333,9 +392,11 @@ function formatMileage(n: number): string {
 export function EstimatePdfDocument({
   estimate,
   requisites,
+  extras,
 }: {
   estimate: EstimatePdfData;
   requisites: EstimatePdfRequisites;
+  extras?: EstimatePdfExtras;
 }) {
   const issueDate = estimate.sentAt ?? estimate.createdAt;
   const hasReqs =
@@ -356,21 +417,21 @@ export function EstimatePdfDocument({
       author={requisites.shortName || "Geleoteka"}
     >
       <Page size="A4" style={styles.page} wrap>
-        {/* Brand watermark — same gold-outline-square + G monogram as
-            the header. Positioned in the lower-left empty area above
-            the pinned signatures so it never overlaps the table,
-            totals, or requisites block. Opacity tuned low so it reads
-            as paper texture, not content. */}
+        {/* Brand seal — placed where a wet-ink company stamp (М.П.)
+            normally lives, just above the executor signature line.
+            Doubles as both the legal stamp space marker and the brand
+            cue. Tilted slightly to mimic a real seal impression. */}
         <View
           fixed
           style={{
             position: "absolute",
-            right: GUTTER,
-            bottom: GUTTER + 4,
-            opacity: 0.025,
+            left: GUTTER + 60,
+            bottom: GUTTER + 8,
+            opacity: 0.45,
+            transform: "rotate(-8deg)",
           }}
         >
-          <Svg width={60} height={60} viewBox="0 0 64 64">
+          <Svg width={70} height={70} viewBox="0 0 64 64">
             <Rect
               x={4}
               y={4}
@@ -443,7 +504,7 @@ export function EstimatePdfDocument({
             <Text style={styles.docMeta}>от {formatDateRu(issueDate)}</Text>
           </View>
           {vehicleLine ? (
-            <View>
+            <View style={styles.titleRightCol}>
               <Text style={styles.titleRight}>
                 <Text style={styles.titleRightStrong}>{vehicleLine}</Text>
               </Text>
@@ -535,8 +596,18 @@ export function EstimatePdfDocument({
           </View>
         ))}
 
-        {/* ---- Totals ---- */}
-        <View style={styles.totals}>
+        {/* ---- Totals + QR ---- */}
+        <View style={styles.totalsWrap}>
+          {extras?.qrDataUrl ? (
+            <View style={styles.qrBlock}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf Image has no alt prop */}
+              <Image src={extras.qrDataUrl} style={styles.qrImage} />
+              <Text style={styles.qrCaption}>
+                {extras.qrCaption ?? "Сканируйте, чтобы открыть смету"}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.totals}>
           {estimate.subtotalLabor ? (
             <View style={styles.totalsRow}>
               <Text>Работы</Text>
@@ -577,7 +648,26 @@ export function EstimatePdfDocument({
             <Text style={styles.grandLabel}>Итого к оплате</Text>
             <Text style={styles.grandValue}>{formatPricePdf(estimate.total)}</Text>
           </View>
+          </View>
         </View>
+
+        {/* ---- Warranty / Payment terms ---- */}
+        {requisites.warranty || requisites.paymentTerms ? (
+          <View style={styles.termsRow} wrap={false}>
+            {requisites.warranty ? (
+              <View style={styles.termsCol}>
+                <Text style={styles.termsHeader}>Гарантия на работы</Text>
+                <Text style={styles.termsBody}>{requisites.warranty}</Text>
+              </View>
+            ) : null}
+            {requisites.paymentTerms ? (
+              <View style={styles.termsCol}>
+                <Text style={styles.termsHeader}>Условия оплаты</Text>
+                <Text style={styles.termsBody}>{requisites.paymentTerms}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {/* ---- Payment requisites ---- */}
         {hasReqs ? (

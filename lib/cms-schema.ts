@@ -817,6 +817,20 @@ export const CMS_SCHEMA = {
     defaultValue:
       "Смета действительна в течение указанного срока. По всем вопросам — отдел сервиса.",
   },
+  "requisites.warranty": {
+    type: "richtext",
+    group: "requisites",
+    label: "Гарантия на работы",
+    defaultValue:
+      "Гарантия на выполненные работы — 6 месяцев или 10 000 км пробега (что наступит раньше). На запчасти распространяется гарантия производителя.",
+  },
+  "requisites.payment_terms": {
+    type: "richtext",
+    group: "requisites",
+    label: "Условия оплаты",
+    defaultValue:
+      "Предоплата 50% после согласования сметы, остаток — по факту выполнения работ. Оплата возможна наличными, банковской картой или переводом на расчётный счёт.",
+  },
 } as const satisfies Record<string, CMSDef>;
 
 export type CMSKey = keyof typeof CMS_SCHEMA;

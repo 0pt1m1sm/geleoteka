@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
+import QRCode from "qrcode";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { loadRequisites } from "@/lib/load-requisites";
 import {
   EstimatePdfDocument,
   type EstimatePdfData,
+  type EstimatePdfExtras,
 } from "@/lib/estimate-pdf-document";
 
 /**
@@ -135,6 +137,25 @@ export async function GET(req: Request, { params }: RouteParams) {
 
   const requisites = await loadRequisites();
 
+  // Build a self-serve review URL that works without a session.
+  // Prefer the guest claim-token form so the QR is scannable from a
+  // physical printout. Falls back to the cabinet URL when the deal
+  // has no claim token (shouldn't happen, but be safe).
+  const origin = new URL(req.url).origin;
+  const reviewUrl = estimate.deal.claimToken
+    ? `${origin}/estimate/${estimate.deal.claimToken}`
+    : `${origin}/cabinet/estimates/${estimate.id}`;
+  const qrDataUrl = await QRCode.toDataURL(reviewUrl, {
+    errorCorrectionLevel: "M",
+    margin: 1,
+    width: 220,
+    color: { dark: "#1a1a1a", light: "#ffffff" },
+  });
+  const extras: EstimatePdfExtras = {
+    qrDataUrl,
+    qrCaption: "Согласовать смету онлайн",
+  };
+
   const data: EstimatePdfData = {
     id: estimate.id,
     number: estimate.number,
@@ -167,7 +188,7 @@ export async function GET(req: Request, { params }: RouteParams) {
   // is ESM and only works in Node runtime; force that explicitly.
   const { renderToBuffer } = await import("@react-pdf/renderer");
   const buffer = await renderToBuffer(
-    EstimatePdfDocument({ estimate: data, requisites }),
+    EstimatePdfDocument({ estimate: data, requisites, extras }),
   );
 
   const filename = `smeta-${estimate.number ?? estimate.id.slice(-6).toUpperCase()}.pdf`;
