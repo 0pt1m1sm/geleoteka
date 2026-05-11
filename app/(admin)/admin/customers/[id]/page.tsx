@@ -10,6 +10,8 @@ import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
+import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
+import { CrmTaskList } from "@/components/crm/CrmTaskList";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -50,7 +52,7 @@ export default async function CustomerDetailPage({ params }: Props) {
   }
   const { id } = await params;
 
-  const [customerRaw, availableTags] = await Promise.all([
+  const [customerRaw, availableTags, commLogs, tasks] = await Promise.all([
     db.user.findUnique({
       where: { id },
       include: {
@@ -76,7 +78,40 @@ export default async function CustomerDetailPage({ params }: Props) {
       },
     }),
     getAllCustomerTags(),
+    db.communicationLog.findMany({
+      where: { customerUserId: id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        channel: true,
+        outcome: true,
+        body: true,
+        durationSec: true,
+        createdAt: true,
+        author: { select: { id: true, name: true } },
+        deal: { select: { id: true, number: true } },
+      },
+    }),
+    db.crmTask.findMany({
+      where: { customerUserId: id, status: { in: ["OPEN", "DONE"] } },
+      orderBy: [{ status: "asc" }, { dueAt: "asc" }],
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        kind: true,
+        status: true,
+        dueAt: true,
+        completedAt: true,
+        owner: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true } },
+        deal: { select: { id: true, number: true } },
+      },
+    }),
   ]);
+  const nowMs = new Date().valueOf();
 
   if (!customerRaw) notFound();
 
@@ -161,6 +196,41 @@ export default async function CustomerDetailPage({ params }: Props) {
           sessionUserId={session.id}
           sessionRole={session.permissionRole}
           notes={timelineNotes}
+        />
+      </div>
+
+      <div className="card mb-8">
+        <CommunicationLogger
+          customerUserId={customer.id}
+          initialEntries={commLogs.map((e) => ({
+            id: e.id,
+            channel: e.channel,
+            outcome: e.outcome,
+            body: e.body,
+            durationSec: e.durationSec,
+            createdAt: e.createdAt,
+            author: e.author,
+            deal: e.deal,
+          }))}
+        />
+      </div>
+
+      <div className="card mb-8">
+        <CrmTaskList
+          tasks={tasks.map((t) => ({
+            id: t.id,
+            title: t.title,
+            body: t.body,
+            kind: t.kind,
+            status: t.status,
+            dueAt: t.dueAt,
+            completedAt: t.completedAt,
+            owner: t.owner,
+            customer: t.customer,
+            deal: t.deal,
+          }))}
+          nowMs={nowMs}
+          customerUserId={customer.id}
         />
       </div>
 

@@ -81,6 +81,7 @@ export const adminNav: AdminNavEntry[] = [
       { href: "/admin/crm", label: "Дашборд CRM" },
       { href: "/admin/crm/deals", label: "Сделки" },
       { href: "/admin/crm/estimates", label: "Сметы" },
+      { href: "/admin/crm/tasks?scope=today&owner=mine", label: "Задачи" },
       { href: "/admin/customers", label: "Клиенты" },
     ],
   },

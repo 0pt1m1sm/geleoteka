@@ -13,6 +13,8 @@ import {
 import { DealLineEditor } from "@/components/crm/DealLineEditor";
 import { DealStageChanger } from "@/components/crm/DealStageChanger";
 import { EstimatesSection } from "@/components/crm/EstimatesSection";
+import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
+import { CrmTaskList } from "@/components/crm/CrmTaskList";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -56,6 +58,28 @@ interface DealDetail {
     sentAt: Date | null;
     validUntil: Date | null;
     createdAt: Date;
+  }>;
+  communicationLogs: Array<{
+    id: string;
+    channel: string;
+    outcome: string;
+    body: string | null;
+    durationSec: number | null;
+    createdAt: Date;
+    author: { id: string; name: string } | null;
+    deal: { id: string; number: string | null } | null;
+  }>;
+  tasks: Array<{
+    id: string;
+    title: string;
+    body: string | null;
+    kind: string;
+    status: string;
+    dueAt: Date;
+    completedAt: Date | null;
+    owner: { id: string; name: string };
+    customer: { id: string; name: string } | null;
+    deal: { id: string; number: string | null } | null;
   }>;
 }
 
@@ -122,6 +146,37 @@ export default async function CrmDealDetailPage({ params }: Props) {
         },
         orderBy: { createdAt: "desc" },
       },
+      communicationLogs: {
+        select: {
+          id: true,
+          channel: true,
+          outcome: true,
+          body: true,
+          durationSec: true,
+          createdAt: true,
+          author: { select: { id: true, name: true } },
+          deal: { select: { id: true, number: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      },
+      tasks: {
+        select: {
+          id: true,
+          title: true,
+          body: true,
+          kind: true,
+          status: true,
+          dueAt: true,
+          completedAt: true,
+          owner: { select: { id: true, name: true } },
+          customer: { select: { id: true, name: true } },
+          deal: { select: { id: true, number: true } },
+        },
+        where: { status: { in: ["OPEN", "DONE"] } },
+        orderBy: [{ status: "asc" }, { dueAt: "asc" }],
+        take: 50,
+      },
     },
   })) as DealDetail | null;
   if (!deal) notFound();
@@ -166,6 +221,23 @@ export default async function CrmDealDetailPage({ params }: Props) {
               dealId={deal.id}
               estimates={deal.estimates}
               canCreate={deal.stage === "DRAFT" || deal.stage === "QUOTED"}
+            />
+          </Card>
+
+          <Card>
+            <CommunicationLogger
+              customerUserId={deal.customer.id}
+              dealId={deal.id}
+              initialEntries={deal.communicationLogs}
+            />
+          </Card>
+
+          <Card>
+            <CrmTaskList
+              tasks={deal.tasks}
+              nowMs={new Date().valueOf()}
+              customerUserId={deal.customer.id}
+              dealId={deal.id}
             />
           </Card>
 
