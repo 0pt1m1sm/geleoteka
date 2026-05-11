@@ -1,10 +1,17 @@
 export const dynamic = "force-dynamic";
 
+import type { Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { EstimatePrintView } from "@/components/portal/EstimatePrintView";
 import { loadRequisites } from "@/lib/load-requisites";
+
+// Desktop viewport for iOS Safari Share → Print to capture full doc.
+export const viewport: Viewport = {
+  width: 820,
+  initialScale: 1,
+};
 
 interface Props {
   params: Promise<{ id: string }>;

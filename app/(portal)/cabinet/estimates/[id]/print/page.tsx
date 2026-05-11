@@ -1,10 +1,18 @@
 export const dynamic = "force-dynamic";
 
+import type { Viewport } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { EstimatePrintView } from "@/components/portal/EstimatePrintView";
 import { loadRequisites } from "@/lib/load-requisites";
+
+// See /estimate/[token]/print for rationale — desktop viewport so
+// iOS Safari Share → Print captures the document without clipping.
+export const viewport: Viewport = {
+  width: 820,
+  initialScale: 1,
+};
 
 interface PrintEstimate {
   id: string;

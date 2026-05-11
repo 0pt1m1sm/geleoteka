@@ -1,9 +1,18 @@
 export const dynamic = "force-dynamic";
 
+import type { Viewport } from "next";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { EstimatePrintView } from "@/components/portal/EstimatePrintView";
 import { loadRequisites } from "@/lib/load-requisites";
+
+// Force a desktop-width layout on mobile so the PDF preview captures
+// the full document instead of clipping the right edge. iOS Safari's
+// Share → Print uses the live viewport, not @page.
+export const viewport: Viewport = {
+  width: 820,
+  initialScale: 1,
+};
 
 interface Props {
   params: Promise<{ token: string }>;

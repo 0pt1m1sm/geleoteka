@@ -95,7 +95,7 @@ export function EstimatePrintView({
 
   return (
     <div
-      className="estimate-print mx-auto w-full max-w-[780px] print:max-w-none overflow-hidden"
+      className="estimate-print mx-auto w-full max-w-[820px] print:max-w-none overflow-hidden"
       style={{ background: PAPER, color: INK, boxSizing: "border-box" }}
     >
       <div className="flex justify-end gap-2 px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
