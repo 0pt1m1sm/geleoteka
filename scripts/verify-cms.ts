@@ -59,11 +59,19 @@ for (const k of keys) {
   }
 }
 
+// Keys deliberately excluded from `/admin/cms` and managed by a dedicated
+// admin page instead. They still resolve via `getCMSText` and remain part
+// of CMS_SCHEMA; they just don't appear in the generic CMS grid.
+const HIDDEN_FROM_CMS_GRID: ReadonlySet<string> = new Set([
+  "payments.gateway_url_template", // managed at /admin/site/settings
+]);
+
 const allKeys = allKeysInDisplayOrder();
+const expectedDisplayCount = keys.filter((k) => !HIDDEN_FROM_CMS_GRID.has(k)).length;
 check(
-  "allKeysInDisplayOrder covers every key",
-  allKeys.length === keys.length,
-  `displayOrder=${allKeys.length} totalKeys=${keys.length}`,
+  "allKeysInDisplayOrder covers every non-hidden key",
+  allKeys.length === expectedDisplayCount,
+  `displayOrder=${allKeys.length} expected=${expectedDisplayCount} totalKeys=${keys.length}`,
 );
 check(
   "GROUP_ORDER is non-empty",

@@ -64,6 +64,24 @@ interface EstimateRow {
   }>;
 }
 
+/**
+ * Resolve the CMS-stored payment-gateway URL template with the current
+ * estimate's identifiers. Returns null when the template is empty,
+ * after-substitution string is not an absolute http(s) URL — in that
+ * case the PDF renders page 2 without the QR block (TS-003).
+ */
+function resolvePaymentUrl(
+  template: string,
+  vars: { id: string; number: string },
+): string | null {
+  if (!template) return null;
+  const resolved = template
+    .replace(/\{estimateId\}/g, encodeURIComponent(vars.id))
+    .replace(/\{number\}/g, encodeURIComponent(vars.number));
+  if (!/^https?:\/\//i.test(resolved)) return null;
+  return resolved;
+}
+
 export async function GET(req: Request, { params }: RouteParams) {
   const { id } = await params;
   const url = new URL(req.url);
@@ -137,23 +155,33 @@ export async function GET(req: Request, { params }: RouteParams) {
 
   const requisites = await loadRequisites();
 
-  // Build a self-serve review URL that works without a session.
-  // Prefer the guest claim-token form so the QR is scannable from a
-  // physical printout. Falls back to the cabinet URL when the deal
-  // has no claim token (shouldn't happen, but be safe).
-  const origin = new URL(req.url).origin;
-  const reviewUrl = estimate.deal.claimToken
-    ? `${origin}/estimate/${estimate.deal.claimToken}`
-    : `${origin}/cabinet/estimates/${estimate.id}`;
-  const qrDataUrl = await QRCode.toDataURL(reviewUrl, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    width: 220,
-    color: { dark: "#1a1a1a", light: "#ffffff" },
-  });
+  // Resolve the payment-gateway URL from CMS. Approval lives in the
+  // customer cabinet — the QR's only job is to take the customer to
+  // the payment portal directly. When the template is empty, page 2
+  // still renders without the QR (TS-003 in the plan).
+  // `estimate.number` is nullable in the schema (prisma/schema.prisma:1130
+  // `String?`); use the cuid tail as the defensive fallback so DRAFT
+  // estimates without a number still produce a scannable URL.
+  const paymentUrl = resolvePaymentUrl(
+    requisites.paymentsGatewayUrlTemplate,
+    {
+      id: estimate.id,
+      number:
+        estimate.number ?? estimate.id.slice(-6).toUpperCase(),
+    },
+  );
+  let qrDataUrl: string | null = null;
+  if (paymentUrl) {
+    qrDataUrl = await QRCode.toDataURL(paymentUrl, {
+      errorCorrectionLevel: "M",
+      margin: 1,
+      width: 320,
+      color: { dark: "#1a1a1a", light: "#ffffff" },
+    });
+  }
   const extras: EstimatePdfExtras = {
     qrDataUrl,
-    qrCaption: "Согласовать смету онлайн",
+    qrCaption: "Отсканируйте для оплаты онлайн",
   };
 
   const data: EstimatePdfData = {

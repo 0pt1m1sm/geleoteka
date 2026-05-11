@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Plus, RotateCcw, X } from "lucide-react";
@@ -121,10 +121,15 @@ function TaskForm({
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(createCrmTask, null);
 
-  if (state?.id && !state?.error && !isPending) {
-    onCreated();
-    router.refresh();
-  }
+  // React 19 forbids triggering parent setState during render — moved
+  // to an effect so the onCreated callback and router.refresh fire
+  // after the action result lands.
+  useEffect(() => {
+    if (state?.id && !state?.error && !isPending) {
+      onCreated();
+      router.refresh();
+    }
+  }, [state, isPending, onCreated, router]);
 
   return (
     <form action={formAction} className="card space-y-3">

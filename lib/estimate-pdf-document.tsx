@@ -10,13 +10,30 @@ import {
   Svg,
   Rect,
 } from "@react-pdf/renderer";
-import { formatPrice } from "@/lib/utils";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
 
 // formatPrice uses ₽ which isn't in the shipped Manrope Cyrillic
-// subset; fallback to "руб." inside the PDF only.
+// subset; fallback to "руб." inside the PDF only. Also enforces
+// non-breaking thin-space thousands separators so prices read as
+// "32 000 руб." not "32000 руб." inside the table.
 function formatPricePdf(n: number): string {
-  return formatPrice(n).replace("₽", "руб.").trim();
+  const formatted = new Intl.NumberFormat("ru-RU").format(n);
+  return `${formatted} руб.`;
+}
+
+// Russian-style phone formatting: +79991234567 → +7 999 123-45-67.
+// Idempotent — already-formatted numbers are normalised then re-formatted.
+function formatPhonePdf(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  // Canonical RU mobile: 11 digits starting with 7 or 8.
+  const ru =
+    digits.length === 11 && (digits[0] === "7" || digits[0] === "8")
+      ? "7" + digits.slice(1)
+      : digits.length === 10
+        ? "7" + digits
+        : null;
+  if (!ru) return raw;
+  return `+${ru[0]} ${ru.slice(1, 4)} ${ru.slice(4, 7)}-${ru.slice(7, 9)}-${ru.slice(9, 11)}`;
 }
 
 export interface EstimatePdfData {
@@ -66,6 +83,7 @@ export interface EstimatePdfRequisites {
   directorName: string;
   estimateFooter: string;
   warranty: string;
+  partsWarranty: string;
   paymentTerms: string;
   contactPhone: string;
   contactEmail: string;
@@ -99,7 +117,6 @@ const INK = "#1a1a1a";
 const INK_2 = "#444";
 const INK_MUTED = "#6b6b64";
 const RULE = "#d4d3cd";
-const RULE_SOFT = "#e8e7e2";
 
 // 22mm A4 margin via @page padding inside the document. Single grid:
 // header / title / parties / table / totals / payment block / signatures
@@ -112,7 +129,10 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     color: INK,
     paddingTop: GUTTER,
-    paddingBottom: GUTTER,
+    // Reserve room for the fixed SignatureFooter. Footer is positioned
+    // at `bottom: 28` and is ~50pt tall, so we need paddingBottom >=
+    // bottom + footer_height to keep flow content above signatures.
+    paddingBottom: GUTTER + 24,
     paddingHorizontal: GUTTER,
     backgroundColor: "#fff",
   },
@@ -140,61 +160,96 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginTop: 1,
   },
-  contactsRow: {
+  // Contacts row — single inline Text with bullet separators. Forcing
+  // one Text element guarantees a single text baseline (no flex-child
+  // cross-axis drift between separate Text nodes, which differ in
+  // intrinsic line metrics across PDF rendering engines).
+  contactsLine: {
     marginTop: 6,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
     fontSize: 8.5,
     color: INK_MUTED,
+    lineHeight: 1.3,
   },
   topRule: {
     height: 0.6,
     backgroundColor: RULE,
-    marginTop: 14,
+    marginTop: 10,
   },
 
   // ---- Title block ----
+  // Title row is top-aligned so the right block's vehicle line lines
+  // up with the doc title's baseline. Title size dialed back so the
+  // header reads like a document, not a landing hero.
+  // Doc identification — number top-left, dates top-right. Invoice-
+  // standard convention: doc number + issue date + validity all live
+  // together as a single header block.
+  docIdRow: {
+    marginTop: 22,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  docDates: {
+    alignItems: "flex-end",
+  },
   titleRow: {
-    marginTop: 26,
+    marginTop: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
   },
   titleCol: { flex: 1 },
+  // Document title — dialed down so it reads as a doc header, not a
+  // landing-page hero. 14pt + 700 sits clearly above the table headers
+  // (10pt 700) without dominating the page.
   docTitle: {
-    fontSize: 26,
-    fontWeight: 800,
+    fontSize: 14,
+    fontWeight: 700,
     color: INK,
-    letterSpacing: -0.3,
+    letterSpacing: -0.1,
   },
   docMeta: {
-    marginTop: 4,
-    fontSize: 10,
+    marginTop: 2,
+    fontSize: 9.5,
     color: INK_2,
   },
-  // Right column of the title row — fixed minWidth so long doc titles
-  // don't squeeze the Mercedes/validity stack onto a new line. The
-  // alignSelf:flex-end keeps it locked to the content gutter.
   titleRightCol: {
     minWidth: 180,
     alignItems: "flex-end",
   },
+  // Matches docTitle (14pt 700) so both halves of the title row read as
+  // one balanced bar across the page.
+  titleRightTop: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: INK,
+    letterSpacing: -0.1,
+    textAlign: "right",
+  },
   titleRight: {
-    marginTop: 4,
+    marginTop: 2,
     textAlign: "right",
     fontSize: 9.5,
     color: INK_2,
   },
-  titleRightStrong: { color: INK, fontWeight: 700 },
 
-  // ---- Parties — clean two-column without heavy backgrounds ----
+  // ---- Parties — two equal cards with a subtle outline so the blocks
+  // don't read as free-floating text on the wide page. Padding and
+  // border weight matched to the rest of the document's minimal look. ----
   parties: {
-    marginTop: 22,
+    marginTop: 12,
     flexDirection: "row",
-    gap: 24,
+    gap: 16,
   },
-  partyCol: { flex: 1, minWidth: 0 },
+  partyCol: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 0.6,
+    borderColor: RULE,
+    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
   partyLabel: {
     fontSize: 7.5,
     color: INK_MUTED,
@@ -204,37 +259,80 @@ const styles = StyleSheet.create({
   },
   partyName: { fontSize: 11, fontWeight: 700 },
   partyDetail: { marginTop: 1.5, fontSize: 9, color: INK_2 },
+  // Email shares the same fontSize/leading as other party details so
+  // baselines align across the card. wrap={false} on the Text element
+  // prevents mid-`@` line breaks for long addresses.
+  partyEmail: { marginTop: 1.5, fontSize: 9, color: INK_2 },
 
-  // ---- Vehicle facts row ----
-  facts: {
-    marginTop: 14,
+  // Subject bar: labeled "Объект работ" + inline vehicle details. Sits
+  // between the parties block and the line-items table to make clear
+  // what work the estimate is about (the vehicle), not who the parties
+  // are (already covered above).
+  subjectBar: {
+    marginTop: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 18,
-    fontSize: 8.5,
-    color: INK_MUTED,
+    alignItems: "baseline",
+    gap: 8,
+    borderTopWidth: 0.6,
+    borderBottomWidth: 0.6,
+    borderColor: RULE,
   },
-  factLabel: { color: INK_MUTED, marginRight: 4 },
-  factValue: { color: INK },
+  subjectLabel: {
+    fontSize: 8,
+    color: INK_MUTED,
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    fontWeight: 700,
+  },
+  subjectValue: {
+    flex: 1,
+    fontSize: 10,
+    color: INK,
+    fontWeight: 700,
+  },
+
+  // ---- Vehicle details — full-width card with two-column rows ----
+  vehicleCard: {
+    borderWidth: 0.6,
+    borderColor: RULE,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  vehicleRow: {
+    flexDirection: "row",
+    paddingVertical: 1,
+  },
+  vehicleLabel: {
+    width: 130,
+    color: INK_MUTED,
+    fontSize: 9,
+  },
+  vehicleValue: {
+    flex: 1,
+    color: INK,
+    fontSize: 9,
+  },
 
   // ---- Table ----
   tableHeader: {
-    marginTop: 22,
+    marginTop: 14,
     flexDirection: "row",
     borderBottomWidth: 0.6,
     borderBottomColor: INK,
-    paddingVertical: 6,
+    paddingVertical: 5,
   },
   tableRow: {
     flexDirection: "row",
-    borderBottomWidth: 0.4,
-    borderBottomColor: RULE_SOFT,
-    paddingVertical: 8,
+    borderBottomWidth: 0.5,
+    borderBottomColor: RULE,
+    paddingVertical: 6,
   },
   th: {
-    fontSize: 8,
+    fontSize: 8.5,
     color: INK_2,
-    letterSpacing: 0.8,
     textTransform: "uppercase",
     fontWeight: 700,
   },
@@ -247,92 +345,86 @@ const styles = StyleSheet.create({
   colSum: { width: "18%", paddingHorizontal: 2, textAlign: "right" },
   cellSecondary: { marginTop: 1, fontSize: 8, color: INK_MUTED },
 
-  // ---- Totals — strong final row ----
-  // Bottom block: QR on the left, totals on the right.
-  totalsWrap: {
-    marginTop: 12,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 24,
-  },
-  qrBlock: {
-    width: 110,
-    alignItems: "flex-start",
-  },
-  qrImage: {
-    width: 110,
-    height: 110,
-  },
-  qrCaption: {
-    marginTop: 6,
-    fontSize: 8,
-    color: INK_MUTED,
-    letterSpacing: 0.4,
-    lineHeight: 1.35,
-  },
+  // ---- Totals — compact right-aligned block. Top breathing room
+  // separates it from the table; grand row sits on a hair-line rule and
+  // carries the largest type, anchored by the gold accent. ----
   totals: {
+    marginTop: 14,
     marginLeft: "auto",
-    width: 260,
+    width: 240,
   },
   totalsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 2.5,
+    paddingVertical: 2,
     fontSize: 9.5,
     color: INK_2,
   },
   totalsValue: { color: INK },
+  // Grand-row baseline alignment is fragile with mismatched font sizes
+  // (12pt label vs 22pt value). Wrapping both children in matched
+  // line-heights via explicit `lineHeight: 1` on each Text removes the
+  // implicit half-leading offset that pushed the label above the value.
   grandRow: {
-    marginTop: 4,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: INK,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 0.6,
+    borderTopColor: INK_MUTED,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "baseline",
+    alignItems: "flex-end",
   },
-  grandLabel: { fontSize: 12, fontWeight: 700, color: INK },
-  grandValue: { fontSize: 20, fontWeight: 800, color: INK },
+  grandLabel: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: INK,
+    letterSpacing: -0.1,
+    lineHeight: 1,
+  },
+  grandValue: {
+    fontSize: 22,
+    fontWeight: 800,
+    color: INK,
+    lineHeight: 1,
+  },
 
-  // ---- Payment + manager block ----
+  // ---- Section header for in-flow blocks (Автомобиль, Реквизиты, etc) ----
   blockHeader: {
-    marginTop: 26,
+    marginTop: 14,
     fontSize: 7.5,
     color: INK_MUTED,
     letterSpacing: 0.6,
     textTransform: "uppercase",
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  reqsGrid: {
+  // Requisites — single-column definition list. Fixed-width label
+  // keeps every value on the same vertical edge.
+  reqsList: {
+    fontSize: 9.5,
+  },
+  defRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    fontSize: 9,
+    marginVertical: 2,
   },
-  reqsCell: {
-    width: "50%",
-    paddingVertical: 1.5,
-    paddingRight: 8,
+  defLabel: {
+    width: 110,
+    color: INK_MUTED,
+    fontSize: 9.5,
   },
-  reqsCellWide: {
-    width: "100%",
-    paddingVertical: 1.5,
-    paddingRight: 8,
+  defValue: {
+    flex: 1,
+    color: INK,
+    fontSize: 9.5,
   },
-  reqsLabel: { color: INK_MUTED },
-  twoCol: {
-    marginTop: 8,
-    flexDirection: "row",
-    gap: 24,
+  // Manager card — stacked, single column. Replaces the prior 3-column
+  // row that pushed phone and email to opposite ends of the page.
+  managerCard: {
+    marginTop: 6,
   },
-  twoColItem: { flex: 1, fontSize: 9, color: INK },
+  managerName: { fontSize: 10.5, fontWeight: 700, color: INK },
+  managerDetail: { marginTop: 2, fontSize: 9.5, color: INK_2 },
 
-  // Warranty / payment-terms two-up panel.
-  termsRow: {
-    marginTop: 14,
-    flexDirection: "row",
-    gap: 24,
-  },
-  termsCol: { flex: 1 },
+  // Block-label microheader reused for terms and other page-2 sections.
   termsHeader: {
     fontSize: 7.5,
     color: INK_MUTED,
@@ -349,12 +441,84 @@ const styles = StyleSheet.create({
     lineHeight: 1.45,
   },
 
-  // ---- Signatures pinned to bottom of page via fixed footer ----
+  // ---- Page-2 specific ----
+  // Compact brand strip — same logo, no tagline, no contacts row.
+  brandStripCompact: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  brandStripCompactLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  brandWordmarkCompact: {
+    fontSize: 12,
+    fontWeight: 800,
+    color: GOLD,
+    letterSpacing: 1.2,
+  },
+  brandReference: {
+    fontSize: 9,
+    color: INK_MUTED,
+    letterSpacing: 0.3,
+  },
+  page2Heading: {
+    marginTop: 18,
+    fontSize: 22,
+    fontWeight: 800,
+    color: INK,
+    letterSpacing: -0.3,
+  },
+  page2Subtitle: {
+    marginTop: 4,
+    fontSize: 10,
+    color: INK_2,
+    lineHeight: 1.45,
+  },
+  page2HeroRow: {
+    marginTop: 22,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 28,
+  },
+  page2HeroLeft: {
+    width: 200,
+    alignItems: "flex-start",
+  },
+  page2QrImage: {
+    width: 180,
+    height: 180,
+  },
+  page2QrCaption: {
+    marginTop: 6,
+    fontSize: 8.5,
+    color: INK_MUTED,
+    letterSpacing: 0.4,
+    lineHeight: 1.35,
+  },
+  page2HeroRight: {
+    flex: 1,
+    minWidth: 0,
+  },
+  page2TermsBlock: {
+    marginBottom: 10,
+  },
+
+  // ---- Signatures — in-flow at end of page 1, so they land once on the
+  // final page-1 instance (after the table + totals) instead of being
+  // repeated on every table-overflow continuation. ----
+  // Signatures pinned to the bottom of every page (both estimate and
+  // conditions). `position: absolute` + low `bottom` keeps them tight
+  // against the page edge so the reserved paddingBottom on `styles.page`
+  // can be smaller, leaving more vertical room for content like totals.
   signatures: {
     position: "absolute",
     left: GUTTER,
     right: GUTTER,
-    bottom: GUTTER,
+    bottom: 28,
     flexDirection: "row",
     gap: 30,
   },
@@ -368,8 +532,8 @@ const styles = StyleSheet.create({
   },
   sigName: { fontSize: 10, color: INK },
   sigLine: {
-    marginTop: 28,
-    paddingTop: 4,
+    marginTop: 16,
+    paddingTop: 3,
     borderTopWidth: 0.6,
     borderTopColor: INK_MUTED,
     fontSize: 8,
@@ -387,6 +551,104 @@ function formatDateRu(d: Date): string {
 
 function formatMileage(n: number): string {
   return new Intl.NumberFormat("ru-RU").format(n) + " км";
+}
+
+/**
+ * Brand strip used at the top of both pages. Compact variant drops the
+ * tagline and contacts row so page 2's header doesn't compete with the
+ * page heading; the right-aligned `reference` slot identifies which
+ * estimate page 2 belongs to (e.g. "К смете № СМ-000142").
+ */
+function BrandStrip({
+  requisites,
+  compact,
+  reference,
+}: {
+  requisites: EstimatePdfRequisites;
+  compact?: boolean;
+  reference?: string;
+}) {
+  if (compact) {
+    return (
+      <View style={styles.brandStripCompact}>
+        <View style={styles.brandStripCompactLeft}>
+          <Svg width={22} height={22} viewBox="0 0 64 64">
+            <Rect
+              x={4}
+              y={4}
+              width={56}
+              height={56}
+              rx={6}
+              stroke={GOLD}
+              strokeWidth={5}
+              fill="none"
+            />
+            <Text
+              x={32}
+              y={46}
+              fill={GOLD}
+              style={{ fontSize: 38, fontWeight: 800 }}
+              textAnchor="middle"
+            >
+              G
+            </Text>
+          </Svg>
+          <Text style={styles.brandWordmarkCompact}>
+            {(requisites.shortName || "GELEOTEKA").toUpperCase()}
+          </Text>
+        </View>
+        {reference ? (
+          <Text style={styles.brandReference}>{reference}</Text>
+        ) : null}
+      </View>
+    );
+  }
+  return (
+    <>
+      <View style={styles.headerRow}>
+        <Svg width={34} height={34} viewBox="0 0 64 64">
+          <Rect
+            x={4}
+            y={4}
+            width={56}
+            height={56}
+            rx={6}
+            stroke={GOLD}
+            strokeWidth={5}
+            fill="none"
+          />
+          <Text
+            x={32}
+            y={46}
+            fill={GOLD}
+            style={{ fontSize: 38, fontWeight: 800 }}
+            textAnchor="middle"
+          >
+            G
+          </Text>
+        </Svg>
+        <View>
+          <Text style={styles.brand}>
+            {(requisites.shortName || "GELEOTEKA").toUpperCase()}
+          </Text>
+          <Text style={styles.brandTag}>
+            Специализированный сервис Mercedes-Benz G-Class
+          </Text>
+        </View>
+      </View>
+      {(() => {
+        const parts: string[] = [];
+        if (requisites.contactAddress) parts.push(requisites.contactAddress);
+        if (requisites.contactPhone)
+          parts.push(`тел. ${formatPhonePdf(requisites.contactPhone)}`);
+        if (requisites.contactEmail) parts.push(requisites.contactEmail);
+        return parts.length > 0 ? (
+          <Text style={styles.contactsLine}>{parts.join("  ·  ")}</Text>
+        ) : null;
+      })()}
+      <View style={styles.topRule} />
+    </>
+  );
 }
 
 export function EstimatePdfDocument({
@@ -407,9 +669,6 @@ export function EstimatePdfDocument({
     requisites.bankName;
   const docNumber =
     estimate.number ?? estimate.id.slice(-6).toUpperCase();
-  const vehicleLine = estimate.vehicle
-    ? `${estimate.vehicle.make} ${estimate.vehicle.model} ${estimate.vehicle.year}`
-    : null;
 
   return (
     <Document
@@ -417,116 +676,38 @@ export function EstimatePdfDocument({
       author={requisites.shortName || "Geleoteka"}
     >
       <Page size="A4" style={styles.page} wrap>
-        {/* Brand seal — placed where a wet-ink company stamp (М.П.)
-            normally lives, just above the executor signature line.
-            Doubles as both the legal stamp space marker and the brand
-            cue. Tilted slightly to mimic a real seal impression. */}
-        <View
-          fixed
-          style={{
-            position: "absolute",
-            left: GUTTER + 60,
-            bottom: GUTTER + 8,
-            opacity: 0.45,
-            transform: "rotate(-8deg)",
-          }}
-        >
-          <Svg width={70} height={70} viewBox="0 0 64 64">
-            <Rect
-              x={4}
-              y={4}
-              width={56}
-              height={56}
-              rx={6}
-              stroke={GOLD}
-              strokeWidth={5}
-              fill="none"
-            />
-            <Text
-              x={32}
-              y={46}
-              fill={GOLD}
-              style={{ fontSize: 38, fontWeight: 800 }}
-              textAnchor="middle"
-            >
-              G
-            </Text>
-          </Svg>
-        </View>
+        <BrandStrip requisites={requisites} />
 
-        {/* ---- Brand strip ---- */}
-        <View style={styles.headerRow}>
-          <Svg width={34} height={34} viewBox="0 0 64 64">
-            <Rect
-              x={4}
-              y={4}
-              width={56}
-              height={56}
-              rx={6}
-              stroke={GOLD}
-              strokeWidth={5}
-              fill="none"
-            />
-            <Text
-              x={32}
-              y={46}
-              fill={GOLD}
-              style={{ fontSize: 38, fontWeight: 800 }}
-              textAnchor="middle"
-            >
-              G
+        {/* ---- Document identification — all dates and the number live
+            together (industry-standard invoice convention). Vehicle is
+            NOT here — it's the subject of the work, shown below in its
+            own labeled bar. ---- */}
+        <View style={styles.docIdRow}>
+          <Text style={styles.docTitle}>Смета № {docNumber}</Text>
+          <View style={styles.docDates}>
+            <Text style={styles.docMeta}>
+              Дата: {formatDateRu(issueDate)}
             </Text>
-          </Svg>
-          <View>
-            <Text style={styles.brand}>
-              {(requisites.shortName || "GELEOTEKA").toUpperCase()}
-            </Text>
-            <Text style={styles.brandTag}>
-              Специализированный сервис Mercedes-Benz G-Class
-            </Text>
-          </View>
-        </View>
-        <View style={styles.contactsRow}>
-          {requisites.contactAddress ? (
-            <Text>{requisites.contactAddress}</Text>
-          ) : null}
-          {requisites.contactPhone ? (
-            <Text>тел. {requisites.contactPhone}</Text>
-          ) : null}
-          {requisites.contactEmail ? <Text>{requisites.contactEmail}</Text> : null}
-        </View>
-        <View style={styles.topRule} />
-
-        {/* ---- Title — single dominant element ---- */}
-        <View style={styles.titleRow}>
-          <View style={styles.titleCol}>
-            <Text style={styles.docTitle}>Смета № {docNumber}</Text>
-            <Text style={styles.docMeta}>от {formatDateRu(issueDate)}</Text>
-          </View>
-          {vehicleLine ? (
-            <View style={styles.titleRightCol}>
-              <Text style={styles.titleRight}>
-                <Text style={styles.titleRightStrong}>{vehicleLine}</Text>
+            {estimate.validUntil ? (
+              <Text style={styles.docMeta}>
+                Действительна до: {formatDateRu(estimate.validUntil)}
               </Text>
-              {estimate.validUntil ? (
-                <Text style={styles.titleRight}>
-                  действительна до {formatDateRu(estimate.validUntil)}
-                </Text>
-              ) : null}
-            </View>
-          ) : null}
+            ) : null}
+          </View>
         </View>
 
-        {/* ---- Parties ---- */}
+        {/* ---- Parties: Заказчик / Исполнитель ---- */}
         <View style={styles.parties}>
           <View style={styles.partyCol}>
             <Text style={styles.partyLabel}>Заказчик</Text>
             <Text style={styles.partyName}>{estimate.customer.name}</Text>
             {estimate.customer.phone ? (
-              <Text style={styles.partyDetail}>{estimate.customer.phone}</Text>
+              <Text style={styles.partyDetail}>
+                {formatPhonePdf(estimate.customer.phone)}
+              </Text>
             ) : null}
             {estimate.customer.email ? (
-              <Text style={styles.partyDetail}>{estimate.customer.email}</Text>
+              <Text style={styles.partyEmail} wrap={false}>{estimate.customer.email}</Text>
             ) : null}
           </View>
           <View style={styles.partyCol}>
@@ -538,37 +719,38 @@ export function EstimatePdfDocument({
               <Text style={styles.partyDetail}>ИНН {requisites.inn}</Text>
             ) : null}
             {requisites.contactPhone ? (
-              <Text style={styles.partyDetail}>{requisites.contactPhone}</Text>
+              <Text style={styles.partyDetail}>
+                {formatPhonePdf(requisites.contactPhone)}
+              </Text>
+            ) : null}
+            {requisites.contactEmail ? (
+              <Text style={styles.partyEmail} wrap={false}>{requisites.contactEmail}</Text>
             ) : null}
           </View>
         </View>
 
-        {/* ---- Vehicle facts row ---- */}
-        {estimate.vehicle ? (
-          <View style={styles.facts}>
-            {estimate.vehicle.vin ? (
-              <Text>
-                <Text style={styles.factLabel}>VIN:</Text>
-                <Text style={styles.factValue}>{estimate.vehicle.vin}</Text>
-              </Text>
-            ) : null}
-            {estimate.vehicle.plate ? (
-              <Text>
-                <Text style={styles.factLabel}>Госномер:</Text>
-                <Text style={styles.factValue}>{estimate.vehicle.plate}</Text>
-              </Text>
-            ) : null}
-            {estimate.mileage !== null && estimate.mileage > 0 ? (
-              <Text>
-                <Text style={styles.factLabel}>Пробег: </Text>
-                <Text style={styles.factValue}>{formatMileage(estimate.mileage)}</Text>
-              </Text>
-            ) : null}
-          </View>
-        ) : null}
+        {/* ---- Subject of work: the vehicle this estimate applies to.
+            Invoice-standard "Subject" / "Re:" line — labeled, distinct
+            from parties. Inline so it reads as one fact, not a stack. ---- */}
+        <View style={styles.subjectBar}>
+          <Text style={styles.subjectLabel}>Объект работ:</Text>
+          <Text style={styles.subjectValue}>
+            {estimate.vehicle
+              ? `${estimate.vehicle.make} ${estimate.vehicle.model} ${estimate.vehicle.year} г.`
+              : "Н/Д"}
+            {estimate.vehicle?.plate ? ` · ${estimate.vehicle.plate}` : ""}
+            {estimate.vehicle?.vin ? ` · VIN ${estimate.vehicle.vin}` : ""}
+            {estimate.mileage !== null && estimate.mileage > 0
+              ? ` · пробег ${formatMileage(estimate.mileage)}`
+              : ""}
+          </Text>
+        </View>
 
-        {/* ---- Table ---- */}
-        <View style={styles.tableHeader} fixed>
+        {/* ---- Table ---- header is in-flow (not `fixed`) so it doesn't
+            render as an empty band above the totals on a page-1 overflow
+            continuation. Long tables still get a clean break — the
+            secondary type label keeps each row identifiable. */}
+        <View style={styles.tableHeader}>
           <Text style={[styles.th, styles.colNo]}>№</Text>
           <Text style={[styles.th, styles.colDescr]}>Описание</Text>
           <Text style={[styles.th, styles.colQty]}>Кол-во</Text>
@@ -596,18 +778,8 @@ export function EstimatePdfDocument({
           </View>
         ))}
 
-        {/* ---- Totals + QR ---- */}
-        <View style={styles.totalsWrap}>
-          {extras?.qrDataUrl ? (
-            <View style={styles.qrBlock}>
-              {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf Image has no alt prop */}
-              <Image src={extras.qrDataUrl} style={styles.qrImage} />
-              <Text style={styles.qrCaption}>
-                {extras.qrCaption ?? "Сканируйте, чтобы открыть смету"}
-              </Text>
-            </View>
-          ) : null}
-          <View style={styles.totals}>
+        {/* ---- Totals — right-aligned final row, page 1 only. ---- */}
+        <View style={styles.totals}>
           {estimate.subtotalLabor ? (
             <View style={styles.totalsRow}>
               <Text>Работы</Text>
@@ -648,121 +820,168 @@ export function EstimatePdfDocument({
             <Text style={styles.grandLabel}>Итого к оплате</Text>
             <Text style={styles.grandValue}>{formatPricePdf(estimate.total)}</Text>
           </View>
-          </View>
         </View>
 
-        {/* ---- Warranty / Payment terms ---- */}
-        {requisites.warranty || requisites.paymentTerms ? (
-          <View style={styles.termsRow} wrap={false}>
-            {requisites.warranty ? (
-              <View style={styles.termsCol}>
-                <Text style={styles.termsHeader}>Гарантия на работы</Text>
-                <Text style={styles.termsBody}>{requisites.warranty}</Text>
-              </View>
-            ) : null}
+        <SignatureFooter estimate={estimate} requisites={requisites} />
+      </Page>
+
+      {/* ============= Page 2 — Conditions & Online Payment =============
+          QR (when CMS template is configured) pulls the customer straight
+          to the payment gateway. Approval of the estimate continues to
+          live in the customer cabinet — this page is purely about payment
+          terms, warranties, and a fast-pay path. */}
+      <Page size="A4" style={styles.page}>
+        <BrandStrip
+          requisites={requisites}
+          compact
+          reference={`К смете № ${docNumber}`}
+        />
+        <Text style={styles.page2Heading}>Условия и онлайн-оплата</Text>
+        <Text style={styles.page2Subtitle}>
+          {extras?.qrDataUrl
+            ? "Для оплаты сметы отсканируйте QR-код или используйте реквизиты ниже."
+            : "Ниже — условия оплаты, гарантия на работы и запчасти, а также банковские реквизиты для перевода."}
+        </Text>
+
+        <View style={styles.page2HeroRow}>
+          {extras?.qrDataUrl ? (
+            <View style={styles.page2HeroLeft}>
+              {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf Image has no alt prop */}
+              <Image src={extras.qrDataUrl} style={styles.page2QrImage} />
+              <Text style={styles.page2QrCaption}>
+                {extras.qrCaption ?? "Отсканируйте для оплаты онлайн"}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.page2HeroRight}>
             {requisites.paymentTerms ? (
-              <View style={styles.termsCol}>
+              <View style={styles.page2TermsBlock}>
                 <Text style={styles.termsHeader}>Условия оплаты</Text>
                 <Text style={styles.termsBody}>{requisites.paymentTerms}</Text>
               </View>
             ) : null}
+            {requisites.warranty ? (
+              <View style={styles.page2TermsBlock}>
+                <Text style={styles.termsHeader}>Гарантия на работы</Text>
+                <Text style={styles.termsBody}>{requisites.warranty}</Text>
+              </View>
+            ) : null}
+            {requisites.partsWarranty ? (
+              <View style={styles.page2TermsBlock}>
+                <Text style={styles.termsHeader}>Гарантия на запчасти</Text>
+                <Text style={styles.termsBody}>
+                  {requisites.partsWarranty}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        ) : null}
+        </View>
 
-        {/* ---- Payment requisites ---- */}
         {hasReqs ? (
           <>
             <Text style={styles.blockHeader}>Реквизиты для оплаты</Text>
-            <View style={styles.reqsGrid}>
+            <View style={styles.reqsList}>
               {requisites.legalName ? (
-                <Req wide label="Получатель" value={requisites.legalName} />
+                <DefRow label="Получатель" value={requisites.legalName} />
               ) : null}
-              {requisites.inn ? <Req label="ИНН" value={requisites.inn} /> : null}
-              {requisites.kpp ? <Req label="КПП" value={requisites.kpp} /> : null}
+              {requisites.inn || requisites.kpp ? (
+                <DefRow
+                  label="ИНН / КПП"
+                  value={[requisites.inn, requisites.kpp]
+                    .filter(Boolean)
+                    .join(" / ")}
+                />
+              ) : null}
               {requisites.ogrn ? (
-                <Req label="ОГРН" value={requisites.ogrn} />
+                <DefRow label="ОГРН" value={requisites.ogrn} />
               ) : null}
               {requisites.legalAddress ? (
-                <Req wide label="Юр. адрес" value={requisites.legalAddress} />
+                <DefRow label="Юр. адрес" value={requisites.legalAddress} />
               ) : null}
               {requisites.bankName ? (
-                <Req wide label="Банк" value={requisites.bankName} />
+                <DefRow label="Банк" value={requisites.bankName} />
               ) : null}
               {requisites.bankBik ? (
-                <Req label="БИК" value={requisites.bankBik} />
+                <DefRow label="БИК" value={requisites.bankBik} />
               ) : null}
               {requisites.account ? (
-                <Req label="Р/счёт" value={requisites.account} />
+                <DefRow label="Р/счёт" value={requisites.account} />
               ) : null}
               {requisites.corrAccount ? (
-                <Req wide label="К/счёт" value={requisites.corrAccount} />
+                <DefRow label="К/счёт" value={requisites.corrAccount} />
               ) : null}
             </View>
           </>
         ) : null}
 
-        {/* ---- Manager / contact for questions ---- */}
         {estimate.manager ? (
           <>
             <Text style={styles.blockHeader}>Ответственный менеджер</Text>
-            <View style={styles.twoCol}>
-              <Text style={styles.twoColItem}>{estimate.manager.name}</Text>
+            <View style={styles.managerCard}>
+              <Text style={styles.managerName}>{estimate.manager.name}</Text>
               {estimate.manager.phone ? (
-                <Text style={styles.twoColItem}>{estimate.manager.phone}</Text>
+                <Text style={styles.managerDetail}>
+                  {formatPhonePdf(estimate.manager.phone)}
+                </Text>
               ) : null}
               {estimate.manager.email ? (
-                <Text style={styles.twoColItem}>{estimate.manager.email}</Text>
+                <Text style={styles.managerDetail}>
+                  {estimate.manager.email}
+                </Text>
               ) : null}
             </View>
           </>
         ) : null}
 
-        {/* ---- Footer note — concrete validity date instead of the
-            generic "during the specified term" CMS placeholder. */}
         <Text style={styles.footerNote}>
           {estimate.validUntil
-            ? `Смета действительна до ${formatDateRu(estimate.validUntil)}. `
-            : ""}
-          По вопросам согласования — отдел сервиса.
+            ? `Смета действительна до ${formatDateRu(estimate.validUntil)} По вопросам согласования — отдел сервиса.`
+            : "По вопросам согласования — отдел сервиса."}
         </Text>
-
-        {/* ---- Signatures pinned to bottom of last page ---- */}
-        <View style={styles.signatures} fixed>
-          <View style={styles.sigCol}>
-            <Text style={styles.sigLabel}>Исполнитель</Text>
-            <Text style={styles.sigName}>
-              {requisites.directorName ||
-                requisites.legalName ||
-                requisites.shortName}
-            </Text>
-            <Text style={styles.sigLine}>Подпись · М.П.</Text>
-          </View>
-          <View style={styles.sigCol}>
-            <Text style={styles.sigLabel}>Заказчик</Text>
-            <Text style={styles.sigName}>{estimate.customer.name}</Text>
-            <Text style={styles.sigLine}>Подпись</Text>
-          </View>
-        </View>
+        <SignatureFooter estimate={estimate} requisites={requisites} />
       </Page>
     </Document>
   );
 }
 
-function Req({
-  label,
-  value,
-  wide,
+/**
+ * Pinned-to-bottom signature row, used on every page via `fixed`. The page
+ * itself reserves `paddingBottom: GUTTER` so flowing content never overlaps
+ * the footer. `wrap={false}` keeps each side's three lines together when
+ * an overflow continuation re-renders the footer.
+ */
+function SignatureFooter({
+  estimate,
+  requisites,
 }: {
-  label: string;
-  value: string;
-  wide?: boolean;
+  estimate: EstimatePdfData;
+  requisites: EstimatePdfRequisites;
 }) {
   return (
-    <View style={wide ? styles.reqsCellWide : styles.reqsCell}>
-      <Text>
-        <Text style={styles.reqsLabel}>{label}: </Text>
-        {value}
-      </Text>
+    <View style={styles.signatures} fixed>
+      <View style={styles.sigCol}>
+        <Text style={styles.sigLabel}>Исполнитель</Text>
+        <Text style={styles.sigName}>
+          {requisites.directorName ||
+            requisites.legalName ||
+            requisites.shortName}
+        </Text>
+        <Text style={styles.sigLine}>Подпись · М.П.</Text>
+      </View>
+      <View style={styles.sigCol}>
+        <Text style={styles.sigLabel}>Заказчик</Text>
+        <Text style={styles.sigName}>{estimate.customer.name}</Text>
+        <Text style={styles.sigLine}>Подпись</Text>
+      </View>
+    </View>
+  );
+}
+
+function DefRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.defRow} wrap={false}>
+      <Text style={styles.defLabel}>{label}:</Text>
+      <Text style={styles.defValue}>{value}</Text>
     </View>
   );
 }

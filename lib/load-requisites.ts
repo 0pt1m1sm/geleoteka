@@ -14,7 +14,9 @@ export interface Requisites {
   directorName: string;
   estimateFooter: string;
   warranty: string;
+  partsWarranty: string;
   paymentTerms: string;
+  paymentsGatewayUrlTemplate: string;
   contactPhone: string;
   contactEmail: string;
   contactAddress: string;
@@ -26,7 +28,7 @@ export interface Requisites {
  * lines in the print template and the corresponding block hides.
  */
 export async function loadRequisites(): Promise<Requisites> {
-  const [base, footer, warranty, paymentTerms] = await Promise.all([
+  const [base, footer, warranty, partsWarranty, paymentTerms] = await Promise.all([
     getCMSMany([
       "requisites.legal_name",
       "requisites.short_name",
@@ -39,12 +41,14 @@ export async function loadRequisites(): Promise<Requisites> {
       "requisites.account",
       "requisites.corr_account",
       "requisites.director_name",
+      "payments.gateway_url_template",
       "contacts.phone.service",
       "contacts.email",
       "contacts.address",
     ]),
     getCMSRichtext("requisites.estimate_footer"),
     getCMSRichtext("requisites.warranty"),
+    getCMSRichtext("requisites.parts_warranty"),
     getCMSRichtext("requisites.payment_terms"),
   ]);
 
@@ -62,7 +66,9 @@ export async function loadRequisites(): Promise<Requisites> {
     directorName: base["requisites.director_name"] ?? "",
     estimateFooter: footer,
     warranty,
+    partsWarranty,
     paymentTerms,
+    paymentsGatewayUrlTemplate: base["payments.gateway_url_template"] ?? "",
     contactPhone: base["contacts.phone.service"] ?? "",
     contactEmail: base["contacts.email"] ?? "",
     contactAddress: base["contacts.address"] ?? "",
