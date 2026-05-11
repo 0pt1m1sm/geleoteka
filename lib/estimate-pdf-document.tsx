@@ -568,6 +568,45 @@ export function EstimatePdfDocument({
           </View>
         </View>
 
+        {/* Brand watermark — same gold-outline-square + G mark as the
+            header logo, centered behind content, low opacity. */}
+        <View
+          fixed
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: -1,
+          }}
+        >
+          <Svg width={420} height={420} viewBox="0 0 64 64">
+            <Rect
+              x={4}
+              y={4}
+              width={56}
+              height={56}
+              rx={6}
+              stroke={GOLD}
+              strokeWidth={5}
+              fill="none"
+              opacity={0.08}
+            />
+            <Text
+              x={32}
+              y={46}
+              fill={GOLD}
+              style={{ fontSize: 38, fontWeight: 800 }}
+              textAnchor="middle"
+              opacity={0.08}
+            >
+              G
+            </Text>
+          </Svg>
+        </View>
       </Page>
     </Document>
   );
