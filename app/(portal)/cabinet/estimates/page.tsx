@@ -1,79 +1,136 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { EstimateReview } from "@/components/portal/EstimateReview";
 import { Card, PageHeader } from "@/components/ui";
+import { formatDate, formatPrice } from "@/lib/utils";
+import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
 
-export default async function EstimatesPage() {
+interface EstimateRow {
+  id: string;
+  number: string | null;
+  stage: string;
+  total: number;
+  sentAt: Date | null;
+  validUntil: Date | null;
+  createdAt: Date;
+  deal: {
+    id: string;
+    vehicle: { make: string; model: string; year: number } | null;
+  };
+}
+
+export default async function CabinetEstimatesPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const repairOrders = await db.repairOrder.findMany({
+  const estimates = (await db.estimate.findMany({
     where: {
-      userId: session.id,
-      status: "ESTIMATE",
+      deal: { customerUserId: session.id },
+      stage: { in: ["DRAFT", "SENT", "APPROVED", "DECLINED"] },
     },
-    include: {
-      vehicle: { select: { model: true } },
-      jobLines: {
-        orderBy: { sortOrder: "asc" },
-        include: {
-          laborLines: { select: { description: true, bookHours: true, rate: true, total: true } },
-          partLines: { select: { description: true, qty: true, unitPrice: true } },
+    orderBy: [{ stage: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      number: true,
+      stage: true,
+      total: true,
+      sentAt: true,
+      validUntil: true,
+      createdAt: true,
+      deal: {
+        select: {
+          id: true,
+          vehicle: { select: { make: true, model: true, year: true } },
         },
       },
     },
-    orderBy: { createdAt: "desc" },
-  });
+  })) as unknown as EstimateRow[];
 
-  const serialized = repairOrders.map((ro: Record<string, unknown>) => {
-    const vehicle = ro.vehicle as { model: string };
-    const jobs = ro.jobLines as Array<Record<string, unknown>>;
-    return {
-      id: ro.id as string,
-      total: ro.total as number,
-      carModel: vehicle.model,
-      jobs: jobs.map((j) => ({
-        id: j.id as string,
-        description: j.description as string,
-        status: j.status as "PROPOSED" | "APPROVED" | "DECLINED" | "DEFERRED" | "IN_PROGRESS" | "DONE",
-        total: j.total as number,
-        laborLines: (j.laborLines as Array<{
-          description: string;
-          bookHours: number;
-          rate: number;
-          total: number;
-        }>).map((l) => ({
-          description: l.description,
-          bookHours: l.bookHours,
-          rate: l.rate,
-          total: l.total,
-        })),
-        partLines: (j.partLines as Array<{
-          description: string;
-          qty: number;
-          unitPrice: number;
-        }>).map((p) => ({
-          description: p.description,
-          qty: p.qty,
-          unitPrice: p.unitPrice,
-        })),
-      })),
-    };
-  });
+  const pending = estimates.filter((e) => e.stage === "SENT" || e.stage === "DRAFT");
+  const closed = estimates.filter((e) => e.stage !== "SENT" && e.stage !== "DRAFT");
 
   return (
     <div>
       <PageHeader eyebrow="Кабинет" title="Сметы" />
-      {serialized.length === 0 ? (
+
+      {pending.length === 0 && closed.length === 0 ? (
         <Card className="text-center py-12">
-          <p className="text-[var(--foreground-muted)]">Нет смет на согласование</p>
+          <p className="text-[var(--foreground-muted)]">Смет нет.</p>
         </Card>
-      ) : (
-        <EstimateReview repairOrders={serialized} />
-      )}
+      ) : null}
+
+      {pending.length > 0 ? (
+        <>
+          <h2 className="text-sm uppercase tracking-wider text-[var(--foreground-muted)] mb-3">
+            Ожидают вашего решения
+          </h2>
+          <ul className="space-y-3 mb-6">
+            {pending.map((est) => (
+              <EstimateRowItem key={est.id} est={est} highlight />
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {closed.length > 0 ? (
+        <>
+          <h2 className="text-sm uppercase tracking-wider text-[var(--foreground-muted)] mb-3">
+            История
+          </h2>
+          <ul className="space-y-3">
+            {closed.map((est) => (
+              <EstimateRowItem key={est.id} est={est} />
+            ))}
+          </ul>
+        </>
+      ) : null}
     </div>
+  );
+}
+
+function EstimateRowItem({
+  est,
+  highlight,
+}: {
+  est: EstimateRow;
+  highlight?: boolean;
+}): React.ReactElement {
+  return (
+    <li>
+      <Link
+        href={`/cabinet/estimates/${est.id}`}
+        className={
+          "card flex items-start justify-between gap-4 " +
+          (highlight ? "border-[var(--color-accent)]" : "hover:border-[var(--border-hover)]")
+        }
+      >
+        <div className="flex-1 min-w-0">
+          <div className="font-medium">
+            {est.deal.vehicle
+              ? `${est.deal.vehicle.make} ${est.deal.vehicle.model} ${est.deal.vehicle.year}`
+              : est.number ?? "Смета"}
+          </div>
+          <div className="mt-1 text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3">
+            <span>{ESTIMATE_STAGE_LABELS[est.stage] ?? est.stage}</span>
+            <span>
+              {est.sentAt
+                ? `отправлена ${formatDate(est.sentAt)}`
+                : `создана ${formatDate(est.createdAt)}`}
+            </span>
+            {est.validUntil ? (
+              <span>действует до {formatDate(est.validUntil)}</span>
+            ) : null}
+          </div>
+        </div>
+        <div className="text-right shrink-0">
+          <div className="text-lg font-bold text-[var(--color-accent)] tabular-nums">
+            {formatPrice(est.total)}
+          </div>
+        </div>
+      </Link>
+    </li>
   );
 }
