@@ -24,7 +24,6 @@ export type CMSGroup =
   | "footer"
   | "cookie"
   | "fab"
-  | "payments"
   | "requisites";
 
 export interface CMSListField {
@@ -75,14 +74,10 @@ export const GROUP_LABELS: Record<CMSGroup, string> = {
   footer: "Подвал",
   cookie: "Cookie-баннер",
   fab: "Плавающие кнопки",
-  payments: "Платёжный шлюз",
   requisites: "Реквизиты организации",
 };
 
-/** Display order for admin sections — keep stable so admin muscle memory works.
- *  Note: the `payments` group is intentionally excluded — its single key
- *  (`payments.gateway_url_template`) is managed from the dedicated
- *  `/admin/site/settings` page, not from the generic CMS grid. */
+/** Display order for admin sections — keep stable so admin muscle memory works. */
 export const GROUP_ORDER: readonly CMSGroup[] = [
   "home",
   "about",
@@ -835,20 +830,6 @@ export const CMS_SCHEMA = {
     label: "Гарантия на запчасти",
     defaultValue:
       "Гарантия на запчасти — по условиям производителя (от 6 до 24 месяцев). Гарантия не распространяется на расходные материалы и узлы, повреждённые в результате нарушения эксплуатации.",
-  },
-  "payments.gateway_url_template": {
-    type: "text",
-    group: "payments",
-    // CMSTextDef has no helperText slot; embed the placeholder hint in the
-    // label so the admin sees it next to the field. The QR on PDF page 2
-    // resolves to this URL, with {estimateId}/{number} URL-encoded.
-    // Empty value hides the QR but keeps the rest of page 2.
-    // Recommended target: YooKassa hosted-payment, e.g.
-    //   https://yookassa.ru/checkout/payments/v2/contract?orderId={estimateId}
-    // A full YooKassa integration (shopId + signed redirect) is a separate
-    // follow-up plan: docs/plans/2026-05-11-yookassa-integration.md.
-    label: "URL платёжного шлюза (шаблон) — {estimateId}, {number}",
-    defaultValue: "",
   },
   "requisites.payment_terms": {
     type: "richtext",

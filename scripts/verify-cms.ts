@@ -52,26 +52,18 @@ for (const k of keys) {
       `${k}: list defaultValue is array`,
       Array.isArray(def.defaultValue),
     );
-  } else if (def.type === "text" || def.type === "richtext") {
+  } else if (def.type === "text" || def.type === "richtext" || def.type === "image") {
     check(`${k}: defaultValue is string`, typeof def.defaultValue === "string");
   } else {
-    check(`${k}: type is one of text|richtext|list`, false, `type=${def.type}`);
+    check(`${k}: type is one of text|richtext|list|image`, false, `type=${def.type}`);
   }
 }
 
-// Keys deliberately excluded from `/admin/cms` and managed by a dedicated
-// admin page instead. They still resolve via `getCMSText` and remain part
-// of CMS_SCHEMA; they just don't appear in the generic CMS grid.
-const HIDDEN_FROM_CMS_GRID: ReadonlySet<string> = new Set([
-  "payments.gateway_url_template", // managed at /admin/site/settings
-]);
-
 const allKeys = allKeysInDisplayOrder();
-const expectedDisplayCount = keys.filter((k) => !HIDDEN_FROM_CMS_GRID.has(k)).length;
 check(
-  "allKeysInDisplayOrder covers every non-hidden key",
-  allKeys.length === expectedDisplayCount,
-  `displayOrder=${allKeys.length} expected=${expectedDisplayCount} totalKeys=${keys.length}`,
+  "allKeysInDisplayOrder covers every key",
+  allKeys.length === keys.length,
+  `displayOrder=${allKeys.length} totalKeys=${keys.length}`,
 );
 check(
   "GROUP_ORDER is non-empty",
@@ -160,6 +152,7 @@ for (const k of keys) {
   let payload: Record<string, unknown>;
   if (def.type === "text") payload = { value: def.defaultValue };
   else if (def.type === "richtext") payload = { markdown: def.defaultValue };
+  else if (def.type === "image") payload = { url: def.defaultValue };
   else payload = { items: def.defaultValue };
   const r = validateCMSContent(k, payload);
   if (!r.ok) {

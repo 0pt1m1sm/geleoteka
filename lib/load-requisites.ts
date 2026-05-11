@@ -16,7 +16,6 @@ export interface Requisites {
   warranty: string;
   partsWarranty: string;
   paymentTerms: string;
-  paymentsGatewayUrlTemplate: string;
   contactPhone: string;
   contactEmail: string;
   contactAddress: string;
@@ -41,7 +40,6 @@ export async function loadRequisites(): Promise<Requisites> {
       "requisites.account",
       "requisites.corr_account",
       "requisites.director_name",
-      "payments.gateway_url_template",
       "contacts.phone.service",
       "contacts.email",
       "contacts.address",
@@ -68,7 +66,6 @@ export async function loadRequisites(): Promise<Requisites> {
     warranty,
     partsWarranty,
     paymentTerms,
-    paymentsGatewayUrlTemplate: base["payments.gateway_url_template"] ?? "",
     contactPhone: base["contacts.phone.service"] ?? "",
     contactEmail: base["contacts.email"] ?? "",
     contactAddress: base["contacts.address"] ?? "",

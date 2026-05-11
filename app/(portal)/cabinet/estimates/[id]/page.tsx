@@ -5,6 +5,9 @@ import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { CustomerEstimateView } from "@/components/portal/CustomerEstimateView";
+import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
+import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
+import { getEstimateChain } from "@/lib/crm/estimate-chain";
 
 interface EstimateFull {
   id: string;
@@ -83,6 +86,10 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
   if (!estimate) notFound();
   if (estimate.deal.customerUserId !== session.id) notFound();
 
+  const chain = await getEstimateChain(estimate.id);
+  const supersededTarget = estimate.stage === "SUPERSEDED" ? chain.activeRevision : null;
+  const cabinetHref = (id: string): string => `/cabinet/estimates/${id}`;
+
   return (
     <div>
       <div className="mb-4 text-xs">
@@ -93,6 +100,21 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
           ← К списку смет
         </Link>
       </div>
+      <EstimateRevisionBanner
+        mode="revision"
+        target={chain.parent}
+        href={chain.parent ? cabinetHref(chain.parent.id) : ""}
+      />
+      <EstimateRevisionBanner
+        mode="superseded"
+        target={supersededTarget}
+        href={supersededTarget ? cabinetHref(supersededTarget.id) : ""}
+      />
+      <EstimateLineageBreadcrumb
+        chain={chain.chain}
+        currentId={estimate.id}
+        hrefBuilder={cabinetHref}
+      />
       <CustomerEstimateView
         estimate={{
           ...estimate,

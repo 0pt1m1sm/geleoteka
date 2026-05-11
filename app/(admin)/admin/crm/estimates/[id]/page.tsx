@@ -11,6 +11,10 @@ import {
   ESTIMATE_STAGE_LABELS,
 } from "@/lib/deal-stage-labels";
 import { EstimateActions } from "@/components/crm/EstimateActions";
+import { EstimateLineEditor } from "@/components/crm/EstimateLineEditor";
+import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
+import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
+import { getEstimateChain } from "@/lib/crm/estimate-chain";
 
 interface EstimateDetail {
   id: string;
@@ -112,9 +116,30 @@ export default async function EstimateDetailPage({ params }: Props) {
   const isTerminal = ["APPROVED", "DECLINED", "EXPIRED", "SUPERSEDED"].includes(
     estimate.stage,
   );
+  const isDraft = estimate.stage === "DRAFT";
+
+  const chain = await getEstimateChain(estimate.id);
+  const supersededTarget = estimate.stage === "SUPERSEDED" ? chain.activeRevision : null;
+  const adminHref = (id: string): string => `/admin/crm/estimates/${id}`;
 
   return (
     <div>
+      <EstimateRevisionBanner
+        mode="revision"
+        target={chain.parent}
+        href={chain.parent ? adminHref(chain.parent.id) : ""}
+      />
+      <EstimateRevisionBanner
+        mode="superseded"
+        target={supersededTarget}
+        href={supersededTarget ? adminHref(supersededTarget.id) : ""}
+      />
+      <EstimateLineageBreadcrumb
+        chain={chain.chain}
+        currentId={estimate.id}
+        hrefBuilder={adminHref}
+      />
+
       <PageHeader
         eyebrow={`Смета${estimate.number ? ` ${estimate.number}` : ""} · ${ESTIMATE_STAGE_LABELS[estimate.stage] ?? estimate.stage}`}
         title={estimate.deal.customer.name}
@@ -135,7 +160,7 @@ export default async function EstimateDetailPage({ params }: Props) {
             </a>
             <Link
               href={`/admin/crm/deals/${estimate.deal.id}`}
-              className="text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+              className="text-[var(--color-accent)] hover:underline"
             >
               ← К сделке
             </Link>
@@ -149,10 +174,18 @@ export default async function EstimateDetailPage({ params }: Props) {
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold">Позиции сметы</h3>
               <span className="text-xs text-[var(--foreground-muted)]">
-                Зафиксировано на момент создания
+                {isDraft
+                  ? "Черновик — позиции редактируются"
+                  : "Зафиксировано на момент создания"}
               </span>
             </div>
-            {estimate.estimateLines.length === 0 ? (
+            {isDraft ? (
+              <EstimateLineEditor
+                estimateId={estimate.id}
+                initialLines={estimate.estimateLines.map((l, i) => ({ ...l, sortOrder: i }))}
+                editable
+              />
+            ) : estimate.estimateLines.length === 0 ? (
               <p className="text-sm text-[var(--foreground-muted)]">
                 Смета пуста.
               </p>

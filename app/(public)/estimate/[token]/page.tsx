@@ -5,6 +5,9 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { CustomerEstimateView } from "@/components/portal/CustomerEstimateView";
+import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
+import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
+import { getEstimateChain } from "@/lib/crm/estimate-chain";
 
 interface DealMin {
   id: string;
@@ -40,6 +43,7 @@ interface DealMin {
 
 interface Props {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ id?: string }>;
 }
 
 /**
@@ -50,8 +54,9 @@ interface Props {
  * the guest can review every estimate attached to the deal and
  * accept/decline without logging in.
  */
-export default async function GuestEstimatePage({ params }: Props) {
+export default async function GuestEstimatePage({ params, searchParams }: Props) {
   const { token } = await params;
+  const { id: requestedId } = await searchParams;
 
   const deal = (await db.deal.findFirst({
     where: { claimToken: token },
@@ -102,7 +107,13 @@ export default async function GuestEstimatePage({ params }: Props) {
       s === "SENT" ? 0 : s === "DRAFT" ? 1 : s === "APPROVED" ? 2 : 3;
     return score(a.stage) - score(b.stage);
   });
-  const primary = ordered[0];
+  // Token grants access to every estimate on the deal — when `?id=` is
+  // present and resolves to one of them, render that estimate as primary.
+  // Otherwise fall back to the natural primary (latest non-superseded).
+  const requested = requestedId
+    ? ordered.find((e) => e.id === requestedId)
+    : undefined;
+  const primary = requested ?? ordered[0];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
@@ -120,31 +131,7 @@ export default async function GuestEstimatePage({ params }: Props) {
           </p>
         </Card>
       ) : (
-        <>
-          <CustomerEstimateView
-            estimate={{
-              ...primary,
-              vehicle: deal.vehicle,
-            }}
-            claimToken={token}
-            printHref={`/api/estimates/${primary.id}/pdf?token=${token}`}
-          />
-
-          {ordered.length > 1 ? (
-            <div className="mt-8">
-              <h2 className="text-sm uppercase tracking-wider text-[var(--foreground-muted)] mb-3">
-                Другие версии сметы
-              </h2>
-              <ul className="space-y-2 text-sm">
-                {ordered.slice(1).map((e) => (
-                  <li key={e.id} className="text-[var(--foreground-muted)]">
-                    {e.number ?? "Версия"} · {e.stage}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </>
+        <PrimaryEstimateBlock primary={primary} deal={deal} token={token} />
       )}
 
       <p className="mt-8 text-xs text-[var(--foreground-muted)] text-center">
@@ -154,5 +141,58 @@ export default async function GuestEstimatePage({ params }: Props) {
         </Link>
       </p>
     </div>
+  );
+}
+
+type PrimaryEstimate = DealMin["estimates"][number];
+
+interface PrimaryBlockProps {
+  primary: PrimaryEstimate;
+  deal: DealMin;
+  token: string;
+}
+
+/**
+ * The token page renders one estimate at a time. The active estimate is
+ * either the natural primary (latest non-superseded) or whatever
+ * `?id=<estimateId>` selects. Banner/breadcrumb links pass `?id=` so
+ * clicking a revision actually loads that revision's body and PDF link.
+ */
+async function PrimaryEstimateBlock({
+  primary,
+  deal,
+  token,
+}: PrimaryBlockProps): Promise<React.ReactElement> {
+  const chain = await getEstimateChain(primary.id);
+  const supersededTarget = primary.stage === "SUPERSEDED" ? chain.activeRevision : null;
+  const tokenHref = (id: string): string => `/estimate/${token}?id=${id}`;
+
+  return (
+    <>
+      <EstimateRevisionBanner
+        mode="revision"
+        target={chain.parent}
+        href={chain.parent ? tokenHref(chain.parent.id) : ""}
+      />
+      <EstimateRevisionBanner
+        mode="superseded"
+        target={supersededTarget}
+        href={supersededTarget ? tokenHref(supersededTarget.id) : ""}
+      />
+      <EstimateLineageBreadcrumb
+        chain={chain.chain}
+        currentId={primary.id}
+        hrefBuilder={tokenHref}
+      />
+
+      <CustomerEstimateView
+        estimate={{
+          ...primary,
+          vehicle: deal.vehicle,
+        }}
+        claimToken={token}
+        printHref={`/api/estimates/${primary.id}/pdf?token=${token}`}
+      />
+    </>
   );
 }

@@ -4,7 +4,6 @@ import {
   Page,
   Text,
   View,
-  Image,
   StyleSheet,
   Font,
   Svg,
@@ -88,14 +87,6 @@ export interface EstimatePdfRequisites {
   contactPhone: string;
   contactEmail: string;
   contactAddress: string;
-}
-
-export interface EstimatePdfExtras {
-  /** Optional PNG/base64 data URL of a QR pointing at the customer
-   *  review page. Rendered next to totals when present. */
-  qrDataUrl?: string | null;
-  /** Plain-text caption under the QR (e.g. "Согласовать смету"). */
-  qrCaption?: string | null;
 }
 
 const fontsDir = join(process.cwd(), "public", "fonts");
@@ -478,30 +469,8 @@ const styles = StyleSheet.create({
     color: INK_2,
     lineHeight: 1.45,
   },
-  page2HeroRow: {
+  page2TermsColumn: {
     marginTop: 22,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 28,
-  },
-  page2HeroLeft: {
-    width: 200,
-    alignItems: "flex-start",
-  },
-  page2QrImage: {
-    width: 180,
-    height: 180,
-  },
-  page2QrCaption: {
-    marginTop: 6,
-    fontSize: 8.5,
-    color: INK_MUTED,
-    letterSpacing: 0.4,
-    lineHeight: 1.35,
-  },
-  page2HeroRight: {
-    flex: 1,
-    minWidth: 0,
   },
   page2TermsBlock: {
     marginBottom: 10,
@@ -654,11 +623,9 @@ function BrandStrip({
 export function EstimatePdfDocument({
   estimate,
   requisites,
-  extras,
 }: {
   estimate: EstimatePdfData;
   requisites: EstimatePdfRequisites;
-  extras?: EstimatePdfExtras;
 }) {
   const issueDate = estimate.sentAt ?? estimate.createdAt;
   const hasReqs =
@@ -825,56 +792,42 @@ export function EstimatePdfDocument({
         <SignatureFooter estimate={estimate} requisites={requisites} />
       </Page>
 
-      {/* ============= Page 2 — Conditions & Online Payment =============
-          QR (when CMS template is configured) pulls the customer straight
-          to the payment gateway. Approval of the estimate continues to
-          live in the customer cabinet — this page is purely about payment
-          terms, warranties, and a fast-pay path. */}
+      {/* ============= Page 2 — Conditions & Warranty =============
+          Payment terms, warranty on labor and parts, plus banking
+          requisites for bank-transfer payment. Approval of the estimate
+          lives in the customer cabinet. */}
       <Page size="A4" style={styles.page}>
         <BrandStrip
           requisites={requisites}
           compact
           reference={`К смете № ${docNumber}`}
         />
-        <Text style={styles.page2Heading}>Условия и онлайн-оплата</Text>
+        <Text style={styles.page2Heading}>Условия и гарантия</Text>
         <Text style={styles.page2Subtitle}>
-          {extras?.qrDataUrl
-            ? "Для оплаты сметы отсканируйте QR-код или используйте реквизиты ниже."
-            : "Ниже — условия оплаты, гарантия на работы и запчасти, а также банковские реквизиты для перевода."}
+          Ниже — условия оплаты, гарантия на работы и запчасти, а также банковские реквизиты для перевода.
         </Text>
 
-        <View style={styles.page2HeroRow}>
-          {extras?.qrDataUrl ? (
-            <View style={styles.page2HeroLeft}>
-              {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf Image has no alt prop */}
-              <Image src={extras.qrDataUrl} style={styles.page2QrImage} />
-              <Text style={styles.page2QrCaption}>
-                {extras.qrCaption ?? "Отсканируйте для оплаты онлайн"}
+        <View style={styles.page2TermsColumn}>
+          {requisites.paymentTerms ? (
+            <View style={styles.page2TermsBlock}>
+              <Text style={styles.termsHeader}>Условия оплаты</Text>
+              <Text style={styles.termsBody}>{requisites.paymentTerms}</Text>
+            </View>
+          ) : null}
+          {requisites.warranty ? (
+            <View style={styles.page2TermsBlock}>
+              <Text style={styles.termsHeader}>Гарантия на работы</Text>
+              <Text style={styles.termsBody}>{requisites.warranty}</Text>
+            </View>
+          ) : null}
+          {requisites.partsWarranty ? (
+            <View style={styles.page2TermsBlock}>
+              <Text style={styles.termsHeader}>Гарантия на запчасти</Text>
+              <Text style={styles.termsBody}>
+                {requisites.partsWarranty}
               </Text>
             </View>
           ) : null}
-          <View style={styles.page2HeroRight}>
-            {requisites.paymentTerms ? (
-              <View style={styles.page2TermsBlock}>
-                <Text style={styles.termsHeader}>Условия оплаты</Text>
-                <Text style={styles.termsBody}>{requisites.paymentTerms}</Text>
-              </View>
-            ) : null}
-            {requisites.warranty ? (
-              <View style={styles.page2TermsBlock}>
-                <Text style={styles.termsHeader}>Гарантия на работы</Text>
-                <Text style={styles.termsBody}>{requisites.warranty}</Text>
-              </View>
-            ) : null}
-            {requisites.partsWarranty ? (
-              <View style={styles.page2TermsBlock}>
-                <Text style={styles.termsHeader}>Гарантия на запчасти</Text>
-                <Text style={styles.termsBody}>
-                  {requisites.partsWarranty}
-                </Text>
-              </View>
-            ) : null}
-          </View>
         </View>
 
         {hasReqs ? (
