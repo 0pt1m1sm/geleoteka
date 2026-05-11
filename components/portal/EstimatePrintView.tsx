@@ -58,14 +58,19 @@ interface Props {
   autoPrint?: boolean;
 }
 
+// Light brand palette — matches the cream/gold theme so the document
+// feels like part of the site, not a foreign black-on-white grid.
 const GOLD = "#b8860b";
+const CREAM = "#faf9f6";
+const CREAM_DEEP = "#f0efe9";
+const INK = "#1a1a1a";
+const INK_MUTED = "#6b6b64";
+const RULE = "#e0dfd8";
 
 /**
- * Print-ready estimate document. Branded letterhead with logo + gold
- * accent rail, two-column corporate header, line table with subtle
- * zebra rows, prominent total panel, requisites footer, and signature
- * area for both parties. Designed for A4 — looks the same on paper
- * and on screen, monochrome-safe.
+ * Print-ready estimate document in Geleoteka's light brand palette.
+ * Cream paper with gold accents, no foreign black panels. Mobile-safe
+ * (no horizontal overflow) and A4-safe in print.
  */
 export function EstimatePrintView({
   estimate,
@@ -88,7 +93,10 @@ export function EstimatePrintView({
     requisites.bankName;
 
   return (
-    <div className="estimate-print bg-white text-black mx-auto max-w-[820px] print:max-w-none">
+    <div
+      className="estimate-print mx-auto max-w-[820px] print:max-w-none"
+      style={{ background: CREAM, color: INK }}
+    >
       <div className="flex justify-end gap-2 px-4 sm:px-8 pt-4 sm:pt-6 print:hidden">
         <button
           type="button"
@@ -99,43 +107,65 @@ export function EstimatePrintView({
         </button>
       </div>
 
-      <article className="px-4 sm:px-8 lg:px-12 py-8 sm:py-10 print:px-0 print:py-0">
+      <article className="px-4 sm:px-8 lg:px-10 py-8 sm:py-10 print:px-0 print:py-0">
         {/* ---- Header ---- */}
         <header className="relative">
           <div
             aria-hidden
             className="absolute -top-2 left-0 right-0 h-[3px]"
-            style={{ backgroundColor: GOLD }}
+            style={{ background: GOLD }}
           />
-          <div className="pt-6 pb-6 flex flex-wrap items-start gap-x-6 gap-y-4 border-b border-black/15">
-            <Image
-              src="/images/logo.svg"
-              alt=""
-              width={48}
-              height={48}
-              priority
-              className="shrink-0"
-            />
-            <div className="flex-1 min-w-[180px]">
+          <div
+            className="pt-6 pb-6 grid gap-4 sm:gap-6 sm:grid-cols-[auto_1fr_auto] items-start border-b"
+            style={{ borderColor: RULE }}
+          >
+            <div className="flex items-center gap-3">
+              <Image
+                src="/images/logo.svg"
+                alt=""
+                width={44}
+                height={44}
+                priority
+              />
+              <div className="sm:hidden">
+                <div
+                  className="text-xl font-black tracking-[0.12em] uppercase leading-tight"
+                  style={{ color: GOLD, fontFamily: "var(--font-display)" }}
+                >
+                  {requisites.shortName || "Geleoteka"}
+                </div>
+              </div>
+            </div>
+            <div className="min-w-0">
               <div
-                className="text-2xl sm:text-3xl font-black tracking-[0.14em] uppercase leading-tight"
+                className="hidden sm:block text-2xl md:text-3xl font-black tracking-[0.14em] uppercase leading-tight"
                 style={{ color: GOLD, fontFamily: "var(--font-display)" }}
               >
                 {requisites.shortName || "Geleoteka"}
               </div>
-              <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-black/60 leading-snug">
+              <div
+                className="mt-1 text-[10px] uppercase tracking-[0.2em] leading-snug"
+                style={{ color: INK_MUTED }}
+              >
                 Специализированный сервис Mercedes-Benz G-Class
               </div>
               {requisites.legalName ? (
-                <div className="mt-2 text-xs text-black/70">{requisites.legalName}</div>
+                <div className="mt-2 text-xs" style={{ color: INK_MUTED }}>
+                  {requisites.legalName}
+                </div>
               ) : null}
             </div>
-            <div className="text-right text-[11px] text-black/70 leading-relaxed max-w-[180px] sm:max-w-[220px] ml-auto">
+            <div
+              className="sm:text-right text-[11px] leading-relaxed sm:max-w-[220px] min-w-0"
+              style={{ color: INK_MUTED }}
+            >
               {requisites.contactAddress ? (
-                <div>{requisites.contactAddress}</div>
+                <div className="break-words">{requisites.contactAddress}</div>
               ) : null}
               {requisites.contactPhone ? (
-                <div className="mt-1 font-mono whitespace-nowrap">тел. {requisites.contactPhone}</div>
+                <div className="mt-1 font-mono break-all">
+                  тел. {requisites.contactPhone}
+                </div>
               ) : null}
               {requisites.contactEmail ? (
                 <div className="font-mono break-all">{requisites.contactEmail}</div>
@@ -145,38 +175,47 @@ export function EstimatePrintView({
         </header>
 
         {/* ---- Document title ---- */}
-        <section className="mt-8 mb-8 flex items-baseline justify-between flex-wrap gap-3">
+        <section className="mt-7 mb-7 flex items-baseline justify-between flex-wrap gap-3">
           <div>
-            <div className="text-[10px] uppercase tracking-[0.25em] text-black/50">
+            <div
+              className="text-[10px] uppercase tracking-[0.25em]"
+              style={{ color: INK_MUTED }}
+            >
               Коммерческое предложение
             </div>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight">
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight">
               Смета №{estimate.number ?? estimate.id.slice(-6).toUpperCase()}
             </h1>
           </div>
-          <div className="text-xs text-black/70 text-right leading-relaxed">
+          <div
+            className="text-xs leading-relaxed sm:text-right"
+            style={{ color: INK_MUTED }}
+          >
             <div>
-              <span className="text-black/50">Дата выпуска: </span>
-              <span className="font-medium">{formatDate(issueDate)}</span>
+              Дата выпуска:{" "}
+              <span className="font-medium" style={{ color: INK }}>
+                {formatDate(issueDate)}
+              </span>
             </div>
             {estimate.validUntil ? (
               <div>
-                <span className="text-black/50">Действительна до: </span>
-                <span className="font-medium">{formatDate(estimate.validUntil)}</span>
+                Действительна до:{" "}
+                <span className="font-medium" style={{ color: INK }}>
+                  {formatDate(estimate.validUntil)}
+                </span>
               </div>
             ) : null}
           </div>
         </section>
 
         {/* ---- Parties ---- */}
-        <section className="mb-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <section className="mb-7 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <PartyCard
             title="Заказчик"
             name={estimate.customer.name}
-            details={[
-              estimate.customer.phone,
-              estimate.customer.email,
-            ].filter(Boolean)}
+            details={[estimate.customer.phone, estimate.customer.email].filter(
+              Boolean,
+            )}
           />
           {estimate.vehicle ? (
             <PartyCard
@@ -185,52 +224,85 @@ export function EstimatePrintView({
               details={estimate.vehicle.vin ? [`VIN ${estimate.vehicle.vin}`] : []}
               mono
             />
-          ) : (
-            <div />
-          )}
+          ) : null}
         </section>
 
-        {/* ---- Lines ---- */}
-        <section className="mb-6 -mx-4 sm:mx-0 print:mx-0 overflow-x-auto print:overflow-visible">
-          <table className="w-full min-w-[640px] sm:min-w-0 text-sm border-collapse">
+        {/* ---- Lines: borderless rows with gold underline header ----
+            No min-width so it fits any viewport. Тип collapses inline
+            under the description on mobile. */}
+        <section className="mb-7">
+          <table className="w-full text-sm border-collapse table-fixed">
+            <colgroup>
+              <col style={{ width: "2.5rem" }} />
+              <col />
+              <col style={{ width: "3rem" }} />
+              <col style={{ width: "5rem" }} />
+              <col style={{ width: "5.5rem" }} />
+            </colgroup>
             <thead>
-              <tr
-                className="text-[10px] uppercase tracking-[0.12em] text-white"
-                style={{ backgroundColor: "#111" }}
-              >
-                <th className="text-left px-2 py-2 font-medium w-7">№</th>
-                <th className="text-left px-2 py-2 font-medium w-20 hidden sm:table-cell">Тип</th>
-                <th className="text-left px-2 py-2 font-medium">Описание</th>
-                <th className="text-right px-2 py-2 font-medium w-12">Кол-во</th>
-                <th className="text-right px-2 py-2 font-medium w-20">Цена</th>
-                <th className="text-right px-2 py-2 font-medium w-24">Сумма</th>
+              <tr style={{ borderBottom: `1.5px solid ${GOLD}` }}>
+                <th
+                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
+                >
+                  №
+                </th>
+                <th
+                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
+                >
+                  Описание
+                </th>
+                <th
+                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
+                >
+                  Кол-во
+                </th>
+                <th
+                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
+                >
+                  Цена
+                </th>
+                <th
+                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
+                >
+                  Сумма
+                </th>
               </tr>
             </thead>
             <tbody>
               {estimate.estimateLines.map((line, i) => (
                 <tr
                   key={line.id}
-                  className={i % 2 === 0 ? "bg-white" : "bg-black/[0.025]"}
+                  style={{
+                    borderBottom: `1px solid ${RULE}`,
+                  }}
                 >
-                  <td className="px-2 py-2 align-top tabular-nums text-black/60">
+                  <td
+                    className="px-1 sm:px-2 py-2.5 align-top tabular-nums"
+                    style={{ color: INK_MUTED }}
+                  >
                     {i + 1}
                   </td>
-                  <td className="px-2 py-2 align-top text-[11px] uppercase tracking-wider text-black/60 hidden sm:table-cell">
-                    {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
-                  </td>
-                  <td className="px-2 py-2 align-top break-words">
+                  <td className="px-1 sm:px-2 py-2.5 align-top break-words">
                     <div>{line.description}</div>
-                    <div className="sm:hidden mt-0.5 text-[10px] uppercase tracking-wider text-black/50">
+                    <div
+                      className="mt-0.5 text-[10px] uppercase tracking-[0.12em]"
+                      style={{ color: INK_MUTED }}
+                    >
                       {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                     </div>
                   </td>
-                  <td className="px-2 py-2 align-top text-right tabular-nums">
+                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums">
                     {line.qty}
                   </td>
-                  <td className="px-2 py-2 align-top text-right tabular-nums whitespace-nowrap">
+                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums whitespace-nowrap">
                     {formatPrice(line.unitPrice)}
                   </td>
-                  <td className="px-2 py-2 align-top text-right tabular-nums font-medium whitespace-nowrap">
+                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums font-medium whitespace-nowrap">
                     {formatPrice(line.total)}
                   </td>
                 </tr>
@@ -239,7 +311,7 @@ export function EstimatePrintView({
           </table>
         </section>
 
-        {/* ---- Subtotals + total panel ---- */}
+        {/* ---- Totals — gold-rule card on cream ---- */}
         <section className="ml-auto w-full sm:w-80 mb-10">
           <div className="space-y-1 text-sm">
             {estimate.subtotalLabor ? (
@@ -258,15 +330,21 @@ export function EstimatePrintView({
           </div>
           <div
             className="mt-3 flex items-baseline justify-between gap-3 px-4 py-3 rounded-sm"
-            style={{ backgroundColor: "#111", color: "#fff" }}
+            style={{
+              background: CREAM_DEEP,
+              borderLeft: `3px solid ${GOLD}`,
+            }}
           >
             <span
               className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] shrink-0"
-              style={{ color: GOLD }}
+              style={{ color: INK_MUTED }}
             >
               Итого к оплате
             </span>
-            <span className="text-xl sm:text-2xl font-bold tabular-nums whitespace-nowrap">
+            <span
+              className="text-xl sm:text-2xl font-bold tabular-nums whitespace-nowrap"
+              style={{ color: GOLD }}
+            >
               {formatPrice(estimate.total)}
             </span>
           </div>
@@ -274,8 +352,14 @@ export function EstimatePrintView({
 
         {/* ---- Requisites for payment ---- */}
         {hasAnyRequisite ? (
-          <section className="mb-8 border-t border-black/15 pt-6">
-            <h3 className="text-[10px] uppercase tracking-[0.25em] text-black/50 mb-3">
+          <section
+            className="mb-8 pt-6 border-t"
+            style={{ borderColor: RULE }}
+          >
+            <h3
+              className="text-[10px] uppercase tracking-[0.25em] mb-3"
+              style={{ color: INK_MUTED }}
+            >
               Реквизиты для оплаты
             </h3>
             <dl className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-8 text-xs leading-snug">
@@ -291,7 +375,9 @@ export function EstimatePrintView({
               {requisites.bankName ? (
                 <Req label="Банк" value={requisites.bankName} wide />
               ) : null}
-              {requisites.bankBik ? <Req label="БИК" value={requisites.bankBik} /> : null}
+              {requisites.bankBik ? (
+                <Req label="БИК" value={requisites.bankBik} />
+              ) : null}
               {requisites.account ? (
                 <Req label="Р/счёт" value={requisites.account} mono />
               ) : null}
@@ -304,30 +390,48 @@ export function EstimatePrintView({
 
         {/* ---- Footer note ---- */}
         {requisites.estimateFooter ? (
-          <section className="mb-10 text-xs text-black/70 leading-relaxed border-l-2 pl-4" style={{ borderColor: GOLD }}>
+          <section
+            className="mb-10 text-xs leading-relaxed pl-4 border-l-2"
+            style={{ color: INK_MUTED, borderColor: GOLD }}
+          >
             <Markdown source={requisites.estimateFooter} />
           </section>
         ) : null}
 
         {/* ---- Signatures ---- */}
-        <footer className="grid grid-cols-1 sm:grid-cols-2 gap-12 pt-6 border-t border-black/15 text-xs">
+        <footer
+          className="grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-12 pt-6 border-t text-xs"
+          style={{ borderColor: RULE }}
+        >
           <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-black/50 mb-1">
+            <div
+              className="text-[10px] uppercase tracking-[0.2em] mb-1"
+              style={{ color: INK_MUTED }}
+            >
               Исполнитель
             </div>
-            <div className="text-black/80">
+            <div style={{ color: INK }}>
               {requisites.directorName || requisites.legalName || requisites.shortName}
             </div>
-            <div className="mt-10 border-t border-black/40 pt-1.5 text-black/60">
+            <div
+              className="mt-10 pt-1.5 border-t"
+              style={{ borderColor: INK_MUTED, color: INK_MUTED }}
+            >
               Подпись · М.П.
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-[0.2em] text-black/50 mb-1">
+            <div
+              className="text-[10px] uppercase tracking-[0.2em] mb-1"
+              style={{ color: INK_MUTED }}
+            >
               Заказчик
             </div>
-            <div className="text-black/80">{estimate.customer.name}</div>
-            <div className="mt-10 border-t border-black/40 pt-1.5 text-black/60">
+            <div style={{ color: INK }}>{estimate.customer.name}</div>
+            <div
+              className="mt-10 pt-1.5 border-t"
+              style={{ borderColor: INK_MUTED, color: INK_MUTED }}
+            >
               Подпись
             </div>
           </div>
@@ -342,8 +446,8 @@ export function EstimatePrintView({
           }
           html,
           body {
-            background: #fff !important;
-            color: #000 !important;
+            background: ${CREAM} !important;
+            color: ${INK} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
@@ -371,16 +475,21 @@ function PartyCard({
   mono?: boolean;
 }): React.ReactElement {
   return (
-    <div className="border border-black/15 rounded-sm px-4 py-3">
-      <div className="text-[10px] uppercase tracking-[0.2em] text-black/50 mb-1">
+    <div
+      className="rounded-sm px-4 py-3 min-w-0"
+      style={{ background: CREAM_DEEP, border: `1px solid ${RULE}` }}
+    >
+      <div
+        className="text-[10px] uppercase tracking-[0.2em] mb-1"
+        style={{ color: INK_MUTED }}
+      >
         {title}
       </div>
-      <div className="font-medium text-sm">{name}</div>
+      <div className="font-medium text-sm break-words">{name}</div>
       {details.length > 0 ? (
         <div
-          className={
-            "mt-0.5 text-xs text-black/70 " + (mono ? "font-mono" : "")
-          }
+          className={"mt-0.5 text-xs " + (mono ? "font-mono break-all" : "break-words")}
+          style={{ color: INK_MUTED }}
         >
           {details.map((d, i) => (
             <div key={i}>{d}</div>
@@ -393,7 +502,7 @@ function PartyCard({
 
 function Row({ label, value }: { label: string; value: number }): React.ReactElement {
   return (
-    <div className="flex justify-between text-black/70">
+    <div className="flex justify-between" style={{ color: INK_MUTED }}>
       <span>{label}</span>
       <span className="tabular-nums">{formatPrice(value)}</span>
     </div>
@@ -413,10 +522,8 @@ function Req({
 }): React.ReactElement {
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
-      <span className="text-black/50">{label}:</span>{" "}
-      <span className={(mono ? "font-mono " : "") + "break-words"}>
-        {value}
-      </span>
+      <span style={{ color: INK_MUTED }}>{label}:</span>{" "}
+      <span className={(mono ? "font-mono " : "") + "break-words"}>{value}</span>
     </div>
   );
 }
