@@ -356,10 +356,42 @@ export function EstimatePdfDocument({
       author={requisites.shortName || "Geleoteka"}
     >
       <Page size="A4" style={styles.page} wrap>
-        {/* Watermark intentionally omitted — the document is dense
-            enough that a brand wash competes with the table and totals.
-            Brand identity lives in the header monogram + wordmark and
-            in the gold rule under the contacts. */}
+        {/* Brand watermark — same gold-outline-square + G monogram as
+            the header. Positioned in the lower-left empty area above
+            the pinned signatures so it never overlaps the table,
+            totals, or requisites block. Opacity tuned low so it reads
+            as paper texture, not content. */}
+        <View
+          fixed
+          style={{
+            position: "absolute",
+            right: GUTTER - 6,
+            top: GUTTER + 320,
+            opacity: 0.05,
+          }}
+        >
+          <Svg width={90} height={90} viewBox="0 0 64 64">
+            <Rect
+              x={4}
+              y={4}
+              width={56}
+              height={56}
+              rx={6}
+              stroke={GOLD}
+              strokeWidth={5}
+              fill="none"
+            />
+            <Text
+              x={32}
+              y={46}
+              fill={GOLD}
+              style={{ fontSize: 38, fontWeight: 800 }}
+              textAnchor="middle"
+            >
+              G
+            </Text>
+          </Svg>
+        </View>
 
         {/* ---- Brand strip ---- */}
         <View style={styles.headerRow}>
