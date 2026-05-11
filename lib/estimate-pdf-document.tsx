@@ -7,8 +7,7 @@ import {
   StyleSheet,
   Font,
   Svg,
-  Rect,
-  G,
+  Circle,
 } from "@react-pdf/renderer";
 import { formatPrice } from "@/lib/utils";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
@@ -102,20 +101,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginBottom: 8,
-  },
-  logoBox: {
-    width: 36,
-    height: 36,
-    borderWidth: 1.5,
-    borderColor: GOLD,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  logoLetter: {
-    color: GOLD,
-    fontSize: 24,
-    fontWeight: 800,
-    lineHeight: 1,
   },
   brand: {
     fontSize: 22,
@@ -369,9 +354,19 @@ export function EstimatePdfDocument({
 
         {/* Header */}
         <View style={styles.headerRow}>
-          <View style={styles.logoBox}>
-            <Text style={styles.logoLetter}>G</Text>
-          </View>
+          <Svg width={42} height={42} viewBox="0 0 64 64">
+            <Circle cx={32} cy={32} r={29.5} stroke={GOLD} strokeWidth={2.4} fill="none" />
+            <Circle cx={32} cy={32} r={24} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.4} />
+            <Text
+              x={32}
+              y={42.5}
+              fill={GOLD}
+              style={{ fontSize: 28, fontWeight: 800 }}
+              textAnchor="middle"
+            >
+              G
+            </Text>
+          </Svg>
           <Text style={styles.brand}>
             {(requisites.shortName || "GELEOTEKA").toUpperCase()}
           </Text>
@@ -591,27 +586,19 @@ export function EstimatePdfDocument({
             zIndex: -1,
           }}
         >
-          <Svg width={500} height={500} viewBox="0 0 100 100">
-            <G opacity={0.05}>
-              <Rect
-                x={5}
-                y={5}
-                width={90}
-                height={90}
-                fill="none"
-                stroke={GOLD}
-                strokeWidth={3}
-              />
-              <Text
-                style={{
-                  fontSize: 70,
-                  color: GOLD,
-                  fontWeight: 800,
-                }}
-              >
-                G
-              </Text>
-            </G>
+          <Svg width={460} height={460} viewBox="0 0 100 100">
+            <Circle cx={50} cy={50} r={47} stroke={GOLD} strokeWidth={1.4} fill="none" opacity={0.08} />
+            <Circle cx={50} cy={50} r={40} stroke={GOLD} strokeWidth={0.6} fill="none" opacity={0.06} />
+            <Text
+              x={50}
+              y={66}
+              fill={GOLD}
+              style={{ fontSize: 56, fontWeight: 800 }}
+              textAnchor="middle"
+              opacity={0.07}
+            >
+              G
+            </Text>
           </Svg>
         </View>
       </Page>
