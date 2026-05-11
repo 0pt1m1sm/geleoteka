@@ -352,12 +352,12 @@ export function EstimatePdfDocument({
         {/* Header */}
         <View style={styles.headerRow}>
           <Svg width={42} height={42} viewBox="0 0 64 64">
-            <Rect x={0} y={0} width={64} height={64} rx={8} fill={GOLD} />
+            <Rect x={4} y={4} width={56} height={56} rx={6} stroke={GOLD} strokeWidth={5} fill="none" />
             <Text
               x={32}
               y={46}
-              fill="#0a0a0a"
-              style={{ fontSize: 40, fontWeight: 800 }}
+              fill={GOLD}
+              style={{ fontSize: 38, fontWeight: 800 }}
               textAnchor="middle"
             >
               G
@@ -568,34 +568,6 @@ export function EstimatePdfDocument({
           </View>
         </View>
 
-        {/* Subtle gold watermark — render as svg behind content */}
-        <View
-          fixed
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: -1,
-          }}
-        >
-          <Svg width={440} height={440} viewBox="0 0 100 100">
-            <Rect x={5} y={5} width={90} height={90} rx={4} stroke={GOLD} strokeWidth={1.4} fill="none" opacity={0.08} />
-            <Text
-              x={50}
-              y={68}
-              fill={GOLD}
-              style={{ fontSize: 60, fontWeight: 800 }}
-              textAnchor="middle"
-              opacity={0.07}
-            >
-              G
-            </Text>
-          </Svg>
-        </View>
       </Page>
     </Document>
   );
