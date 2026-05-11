@@ -352,12 +352,12 @@ export function EstimatePdfDocument({
         {/* Header */}
         <View style={styles.headerRow}>
           <Svg width={42} height={42} viewBox="0 0 64 64">
-            <Rect x={2} y={2} width={60} height={60} rx={4} stroke={GOLD} strokeWidth={2} fill="none" />
+            <Rect x={0} y={0} width={64} height={64} rx={8} fill={GOLD} />
             <Text
               x={32}
               y={46}
-              fill={GOLD}
-              style={{ fontSize: 38, fontWeight: 800 }}
+              fill="#0a0a0a"
+              style={{ fontSize: 40, fontWeight: 800 }}
               textAnchor="middle"
             >
               G
