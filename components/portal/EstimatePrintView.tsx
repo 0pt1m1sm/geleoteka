@@ -95,10 +95,10 @@ export function EstimatePrintView({
 
   return (
     <div
-      className="estimate-print mx-auto max-w-[820px] print:max-w-none"
-      style={{ background: PAPER, color: INK }}
+      className="estimate-print mx-auto w-full max-w-[780px] print:max-w-none overflow-hidden"
+      style={{ background: PAPER, color: INK, boxSizing: "border-box" }}
     >
-      <div className="flex justify-end gap-2 px-4 sm:px-8 pt-4 sm:pt-6 print:hidden">
+      <div className="flex justify-end gap-2 px-4 sm:px-6 pt-4 sm:pt-6 print:hidden">
         <button
           type="button"
           onClick={() => window.print()}
@@ -108,10 +108,11 @@ export function EstimatePrintView({
         </button>
       </div>
 
-      <article className="relative px-3 sm:px-8 lg:px-10 py-6 sm:py-10 print:px-0 print:py-0">
-        {/* Watermark — large translucent gold "G" behind content.
-            Light enough to print without darkening the paper but
-            visible enough to brand the document. */}
+      <article
+        className="relative px-4 sm:px-8 py-6 sm:py-9 overflow-hidden"
+        style={{ boxSizing: "border-box" }}
+      >
+        {/* Watermark — large translucent gold "G" behind content. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
@@ -121,7 +122,7 @@ export function EstimatePrintView({
             className="font-black select-none"
             style={{
               fontFamily: "var(--font-display)",
-              fontSize: "min(60vw, 520px)",
+              fontSize: "min(55vw, 480px)",
               lineHeight: 1,
               color: GOLD,
               opacity: 0.045,
@@ -133,7 +134,7 @@ export function EstimatePrintView({
           </span>
         </div>
         <div className="relative" style={{ zIndex: 1 }}>
-        {/* ---- Header ---- */}
+        {/* ---- Header — bento stack, contacts wrap underneath the brand ---- */}
         <header className="relative">
           <div
             aria-hidden
@@ -141,59 +142,52 @@ export function EstimatePrintView({
             style={{ background: GOLD }}
           />
           <div
-            className="pt-6 pb-6 grid gap-4 sm:gap-6 sm:grid-cols-[auto_1fr_auto] items-start border-b"
+            className="pt-6 pb-5 border-b"
             style={{ borderColor: RULE }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <Image
                 src="/images/logo.svg"
                 alt=""
-                width={44}
-                height={44}
+                width={40}
+                height={40}
                 priority
+                className="shrink-0"
               />
-              <div className="sm:hidden">
-                <div
-                  className="text-xl font-black tracking-[0.12em] uppercase leading-tight"
-                  style={{ color: GOLD, fontFamily: "var(--font-display)" }}
-                >
-                  {requisites.shortName || "Geleoteka"}
-                </div>
-              </div>
-            </div>
-            <div className="min-w-0">
               <div
-                className="hidden sm:block text-2xl md:text-3xl font-black tracking-[0.14em] uppercase leading-tight"
+                className="text-xl sm:text-2xl font-black tracking-[0.12em] uppercase leading-tight truncate"
                 style={{ color: GOLD, fontFamily: "var(--font-display)" }}
               >
                 {requisites.shortName || "Geleoteka"}
               </div>
-              <div
-                className="mt-1 text-[10px] uppercase tracking-[0.2em] leading-snug"
-                style={{ color: INK_MUTED }}
-              >
-                Специализированный сервис Mercedes-Benz G-Class
-              </div>
-              {requisites.legalName ? (
-                <div className="mt-2 text-xs" style={{ color: INK_MUTED }}>
-                  {requisites.legalName}
-                </div>
-              ) : null}
             </div>
             <div
-              className="sm:text-right text-[11px] leading-relaxed sm:max-w-[220px] min-w-0"
+              className="mt-2 text-[10px] uppercase tracking-[0.2em] leading-snug"
+              style={{ color: INK_MUTED }}
+            >
+              Специализированный сервис Mercedes-Benz G-Class
+            </div>
+            {requisites.legalName ? (
+              <div className="mt-1 text-xs" style={{ color: INK_MUTED }}>
+                {requisites.legalName}
+              </div>
+            ) : null}
+            <div
+              className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[11px] leading-relaxed"
               style={{ color: INK_MUTED }}
             >
               {requisites.contactAddress ? (
                 <div className="break-words">{requisites.contactAddress}</div>
               ) : null}
               {requisites.contactPhone ? (
-                <div className="mt-1 font-mono break-all">
+                <div className="font-mono break-all">
                   тел. {requisites.contactPhone}
                 </div>
               ) : null}
               {requisites.contactEmail ? (
-                <div className="font-mono break-all">{requisites.contactEmail}</div>
+                <div className="font-mono break-all">
+                  {requisites.contactEmail}
+                </div>
               ) : null}
             </div>
           </div>
@@ -252,40 +246,50 @@ export function EstimatePrintView({
           ) : null}
         </section>
 
-        {/* ---- Lines: borderless rows with gold underline header.
-            table-auto + whitespace-nowrap on number columns prevents
-            header wraps like "КОЛ-/ВО" and keeps prices on one line.
-            Description column absorbs remaining width and wraps. */}
+        {/* ---- Lines: gold underline header, explicit percent widths
+            via colgroup so the table never exceeds 100% of its
+            container — no horizontal overflow possible. table-fixed
+            forces percent widths to be obeyed. */}
         <section className="mb-7">
-          <table className="w-full text-sm border-collapse">
+          <table
+            className="w-full text-sm border-collapse"
+            style={{ tableLayout: "fixed" }}
+          >
+            <colgroup>
+              <col style={{ width: "6%" }} />
+              <col style={{ width: "46%" }} />
+              <col style={{ width: "12%" }} />
+              <col style={{ width: "17%" }} />
+              <col style={{ width: "19%" }} />
+            </colgroup>
             <thead>
               <tr style={{ borderBottom: `1.5px solid ${GOLD}` }}>
                 <th
-                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
-                  style={{ color: INK_MUTED, width: "1.75rem" }}
+                  className="text-left px-1 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  style={{ color: INK_MUTED }}
                 >
                   №
                 </th>
                 <th
-                  className="text-left px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
+                  className="text-left px-1 py-2 font-medium text-[10px] uppercase tracking-[0.15em]"
                   style={{ color: INK_MUTED }}
                 >
                   Описание
                 </th>
                 <th
-                  className="text-center px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
+                  className="text-center px-1 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Кол-во
                 </th>
                 <th
-                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
+                  className="text-right px-1 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Цена
                 </th>
                 <th
-                  className="text-right px-1 sm:px-2 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
+                  className="text-right px-1 py-2 font-medium text-[10px] uppercase tracking-[0.15em] whitespace-nowrap"
                   style={{ color: INK_MUTED }}
                 >
                   Сумма
@@ -301,12 +305,12 @@ export function EstimatePrintView({
                   }}
                 >
                   <td
-                    className="px-1 sm:px-2 py-2.5 align-top tabular-nums"
+                    className="px-1 py-2.5 align-top tabular-nums"
                     style={{ color: INK_MUTED }}
                   >
                     {i + 1}
                   </td>
-                  <td className="px-1 sm:px-2 py-2.5 align-top break-words">
+                  <td className="px-1 py-2.5 align-top break-words">
                     <div>{line.description}</div>
                     <div
                       className="mt-0.5 text-[10px] uppercase tracking-[0.12em]"
@@ -315,13 +319,13 @@ export function EstimatePrintView({
                       {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                     </div>
                   </td>
-                  <td className="px-1 sm:px-2 py-2.5 align-top text-center tabular-nums whitespace-nowrap">
+                  <td className="px-1 py-2.5 align-top text-center tabular-nums">
                     {line.qty}
                   </td>
-                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums whitespace-nowrap">
+                  <td className="px-1 py-2.5 align-top text-right tabular-nums">
                     {formatPrice(line.unitPrice)}
                   </td>
-                  <td className="px-1 sm:px-2 py-2.5 align-top text-right tabular-nums font-medium whitespace-nowrap">
+                  <td className="px-1 py-2.5 align-top text-right tabular-nums font-medium">
                     {formatPrice(line.total)}
                   </td>
                 </tr>
@@ -462,7 +466,7 @@ export function EstimatePrintView({
         @media print {
           @page {
             size: A4;
-            margin: 12mm;
+            margin: 16mm;
           }
           html,
           body {
@@ -470,6 +474,15 @@ export function EstimatePrintView({
             color: ${INK} !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          .estimate-print {
+            max-width: none !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .estimate-print article {
+            padding: 0 !important;
           }
           .estimate-print thead {
             display: table-header-group;
