@@ -11,6 +11,7 @@ import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm"
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
+import { markRepliesRead } from "@/app/actions/crm/communications";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
 import { DEAL_STAGE_LABELS, DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
@@ -54,6 +55,10 @@ export default async function CustomerDetailPage({ params }: Props) {
     redirect("/login");
   }
   const { id } = await params;
+
+  // Flip readAt on any unread EMAIL_INBOUND for this customer. Failure must
+  // never break the page render — auth is still enforced inside the action.
+  await markRepliesRead(id).catch(() => {});
 
   const [customerRaw, availableTags, commLogs, tasks, deals] = await Promise.all([
     db.user.findUnique({

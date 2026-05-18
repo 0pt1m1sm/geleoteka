@@ -14,6 +14,7 @@ import {
 } from "@/lib/admin-nav";
 import { useAccordionGroup } from "@/lib/use-accordion-group";
 import { InboxBadge } from "@/components/admin/inbox/InboxBadge";
+import { RepliesBadge } from "@/components/admin/replies/RepliesBadge";
 
 export interface SidebarProps {
   /** Navigation tree — supports flat links and grouped accordions. */
@@ -232,7 +233,13 @@ function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, searchPar
             }
             onNavigate={onNavigate}
             indent
-            trailing={item.href === "/admin/crm/inbox" ? <InboxBadge /> : undefined}
+            trailing={
+              item.href === "/admin/crm/inbox"
+                ? <InboxBadge />
+                : item.href.startsWith("/admin/crm/tasks")
+                  ? <RepliesBadge />
+                  : undefined
+            }
           />
         ))}
       </div>

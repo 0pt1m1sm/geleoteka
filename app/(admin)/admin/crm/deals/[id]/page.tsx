@@ -12,6 +12,7 @@ import { EstimatesSection } from "@/components/crm/EstimatesSection";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { markRepliesRead } from "@/app/actions/crm/communications";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -162,6 +163,10 @@ export default async function CrmDealDetailPage({ params }: Props) {
     },
   })) as DealDetail | null;
   if (!deal) notFound();
+
+  // Flip readAt on any unread EMAIL_INBOUND for this deal's customer. Failure
+  // must never break the page render — auth is enforced inside the action.
+  await markRepliesRead(deal.customer.id).catch(() => {});
 
   // The "active" estimate is whichever non-SUPERSEDED row recompute-deal-totals
   // would pick — for UI purposes, just take the first by createdAt-desc that

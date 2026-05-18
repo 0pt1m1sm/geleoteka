@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { ensureFollowUpTask } from "@/lib/crm/auto-task";
 import {
   extractHeader,
   parseFromAddress,
@@ -58,6 +59,7 @@ export async function resolveInboundEmail(input: {
         },
         select: { id: true },
       })) as { id: string };
+      await scheduleFollowUpTask(prior.customerUserId, prior.dealId);
       return { kind: "thread", id: created.id };
     }
   }
@@ -66,8 +68,8 @@ export async function resolveInboundEmail(input: {
   const { email: senderEmail } = parseFromAddress(envelope.data.from);
   const customer = (await db.user.findFirst({
     where: { email: { equals: senderEmail, mode: "insensitive" }, isCustomer: true },
-    select: { id: true },
-  })) as { id: string } | null;
+    select: { id: true, name: true },
+  })) as { id: string; name: string } | null;
   if (customer) {
     const openDeal = (await db.deal.findFirst({
       where: { customerUserId: customer.id, stage: { notIn: ["WON", "LOST"] } },
@@ -89,6 +91,7 @@ export async function resolveInboundEmail(input: {
       },
       select: { id: true },
     })) as { id: string };
+    await scheduleFollowUpTask(customer.id, openDeal?.id ?? null, customer.name);
     return { kind: "customer", id: created.id };
   }
 
@@ -116,6 +119,35 @@ export async function resolveInboundEmail(input: {
     select: { id: true },
   })) as { id: string };
   return { kind: "inbox", id: created.id };
+}
+
+/**
+ * Schedule a FOLLOW_UP CrmTask after a known-customer inbound reply lands.
+ * Wrapped in try/catch so any task-side failure never breaks inbound delivery —
+ * the webhook MUST still 200 even if task creation throws.
+ *
+ * `customerName` is optional because Step 1 (thread match) doesn't load the
+ * customer row; we look it up here on demand. Step 2 already has the name in
+ * scope and passes it through.
+ */
+async function scheduleFollowUpTask(
+  customerUserId: string,
+  dealId: string | null,
+  customerName?: string,
+): Promise<void> {
+  try {
+    let name = customerName;
+    if (!name) {
+      const customer = (await db.user.findUnique({
+        where: { id: customerUserId },
+        select: { name: true },
+      })) as { name: string } | null;
+      name = customer?.name ?? "клиент";
+    }
+    await ensureFollowUpTask({ customerUserId, customerName: name, dealId });
+  } catch (err) {
+    console.error("[AUTO-TASK] ensureFollowUpTask failed", err);
+  }
 }
 
 /** Minimal HTML stripper for the fallback body when only `html` arrived. */

@@ -75,6 +75,10 @@ async function main(): Promise<void> {
 
   // Seed cleanup of any prior run.
   await cleanup(TAG);
+  // Pre-cleanup of auto-tasks the inbound flow may have left from a prior abort.
+  await db.crmTask.deleteMany({
+    where: { kind: "FOLLOW_UP", title: { startsWith: "Ответить клиенту:" } },
+  });
 
   // Pick the seeded client@test.ru.
   const customer = (await db.user.findFirst({
@@ -118,6 +122,23 @@ async function main(): Promise<void> {
     assert(row?.resendEmailId === `${TAG}-2-resend-uuid`, "resendEmailId not stored");
     assert(Array.isArray(row?.attachments) && (row!.attachments as unknown[]).length === 1, "attachments not stored");
     console.log("  ✓ known customer → CommunicationLog(EMAIL_INBOUND)");
+
+    // 2a. Auto-task side effect: a FOLLOW_UP CrmTask must exist for this customer.
+    const followUp = await db.crmTask.findFirst({
+      where: { customerUserId: customerId, kind: "FOLLOW_UP", status: "OPEN" },
+      select: { id: true, title: true },
+    });
+    assert(followUp, "expected an OPEN FOLLOW_UP CrmTask after known-customer inbound");
+    assert(
+      followUp.title.startsWith("Ответить клиенту:"),
+      `unexpected task title: ${followUp.title}`,
+    );
+    console.log("  ✓ auto-task created for known customer (FOLLOW_UP, OPEN)");
+
+    // Cleanup the auto-task before subsequent assertions so we don't pollute later runs.
+    await db.crmTask.deleteMany({
+      where: { customerUserId: customerId, kind: "FOLLOW_UP", title: { startsWith: "Ответить клиенту:" } },
+    });
   }
 
   // 3. Thread match: pre-seed an EMAIL_OUTBOUND row, then reply with In-Reply-To.

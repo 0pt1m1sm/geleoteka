@@ -1256,6 +1256,12 @@ model CommunicationLog {
   resendEmailId  String? // Resend's UUID — required for the attachment proxy
   attachments    Json        @default("[]") // [{ id, filename, content_type, content_disposition, content_id? }]
   createdAt      DateTime    @default(now())
+  // Per-message read state for in-page timeline styling on Customer 360 / Deal
+  // pages. Set non-null by `markRepliesRead` server action when a manager opens
+  // the page. NOT used by the unread-replies badge — that counts OPEN FOLLOW_UP
+  // tasks instead, so any manager opening a page doesn't clear another
+  // manager's per-user action queue.
+  readAt         DateTime?
 
   customer            User           @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
   author              User?          @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
@@ -1266,6 +1272,7 @@ model CommunicationLog {
   @@index([dealId])
   @@index([channel])
   @@index([resendEmailId])
+  @@index([customerUserId, channel, readAt])
 }
 
 /// Bucket for inbound emails from unknown senders (no User.email match, no
