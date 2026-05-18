@@ -150,10 +150,10 @@ export default async function AppointmentsPage({ searchParams }: Props) {
 function StatusFilter({ active }: { active: string | null }): React.ReactElement {
   const presets: Array<{ key: string | null; label: string }> = [
     { key: null, label: "Все" },
-    { key: "APPROVED", label: REPAIR_ORDER_STATUS_LABELS.APPROVED },
+    { key: "SCHEDULED", label: REPAIR_ORDER_STATUS_LABELS.SCHEDULED },
     { key: "IN_PROGRESS", label: REPAIR_ORDER_STATUS_LABELS.IN_PROGRESS },
     { key: "READY", label: REPAIR_ORDER_STATUS_LABELS.READY },
-    { key: "CLOSED", label: REPAIR_ORDER_STATUS_LABELS.CLOSED },
+    { key: "COMPLETED", label: REPAIR_ORDER_STATUS_LABELS.COMPLETED },
   ];
   return (
     <div className="flex flex-wrap gap-2 mb-4">

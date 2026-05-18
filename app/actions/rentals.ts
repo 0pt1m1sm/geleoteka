@@ -115,7 +115,7 @@ export async function updateRentalBookingStatus(
   await requireRole(["ADMIN", "MANAGER"]);
   await db.rentalBooking.update({
     where: { id: bookingId },
-    data: { status: status as "PENDING" | "CONFIRMED" | "ACTIVE" | "RETURNED" | "CANCELLED" },
+    data: { status: status as "BOOKED" | "ACTIVE" | "RETURNED" | "CANCELLED" },
   });
 }
 
@@ -172,7 +172,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
   try {
     const vehicle = await db.vehicle.findUnique({
       where: { id: carId },
-      select: { dailyRate: true, ownershipType: true, make: true, model: true },
+      select: { dailyRate: true, ownershipType: true, make: true, model: true, year: true },
     });
     if (!vehicle || vehicle.ownershipType !== "RENTAL" || !vehicle.dailyRate) {
       return { success: false, error: "Автомобиль не найден" };
@@ -221,7 +221,6 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
           description: `Аренда: ${vehicle.make ?? "Mercedes-Benz"} ${vehicle.model}`,
           qty: days,
           unitPrice: vehicle.dailyRate,
-          vehicleId: carId,
         },
       ],
     });
@@ -241,6 +240,54 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
         notes: notes || null,
       },
     });
+
+    if (contactEmail) {
+      const [
+        {
+          sendRentalBookingConfirmationEmail,
+          generateOutboundMessageId,
+          recordOutboundEmail,
+          markOutboundEmailFailed,
+          markOutboundEmailSent,
+          isPlausibleEmail,
+        },
+        { getCMSText },
+      ] = await Promise.all([import("@/lib/email"), import("@/lib/cms")]);
+      const pickupAddress = (await getCMSText("contacts.address")) || "Москва, ул. Примерная, 15";
+      const vehicleSummary = `${vehicle.make ?? "Mercedes-Benz"} ${vehicle.model}${vehicle.year ? ` ${vehicle.year} г.` : ""}`;
+      const subject = "Geleoteka — бронь автомобиля подтверждена";
+      const bodyText = `Здравствуйте, ${contactName}. Бронь ${vehicleSummary} на ${days} дн. подтверждена. Сумма: ${(totalCost / 100).toLocaleString("ru-RU")} ₽.`;
+      const messageId = generateOutboundMessageId();
+      if (isPlausibleEmail(contactEmail)) {
+        await recordOutboundEmail({
+          customerUserId: guestResult.userId,
+          dealId: deal.id,
+          subject,
+          body: bodyText,
+          messageId,
+        });
+      }
+      void sendRentalBookingConfirmationEmail(
+        contactEmail,
+        {
+          customerName: contactName,
+          vehicleSummary,
+          startAt: start,
+          endAt: end,
+          totalDays: days,
+          totalPrice: totalCost,
+          pickupAddress,
+        },
+        { messageId },
+      )
+        .then((result) => {
+          if (!result.success) return markOutboundEmailFailed(messageId, result.error);
+          return markOutboundEmailSent(messageId);
+        })
+        .catch((err) =>
+          markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
+        );
+    }
 
     return {
       success: true,

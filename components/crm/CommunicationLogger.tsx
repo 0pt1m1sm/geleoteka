@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Phone, Trash2 } from "lucide-react";
 import { Alert, Button, Input, Textarea } from "@/components/ui";
 import {
   deleteCommunication,
@@ -11,9 +11,20 @@ import {
 import {
   COMM_CHANNEL_LABELS,
   COMM_OUTCOME_LABELS,
+  DROPDOWN_CHANNELS,
+  isEmailChannel,
+  isInboundEmailChannel,
+  isOutboundEmailChannel,
   isPhoneChannel,
 } from "@/lib/crm-labels";
 import { formatDateTime } from "@/lib/utils";
+import { EmailReplyForm } from "@/components/crm/EmailReplyForm";
+
+interface CommAttachment {
+  id: string;
+  filename: string;
+  content_type?: string;
+}
 
 interface CommView {
   id: string;
@@ -24,15 +35,22 @@ interface CommView {
   createdAt: Date;
   author: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
+  /** Email-only — null for non-email rows. */
+  subject?: string | null;
+  attachments?: CommAttachment[];
+  /** Resend's UUID — needed to build attachment proxy URLs. */
+  resendEmailId?: string | null;
 }
 
 interface Props {
   customerUserId: string;
   dealId?: string;
   initialEntries: CommView[];
+  /** Customer's email — required to render the reply form. */
+  customerEmail?: string;
 }
 
-const CHANNEL_OPTIONS = Object.keys(COMM_CHANNEL_LABELS);
+const CHANNEL_OPTIONS = DROPDOWN_CHANNELS;
 const OUTCOME_OPTIONS = Object.keys(COMM_OUTCOME_LABELS);
 
 /**
@@ -45,8 +63,22 @@ export function CommunicationLogger({
   customerUserId,
   dealId,
   initialEntries,
+  customerEmail,
 }: Props): React.ReactElement {
   const [showForm, setShowForm] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+
+  // The most recent EMAIL_INBOUND entry is the only one that gets the
+  // "Ответить" button — replies always thread onto the latest inbound.
+  // `initialEntries` is server-sorted by `createdAt: 'desc'` (both deal and
+  // customer pages use the same orderBy), so reduce-by-max gives the
+  // most-recent inbound id without depending on caller sort order.
+  const latestInboundId = initialEntries.reduce<string | null>((acc, e) => {
+    if (!isInboundEmailChannel(e.channel)) return acc;
+    if (acc === null) return e.id;
+    const accEntry = initialEntries.find((x) => x.id === acc);
+    return accEntry && accEntry.createdAt >= e.createdAt ? acc : e.id;
+  }, null);
 
   return (
     <div>
@@ -83,7 +115,27 @@ export function CommunicationLogger({
       {initialEntries.length > 0 ? (
         <ul className="mt-3 divide-y divide-[var(--border)]">
           {initialEntries.map((e) => (
-            <EntryRow key={e.id} entry={e} />
+            <EntryRow
+              key={e.id}
+              entry={e}
+              canReply={
+                customerEmail !== undefined &&
+                e.id === latestInboundId &&
+                replyingTo !== e.id
+              }
+              onReply={() => setReplyingTo(e.id)}
+              replyForm={
+                replyingTo === e.id && customerEmail ? (
+                  <EmailReplyForm
+                    customerUserId={customerUserId}
+                    dealId={dealId ?? null}
+                    customerEmail={customerEmail}
+                    suggestedSubject={`Re: ${(e.subject ?? "Сообщение").replace(/^\s*Re:\s*/i, "")}`}
+                    onClose={() => setReplyingTo(null)}
+                  />
+                ) : null
+              }
+            />
           ))}
         </ul>
       ) : null}
@@ -106,10 +158,16 @@ function LogForm({
   const [state, formAction, isPending] = useActionState(logCommunication, null);
   const [channel, setChannel] = useState("PHONE_INBOUND");
 
-  if (state?.id && !state?.error && !isPending) {
-    onLogged();
-    router.refresh();
-  }
+  // Notify parent + refresh after the action completes. Calling parent's
+  // setState during render would trip React 19's strict cross-component
+  // setState guard ("Cannot update a component while rendering a different
+  // component"). Defer to commit phase via useEffect.
+  useEffect(() => {
+    if (state?.id && !state?.error && !isPending) {
+      onLogged();
+      router.refresh();
+    }
+  }, [state, isPending, onLogged, router]);
 
   return (
     <form action={formAction} className="card space-y-3">
@@ -182,8 +240,18 @@ function LogForm({
   );
 }
 
-function EntryRow({ entry }: { entry: CommView }): React.ReactElement {
+interface EntryRowProps {
+  entry: CommView;
+  canReply: boolean;
+  onReply: () => void;
+  replyForm: React.ReactNode;
+}
+
+function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React.ReactElement {
   const [pending, startDelete] = useTransition();
+  const isEmail = isEmailChannel(entry.channel);
+  const isInbound = isInboundEmailChannel(entry.channel);
+  const isOutbound = isOutboundEmailChannel(entry.channel);
 
   function handleDelete(): void {
     if (!confirm("Удалить эту запись?")) return;
@@ -193,36 +261,88 @@ function EntryRow({ entry }: { entry: CommView }): React.ReactElement {
   }
 
   return (
-    <li className="py-3 flex items-start gap-3">
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium">
-          {COMM_CHANNEL_LABELS[entry.channel] ?? entry.channel}
-          {entry.outcome && entry.outcome !== "N_A" ? (
-            <span className="text-[var(--foreground-muted)] font-normal">
-              {" · "}
-              {COMM_OUTCOME_LABELS[entry.outcome] ?? entry.outcome}
-            </span>
+    <li className="py-3">
+      <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium flex items-center gap-1.5">
+            {isInbound ? <ArrowDownLeft size={14} aria-hidden /> : null}
+            {isOutbound ? <ArrowUpRight size={14} aria-hidden /> : null}
+            {COMM_CHANNEL_LABELS[entry.channel] ?? entry.channel}
+            {entry.outcome && entry.outcome !== "N_A" ? (
+              <span className="text-[var(--foreground-muted)] font-normal">
+                {" · "}
+                {COMM_OUTCOME_LABELS[entry.outcome] ?? entry.outcome}
+              </span>
+            ) : null}
+          </div>
+          <div className="text-xs text-[var(--foreground-muted)] mt-0.5">
+            {formatDateTime(entry.createdAt)}
+            {entry.author ? ` · ${entry.author.name}` : ""}
+            {entry.durationSec ? ` · ${formatDuration(entry.durationSec)}` : ""}
+          </div>
+          {isEmail && entry.subject ? (
+            <p className="mt-1.5 text-sm font-medium">{entry.subject}</p>
+          ) : null}
+          {entry.body ? (
+            <EntryBody body={entry.body} truncate={isEmail} />
+          ) : null}
+          {isEmail && entry.attachments && entry.attachments.length > 0 && entry.resendEmailId ? (
+            <ul className="flex flex-wrap gap-1.5 mt-2">
+              {entry.attachments.map((a) => (
+                <li key={a.id}>
+                  <a
+                    href={`/api/admin/inbox/attachments/${a.id}?email_id=${entry.resendEmailId}`}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 border border-[var(--border)] rounded text-xs hover:bg-[var(--background-elevated)]"
+                  >
+                    📎 {a.filename}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {canReply ? (
+            <button
+              type="button"
+              onClick={onReply}
+              className="mt-2 text-xs text-[var(--color-accent)] hover:underline"
+            >
+              Ответить
+            </button>
           ) : null}
         </div>
-        <div className="text-xs text-[var(--foreground-muted)] mt-0.5">
-          {formatDateTime(entry.createdAt)}
-          {entry.author ? ` · ${entry.author.name}` : ""}
-          {entry.durationSec ? ` · ${formatDuration(entry.durationSec)}` : ""}
-        </div>
-        {entry.body ? (
-          <p className="mt-1.5 text-sm whitespace-pre-wrap">{entry.body}</p>
-        ) : null}
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={pending}
+          className="btn-icon shrink-0"
+          aria-label="Удалить запись"
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
-      <button
-        type="button"
-        onClick={handleDelete}
-        disabled={pending}
-        className="btn-icon shrink-0"
-        aria-label="Удалить запись"
-      >
-        <Trash2 size={14} />
-      </button>
+      {replyForm ? <div className="mt-2">{replyForm}</div> : null}
     </li>
+  );
+}
+
+function EntryBody({ body, truncate }: { body: string; truncate: boolean }): React.ReactElement {
+  const [expanded, setExpanded] = useState(false);
+  const LIMIT = 400;
+  const isLong = truncate && body.length > LIMIT;
+  const visible = !isLong || expanded ? body : body.slice(0, LIMIT) + "…";
+  return (
+    <>
+      <p className="mt-1.5 text-sm whitespace-pre-wrap">{visible}</p>
+      {isLong ? (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1 text-xs text-[var(--foreground-muted)] hover:underline"
+        >
+          {expanded ? "Свернуть" : "Показать полностью"}
+        </button>
+      ) : null}
+    </>
   );
 }
 

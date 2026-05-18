@@ -12,7 +12,7 @@ export async function updatePartOrderStatus(
   await db.partOrder.update({
     where: { id: orderId },
     data: {
-      status: newStatus as "PENDING" | "CONFIRMED" | "SHIPPED" | "COMPLETED" | "CANCELLED",
+      status: newStatus as "PROCESSING" | "SHIPPED" | "COMPLETED" | "CANCELLED",
     },
   });
 
@@ -24,8 +24,7 @@ export async function updatePartOrderStatus(
 
   if (order && (order as Record<string, unknown>).userId) {
     const statusLabels: Record<string, string> = {
-      PENDING: "Ожидает",
-      CONFIRMED: "Подтверждён",
+      PROCESSING: "В обработке",
       SHIPPED: "Отправлен",
       COMPLETED: "Завершён",
       CANCELLED: "Отменён",

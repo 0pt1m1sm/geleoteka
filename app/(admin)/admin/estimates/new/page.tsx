@@ -13,7 +13,7 @@ export default async function NewEstimatePage() {
 
   const repairOrders = await db.repairOrder.findMany({
     where: {
-      status: { in: ["ESTIMATE", "APPROVED", "IN_PROGRESS"] },
+      status: { in: ["SCHEDULED", "IN_PROGRESS"] },
     },
     include: {
       user: { select: { name: true } },

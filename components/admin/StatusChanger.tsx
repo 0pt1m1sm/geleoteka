@@ -4,18 +4,7 @@ import { useRouter } from "next/navigation";
 import { updateRepairOrderStatus } from "@/app/actions/admin";
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 
-const STATUSES = [
-  "ESTIMATE",
-  "APPROVED",
-  "IN_PROGRESS",
-  "AWAITING_PARTS",
-  "QC",
-  "READY",
-  "INVOICED",
-  "PAID",
-  "CLOSED",
-  "CANCELLED",
-];
+const STATUSES = ["SCHEDULED", "IN_PROGRESS", "READY", "COMPLETED", "CANCELLED"];
 
 export function StatusChanger({
   repairOrderId,

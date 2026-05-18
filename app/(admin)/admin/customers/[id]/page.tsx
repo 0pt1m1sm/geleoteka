@@ -12,6 +12,7 @@ import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsMa
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
+import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,6 +23,7 @@ interface RawCustomer {
   name: string;
   phone: string;
   email: string;
+  referralSource: string | null;
   vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
   loyaltyAccount: { points: number } | null;
   customerProfile: { blacklisted: boolean; notes: string | null } | null;
@@ -91,6 +93,9 @@ export default async function CustomerDetailPage({ params }: Props) {
         createdAt: true,
         author: { select: { id: true, name: true } },
         deal: { select: { id: true, number: true } },
+        subject: true,
+        resendEmailId: true,
+        attachments: true,
       },
     }),
     db.crmTask.findMany({
@@ -146,6 +151,14 @@ export default async function CustomerDetailPage({ params }: Props) {
         <p className="text-[var(--foreground-muted)]">
           {customer.phone} · {customer.email}
         </p>
+        {customer.referralSource ? (
+          <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+            Откуда узнал:{" "}
+            <span className="text-[var(--foreground)]">
+              {REFERRAL_SOURCE_LABELS[customer.referralSource] ?? customer.referralSource}
+            </span>
+          </p>
+        ) : null}
         <p className="mt-2 text-xs">
           <Link
             href={`/admin/users/${customer.id}`}
@@ -202,6 +215,7 @@ export default async function CustomerDetailPage({ params }: Props) {
       <div className="card mb-8">
         <CommunicationLogger
           customerUserId={customer.id}
+          customerEmail={customer.email}
           initialEntries={commLogs.map((e) => ({
             id: e.id,
             channel: e.channel,
@@ -211,6 +225,11 @@ export default async function CustomerDetailPage({ params }: Props) {
             createdAt: e.createdAt,
             author: e.author,
             deal: e.deal,
+            subject: e.subject,
+            resendEmailId: e.resendEmailId,
+            attachments: Array.isArray(e.attachments)
+              ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)
+              : [],
           }))}
         />
       </div>

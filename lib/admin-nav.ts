@@ -81,6 +81,7 @@ export const adminNav: AdminNavEntry[] = [
       { href: "/admin/crm/deals", label: "Сделки" },
       { href: "/admin/crm/estimates", label: "Сметы" },
       { href: "/admin/crm/tasks?scope=open&owner=mine", label: "Задачи" },
+      { href: "/admin/crm/inbox", label: "Входящие" },
       { href: "/admin/customers", label: "Клиенты" },
     ],
   },
@@ -99,6 +100,14 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/cms", label: "Контент" },
       { href: "/admin/vacancies", label: "Вакансии" },
+    ],
+  },
+  {
+    kind: "group",
+    id: "admin-group-settings",
+    label: "Настройки",
+    items: [
+      { href: "/admin/settings/integrations", label: "Интеграции" },
     ],
   },
 ];

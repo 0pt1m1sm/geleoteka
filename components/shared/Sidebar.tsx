@@ -13,6 +13,7 @@ import {
   matchesHref,
 } from "@/lib/admin-nav";
 import { useAccordionGroup } from "@/lib/use-accordion-group";
+import { InboxBadge } from "@/components/admin/inbox/InboxBadge";
 
 export interface SidebarProps {
   /** Navigation tree — supports flat links and grouped accordions. */
@@ -168,22 +169,24 @@ interface SidebarLinkProps {
   isActive: boolean;
   indent?: boolean;
   onNavigate?: () => void;
+  trailing?: React.ReactNode;
 }
 
-function SidebarLink({ href, label, isActive, indent = false, onNavigate }: SidebarLinkProps): React.ReactElement {
+function SidebarLink({ href, label, isActive, indent = false, onNavigate, trailing }: SidebarLinkProps): React.ReactElement {
   return (
     <Link
       href={href}
       onClick={onNavigate}
       aria-current={isActive ? "page" : undefined}
       data-active={isActive ? "true" : undefined}
-      className={`block ${indent ? "pl-8 pr-3" : "px-3"} py-2 rounded-[var(--radius-lg)] text-sm transition-colors active:bg-[var(--color-secondary)] ${
+      className={`flex items-center justify-between ${indent ? "pl-8 pr-3" : "px-3"} py-2 rounded-[var(--radius-lg)] text-sm transition-colors active:bg-[var(--color-secondary)] ${
         isActive
           ? "bg-[var(--card-hover)] text-[var(--color-accent)] font-medium"
           : "hover:bg-[var(--card-hover)]"
       }`}
     >
-      {label}
+      <span>{label}</span>
+      {trailing}
     </Link>
   );
 }
@@ -229,6 +232,7 @@ function SidebarGroup({ group, isOpen, onToggle, activeHref, pathname, searchPar
             }
             onNavigate={onNavigate}
             indent
+            trailing={item.href === "/admin/crm/inbox" ? <InboxBadge /> : undefined}
           />
         ))}
       </div>

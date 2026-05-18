@@ -1,11 +1,14 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FileText, Plus } from "lucide-react";
-import { Alert, Button, Input, Textarea } from "@/components/ui";
-import { createEstimate, sendEstimate } from "@/app/actions/crm/estimates";
+import { Alert, Button } from "@/components/ui";
+import {
+  openOrCreateActiveEstimate,
+  sendEstimate,
+} from "@/app/actions/crm/estimates";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
 import { formatDate, formatPrice } from "@/lib/utils";
 
@@ -22,121 +25,74 @@ interface EstimateView {
 interface Props {
   dealId: string;
   estimates: EstimateView[];
-  /** Disables "Создать смету" once the deal moves past QUOTED. */
+  /** Disables the active-estimate button once the deal moves past QUOTED. */
   canCreate: boolean;
 }
 
 /**
- * Embedded on the Deal detail page. Shows existing estimates, lets the
- * manager spawn a new DRAFT from current DealLines, and offers a quick
- * "send" trigger for any DRAFT row.
+ * Embedded on the Deal detail page. Lists every estimate (including
+ * superseded revisions) and exposes a single "Открыть активную смету"
+ * button that routes the manager to:
+ *   - the current DRAFT, if one exists
+ *   - else a new DRAFT cloned from the latest non-SUPERSEDED estimate
+ *     (via `reviseEstimate` inside `openOrCreateActiveEstimate`)
+ *   - else a blank DRAFT (legacy fallback)
+ *
+ * Editing of line items happens on the estimate page itself — never
+ * inline here. PDF + "Отправить" stay one click away per row.
  */
 export function EstimatesSection({
   dealId,
   estimates,
   canCreate,
 }: Props): React.ReactElement {
-  const [createOpen, setCreateOpen] = useState(false);
+  const router = useRouter();
+  const [state, formAction, isPending] = useActionState(openOrCreateActiveEstimate, null);
+
+  useEffect(() => {
+    if (state?.estimateId && !state?.error && !isPending) {
+      router.push(`/admin/crm/estimates/${state.estimateId}`);
+    }
+  }, [state, isPending, router]);
+
+  const hasDraft = estimates.some((e) => e.stage === "DRAFT");
+  const buttonLabel = hasDraft ? "Открыть активную смету" : "Новая смета";
 
   return (
     <div>
       <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="font-semibold">Сметы</h3>
-        {canCreate && !createOpen ? (
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            leftIcon={<Plus size={14} />}
-            onClick={() => setCreateOpen(true)}
-          >
-            Новая смета
-          </Button>
+        {canCreate ? (
+          <form action={formAction}>
+            <input type="hidden" name="dealId" value={dealId} />
+            <Button
+              type="submit"
+              variant="secondary"
+              size="sm"
+              leftIcon={<Plus size={14} />}
+              isLoading={isPending}
+              disabled={isPending}
+            >
+              {buttonLabel}
+            </Button>
+          </form>
         ) : null}
       </div>
 
-      {createOpen ? (
-        <CreateEstimateForm
-          dealId={dealId}
-          onCancel={() => setCreateOpen(false)}
-          onCreated={() => setCreateOpen(false)}
-        />
-      ) : null}
+      {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
 
-      {estimates.length === 0 && !createOpen ? (
+      {estimates.length === 0 ? (
         <p className="text-sm text-[var(--foreground-muted)]">
           Сметы по этой сделке ещё не созданы.
         </p>
-      ) : null}
-
-      {estimates.length > 0 ? (
+      ) : (
         <ul className="mt-3 divide-y divide-[var(--border)]">
           {estimates.map((est) => (
             <EstimateRow key={est.id} est={est} />
           ))}
         </ul>
-      ) : null}
+      )}
     </div>
-  );
-}
-
-function CreateEstimateForm({
-  dealId,
-  onCancel,
-  onCreated,
-}: {
-  dealId: string;
-  onCancel: () => void;
-  onCreated: () => void;
-}): React.ReactElement {
-  const router = useRouter();
-  const [state, formAction, isPending] = useActionState(createEstimate, null);
-
-  // Once the action returns success, navigate user to the estimate.
-  if (state?.estimateId && !state?.error && !isPending) {
-    onCreated();
-    router.push(`/admin/crm/estimates/${state.estimateId}`);
-  }
-
-  return (
-    <form action={formAction} className="card space-y-3 mb-3">
-      <input type="hidden" name="dealId" value={dealId} />
-      <p className="text-xs text-[var(--foreground-muted)]">
-        Смета будет создана из текущих позиций сделки. После создания
-        дальнейшие правки сделки не влияют на смету — используйте
-        «Пересмотреть», чтобы выпустить новую версию.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Input
-          label="Действительна дней"
-          name="validDays"
-          type="number"
-          inputMode="numeric"
-          min="1"
-          defaultValue="14"
-          className="job-line-num"
-        />
-        <div className="sm:col-span-2">
-          <Textarea
-            label="Внутренние заметки (опционально)"
-            name="notes"
-            rows={2}
-            placeholder="Не отправляется клиенту"
-          />
-        </div>
-      </div>
-
-      {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
-
-      <div className="flex gap-2 justify-end">
-        <Button type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
-          Отмена
-        </Button>
-        <Button type="submit" isLoading={isPending} disabled={isPending}>
-          Создать
-        </Button>
-      </div>
-    </form>
   );
 }
 
@@ -179,6 +135,15 @@ function EstimateRow({ est }: { est: EstimateView }): React.ReactElement {
       <div className="text-sm font-medium tabular-nums shrink-0">
         {formatPrice(est.total)}
       </div>
+      <a
+        href={`/api/estimates/${est.id}/pdf`}
+        target="_blank"
+        rel="noopener"
+        className="text-xs text-[var(--color-accent)] hover:underline shrink-0"
+        title="Скачать PDF"
+      >
+        PDF ↗
+      </a>
       {est.stage === "DRAFT" ? (
         <Button
           type="button"

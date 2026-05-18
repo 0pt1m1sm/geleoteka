@@ -3,10 +3,9 @@
 import { useRouter } from "next/navigation";
 import { updateRentalBookingStatus } from "@/app/actions/rentals";
 
-const STATUSES = ["PENDING", "CONFIRMED", "ACTIVE", "RETURNED", "CANCELLED"];
+const STATUSES = ["BOOKED", "ACTIVE", "RETURNED", "CANCELLED"];
 const LABELS: Record<string, string> = {
-  PENDING: "Ожидает",
-  CONFIRMED: "Подтверждена",
+  BOOKED: "Забронирована",
   ACTIVE: "Активна",
   RETURNED: "Завершена",
   CANCELLED: "Отменена",

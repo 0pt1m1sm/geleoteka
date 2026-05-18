@@ -131,7 +131,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
           vehicleId: vehicle!.id,
           trimId: validatedTrimId,
           dateTime: appointmentDate,
-          status: "ESTIMATE",
+          status: "SCHEDULED",
           claimToken,
           dealId: deal.id,
           notes: notes || null,
@@ -165,6 +165,47 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       appointmentDate.toLocaleDateString("ru-RU"),
       appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
     );
+
+    if (email) {
+      const [
+        { sendBookingConfirmationEmail, generateOutboundMessageId, recordOutboundEmail, markOutboundEmailFailed, markOutboundEmailSent, isPlausibleEmail },
+        { getCMSText },
+      ] = await Promise.all([import("@/lib/email"), import("@/lib/cms")]);
+      const address = (await getCMSText("contacts.address")) || "Москва, ул. Примерная, 15";
+      const dateLabel = `${appointmentDate.toLocaleDateString("ru-RU")} в ${appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+      const subject = `Geleoteka — запись на ${dateLabel}`;
+      const bodyText = `Здравствуйте, ${name}. Записываем ваш ${model} ${year} г. на ${dateLabel} по адресу: ${address}. Услуги: ${services.map((s: { name: string }) => s.name).join(", ")}.`;
+      const messageId = generateOutboundMessageId();
+      // Persist FIRST so a fast customer reply can match externalId
+      // before our post-send write would otherwise land.
+      if (isPlausibleEmail(email)) {
+        await recordOutboundEmail({
+          customerUserId: userId,
+          dealId: deal.id,
+          subject,
+          body: bodyText,
+          messageId,
+        });
+      }
+      void sendBookingConfirmationEmail(
+        email,
+        {
+          customerName: name,
+          dateTime: appointmentDate,
+          vehicleSummary: `${model} ${year} г.`,
+          services: services.map((s: { name: string }) => s.name),
+          address,
+        },
+        { messageId },
+      )
+        .then((result) => {
+          if (!result.success) return markOutboundEmailFailed(messageId, result.error);
+          return markOutboundEmailSent(messageId);
+        })
+        .catch((err) =>
+          markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
+        );
+    }
 
     const { pushAppointment: splusPush } = await import("@/lib/splus");
     await splusPush({

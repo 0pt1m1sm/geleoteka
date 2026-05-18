@@ -86,6 +86,14 @@ export async function createCustomer(
     return { ok: false, error: "Пользователь с таким email или телефоном уже существует" };
   }
 
+  // Optional marketing source ("откуда узнал"). Unknown / missing → null.
+  const referralRaw = (formData.get("referralSource") as string | null)?.trim() ?? "";
+  const REFERRAL_VALUES = new Set([
+    "YANDEX", "GOOGLE", "AVITO", "INSTAGRAM", "TELEGRAM_CHAN",
+    "FRIEND", "REPEAT", "WALK_IN", "OTHER",
+  ]);
+  const referralSource = REFERRAL_VALUES.has(referralRaw) ? (referralRaw as never) : null;
+
   const tempPassword = generateTempPassword();
   const passwordHash = await bcrypt.hash(tempPassword, 12);
 
@@ -100,6 +108,7 @@ export async function createCustomer(
         isTempPassword: true,
         permissionRole: "CLIENT",
         isCustomer: true,
+        referralSource,
         customerProfile: { create: {} },
         loyaltyAccount: { create: {} },
       },

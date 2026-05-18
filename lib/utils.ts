@@ -69,17 +69,13 @@ export function normalizePhone(phone: string): string {
   return phone;
 }
 
-/** RepairOrder status labels (Russian) */
+/** RepairOrder status labels (Russian). Collapsed 2026-05-18: estimate stage
+ *  lives on Estimate now; RO tracks work only. */
 export const REPAIR_ORDER_STATUS_LABELS: Record<string, string> = {
-  ESTIMATE: "Смета",
-  APPROVED: "Согласовано",
+  SCHEDULED: "Принят",
   IN_PROGRESS: "В работе",
-  AWAITING_PARTS: "Ожидает запчасти",
-  QC: "Контроль качества",
   READY: "Готов к выдаче",
-  INVOICED: "Выставлен счёт",
-  PAID: "Оплачено",
-  CLOSED: "Закрыт",
+  COMPLETED: "Завершён",
   CANCELLED: "Отменён",
 };
 

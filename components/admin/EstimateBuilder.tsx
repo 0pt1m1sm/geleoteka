@@ -144,7 +144,7 @@ export function EstimateBuilder({
       </Card>
 
       <div className="flex gap-3">
-        <Link href="/admin/repair-orders?status=ESTIMATE">
+        <Link href="/admin/repair-orders?status=SCHEDULED">
           <Button type="button" variant="secondary">Отмена</Button>
         </Link>
         <Button type="submit" isLoading={isPending} disabled={isPending}>

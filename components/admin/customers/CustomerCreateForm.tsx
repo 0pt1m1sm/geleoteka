@@ -5,8 +5,19 @@ import { useActionState, useState } from "react";
 import { createCustomer } from "@/app/actions/customers";
 import { AdminFormShell } from "@/components/admin/AdminFormShell";
 import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
+import { REFERRAL_SOURCE_KEYS, REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
 
-function CreateForm(): React.ReactElement {
+interface CreateFormProps {
+  defaultName?: string;
+  defaultEmail?: string;
+  defaultPhone?: string;
+}
+
+function CreateForm({
+  defaultName,
+  defaultEmail,
+  defaultPhone,
+}: CreateFormProps): React.ReactElement {
   const [state, formAction, isPending] = useActionState(createCustomer, null);
 
   return (
@@ -16,7 +27,15 @@ function CreateForm(): React.ReactElement {
           <label htmlFor="name" className="block text-sm font-medium mb-2">
             Имя *
           </label>
-          <input id="name" name="name" required minLength={2} maxLength={120} className="input" />
+          <input
+            id="name"
+            name="name"
+            required
+            minLength={2}
+            maxLength={120}
+            className="input"
+            defaultValue={defaultName ?? ""}
+          />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -34,6 +53,7 @@ function CreateForm(): React.ReactElement {
               title={PHONE_TITLE}
               className="input"
               placeholder="+79991234567"
+              defaultValue={defaultPhone ?? ""}
             />
           </div>
           <div>
@@ -50,8 +70,28 @@ function CreateForm(): React.ReactElement {
               title={EMAIL_TITLE}
               className="input"
               placeholder="name@example.com"
+              defaultValue={defaultEmail ?? ""}
             />
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="referralSource" className="block text-sm font-medium mb-2">
+            Откуда узнал
+          </label>
+          <select
+            id="referralSource"
+            name="referralSource"
+            className="input"
+            defaultValue=""
+          >
+            <option value="">— не указано —</option>
+            {REFERRAL_SOURCE_KEYS.map((k) => (
+              <option key={k} value={k}>
+                {REFERRAL_SOURCE_LABELS[k]}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -142,6 +182,20 @@ function SuccessPanel({
   );
 }
 
-export function CustomerCreateForm(): React.ReactElement {
-  return <CreateForm />;
+export function CustomerCreateForm({
+  defaultName,
+  defaultEmail,
+  defaultPhone,
+}: {
+  defaultName?: string;
+  defaultEmail?: string;
+  defaultPhone?: string;
+} = {}): React.ReactElement {
+  return (
+    <CreateForm
+      defaultName={defaultName}
+      defaultEmail={defaultEmail}
+      defaultPhone={defaultPhone}
+    />
+  );
 }

@@ -6,11 +6,23 @@ import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { CustomerCreateForm } from "@/components/admin/customers/CustomerCreateForm";
 
-export default async function NewCustomerPage() {
+interface Props {
+  searchParams: Promise<{ email?: string; name?: string; phone?: string }>;
+}
+
+function pickString(value: string | undefined, max: number): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.slice(0, max);
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export default async function NewCustomerPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
+
+  const sp = await searchParams;
 
   return (
     <div>
@@ -24,7 +36,11 @@ export default async function NewCustomerPage() {
           </Link>
         }
       />
-      <CustomerCreateForm />
+      <CustomerCreateForm
+        defaultName={pickString(sp.name, 120)}
+        defaultEmail={pickString(sp.email, 254)}
+        defaultPhone={pickString(sp.phone, 32)}
+      />
     </div>
   );
 }

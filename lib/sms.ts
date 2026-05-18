@@ -1,25 +1,33 @@
-const SMSC_LOGIN = process.env.SMSC_LOGIN;
-const SMSC_PASSWORD = process.env.SMSC_PASSWORD;
-const SMSC_ENABLED = !!(SMSC_LOGIN && SMSC_PASSWORD);
+import "server-only";
+import { getSetting } from "@/lib/settings";
 
 interface SmsSendResult {
   success: boolean;
   error?: string;
 }
 
+/**
+ * SMS via smsc.ru. Credentials are resolved per call through `getSetting`
+ * (DB override at /admin/settings/integrations, falls back to env vars).
+ * `getSetting` caches with 60s TTL so per-call overhead is negligible.
+ * Without credentials we mock — booking/status flows continue to work.
+ */
 export async function sendSms(
   phone: string,
-  message: string
+  message: string,
 ): Promise<SmsSendResult> {
-  if (!SMSC_ENABLED) {
+  const login = await getSetting("SMSC_LOGIN");
+  const psw = await getSetting("SMSC_PASSWORD");
+
+  if (!login || !psw) {
     console.log(`[SMS MOCK] To: ${phone} | Message: ${message}`);
     return { success: true };
   }
 
   try {
     const params = new URLSearchParams({
-      login: SMSC_LOGIN!,
-      psw: SMSC_PASSWORD!,
+      login,
+      psw,
       phones: phone,
       mes: message,
       fmt: "3", // JSON response
@@ -28,7 +36,7 @@ export async function sendSms(
     });
 
     const res = await fetch(`https://smsc.ru/sys/send.php?${params.toString()}`);
-    const data = await res.json();
+    const data = (await res.json()) as { error?: string };
 
     if (data.error) {
       console.error("[SMS ERROR]", data.error);
@@ -45,30 +53,28 @@ export async function sendSms(
 export async function sendBookingConfirmation(
   phone: string,
   dateStr: string,
-  timeStr: string
+  timeStr: string,
 ): Promise<SmsSendResult> {
   return sendSms(
     phone,
-    `Geleoteka: Ваша запись подтверждена на ${dateStr} в ${timeStr}. Ждём вас! Тел: +7(963)768-06-42`
+    `Geleoteka: Ваша запись подтверждена на ${dateStr} в ${timeStr}. Ждём вас! Тел: +7(963)768-06-42`,
   );
 }
 
 export async function sendStatusChange(
   phone: string,
-  statusLabel: string
+  statusLabel: string,
 ): Promise<SmsSendResult> {
   return sendSms(
     phone,
-    `Geleoteka: Статус вашего заказа: ${statusLabel}. Подробности в личном кабинете.`
+    `Geleoteka: Статус вашего заказа: ${statusLabel}. Подробности в личном кабинете.`,
   );
 }
 
-export async function sendEstimateReady(
-  phone: string
-): Promise<SmsSendResult> {
+export async function sendEstimateReady(phone: string): Promise<SmsSendResult> {
   return sendSms(
     phone,
-    `Geleoteka: Смета на обслуживание готова. Откройте личный кабинет для согласования.`
+    `Geleoteka: Смета на обслуживание готова. Откройте личный кабинет для согласования.`,
   );
 }
 
@@ -76,11 +82,11 @@ export async function sendReminder(
   phone: string,
   dateStr: string,
   timeStr: string,
-  daysBefore: number
+  daysBefore: number,
 ): Promise<SmsSendResult> {
   const prefix = daysBefore === 0 ? "Сегодня" : "Завтра";
   return sendSms(
     phone,
-    `Geleoteka: ${prefix} у вас запись на ${timeStr}. Ждём вас по адресу: Химки, Пролетарская ул., 18к1. Тел: +7(963)768-06-42`
+    `Geleoteka: ${prefix} у вас запись на ${timeStr}. Ждём вас по адресу: Химки, Пролетарская ул., 18к1. Тел: +7(963)768-06-42`,
   );
 }

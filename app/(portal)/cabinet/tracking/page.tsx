@@ -35,7 +35,7 @@ export default async function TrackingPage() {
   const repairOrders = (await db.repairOrder.findMany({
     where: {
       userId: session.id,
-      status: { notIn: ["PAID", "CLOSED", "CANCELLED"] },
+      status: { notIn: ["COMPLETED", "CANCELLED"] },
     },
     include: {
       vehicle: { select: { model: true } },

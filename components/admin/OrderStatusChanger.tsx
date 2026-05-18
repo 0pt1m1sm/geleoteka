@@ -3,10 +3,9 @@
 import { useRouter } from "next/navigation";
 import { updatePartOrderStatus } from "@/app/actions/part-order-admin";
 
-const STATUSES = ["PENDING", "CONFIRMED", "SHIPPED", "COMPLETED", "CANCELLED"];
+const STATUSES = ["PROCESSING", "SHIPPED", "COMPLETED", "CANCELLED"];
 const LABELS: Record<string, string> = {
-  PENDING: "Ожидает",
-  CONFIRMED: "Подтверждён",
+  PROCESSING: "В обработке",
   SHIPPED: "Отправлен",
   COMPLETED: "Завершён",
   CANCELLED: "Отменён",

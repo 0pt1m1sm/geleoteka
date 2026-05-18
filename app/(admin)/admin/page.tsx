@@ -50,11 +50,11 @@ export default async function AdminDashboard() {
       where: { dateTime: { gte: dayStart, lte: dayEnd } },
     }),
     db.repairOrder.count({
-      where: { status: { in: ["APPROVED", "IN_PROGRESS", "AWAITING_PARTS", "QC"] } },
+      where: { status: { in: ["SCHEDULED", "IN_PROGRESS"] } },
     }),
     db.repairOrder.findMany({
       where: {
-        status: { in: ["PAID", "CLOSED"] },
+        status: "COMPLETED",
         completedAt: { gte: dayStart, lte: dayEnd },
       },
       select: { total: true },
@@ -62,7 +62,7 @@ export default async function AdminDashboard() {
     db.repairOrder.findMany({
       where: {
         dateTime: { gte: dayStart, lte: weekEnd },
-        status: { notIn: ["PAID", "CLOSED", "CANCELLED"] },
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
       },
       include: {
         user: { select: { name: true, phone: true } },

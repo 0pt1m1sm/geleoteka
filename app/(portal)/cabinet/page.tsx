@@ -15,7 +15,7 @@ export default async function CabinetDashboard() {
     db.repairOrder.findMany({
       where: {
         userId: session.id,
-        status: { notIn: ["PAID", "CLOSED", "CANCELLED"] },
+        status: { notIn: ["COMPLETED", "CANCELLED"] },
       },
       include: {
         vehicle: { select: { model: true } },

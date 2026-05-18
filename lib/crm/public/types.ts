@@ -28,9 +28,10 @@ export interface CreateDealInput {
    */
   initialStage?: DealStage;
   /**
-   * Pre-populated line items. Most callers add lines via subsequent
-   * addDealLine calls; passing them here is a convenience for
-   * single-shot creates (e.g. cart checkout).
+   * Pre-populated line items. Written into the deal's initial DRAFT
+   * Estimate (every deal gets one — see `lib/crm/public/create-deal`).
+   * Used by single-shot creates (booking, cart checkout, rental) that
+   * already know the full scope at creation time.
    */
   lines?: CreateDealLineInput[];
   /**
@@ -48,7 +49,6 @@ export interface CreateDealLineInput {
   qty: number;
   unitPrice: number;
   partId?: string | null;
-  vehicleId?: string | null;
   /** Optional explicit sortOrder; defaults to append. */
   sortOrder?: number;
 }

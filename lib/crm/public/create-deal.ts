@@ -31,10 +31,21 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
       select: { id: true },
     })) as { id: string };
 
+    // Every deal gets an initial DRAFT estimate. This is the working
+    // basket — the manager edits its lines until ready to send. Lines
+    // passed by booking/parts/rentals callers populate this DRAFT.
+    const estimate = (await tx.estimate.create({
+      data: {
+        dealId: deal.id,
+        stage: "DRAFT",
+      },
+      select: { id: true },
+    })) as { id: string };
+
     if (input.lines && input.lines.length > 0) {
-      await tx.dealLine.createMany({
+      await tx.estimateLine.createMany({
         data: input.lines.map((line, i) => ({
-          dealId: deal.id,
+          estimateId: estimate.id,
           sortOrder: line.sortOrder ?? i,
           type: line.type,
           description: line.description,
@@ -42,7 +53,6 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
           unitPrice: line.unitPrice,
           total: Math.round(line.qty * line.unitPrice),
           partId: line.partId ?? null,
-          vehicleId: line.vehicleId ?? null,
         })),
       });
     }

@@ -26,7 +26,7 @@ export default async function AdminOrdersPage() {
 
   const total = orders.length;
   const pending = orders.filter(
-    (o: Record<string, unknown>) => o.status === "PENDING"
+    (o: Record<string, unknown>) => o.status === "PROCESSING"
   ).length;
 
   return (

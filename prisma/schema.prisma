@@ -27,16 +27,12 @@ enum VehicleOwnershipType {
 }
 
 enum RepairOrderStatus {
-  ESTIMATE // Initial quote, awaiting customer approval
-  APPROVED // Customer approved, ready to start
-  IN_PROGRESS // Work underway
-  AWAITING_PARTS // Blocked on parts delivery
-  QC // Quality check
-  READY // Done, ready for pickup
-  INVOICED // Invoice issued
-  PAID // Payment received
-  CLOSED // Fully completed
-  CANCELLED // Cancelled by customer or shop
+  // Estimate-stage approval lives on the Estimate now; RO tracks WORK only.
+  SCHEDULED // Принят и ждёт работ (заменяет ESTIMATE + APPROVED)
+  IN_PROGRESS // В работе (включая ожидание запчастей, контроль качества)
+  READY // Готов к выдаче / счёт выставлен
+  COMPLETED // Выдан и оплачен (заменяет PAID + CLOSED)
+  CANCELLED // Отменён клиентом или цехом
 }
 
 enum JobLineStatus {
@@ -93,18 +89,16 @@ enum LoyaltyTier {
 }
 
 enum PartOrderStatus {
-  PENDING
-  CONFIRMED
-  SHIPPED
-  COMPLETED
+  PROCESSING // Принят, в обработке (заменяет PENDING + CONFIRMED)
+  SHIPPED // Передан в доставку
+  COMPLETED // Получен клиентом
   CANCELLED
 }
 
 enum RentalBookingStatus {
-  PENDING
-  CONFIRMED
-  ACTIVE
-  RETURNED
+  BOOKED // Забронирован, до выдачи (заменяет PENDING + CONFIRMED)
+  ACTIVE // Автомобиль у клиента
+  RETURNED // Возвращён, расчёты закрыты
   CANCELLED
 }
 
@@ -164,13 +158,49 @@ enum EstimateStage {
 enum CommChannel {
   PHONE_INBOUND
   PHONE_OUTBOUND
-  SMS_OUTBOUND
   SMS_INBOUND
+  SMS_OUTBOUND
+  EMAIL_INBOUND
+  EMAIL_OUTBOUND
+  WHATSAPP_INBOUND
+  WHATSAPP_OUTBOUND
+  TELEGRAM_INBOUND
+  TELEGRAM_OUTBOUND
+  MAX_INBOUND
+  MAX_OUTBOUND
+  IN_PERSON
+  OTHER
+  // Legacy values kept on the enum to satisfy in-flight rows that may have
+  // been written before the directional split — they are hidden from the
+  // dropdown (see lib/crm-labels.ts) but readable for audit.
   WHATSAPP
   TELEGRAM
   EMAIL
-  IN_PERSON
-  OTHER
+}
+
+enum InboxMessageStatus {
+  PENDING
+  ASSIGNED
+  SPAM
+  ARCHIVED
+}
+
+/// Key-value store for runtime-mutable settings: integration secrets,
+/// webhook credentials, feature flags an admin should be able to change
+/// without redeploy. Read via lib/settings.ts:getSetting(key) which
+/// falls back to process.env when the row is missing — so existing
+/// env-var-driven config keeps working until an admin overrides it
+/// through /admin/settings/integrations.
+model Setting {
+  id              String   @id @default(cuid())
+  key             String   @unique
+  value           String   @db.Text
+  updatedAt       DateTime @updatedAt
+  updatedByUserId String?
+
+  updatedBy User? @relation("SettingUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([key])
 }
 
 enum CommOutcome {
@@ -206,6 +236,22 @@ enum FuelType {
   HYBRID
 }
 
+/// Marketing source — где клиент узнал о Geleoteka. Заполняется при
+/// создании клиента или редактировании Customer 360. Отдельное от
+/// User.referredBy (которое для user-to-user рефералов: один клиент
+/// привёл другого).
+enum ReferralSource {
+  YANDEX
+  GOOGLE
+  AVITO
+  INSTAGRAM
+  TELEGRAM_CHAN
+  FRIEND
+  REPEAT
+  WALK_IN
+  OTHER
+}
+
 // ============================================
 // USER & AUTH (unified person model)
 // ============================================
@@ -227,6 +273,11 @@ model User {
   isCustomer Boolean @default(true)
   isMaster   Boolean @default(false)
   isSupplier Boolean @default(false)
+
+  // Marketing source — заполняется один раз при создании клиента.
+  // Nullable because legacy customers + customers created before this
+  // field existed will have unknown source.
+  referralSource ReferralSource?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -272,6 +323,12 @@ model User {
   // CRM Phase 3 — Communications
   commLogsAsCustomer CommunicationLog[] @relation("CommLogCustomer")
   commLogsAuthored   CommunicationLog[] @relation("CommLogAuthor")
+
+  // Inbound email inbox — messages assigned to this manager during triage
+  assignedInboxMessages InboxMessage[] @relation("InboxAssignee")
+
+  // Settings audit — admin who last updated a Setting row
+  settingsUpdated Setting[] @relation("SettingUpdater")
 
   // CRM Phase 4 — Tasks
   crmTasksOwned    CrmTask[] @relation("CrmTaskOwner")
@@ -428,7 +485,6 @@ model Vehicle {
   repairOrders   RepairOrder[]
   rentalBookings RentalBooking[]
   deals          Deal[]
-  dealLines      DealLine[]
 
   @@index([ownerUserId])
   @@index([ownershipType])
@@ -466,7 +522,7 @@ model RepairOrder {
   vehicleId    String
   masterUserId String? // Assigned technician
   trimId       String? // Captured from booking picker; null for older flows or "Не уверен"
-  status       RepairOrderStatus @default(ESTIMATE)
+  status       RepairOrderStatus @default(SCHEDULED)
   dateTime     DateTime // Scheduled date/time
   mileageIn    Int?
   mileageOut   Int?
@@ -769,7 +825,6 @@ model Part {
   supplierOrderItems SupplierOrderItem[]
   partLines          PartLine[]
   partTrims          PartTrim[]
-  dealLines          DealLine[]
   estimateLines      EstimateLine[]
 
   @@index([slug])
@@ -781,7 +836,7 @@ model Part {
 model PartOrder {
   id           String          @id @default(cuid())
   userId       String?
-  status       PartOrderStatus @default(PENDING)
+  status       PartOrderStatus @default(PROCESSING)
   total        Int             @default(0)
   contactName  String
   contactPhone String
@@ -831,7 +886,7 @@ model RentalBooking {
   id           String              @id @default(cuid())
   vehicleId    String // Was carId — now references Vehicle
   userId       String?
-  status       RentalBookingStatus @default(PENDING)
+  status       RentalBookingStatus @default(BOOKED)
   startDate    DateTime
   endDate      DateTime
   totalCost    Int
@@ -1038,9 +1093,9 @@ model PartTrim {
 /// Deal is the unified commercial aggregate. Workshop service, parts
 /// purchases, rentals — everything that involves money commitment is a
 /// Deal. Operational fulfillments (RepairOrder, PartOrder, RentalBooking)
-/// link back via dealId. Money is denormalized from DealLine[] sums and
-/// is the source of truth for total revenue. See
-/// docs/prd/2026-05-10-deal-fulfillment-architecture.md.
+/// link back via dealId. Money is denormalized from the active (non-SUPERSEDED)
+/// Estimate's EstimateLine[] and is the source of truth for total revenue.
+/// See docs/prd/2026-05-10-deal-fulfillment-architecture.md.
 model Deal {
   id              String              @id @default(cuid())
   number          String?             @unique
@@ -1076,7 +1131,6 @@ model Deal {
   customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
   vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  dealLines        DealLine[]
   estimates        Estimate[]
   repairOrders     RepairOrder[]
   partOrders       PartOrder[]
@@ -1093,33 +1147,10 @@ model Deal {
   @@index([createdAt])
 }
 
-/// Polymorphic line item on a Deal. `type` discriminates LABOR / PART /
-/// RENTAL_DAY / DISCOUNT / FEE; `qty` is hours for LABOR, units for PART,
-/// days for RENTAL_DAY. `total` is signed (DISCOUNT is negative).
-/// DealLine is the source of truth for what was sold; fulfillment-side
-/// rows (JobLine, PartLine, RentalBooking pricing) denormalize.
-model DealLine {
-  id          String       @id @default(cuid())
-  dealId      String
-  sortOrder   Int          @default(0)
-  type        DealLineType
-  description String
-  qty         Float        @default(1)
-  unitPrice   Int          @default(0)
-  total       Int          @default(0)
-  partId      String?
-  vehicleId   String? // For RENTAL_DAY lines
-
-  createdAt DateTime @default(now())
-
-  deal    Deal     @relation(fields: [dealId], references: [id], onDelete: Cascade)
-  part    Part?    @relation(fields: [partId], references: [id], onDelete: SetNull)
-  vehicle Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-
-  @@index([dealId, sortOrder])
-  @@index([type])
-  @@index([partId])
-}
+// DealLine model removed (refactor 2026-05-18). The active non-SUPERSEDED
+// Estimate's EstimateLine[] is now the single source of truth for "what is
+// being sold" on a deal. Deal.subtotal*/total stay denormalized for list
+// pages; recompute reads from the active estimate.
 
 /// Estimate is a frozen sales document attached to a Deal. A Deal may have
 /// 0..N estimates (revisions chain via parentEstimateId). Money on an
@@ -1198,16 +1229,56 @@ model CommunicationLog {
   outcome        CommOutcome @default(N_A)
   body           String? // Message text or call summary
   durationSec    Int? // For calls
-  externalId     String? // smsc.ru msg id, future webhook id
+  // Provider message id (smsc.ru, Resend Message-Id header for email). @unique
+  // makes the inbound webhook idempotent against duplicate delivery. Nullable
+  // — most non-email rows leave it null; PG treats multiple NULLs as distinct.
+  externalId     String?     @unique
+  // Email-only fields. Populated for EMAIL_INBOUND/EMAIL_OUTBOUND, null otherwise.
+  subject        String?
+  resendEmailId  String? // Resend's UUID — required for the attachment proxy
+  attachments    Json        @default("[]") // [{ id, filename, content_type, content_disposition, content_id? }]
   createdAt      DateTime    @default(now())
 
-  customer User  @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
-  author   User? @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
-  deal     Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  customer            User           @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  author              User?          @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  deal                Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  linkedInboxMessages InboxMessage[] @relation("InboxLinkedCommLog")
 
   @@index([customerUserId, createdAt])
   @@index([dealId])
   @@index([channel])
+  @@index([resendEmailId])
+}
+
+/// Bucket for inbound emails from unknown senders (no User.email match, no
+/// In-Reply-To match). Managers triage from /admin/crm/inbox: link to a
+/// customer, create a new customer, mark spam, or archive. Linking copies
+/// the row into CommunicationLog (channel EMAIL_INBOUND) and flips status
+/// to ASSIGNED — the InboxMessage row itself is never deleted (audit).
+model InboxMessage {
+  id                       String             @id @default(cuid())
+  fromEmail                String
+  fromName                 String?
+  toEmail                  String
+  subject                  String
+  bodyText                 String?
+  bodyHtml                 String?
+  attachments              Json               @default("[]")
+  messageId                String             @unique
+  inReplyTo                String?
+  references               String[]           @default([])
+  resendEmailId            String             @unique
+  receivedAt               DateTime           @default(now())
+  status                   InboxMessageStatus @default(PENDING)
+  assignedToUserId         String?
+  linkedCommunicationLogId String?
+
+  assignedTo             User?             @relation("InboxAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  linkedCommunicationLog CommunicationLog? @relation("InboxLinkedCommLog", fields: [linkedCommunicationLogId], references: [id], onDelete: SetNull)
+
+  @@index([status, receivedAt])
+  @@index([inReplyTo])
+  @@index([fromEmail])
 }
 
 /// CRM task — a reminder/follow-up assigned to a manager. May be linked

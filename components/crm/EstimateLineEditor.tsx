@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useRef, useState, useTransition } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Alert, Button, Input } from "@/components/ui";
 import {
   addEstimateLine,
@@ -28,6 +29,7 @@ interface Props {
 }
 
 const LINE_TYPES = ["LABOR", "PART", "RENTAL_DAY", "DISCOUNT", "FEE"];
+const SAVE_DEBOUNCE_MS = 800;
 
 interface Draft {
   type: string;
@@ -35,8 +37,6 @@ interface Draft {
   qty: string;
   unitPrice: string;
 }
-
-const EMPTY: Draft = { type: "LABOR", description: "", qty: "1", unitPrice: "" };
 
 function draftFrom(line: EstimateLineView): Draft {
   return {
@@ -54,34 +54,54 @@ function rowTotal(d: Draft): number {
   return Math.round(qty * signed);
 }
 
+type SaveStatus = "clean" | "dirty" | "saving" | "saved" | "error";
+
 /**
- * DRAFT-only line editor for an Estimate. Mirrors DealLineEditor — the
- * two are deliberately separate components so they can diverge as
- * estimate-side rules evolve (e.g. supersede-on-edit semantics that the
- * deal side will never need).
+ * DRAFT-only line editor for an Estimate. Every change to a row is
+ * debounced-autosaved (~800ms after the last keystroke). A compact status
+ * indicator at the top of the editor surfaces in-flight / saved / error
+ * states — no per-row Save buttons.
  *
- * Edits write to EstimateLine only; the parent Deal and its DealLine[]
- * are untouched (snapshot contract).
+ * Add and delete are still single-shot transitions.
  */
 export function EstimateLineEditor({
   estimateId,
   initialLines,
   editable,
 }: Props): React.ReactElement {
-  const [showAdd, setShowAdd] = useState(initialLines.length === 0 && editable);
+  const [rowStatuses, setRowStatuses] = useState<Map<string, SaveStatus>>(
+    new Map(),
+  );
+
+  function reportRowStatus(id: string, status: SaveStatus): void {
+    setRowStatuses((prev) => {
+      const next = new Map(prev);
+      if (status === "clean") next.delete(id);
+      else next.set(id, status);
+      return next;
+    });
+  }
+
+  const aggregate = aggregateStatus(rowStatuses);
 
   return (
     <div className="space-y-4">
+      {editable ? <StatusBadge status={aggregate} /> : null}
+
       {initialLines.length === 0 ? (
         <p className="text-sm text-[var(--foreground-muted)]">
-          {editable ? "В смете ещё нет позиций." : "Смета пуста."}
+          {editable ? "В смете ещё нет позиций — нажмите «Добавить строку»." : "Смета пуста."}
         </p>
       ) : (
         <ul className="space-y-3">
           {initialLines.map((line, i) => (
             <li key={line.id}>
               {editable ? (
-                <EditRow line={line} index={i} />
+                <EditRow
+                  line={line}
+                  index={i}
+                  onStatusChange={(s) => reportRowStatus(line.id, s)}
+                />
               ) : (
                 <ReadOnlyRow line={line} index={i} />
               )}
@@ -90,24 +110,35 @@ export function EstimateLineEditor({
         </ul>
       )}
 
-      {editable && showAdd ? (
-        <AddRow
-          estimateId={estimateId}
-          index={initialLines.length}
-          onCancel={() => setShowAdd(false)}
-          allowCancel={initialLines.length > 0}
-        />
-      ) : editable ? (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          leftIcon={<Plus size={14} />}
-          onClick={() => setShowAdd(true)}
-        >
-          Добавить строку
-        </Button>
+      {editable ? (
+        <AddLineButton estimateId={estimateId} />
       ) : null}
+    </div>
+  );
+}
+
+function aggregateStatus(statuses: Map<string, SaveStatus>): SaveStatus {
+  if (statuses.size === 0) return "clean";
+  const vals = Array.from(statuses.values());
+  if (vals.includes("error")) return "error";
+  if (vals.includes("saving")) return "saving";
+  if (vals.includes("dirty")) return "dirty";
+  if (vals.includes("saved")) return "saved";
+  return "clean";
+}
+
+function StatusBadge({ status }: { status: SaveStatus }): React.ReactElement | null {
+  if (status === "clean") return null;
+  const config = {
+    dirty: { Icon: Loader2, text: "Не сохранено", className: "text-[var(--foreground-muted)]" },
+    saving: { Icon: Loader2, text: "Сохраняем…", className: "text-[var(--foreground-muted)] animate-pulse" },
+    saved: { Icon: Check, text: "Сохранено", className: "text-[var(--color-accent)]" },
+    error: { Icon: TriangleAlert, text: "Ошибка сохранения", className: "text-[var(--color-error)]" },
+  }[status];
+  return (
+    <div className={`flex items-center gap-1.5 text-xs ${config.className}`} role="status">
+      <config.Icon size={12} aria-hidden />
+      <span>{config.text}</span>
     </div>
   );
 }
@@ -115,14 +146,97 @@ export function EstimateLineEditor({
 function EditRow({
   line,
   index,
+  onStatusChange,
 }: {
   line: EstimateLineView;
   index: number;
+  onStatusChange: (s: SaveStatus) => void;
 }): React.ReactElement {
-  const [state, formAction, isPending] = useActionState(updateEstimateLine, null);
-  const [isDeleting, startDelete] = useTransition();
+  const router = useRouter();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(line));
-  const total = rowTotal(draft);
+  const [error, setError] = useState<string | null>(null);
+  const [isDeleting, startDelete] = useTransition();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlightRef = useRef(false);
+  const lastSavedRef = useRef<Draft>(draftFrom(line));
+  const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-sync local draft when the parent re-fetches (e.g. after add/delete).
+  // Avoid clobbering edits-in-flight: only reset when the prop changes AND
+  // the local draft matches the last known saved state.
+  useEffect(() => {
+    if (!isDraftDirty(draft, lastSavedRef.current)) {
+      const fresh = draftFrom(line);
+      setDraft(fresh);
+      lastSavedRef.current = fresh;
+    }
+    // We only care about line.id stability — qty/price refresh shouldn't fight
+    // the user's in-flight edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [line.id]);
+
+  // Debounced auto-save: whenever draft differs from last-saved, schedule a
+  // save 800ms after the most recent keystroke.
+  useEffect(() => {
+    if (!isDraftDirty(draft, lastSavedRef.current)) return;
+
+    if (!draft.description.trim()) {
+      // Empty description is invalid — server would reject. Stay dirty
+      // silently; once the user fills it in we'll attempt.
+      onStatusChange("dirty");
+      return;
+    }
+
+    onStatusChange("dirty");
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      void doSave();
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+    // doSave is a stable inline closure; we intentionally don't depend on it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
+
+  async function doSave(): Promise<void> {
+    if (inFlightRef.current) {
+      // Another save already mid-flight; schedule a retry after it returns
+      // by leaving the timer null — the next keystroke will re-arm it.
+      return;
+    }
+    inFlightRef.current = true;
+    onStatusChange("saving");
+    setError(null);
+    try {
+      const fd = new FormData();
+      fd.set("estimateLineId", line.id);
+      fd.set("description", draft.description);
+      fd.set("type", draft.type);
+      fd.set("qty", draft.qty);
+      fd.set("unitPrice", draft.unitPrice);
+      const result = await updateEstimateLine(null, fd);
+      if (result.error) {
+        setError(result.error);
+        onStatusChange("error");
+        return;
+      }
+      lastSavedRef.current = { ...draft };
+      onStatusChange("saved");
+      // Brief "Сохранено" flash, then clean.
+      if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
+      savedFlashRef.current = setTimeout(() => onStatusChange("clean"), 1500);
+      // Re-fetch parent so totals stay accurate; debounce-friendly because
+      // recomputeDealTotals cascades.
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Не удалось сохранить");
+      onStatusChange("error");
+    } finally {
+      inFlightRef.current = false;
+    }
+  }
 
   function update<K extends keyof Draft>(key: K, value: Draft[K]): void {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -131,87 +245,79 @@ function EditRow({
   function handleDelete(): void {
     if (!confirm("Удалить строку?")) return;
     startDelete(async () => {
+      onStatusChange("clean");
       await deleteEstimateLine(line.id);
+      router.refresh();
     });
   }
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="estimateLineId" value={line.id} />
+    <div>
       <RowFields
         index={index}
         draft={draft}
-        rowTotal={total}
+        rowTotal={rowTotal(draft)}
         canRemove
         onChange={update}
         onRemove={handleDelete}
         removeDisabled={isDeleting}
       />
-      {state?.error ? (
+      {error ? (
         <div className="mt-2">
-          <Alert variant="error">{state.error}</Alert>
+          <Alert variant="error">{error}</Alert>
         </div>
       ) : null}
-      <div className="mt-2 flex justify-end">
-        <Button
-          type="submit"
-          variant="secondary"
-          size="sm"
-          isLoading={isPending}
-          disabled={isPending || isDeleting}
-        >
-          Сохранить
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }
 
-function AddRow({
-  estimateId,
-  index,
-  onCancel,
-  allowCancel,
-}: {
-  estimateId: string;
-  index: number;
-  onCancel: () => void;
-  allowCancel: boolean;
-}): React.ReactElement {
-  const [state, formAction, isPending] = useActionState(addEstimateLine, null);
-  const [draft, setDraft] = useState<Draft>({ ...EMPTY });
-  const total = rowTotal(draft);
-  const descRef = useRef<HTMLInputElement | null>(null);
+function isDraftDirty(a: Draft, b: Draft): boolean {
+  return (
+    a.type !== b.type ||
+    a.description !== b.description ||
+    a.qty !== b.qty ||
+    a.unitPrice !== b.unitPrice
+  );
+}
 
-  function update<K extends keyof Draft>(key: K, value: Draft[K]): void {
-    setDraft((prev) => ({ ...prev, [key]: value }));
+function AddLineButton({ estimateId }: { estimateId: string }): React.ReactElement {
+  const router = useRouter();
+  const [pending, startAdd] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleAdd(): void {
+    setError(null);
+    startAdd(async () => {
+      const fd = new FormData();
+      fd.set("estimateId", estimateId);
+      fd.set("type", "LABOR");
+      fd.set("description", "Новая позиция");
+      fd.set("qty", "1");
+      fd.set("unitPrice", "0");
+      const result = await addEstimateLine(null, fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.refresh();
+    });
   }
 
   return (
-    <form action={formAction}>
-      <input type="hidden" name="estimateId" value={estimateId} />
-      <RowFields
-        index={index}
-        draft={draft}
-        rowTotal={total}
-        canRemove={allowCancel}
-        onChange={update}
-        onRemove={onCancel}
-        removeIcon="x"
-        removeLabel="Отменить добавление"
-        descriptionRef={descRef}
-      />
-      {state?.error ? (
-        <div className="mt-2">
-          <Alert variant="error">{state.error}</Alert>
-        </div>
-      ) : null}
-      <div className="mt-2 flex justify-end">
-        <Button type="submit" size="sm" isLoading={isPending} disabled={isPending}>
-          Добавить
-        </Button>
-      </div>
-    </form>
+    <div className="space-y-2">
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        leftIcon={<Plus size={14} />}
+        onClick={handleAdd}
+        isLoading={pending}
+        disabled={pending}
+      >
+        Добавить строку
+      </Button>
+      {error ? <Alert variant="error">{error}</Alert> : null}
+    </div>
   );
 }
 
@@ -248,10 +354,7 @@ interface RowFieldsProps {
   canRemove: boolean;
   onChange: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   onRemove: () => void;
-  removeIcon?: "trash" | "x";
-  removeLabel?: string;
   removeDisabled?: boolean;
-  descriptionRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 function RowFields({
@@ -261,14 +364,8 @@ function RowFields({
   canRemove,
   onChange,
   onRemove,
-  removeIcon = "trash",
-  removeLabel,
   removeDisabled,
-  descriptionRef,
 }: RowFieldsProps): React.ReactElement {
-  const RemoveIcon = removeIcon === "x" ? X : Trash2;
-  const ariaRemove = removeLabel ?? `Удалить строку #${index + 1}`;
-
   return (
     <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--card)] overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3 border-b border-[var(--border)]">
@@ -279,7 +376,6 @@ function RowFields({
           #{index + 1}
         </span>
         <select
-          name="type"
           value={draft.type}
           onChange={(e) => onChange("type", e.target.value)}
           aria-label="Тип строки"
@@ -292,8 +388,6 @@ function RowFields({
           ))}
         </select>
         <input
-          ref={descriptionRef ?? undefined}
-          name="description"
           value={draft.description}
           onChange={(e) => onChange("description", e.target.value)}
           className="input flex-1 text-sm"
@@ -307,9 +401,9 @@ function RowFields({
             onClick={onRemove}
             disabled={removeDisabled}
             className="btn-icon"
-            aria-label={ariaRemove}
+            aria-label={`Удалить строку #${index + 1}`}
           >
-            <RemoveIcon size={14} />
+            <Trash2 size={14} />
           </button>
         ) : null}
       </div>
@@ -317,7 +411,6 @@ function RowFields({
       <div className="p-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Input
           label={draft.type === "LABOR" ? "Часы" : draft.type === "RENTAL_DAY" ? "Дни" : "Кол-во"}
-          name="qty"
           type="number"
           step="0.25"
           min="0"
@@ -328,7 +421,6 @@ function RowFields({
         />
         <Input
           label={draft.type === "LABOR" ? "Ставка ₽/ч" : "Цена ₽"}
-          name="unitPrice"
           type="number"
           inputMode="numeric"
           value={draft.unitPrice}

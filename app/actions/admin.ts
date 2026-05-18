@@ -36,7 +36,7 @@ export async function updateRepairOrderStatus(
   await requireRole(["ADMIN", "MANAGER"]);
 
   const updateData: Record<string, unknown> = { status: newStatus };
-  if (newStatus === "PAID" || newStatus === "CLOSED") {
+  if (newStatus === "COMPLETED") {
     updateData.completedAt = new Date();
   }
 

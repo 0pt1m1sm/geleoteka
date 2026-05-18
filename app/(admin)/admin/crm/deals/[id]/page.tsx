@@ -6,15 +6,12 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime, formatPrice } from "@/lib/utils";
-import {
-  DEAL_CHANNEL_LABELS,
-  isOpenStage,
-} from "@/lib/deal-stage-labels";
-import { DealLineEditor } from "@/components/crm/DealLineEditor";
+import { DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
 import { DealStageChanger } from "@/components/crm/DealStageChanger";
 import { EstimatesSection } from "@/components/crm/EstimatesSection";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
+import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -38,15 +35,6 @@ interface DealDetail {
   customer: { id: string; name: string; phone: string; email: string };
   vehicle: { id: string; make: string; model: string; year: number; vin: string | null } | null;
   owner: { id: string; name: string } | null;
-  dealLines: Array<{
-    id: string;
-    type: string;
-    description: string;
-    qty: number;
-    unitPrice: number;
-    total: number;
-    sortOrder: number;
-  }>;
   repairOrders: Array<{ id: string; roNumber: string | null; status: string; dateTime: Date }>;
   partOrders: Array<{ id: string; status: string; total: number }>;
   rentalBookings: Array<{ id: string; status: string; startDate: Date; endDate: Date }>;
@@ -68,6 +56,9 @@ interface DealDetail {
     createdAt: Date;
     author: { id: string; name: string } | null;
     deal: { id: string; number: string | null } | null;
+    subject: string | null;
+    resendEmailId: string | null;
+    attachments: unknown;
   }>;
   tasks: Array<{
     id: string;
@@ -110,18 +101,6 @@ export default async function CrmDealDetailPage({ params }: Props) {
       customer: { select: { id: true, name: true, phone: true, email: true } },
       vehicle: { select: { id: true, make: true, model: true, year: true, vin: true } },
       owner: { select: { id: true, name: true } },
-      dealLines: {
-        orderBy: { sortOrder: "asc" },
-        select: {
-          id: true,
-          type: true,
-          description: true,
-          qty: true,
-          unitPrice: true,
-          total: true,
-          sortOrder: true,
-        },
-      },
       repairOrders: {
         select: { id: true, roNumber: true, status: true, dateTime: true },
         orderBy: { dateTime: "desc" },
@@ -156,6 +135,9 @@ export default async function CrmDealDetailPage({ params }: Props) {
           createdAt: true,
           author: { select: { id: true, name: true } },
           deal: { select: { id: true, number: true } },
+          subject: true,
+          resendEmailId: true,
+          attachments: true,
         },
         orderBy: { createdAt: "desc" },
         take: 50,
@@ -181,7 +163,10 @@ export default async function CrmDealDetailPage({ params }: Props) {
   })) as DealDetail | null;
   if (!deal) notFound();
 
-  const editable = isOpenStage(deal.stage);
+  // The "active" estimate is whichever non-SUPERSEDED row recompute-deal-totals
+  // would pick — for UI purposes, just take the first by createdAt-desc that
+  // isn't SUPERSEDED. Most deals have exactly one active estimate at a time.
+  const activeEstimate = deal.estimates.find((e) => e.stage !== "SUPERSEDED") ?? null;
 
   return (
     <div>
@@ -203,17 +188,32 @@ export default async function CrmDealDetailPage({ params }: Props) {
         <div className="space-y-4">
           <Card>
             <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="font-semibold">Позиции сделки</h3>
-              <span className="text-xs text-[var(--foreground-muted)]">
-                {editable ? "Можно редактировать" : "Только просмотр"}
-              </span>
+              <h3 className="font-semibold">Активная смета</h3>
+              {activeEstimate ? (
+                <Link
+                  href={`/admin/crm/estimates/${activeEstimate.id}`}
+                  className="text-xs text-[var(--color-accent)] hover:underline"
+                >
+                  Открыть смету →
+                </Link>
+              ) : null}
             </div>
-            <DealLineEditor
-              dealId={deal.id}
-              initialLines={deal.dealLines}
-              editable={editable}
-            />
-            <DealTotals deal={deal} />
+            {activeEstimate ? (
+              <div className="text-sm space-y-1">
+                <div className="text-[var(--foreground-muted)]">
+                  {ESTIMATE_STAGE_LABELS[activeEstimate.stage] ?? activeEstimate.stage}
+                  {activeEstimate.number ? ` · ${activeEstimate.number}` : ""}
+                  {activeEstimate.sentAt
+                    ? ` · отпр. ${formatDateTime(activeEstimate.sentAt)}`
+                    : ` · созд. ${formatDateTime(activeEstimate.createdAt)}`}
+                </div>
+                <DealTotals deal={deal} />
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--foreground-muted)]">
+                Активной сметы нет — используйте кнопку ниже.
+              </p>
+            )}
           </Card>
 
           <Card>
@@ -228,7 +228,22 @@ export default async function CrmDealDetailPage({ params }: Props) {
             <CommunicationLogger
               customerUserId={deal.customer.id}
               dealId={deal.id}
-              initialEntries={deal.communicationLogs}
+              customerEmail={deal.customer.email}
+              initialEntries={deal.communicationLogs.map((e) => ({
+                id: e.id,
+                channel: e.channel,
+                outcome: e.outcome,
+                body: e.body,
+                durationSec: e.durationSec,
+                createdAt: e.createdAt,
+                author: e.author,
+                deal: e.deal,
+                subject: e.subject,
+                resendEmailId: e.resendEmailId,
+                attachments: Array.isArray(e.attachments)
+                  ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)
+                  : [],
+              }))}
             />
           </Card>
 

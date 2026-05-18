@@ -12,7 +12,11 @@
     "verify-vehicle-trims": "tsx scripts/verify-vehicle-trims.ts",
     "verify-cms": "tsx scripts/verify-cms.ts",
     "verify-customer-onboarding": "tsx scripts/verify-customer-onboarding.ts",
-    "verify-customers": "tsx scripts/verify-customers.ts"
+    "verify-customers": "tsx scripts/verify-customers.ts",
+    "verify-email-log": "tsx scripts/verify-email-log.ts",
+    "verify-email-inbound": "tsx scripts/verify-email-inbound.ts",
+    "verify-email-resolve": "tsx scripts/verify-email-resolve.ts",
+    "verify-deal-estimate": "tsx scripts/verify-deal-estimate.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -128,9 +128,72 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       return created;
     });
 
+    const orderId = (order as Record<string, unknown>).id as string;
+
+    if (contactEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+      // cabinetUrl is meaningful only for logged-in customers — guests have no
+      // working deep-link to /cabinet without going through PostCheckoutAuthPanel
+      // at submit time (see TD-003). Points at the orders list — there is no
+      // /cabinet/orders/[id] detail page in this iteration.
+      const cabinetUrl = session?.id ? `${appUrl}/cabinet/orders` : undefined;
+      const emailItems = orderItems.map((row) => {
+        const part = partMap.get(row.partId) as Record<string, unknown> | undefined;
+        return {
+          name: (part?.name as string) ?? "Запчасть",
+          qty: row.quantity,
+          unitPrice: row.unitPrice,
+          total: row.unitPrice * row.quantity,
+        };
+      });
+      const {
+        sendPartOrderConfirmationEmail,
+        generateOutboundMessageId,
+        recordOutboundEmail,
+        markOutboundEmailFailed,
+        markOutboundEmailSent,
+        isPlausibleEmail,
+      } = await import("@/lib/email");
+      const subject = "Geleoteka — заказ запчастей принят";
+      const itemSummary = emailItems
+        .slice(0, 10)
+        .map((it) => `${it.name} × ${it.qty}`)
+        .join("; ");
+      const bodyText = `Здравствуйте, ${contactName}. Ваш заказ №${orderId.slice(-6).toUpperCase()} принят. Позиции: ${itemSummary}. Сумма: ${(total / 100).toLocaleString("ru-RU")} ₽.`;
+      const messageId = generateOutboundMessageId();
+      if (isPlausibleEmail(contactEmail)) {
+        await recordOutboundEmail({
+          customerUserId: guestResult.userId,
+          dealId: deal.id,
+          subject,
+          body: bodyText,
+          messageId,
+        });
+      }
+      void sendPartOrderConfirmationEmail(
+        contactEmail,
+        {
+          customerName: contactName,
+          orderId,
+          items: emailItems,
+          total,
+          contactPhone: normalizedPhone,
+          cabinetUrl,
+        },
+        { messageId },
+      )
+        .then((result) => {
+          if (!result.success) return markOutboundEmailFailed(messageId, result.error);
+          return markOutboundEmailSent(messageId);
+        })
+        .catch((err) =>
+          markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
+        );
+    }
+
     return {
       success: true,
-      orderId: (order as Record<string, unknown>).id as string,
+      orderId,
       userId: guestResult.userId,
       isReturningCustomer: guestResult.isReturning && guestResult.hasRealPassword,
       claimToken,

@@ -54,7 +54,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
   const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "active";
   const stages = STAGE_GROUPS[stageKey];
 
-  const [estimates, customers] = await Promise.all([
+  const [estimates, customers, dealsWithoutEstimate] = await Promise.all([
     db.estimate.findMany({
       where: { stage: { in: stages as never[] } },
       orderBy: { createdAt: "desc" },
@@ -91,6 +91,35 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
         },
       },
     }) as Promise<CustomerOption[]>,
+    // Empty-state helper: when the manager opens "Сметы" on a fresh DB,
+    // surface the open deals that don't have an estimate yet so they have a
+    // direct path forward instead of "Смета создаётся внутри сделки..."
+    // dead-end. Cheap because the deal count is small.
+    db.deal.findMany({
+      where: {
+        stage: { in: ["DRAFT", "QUOTED"] },
+        estimates: { none: {} },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 20,
+      select: {
+        id: true,
+        channel: true,
+        total: true,
+        updatedAt: true,
+        customer: { select: { name: true } },
+        vehicle: { select: { make: true, model: true } },
+      },
+    }) as Promise<
+      Array<{
+        id: string;
+        channel: string;
+        total: number;
+        updatedAt: Date;
+        customer: { name: string };
+        vehicle: { make: string; model: string } | null;
+      }>
+    >,
   ]);
 
   return (
@@ -98,7 +127,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
       <PageHeader
         eyebrow="CRM · Коммерция"
         title="Сметы"
-        description="Смета создаётся внутри сделки. Начните с новой сделки или откройте существующую."
+        description="Все сметы по всем сделкам. Каждая смета привязана к одной сделке — открыть, скачать PDF или пересмотреть можно из карточки сметы."
         actions={<NewDealDialog customers={customers} />}
       />
 
@@ -111,9 +140,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
       </div>
 
       {estimates.length === 0 ? (
-        <Card className="text-center py-12">
-          <p className="text-[var(--foreground-muted)]">Смет нет.</p>
-        </Card>
+        <EmptyState deals={dealsWithoutEstimate} stageLabel={stageKey} />
       ) : (
         <ul className="space-y-3">
           {estimates.map((est) => (
@@ -154,6 +181,72 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
         </ul>
       )}
     </div>
+  );
+}
+
+interface DealRow {
+  id: string;
+  channel: string;
+  total: number;
+  updatedAt: Date;
+  customer: { name: string };
+  vehicle: { make: string; model: string } | null;
+}
+
+function EmptyState({ deals, stageLabel }: { deals: DealRow[]; stageLabel: string }): React.ReactElement {
+  // No estimates AND no open deals — true blank slate.
+  if (deals.length === 0) {
+    return (
+      <Card className="text-center py-12 space-y-2">
+        <p className="text-[var(--foreground-muted)]">Смет нет в этом разделе.</p>
+        {stageLabel === "active" ? (
+          <p className="text-xs text-[var(--foreground-muted)]">
+            Создайте сделку — смета формируется из её позиций.
+          </p>
+        ) : null}
+      </Card>
+    );
+  }
+  // We're showing the empty-state CTA only on the "active" tab; other tabs
+  // (Согласованы / Отклонены / Архив) keep the plain "Смет нет" message above.
+  if (stageLabel !== "active") {
+    return (
+      <Card className="text-center py-12">
+        <p className="text-[var(--foreground-muted)]">Смет нет в этом разделе.</p>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <h3 className="font-semibold mb-1">Открытые сделки без сметы</h3>
+      <p className="text-sm text-[var(--foreground-muted)] mb-3">
+        Откройте сделку и нажмите «Новая смета» в карточке «Сметы».
+      </p>
+      <ul className="divide-y divide-[var(--border)]">
+        {deals.map((d) => (
+          <li key={d.id}>
+            <Link
+              href={`/admin/crm/deals/${d.id}`}
+              className="flex items-start justify-between gap-4 py-3 hover:bg-[var(--card-hover)] -mx-3 px-3 rounded"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">
+                  {d.customer.name}
+                  {d.vehicle ? ` · ${d.vehicle.make} ${d.vehicle.model}` : ""}
+                </div>
+                <div className="mt-0.5 text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3">
+                  <span>{d.channel}</span>
+                  <span>обновлено {formatDate(d.updatedAt)}</span>
+                </div>
+              </div>
+              <div className="text-right shrink-0 text-sm tabular-nums">
+                {formatPrice(d.total)}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

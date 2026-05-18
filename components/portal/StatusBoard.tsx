@@ -11,14 +11,7 @@ interface Appointment {
   services: string[];
 }
 
-const STATUS_ORDER = [
-  "ESTIMATE",
-  "APPROVED",
-  "IN_PROGRESS",
-  "AWAITING_PARTS",
-  "QC",
-  "READY",
-];
+const STATUS_ORDER = ["SCHEDULED", "IN_PROGRESS", "READY", "COMPLETED"];
 
 async function fetchStatus(id: string): Promise<{ status: string }> {
   const res = await fetch(`/api/repair-orders/${id}/status`);

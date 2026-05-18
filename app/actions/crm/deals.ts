@@ -4,8 +4,6 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { recomputeDealTotals } from "@/lib/crm/internal/recompute-deal-totals";
-import { signedLineTotal } from "@/lib/crm/internal/signed-line-total";
 import { createDeal as createDealPublic } from "@/lib/crm/public/create-deal";
 
 interface DealMutationResult {
@@ -61,99 +59,10 @@ export async function createDealManually(
   redirect(`/admin/crm/deals/${deal.id}`);
 }
 
-export async function addDealLine(
-  _prevState: DealMutationResult | null,
-  formData: FormData,
-): Promise<DealMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
-
-  const dealId = formData.get("dealId") as string;
-  if (!dealId) return { error: "Не передан dealId" };
-
-  const description = ((formData.get("description") as string | null) ?? "").trim();
-  if (!description) return { error: "Введите описание" };
-
-  const type = ((formData.get("type") as string | null) ?? "LABOR").trim();
-  const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
-  const rawUnitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
-  const partId = ((formData.get("partId") as string | null) ?? "").trim() || null;
-
-  const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
-
-  const last = await db.dealLine.findFirst({
-    where: { dealId },
-    orderBy: { sortOrder: "desc" },
-    select: { sortOrder: true },
-  });
-  const sortOrder = last ? (last as { sortOrder: number }).sortOrder + 1 : 0;
-
-  await db.dealLine.create({
-    data: {
-      dealId,
-      sortOrder,
-      type: type as never,
-      description,
-      qty,
-      unitPrice,
-      total,
-      partId,
-    },
-  });
-
-  await recomputeDealTotals(dealId);
-  revalidatePath(`/admin/crm/deals/${dealId}`);
-  return { error: null, success: true };
-}
-
-export async function updateDealLine(
-  _prevState: DealMutationResult | null,
-  formData: FormData,
-): Promise<DealMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
-
-  const id = formData.get("dealLineId") as string;
-  if (!id) return { error: "Не передан dealLineId" };
-
-  const existing = (await db.dealLine.findUnique({
-    where: { id },
-    select: { dealId: true },
-  })) as { dealId: string } | null;
-  if (!existing) return { error: "Строка не найдена" };
-
-  const description = ((formData.get("description") as string | null) ?? "").trim();
-  if (!description) return { error: "Введите описание" };
-  const type = ((formData.get("type") as string | null) ?? "LABOR").trim();
-  const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
-  const rawUnitPrice = Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
-  const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
-
-  await db.dealLine.update({
-    where: { id },
-    data: {
-      description,
-      type: type as never,
-      qty,
-      unitPrice,
-      total,
-    },
-  });
-
-  await recomputeDealTotals(existing.dealId);
-  revalidatePath(`/admin/crm/deals/${existing.dealId}`);
-  return { error: null, success: true };
-}
-
-export async function deleteDealLine(dealLineId: string): Promise<void> {
-  await requireRole(["ADMIN", "MANAGER"]);
-  const existing = (await db.dealLine.findUnique({
-    where: { id: dealLineId },
-    select: { dealId: true },
-  })) as { dealId: string } | null;
-  if (!existing) return;
-  await db.dealLine.delete({ where: { id: dealLineId } });
-  await recomputeDealTotals(existing.dealId);
-  revalidatePath(`/admin/crm/deals/${existing.dealId}`);
-}
+// addDealLine / updateDealLine / deleteDealLine were removed in the
+// 2026-05-18 refactor. The deal page no longer edits lines directly —
+// everything lives on the active Estimate now (see
+// app/actions/crm/estimate-lines.ts).
 
 interface SetStageResult {
   error: string | null;
