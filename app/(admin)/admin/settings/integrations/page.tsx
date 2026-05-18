@@ -52,14 +52,14 @@ export default async function IntegrationsSettingsPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div>
       <PageHeader
         eyebrow="Настройки"
         title="Интеграции"
         description="Секреты и креды для внешних сервисов. Изменения подхватываются всеми инстансами в течение 60 сек, без перезапуска. Пустое значение возвращает fallback на переменную окружения."
       />
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         {Array.from(groups.entries()).map(([groupName, descriptors]) => {
           const fields = descriptors.map((s) => {
             const envName = s.envFallback ?? s.key;
