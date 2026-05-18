@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
+import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 
 export interface UpsertSettingsResult {
   error: string | null;
@@ -11,7 +12,7 @@ export interface UpsertSettingsResult {
   savedKeys?: string[];
 }
 
-const PLACEHOLDER = "••••••";
+const PLACEHOLDER = SECRET_PLACEHOLDER;
 
 /**
  * Bulk-upsert a group of settings — one Save button per integration card.
@@ -59,4 +60,3 @@ export async function upsertSettings(
   return { ok: true, error: null, savedKeys };
 }
 
-export const SECRET_PLACEHOLDER = PLACEHOLDER;

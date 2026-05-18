@@ -3,7 +3,8 @@
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Input } from "@/components/ui";
-import { upsertSettings, SECRET_PLACEHOLDER } from "@/app/actions/settings";
+import { upsertSettings } from "@/app/actions/settings";
+import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 import type { SettingDescriptor } from "@/lib/settings";
 
 interface FieldState {

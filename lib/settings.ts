@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 const CACHE = new Map<string, { value: string | null; expiresAt: number }>();
 const TTL_MS = 60_000;
 
+
 export interface SettingDescriptor {
   /** Setting key (also the DB row's `key`). */
   key: string;
