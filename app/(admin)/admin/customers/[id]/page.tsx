@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
+import { formatDate, formatPrice } from "@/lib/utils";
 import { getAllCustomerTags } from "@/lib/customer-queries";
 import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
@@ -28,14 +28,7 @@ interface RawCustomer {
   vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
   loyaltyAccount: { points: number } | null;
   customerProfile: { blacklisted: boolean; notes: string | null } | null;
-  repairOrders: Array<{
-    id: string;
-    dateTime: Date;
-    status: string;
-    total: number;
-    vehicle: { model: string };
-    jobLines: Array<{ description: string; status: string }>;
-  }>;
+  _count: { repairOrders: number };
   customerNotes: Array<{
     id: string;
     body: string;
@@ -66,14 +59,7 @@ export default async function CustomerDetailPage({ params }: Props) {
         vehicles: { where: { ownershipType: "CUSTOMER" } },
         loyaltyAccount: true,
         customerProfile: true,
-        repairOrders: {
-          include: {
-            vehicle: { select: { model: true } },
-            jobLines: { select: { description: true, status: true } },
-          },
-          orderBy: { dateTime: "desc" },
-          take: 20,
-        },
+        _count: { select: { repairOrders: true } },
         customerNotes: {
           orderBy: { createdAt: "desc" },
           take: 50,
@@ -225,7 +211,7 @@ export default async function CustomerDetailPage({ params }: Props) {
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Визиты</p>
-          <p className="text-2xl font-bold">{customer.repairOrders.length}</p>
+          <p className="text-2xl font-bold">{customer._count.repairOrders}</p>
         </div>
         <div className="card">
           <p className="text-sm text-[var(--foreground-muted)]">Баллы</p>
@@ -340,28 +326,6 @@ export default async function CustomerDetailPage({ params }: Props) {
         )}
       </div>
 
-      <h2 className="text-lg font-semibold mb-3">История заказ-нарядов</h2>
-      <div className="space-y-3">
-        {customer.repairOrders.map((ro) => (
-          <div key={ro.id} className="card">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-medium">{formatDate(ro.dateTime)}</p>
-                <p className="text-sm text-[var(--foreground-muted)]">{ro.vehicle.model}</p>
-              </div>
-              <span className={`badge text-xs status-${ro.status.toLowerCase()}`}>
-                {REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status}
-              </span>
-            </div>
-            {ro.total > 0 ? (
-              <p className="text-sm mt-2">Стоимость: {formatPrice(ro.total)}</p>
-            ) : null}
-          </div>
-        ))}
-        {customer.repairOrders.length === 0 ? (
-          <div className="card text-sm text-[var(--foreground-muted)]">— нет —</div>
-        ) : null}
-      </div>
     </div>
   );
 }
