@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 /**
  * Resend inbound (`email.received`) webhook envelope. The webhook does NOT
  * include the body or headers — those live behind a follow-up GET on
- * `/emails/{email_id}/receiving`.
+ * `/emails/receiving/{email_id}`.
  */
 export interface ResendInboundEnvelope {
   type: "email.received";
@@ -158,12 +158,12 @@ export async function fetchResendEmailContent(
   emailId: string,
   apiKey: string,
 ): Promise<ResendInboundContent> {
-  const res = await fetch(`https://api.resend.com/emails/${emailId}/receiving`, {
+  const res = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Resend GET /emails/${emailId}/receiving → ${res.status}: ${text.slice(0, 200)}`);
+    throw new Error(`Resend GET /emails/receiving/${emailId} → ${res.status}: ${text.slice(0, 200)}`);
   }
   const data = (await res.json()) as Record<string, unknown>;
   return {

@@ -60,7 +60,7 @@ export async function GET(
   if (!apiKey) return NextResponse.json({ error: "not configured" }, { status: 503 });
 
   const upstream = await fetch(
-    `https://api.resend.com/emails/${emailId}/attachments/${attachmentId}`,
+    `https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`,
     { headers: { Authorization: `Bearer ${apiKey}` } },
   );
 
