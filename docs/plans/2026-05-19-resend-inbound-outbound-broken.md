@@ -2,7 +2,7 @@
 
 Created: 2026-05-19
 Author: aspiskov@student.42abudhabi.ae
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -114,8 +114,18 @@ When `customer.email` is missing or implausible → return `{ error: "У кли�
 
 - [x] Task 1: Write Reproducing Tests (RED)
 - [x] Task 2: Implement Fix at Root Cause
-- [ ] Task 3: Quality Gate + E2E Verification on Prod
-      **Tasks:** 3 | **Done:** 2
+- [x] Task 3: Quality Gate + E2E Verification on Prod
+      **Tasks:** 3 | **Done:** 3
+
+## Verification Evidence (prod E2E)
+
+**TS-001 PASS** — clicked "Пересмотреть" → DRAFT child created → clicked "Отправить клиенту" → estimate stage = SENT, no error. Customer page `/admin/customers/cmoxwethf0000mr0plhvi9pcs` now shows a **NEW** `EMAIL_OUTBOUND · Доставлено` row at `02:50` (was 1 row, now 2). "Доставлено" status confirms Resend send returned 200 and `markOutboundEmailSent` flipped the row.
+
+**TS-002 PASS** — user sent fresh email from a.m.spiskov@gmail.com → info@geleoteka.ru. `/admin/settings/inbound-log` shows new entry at `22:52`: "✓ Принято (известный клиент)". This proves the full inbound chain: webhook delivery → HMAC verify → `fetchResendEmailContent` with new path `/emails/receiving/{id}` returned 200 → `resolveInboundEmail` matched the known customer → CommunicationLog row written. No 502 / 405.
+
+Commits:
+- `8885e8e fix(email): correct Resend inbound API path` (path was `/emails/{id}/receiving`, now `/emails/receiving/{id}`)
+- `3270420 fix(crm): sendEstimate silent-skip — always dispatch outbound`
 
 ## Tasks
 

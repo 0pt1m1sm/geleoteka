@@ -21,7 +21,7 @@ interface OpenDealRow {
   customer: { id: string; name: string };
 }
 
-const OPEN_DEAL_STAGES = ["DRAFT", "QUOTED", "APPROVED", "IN_FULFILLMENT", "DELIVERED"] as const;
+const OPEN_DEAL_STAGES = ["NEW", "IN_PROGRESS"] as const;
 
 export default async function AdminDashboard() {
   const session = await getSession();
