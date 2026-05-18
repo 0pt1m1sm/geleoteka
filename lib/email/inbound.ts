@@ -36,8 +36,8 @@ export interface ResendInboundContent {
   attachments?: ResendInboundAttachment[];
 }
 
-/** Hardcoded info@geleoteka.ru recipient filter — the only address we listen on. */
-const ALLOWED_RECIPIENT = "info@geleoteka.ru";
+/** Default recipient when no INBOUND_EMAIL setting is configured. */
+export const DEFAULT_INBOUND_RECIPIENT = "info@geleoteka.ru";
 const MAX_CLOCK_SKEW_SEC = 5 * 60;
 
 interface VerifyInput {
@@ -110,9 +110,12 @@ export function verifyResendWebhook(input: VerifyInput): VerifyResult {
  * `to` may be `["info@geleoteka.ru"]` or `["Geleoteka <info@geleoteka.ru>"]`.
  * Case-insensitive substring match on the allowed local-part@domain string.
  */
-export function shouldAcceptRecipient(toList: string[]): boolean {
+export function shouldAcceptRecipient(
+  toList: string[],
+  allowedRecipient: string = DEFAULT_INBOUND_RECIPIENT,
+): boolean {
   if (!toList || toList.length === 0) return false;
-  const needle = ALLOWED_RECIPIENT.toLowerCase();
+  const needle = allowedRecipient.toLowerCase();
   return toList.some((raw) => raw.toLowerCase().includes(needle));
 }
 

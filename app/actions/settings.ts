@@ -5,41 +5,58 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
 
-export interface UpsertSettingResult {
+export interface UpsertSettingsResult {
   error: string | null;
   ok: boolean;
+  savedKeys?: string[];
 }
+
+const PLACEHOLDER = "••••••";
 
 /**
- * Upsert a setting row by key. Only keys listed in KNOWN_SETTINGS are
- * accepted — prevents arbitrary key writes through a forged form.
+ * Bulk-upsert a group of settings — one Save button per integration card.
+ *
+ * Form payload is multi-key: each input's `name` is the setting key.
+ * Special value handling:
+ *   - empty string → drop the row (env-var fallback takes over)
+ *   - placeholder string ("••••••") → no-op (user didn't touch this field;
+ *     password inputs show a placeholder when a value is already set)
+ *
+ * Only keys listed in KNOWN_SETTINGS are accepted — prevents forged writes.
  */
-export async function upsertSetting(
-  _prev: UpsertSettingResult | null,
+export async function upsertSettings(
+  _prev: UpsertSettingsResult | null,
   formData: FormData,
-): Promise<UpsertSettingResult> {
+): Promise<UpsertSettingsResult> {
   const session = await requireRole(["ADMIN"]);
 
-  const key = ((formData.get("key") as string | null) ?? "").trim();
-  const value = ((formData.get("value") as string | null) ?? "").trim();
+  const knownByKey = new Map(KNOWN_SETTINGS.map((s) => [s.key, s]));
+  const savedKeys: string[] = [];
 
-  if (!key) return { ok: false, error: "Не передан ключ" };
+  for (const [rawKey, rawValue] of formData.entries()) {
+    const key = rawKey.trim();
+    if (!knownByKey.has(key)) continue; // Silently ignore unknown / framework fields.
+    const raw = (rawValue as FormDataEntryValue).toString();
+    const value = raw.trim();
 
-  const known = KNOWN_SETTINGS.find((s) => s.key === key);
-  if (!known) return { ok: false, error: `Неизвестный ключ настройки: ${key}` };
+    // Skip untouched secret fields (input held the masked placeholder).
+    if (value === PLACEHOLDER) continue;
 
-  if (!value) {
-    // Empty value = "delete" — drop the row so env-var fallback wins again.
-    await db.setting.deleteMany({ where: { key } });
-  } else {
-    await db.setting.upsert({
-      where: { key },
-      create: { key, value, updatedByUserId: session.id },
-      update: { value, updatedByUserId: session.id },
-    });
+    if (value === "") {
+      await db.setting.deleteMany({ where: { key } });
+    } else {
+      await db.setting.upsert({
+        where: { key },
+        create: { key, value, updatedByUserId: session.id },
+        update: { value, updatedByUserId: session.id },
+      });
+    }
+    invalidateSetting(key);
+    savedKeys.push(key);
   }
 
-  invalidateSetting(key);
   revalidatePath("/admin/settings/integrations");
-  return { ok: true, error: null };
+  return { ok: true, error: null, savedKeys };
 }
+
+export const SECRET_PLACEHOLDER = PLACEHOLDER;

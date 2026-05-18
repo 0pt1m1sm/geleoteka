@@ -76,7 +76,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!envelope.data || typeof envelope.data.message_id !== "string" || !Array.isArray(envelope.data.to)) {
     return NextResponse.json({ error: "malformed payload" }, { status: 400 });
   }
-  if (!shouldAcceptRecipient(envelope.data.to)) {
+  const inboundEmail = (await getSetting("INBOUND_EMAIL")) ?? undefined;
+  if (!shouldAcceptRecipient(envelope.data.to, inboundEmail)) {
     return NextResponse.json({ ignored: true, reason: "recipient" });
   }
 

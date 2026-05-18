@@ -73,6 +73,13 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
       "Resend dashboard → Webhooks → Reveal signing secret. Без неё POST /api/email/inbound в production возвращает 503 (HMAC verify не пройдёт). Формат: whsec_… (base64).",
     secret: true,
   },
+  {
+    group: "Email (Resend)",
+    key: "INBOUND_EMAIL",
+    label: "Адрес входящей почты",
+    description:
+      "Email-адрес на verified-домене, на который Resend будет отправлять webhooks для входящих писем. По умолчанию info@geleoteka.ru. Остальные адреса (sales@, billing@) игнорируются.",
+  },
 
   // ── SMS (smsc.ru) ────────────────────────────────────────────────────
   {
