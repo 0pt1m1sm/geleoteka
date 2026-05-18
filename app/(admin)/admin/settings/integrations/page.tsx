@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { KNOWN_SETTINGS, type SettingDescriptor } from "@/lib/settings";
 import { SettingGroupForm } from "@/components/admin/settings/SettingGroupForm";
+import { TestSendButton } from "@/components/admin/settings/TestSendButton";
 
 /**
  * Integration secrets page — one card per integration (Resend / SMSC /
@@ -71,12 +72,23 @@ export default async function IntegrationsSettingsPage() {
             return { descriptor: s, source };
           });
           return (
-            <SettingGroupForm
-              key={groupName}
-              groupName={groupName}
-              fields={fields}
-              infoRows={groupInfo[groupName]}
-            />
+            <div key={groupName} className="space-y-3">
+              <SettingGroupForm
+                groupName={groupName}
+                fields={fields}
+                infoRows={groupInfo[groupName]}
+              />
+              {groupName === "Email (Resend)" ? (
+                <div className="card">
+                  <h3 className="text-sm font-semibold mb-2">Диагностика</h3>
+                  <p className="text-xs text-[var(--foreground-muted)] mb-3">
+                    Отправит письмо на email вашего админ-аккаунта через текущие настройки Resend.
+                    Покажет какой API key/from использовался и что ответил Resend.
+                  </p>
+                  <TestSendButton />
+                </div>
+              ) : null}
+            </div>
           );
         })}
       </div>
