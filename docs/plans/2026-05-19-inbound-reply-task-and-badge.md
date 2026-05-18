@@ -2,7 +2,7 @@
 
 Created: 2026-05-19
 Author: aspiskov@student.42abudhabi.ae
-Status: PENDING
+Status: COMPLETE
 Approved: Yes
 Iterations: 0
 Worktree: No
@@ -190,8 +190,27 @@ Type: Feature
 - [x] Task 4: `markRepliesRead` server action + page-render integration
 - [x] Task 5: `/api/admin/replies/count` endpoint
 - [x] Task 6: `RepliesBadge` component + sidebar wiring
-- [ ] Task 7: E2E verification on prod
-      **Total Tasks:** 7 | **Completed:** 6 | **Remaining:** 1
+- [x] Task 7: E2E verification on prod
+      **Total Tasks:** 7 | **Completed:** 7 | **Remaining:** 0
+
+## Verification Evidence (prod E2E)
+
+**Commit:** `ff10f35 feat(crm): auto-task on inbound reply + nav badge for follow-ups`
+
+**TS-001 PASS** — User sent fresh email from a.m.spiskov@gmail.com → info@geleoteka.ru. Within ~30s a new CrmTask appeared on `/admin/crm/tasks?scope=open&owner=all`:
+- Title: "Ответить клиенту: Alex Alex"
+- Kind: FOLLOW_UP (rendered as "Связаться")
+- Owner: Администратор (first ADMIN fallback — Alex Alex deal has no owner)
+- dueAt: 07:29 (≈ now + 4h)
+- Body: "Клиент ответил по email. Откройте сделку и ответьте."
+
+**TS-002 PASS** — User sent a second email. Task did NOT duplicate (atomic dedup via partial unique index). Body extended in-place: `+ ещё 1 ответ 18.05.2026, 23:29:26`. After a third email the body grew to `+ ещё 1 ответ 18.05.2026, 23:29:26 + ещё 1 ответ 18.05.2026, 23:31:36`. dueAt rolled forward to 07:31. Confirms `ensureFollowUpTask` create → P2002 → findFirst+update path works under real load.
+
+**TS-003 PASS** — `GET /api/admin/replies/count` returns `{"count": 1}`. Sidebar nav (CRM expanded) shows "Задачи **Открытых задач-ответов: 1**" — aria-label correct, badge "1" rendered. Per-user scope confirmed (matches the owner-scoped task).
+
+**TS-004 PASS** — Opened `/admin/customers/cmoxwethf0000mr0plhvi9pcs`. Re-queried count endpoint: still `{"count": 1}`. Confirms badge is decoupled from `readAt` flips — opening Customer 360 marks messages read for timeline styling but does NOT close any team member's per-user action queue.
+
+**Anti-regression:** `/admin` dashboard still loads. `/admin/crm/deals` still loads. `/admin/settings/inbound-log` still works (new entries with outcome `accepted_customer`). All 5 verify-*.ts integration scripts pass locally (verify-email-log, verify-email-resolve [extended with auto-task assertion], verify-email-inbound, verify-deal-estimate, verify-crm-task-unique, verify-auto-task).
 
 ## Implementation Tasks
 
@@ -386,7 +405,7 @@ Type: Feature
 
 **Definition of Done:**
 - [ ] File created, mirrors `inbox/count/route.ts` shape
-- [ ] Curl (logged-in cookie): returns `{unread: <number>}` 200
+- [ ] Curl (logged-in cookie): returns `{count: <number>}` 200
 - [ ] Curl (no cookie): returns `{error: "Unauthorized"}` 401
 
 **Verify:** Covered by Task 7 (TS-003 in prod E2E).

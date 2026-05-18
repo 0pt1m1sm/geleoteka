@@ -77,9 +77,11 @@ export async function ensureFollowUpTask(
     return { taskId: created.id, created: true };
   } catch (err) {
     if ((err as { code?: string }).code !== "P2002") throw err;
+    // Fall through to the recovery branch below. P2002 means an OPEN FOLLOW_UP
+    // already exists for this (customerUserId, dealId) per the partial unique
+    // index `CrmTask_open_followup_unique`.
   }
 
-  // P2002 — an OPEN FOLLOW_UP already exists for this (customer, deal).
   // The dedup query MUST include customerUserId; without it, a no-deal
   // task from a different customer could match.
   const existing = (await db.crmTask.findFirst({
@@ -89,8 +91,8 @@ export async function ensureFollowUpTask(
       kind: "FOLLOW_UP",
       status: "OPEN",
     },
-    select: { id: true, body: true },
-  })) as { id: string; body: string | null } | null;
+    select: { id: true, body: true, ownerUserId: true },
+  })) as { id: string; body: string | null; ownerUserId: string } | null;
   if (!existing) {
     throw new Error(
       "ensureFollowUpTask: P2002 raised but no matching OPEN FOLLOW_UP row found — index/query mismatch",
@@ -100,10 +102,13 @@ export async function ensureFollowUpTask(
   const appendedBody = `${existing.body ?? ""}\n+ ещё 1 ответ ${new Date().toLocaleString("ru-RU")}`
     .slice(-BODY_MAX_CHARS);
 
-  await db.crmTask.update({
-    where: { id: existing.id },
-    data: { dueAt, body: appendedBody },
-  });
+  // Reassign owner when it changed (e.g. a manager claimed an unowned deal
+  // between the first and second inbound reply — the stale fallback-ADMIN
+  // owner would otherwise miss the follow-up).
+  const data: Record<string, unknown> = { dueAt, body: appendedBody };
+  if (existing.ownerUserId !== ownerUserId) data.ownerUserId = ownerUserId;
+
+  await db.crmTask.update({ where: { id: existing.id }, data });
 
   return { taskId: existing.id, created: false };
 }

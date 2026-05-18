@@ -12,7 +12,6 @@ import { EstimatesSection } from "@/components/crm/EstimatesSection";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
-import { markRepliesRead } from "@/app/actions/crm/communications";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -60,6 +59,7 @@ interface DealDetail {
     subject: string | null;
     resendEmailId: string | null;
     attachments: unknown;
+    readAt: Date | null;
   }>;
   tasks: Array<{
     id: string;
@@ -139,6 +139,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
           subject: true,
           resendEmailId: true,
           attachments: true,
+          readAt: true,
         },
         orderBy: { createdAt: "desc" },
         take: 50,
@@ -164,9 +165,9 @@ export default async function CrmDealDetailPage({ params }: Props) {
   })) as DealDetail | null;
   if (!deal) notFound();
 
-  // Flip readAt on any unread EMAIL_INBOUND for this deal's customer. Failure
-  // must never break the page render — auth is enforced inside the action.
-  await markRepliesRead(deal.customer.id).catch(() => {});
+  // NOTE: readAt is flipped by the CommunicationLogger client component
+  // AFTER first paint, NOT here — otherwise the unread visual treatment
+  // never renders.
 
   // The "active" estimate is whichever non-SUPERSEDED row recompute-deal-totals
   // would pick — for UI purposes, just take the first by createdAt-desc that
@@ -245,6 +246,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
                 deal: e.deal,
                 subject: e.subject,
                 resendEmailId: e.resendEmailId,
+                readAt: e.readAt,
                 attachments: Array.isArray(e.attachments)
                   ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)
                   : [],

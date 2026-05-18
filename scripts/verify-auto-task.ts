@@ -151,6 +151,44 @@ async function main(): Promise<void> {
   assert(r3.taskId !== r1.taskId, `(c) expected new task id after DONE, got same id ${r3.taskId}`);
   console.log("  ✓ (c) creates new task when prior was DONE");
 
+  // (g) reassigns owner when deal ownership changes between dedup hits
+  //     Setup: dealNoOwner (currently owned by fallback first ADMIN per case d).
+  //     Action: a manager claims the deal — set deal.ownerUserId = customer.id
+  //             (just any non-admin user; we don't need a real manager here).
+  //     Second inbound call should reassign the dedup task's ownerUserId.
+  const t4Before = (await db.crmTask.findUnique({
+    where: { id: r4.taskId },
+    select: { ownerUserId: true },
+  })) as { ownerUserId: string };
+  await db.deal.update({
+    where: { id: dealNoOwner.id },
+    data: { ownerUserId: admin.id }, // simulate manager claim (use admin id since it's a real User id)
+  });
+  // Wait — if admin.id === firstAdmin.id and existing.ownerUserId is already
+  // firstAdmin.id, the reassignment branch wouldn't fire. Pick a DIFFERENT
+  // user so the diff is detectable. Use the customer user as the "new manager"
+  // (User.id is a valid FK target regardless of permissionRole for this test).
+  await db.deal.update({
+    where: { id: dealNoOwner.id },
+    data: { ownerUserId: customer.id },
+  });
+  const r7 = await ensureFollowUpTask({
+    customerUserId: customer.id,
+    customerName: customer.name,
+    dealId: dealNoOwner.id,
+  });
+  assert(r7.created === false, `(g) expected dedup, got created=${r7.created}`);
+  assert(r7.taskId === r4.taskId, `(g) expected same task id, got ${r7.taskId} vs ${r4.taskId}`);
+  const t4After = (await db.crmTask.findUnique({
+    where: { id: r4.taskId },
+    select: { ownerUserId: true },
+  })) as { ownerUserId: string };
+  assert(
+    t4After.ownerUserId === customer.id,
+    `(g) expected ownerUserId reassigned to new deal owner ${customer.id}, got ${t4After.ownerUserId} (was ${t4Before.ownerUserId})`,
+  );
+  console.log("  ✓ (g) reassigns owner when deal ownership changes between dedup hits");
+
   await cleanup(customer.id);
 
   console.log("[verify-auto-task] PASS");

@@ -7,6 +7,7 @@ import { Alert, Button, Input, Textarea } from "@/components/ui";
 import {
   deleteCommunication,
   logCommunication,
+  markRepliesRead,
 } from "@/app/actions/crm/communications";
 import {
   COMM_CHANNEL_LABELS,
@@ -40,6 +41,9 @@ interface CommView {
   attachments?: CommAttachment[];
   /** Resend's UUID — needed to build attachment proxy URLs. */
   resendEmailId?: string | null;
+  /** Per-message read state. null = unread, Date = when an admin first opened
+   *  the customer/deal page. Drives the unread visual treatment in EntryRow. */
+  readAt?: Date | string | null;
 }
 
 interface Props {
@@ -67,6 +71,19 @@ export function CommunicationLogger({
 }: Props): React.ReactElement {
   const [showForm, setShowForm] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+
+  // Fire markRepliesRead AFTER first paint so the user actually sees the
+  // unread styling on the rows that prompted them to open this page. Running
+  // this on the server before the data fetch (as we used to) flipped readAt
+  // before the snapshot was rendered, making the unread treatment dead code.
+  // Auth is enforced inside the server action; .catch absorbs any failure.
+  useEffect(() => {
+    const hasUnreadInbound = initialEntries.some(
+      (e) => isInboundEmailChannel(e.channel) && e.readAt == null,
+    );
+    if (!hasUnreadInbound) return;
+    markRepliesRead(customerUserId).catch(() => {});
+  }, [customerUserId, initialEntries]);
 
   // The most recent EMAIL_INBOUND entry is the only one that gets the
   // "Ответить" button — replies always thread onto the latest inbound.
@@ -252,6 +269,11 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
   const isEmail = isEmailChannel(entry.channel);
   const isInbound = isInboundEmailChannel(entry.channel);
   const isOutbound = isOutboundEmailChannel(entry.channel);
+  // Unread visual treatment: only inbound emails that haven't been opened yet.
+  // The page's CommunicationLogger fires markRepliesRead after first paint, so
+  // a refresh clears this styling. `entry.readAt` may arrive as a string when
+  // serialized from a server component — both undefined and null count as unread.
+  const isUnread = isInbound && (entry.readAt == null);
 
   function handleDelete(): void {
     if (!confirm("Удалить эту запись?")) return;
@@ -261,13 +283,27 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
   }
 
   return (
-    <li className="py-3">
+    <li
+      className={
+        isUnread
+          ? "py-3 pl-3 -ml-3 border-l-2 border-[var(--color-accent)] bg-[var(--background-elevated)]/40"
+          : "py-3"
+      }
+    >
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="text-sm font-medium flex items-center gap-1.5">
             {isInbound ? <ArrowDownLeft size={14} aria-hidden /> : null}
             {isOutbound ? <ArrowUpRight size={14} aria-hidden /> : null}
             {COMM_CHANNEL_LABELS[entry.channel] ?? entry.channel}
+            {isUnread ? (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-[var(--color-accent)] text-[var(--background)]"
+                aria-label="Непрочитано"
+              >
+                NEW
+              </span>
+            ) : null}
             {entry.outcome && entry.outcome !== "N_A" ? (
               <span className="text-[var(--foreground-muted)] font-normal">
                 {" · "}
