@@ -8,8 +8,8 @@ import type { CreateDealInput, DealSummary } from "./types";
  * Other modules call this when their flow originates a commercial
  * transaction:
  *  - Service booking → createDeal({channel: SERVICE, source: "booking-form"})
- *  - Parts cart checkout → createDeal({channel: PARTS_RETAIL, initialStage: APPROVED, lines: [...]})
- *  - Rentals booking → createDeal({channel: RENTAL, initialStage: APPROVED, lines: [...]})
+ *  - Parts cart checkout → createDeal({channel: PARTS_RETAIL, initialStage: IN_PROGRESS, lines: [...]})
+ *  - Rentals booking → createDeal({channel: RENTAL, initialStage: IN_PROGRESS, lines: [...]})
  *
  * The caller is responsible for creating its own fulfillment row
  * (RepairOrder / PartOrder / RentalBooking) and setting that row's
@@ -24,7 +24,7 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
         ownerUserId: input.ownerUserId ?? null,
         channel: input.channel,
         source: input.source,
-        stage: input.initialStage ?? "DRAFT",
+        stage: input.initialStage ?? "NEW",
         claimToken: input.claimToken ?? null,
         notes: input.notes ?? null,
       },

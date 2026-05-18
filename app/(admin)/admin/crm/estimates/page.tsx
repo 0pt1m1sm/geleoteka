@@ -97,7 +97,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
     // dead-end. Cheap because the deal count is small.
     db.deal.findMany({
       where: {
-        stage: { in: ["DRAFT", "QUOTED"] },
+        stage: "NEW",
         estimates: { none: {} },
       },
       orderBy: { updatedAt: "desc" },

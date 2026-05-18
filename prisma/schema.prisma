@@ -111,13 +111,10 @@ enum RentalBookingStatus {
 // docs/prd/2026-05-10-deal-fulfillment-architecture.md.
 
 enum DealStage {
-  DRAFT          // being assembled by sales (no estimate sent)
-  QUOTED         // estimate sent, awaiting customer
-  APPROVED       // customer accepted; fulfillment can start
-  IN_FULFILLMENT // any fulfillment is active
-  DELIVERED      // all fulfillments completed; awaiting payment / closure
-  WON            // closed-paid
-  LOST           // declined / cancelled
+  NEW         // создана; нет ещё APPROVED-сметы. Заменяет DRAFT + QUOTED.
+  IN_PROGRESS // есть APPROVED estimate; fulfillment либо ждёт, либо идёт, либо ждёт оплаты. Заменяет APPROVED + IN_FULFILLMENT + DELIVERED.
+  WON         // фулфилмент завершён + оплачено. Manual transition.
+  LOST        // отказ клиента / протух / отменён. Manual transition.
 }
 
 enum DealChannel {
@@ -1123,7 +1120,7 @@ model Deal {
   customerUserId  String
   vehicleId       String? // Optional — parts-only deal may not have one
   ownerUserId     String? // Sales rep / deal owner
-  stage           DealStage           @default(DRAFT)
+  stage           DealStage           @default(NEW)
   channel         DealChannel
   source          String? // "booking-form" | "parts-cart" | "rentals-form" | "walk-in" | "phone"
   paymentStatus   DealPaymentStatus   @default(UNPAID)

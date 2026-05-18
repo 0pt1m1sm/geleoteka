@@ -20,8 +20,8 @@ interface CustomerOption {
 }
 
 const STAGE_GROUPS: Record<string, string[]> = {
-  all: ["DRAFT", "QUOTED", "APPROVED", "IN_FULFILLMENT", "DELIVERED", "WON", "LOST"],
-  open: ["DRAFT", "QUOTED", "APPROVED", "IN_FULFILLMENT", "DELIVERED"],
+  all: ["NEW", "IN_PROGRESS", "WON", "LOST"],
+  active: ["NEW", "IN_PROGRESS"],
   won: ["WON"],
   lost: ["LOST"],
 };
@@ -49,7 +49,7 @@ export default async function CrmDealsPage({ searchParams }: Props) {
   }
 
   const { stage: stageParam, channel } = await searchParams;
-  const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "open";
+  const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "active";
   const stagesFilter = STAGE_GROUPS[stageKey];
 
   const where: Record<string, unknown> = { stage: { in: stagesFilter } };
@@ -97,9 +97,9 @@ export default async function CrmDealsPage({ searchParams }: Props) {
       />
 
       <div className="flex flex-wrap gap-2 mb-4">
-        <StageChip current={stageKey} value="open" label="Открытые" />
-        <StageChip current={stageKey} value="won" label="WON" />
-        <StageChip current={stageKey} value="lost" label="LOST" />
+        <StageChip current={stageKey} value="active" label="Активные" />
+        <StageChip current={stageKey} value="won" label="Выиграны" />
+        <StageChip current={stageKey} value="lost" label="Проиграны" />
         <StageChip current={stageKey} value="all" label="Все" />
       </div>
 

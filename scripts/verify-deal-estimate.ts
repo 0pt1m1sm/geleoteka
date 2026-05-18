@@ -120,7 +120,7 @@ async function main(): Promise<void> {
     customerUserId: customer.id,
     channel: "SERVICE",
     source: "verify-deal-estimate",
-    initialStage: "DRAFT",
+    initialStage: "NEW",
     lines: [
       { type: "LABOR", description: "verify-test labor", qty: 2, unitPrice: 1500 },
       { type: "PART", description: "verify-test part", qty: 1, unitPrice: 5000 },

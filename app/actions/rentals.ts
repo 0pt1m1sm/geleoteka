@@ -212,7 +212,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
       vehicleId: carId,
       channel: "RENTAL",
       source: "rentals-form",
-      initialStage: "APPROVED",
+      initialStage: "IN_PROGRESS",
       claimToken,
       notes: notes || null,
       lines: [

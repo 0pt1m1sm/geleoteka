@@ -51,7 +51,7 @@ export async function createDealManually(
     ownerUserId: session.id,
     channel: channel as never,
     source,
-    initialStage: "DRAFT",
+    initialStage: "NEW",
     notes,
   });
 
@@ -68,14 +68,20 @@ interface SetStageResult {
   error: string | null;
 }
 
+/**
+ * DealStage transitions (4 stages, soft policy):
+ *   NEW → IN_PROGRESS (auto, via approveEstimate — no manual transition)
+ *   NEW → LOST (manual)
+ *   IN_PROGRESS → WON (manual: фулфилмент завершён + оплачено)
+ *   IN_PROGRESS → LOST (manual)
+ *   WON → IN_PROGRESS (manual rollback: ошиблись с закрытием)
+ *   LOST → NEW (manual rollback: клиент вернулся)
+ */
 const FORWARD_FROM: Record<string, ReadonlyArray<string>> = {
-  DRAFT: ["QUOTED", "APPROVED", "LOST"],
-  QUOTED: ["APPROVED", "LOST"],
-  APPROVED: ["IN_FULFILLMENT", "LOST"],
-  IN_FULFILLMENT: ["DELIVERED", "LOST"],
-  DELIVERED: ["WON", "LOST"],
-  WON: [],
-  LOST: [],
+  NEW: ["LOST"],
+  IN_PROGRESS: ["WON", "LOST"],
+  WON: ["IN_PROGRESS"],
+  LOST: ["NEW"],
 };
 
 export async function setDealStage(
@@ -100,15 +106,48 @@ export async function setDealStage(
 
   const data: Record<string, unknown> = { stage: nextStage };
   const now = new Date();
-  if (nextStage === "QUOTED") data.quotedAt = now;
-  if (nextStage === "APPROVED") data.approvedAt = now;
+  if (nextStage === "IN_PROGRESS") {
+    // Coming from WON rollback OR auto-set by approveEstimate.
+    data.approvedAt = now;
+    data.closedAt = null;
+  }
   if (nextStage === "WON" || nextStage === "LOST") {
     data.closedAt = now;
     if (nextStage === "LOST" && lostReason) data.lostReason = lostReason;
   }
+  if (nextStage === "NEW") {
+    // Rollback from LOST. Clear close timestamps so list filters treat as open.
+    data.closedAt = null;
+    data.lostReason = null;
+  }
 
   await db.deal.update({ where: { id: dealId }, data });
   revalidatePath(`/admin/crm/deals/${dealId}`);
+  revalidatePath("/admin/crm/deals");
+  return { error: null };
+}
+
+/**
+ * Delete a deal. Soft policy:
+ *   - WON → blocked (commercial history; rollback to IN_PROGRESS first)
+ *   - any other stage → permitted with confirm at the UI
+ *
+ * Cascades: Estimate[] (and their EstimateLine[]) drop via onDelete: Cascade.
+ * Fulfillment rows (RepairOrder/PartOrder/RentalBooking) keep their dealId
+ * column NULL via onDelete: SetNull — work history survives, the commercial
+ * thread is gone.
+ */
+export async function deleteDeal(dealId: string): Promise<SetStageResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const deal = (await db.deal.findUnique({
+    where: { id: dealId },
+    select: { stage: true },
+  })) as { stage: string } | null;
+  if (!deal) return { error: "Сделка не найдена" };
+  if (deal.stage === "WON") {
+    return { error: "Выигранную сделку нельзя удалить. Сначала откатите её в «В работе»." };
+  }
+  await db.deal.delete({ where: { id: dealId } });
   revalidatePath("/admin/crm/deals");
   return { error: null };
 }

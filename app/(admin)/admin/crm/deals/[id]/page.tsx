@@ -220,7 +220,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
             <EstimatesSection
               dealId={deal.id}
               estimates={deal.estimates}
-              canCreate={deal.stage === "DRAFT" || deal.stage === "QUOTED"}
+              canCreate={deal.stage === "NEW"}
             />
           </Card>
 

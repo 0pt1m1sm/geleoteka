@@ -86,7 +86,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       customerUserId: guestResult.userId,
       channel: "PARTS_RETAIL",
       source: "parts-cart",
-      initialStage: "APPROVED",
+      initialStage: "IN_PROGRESS",
       claimToken,
       notes: notes || null,
       lines: orderItems.map((item) => {

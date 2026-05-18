@@ -116,7 +116,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       vehicleId: vehicle!.id,
       channel: "SERVICE",
       source: "booking-form",
-      initialStage: "QUOTED",
+      initialStage: "NEW",
       claimToken,
       notes: notes || null,
     });

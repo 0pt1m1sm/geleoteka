@@ -92,16 +92,12 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
     })) as { count: number };
     transitioned = result.count === 1;
     if (!transitioned) return;
-    const deal = (await tx.deal.findUnique({
+    // Post-collapse: deal stage stays NEW when sending; only approveEstimate
+    // promotes it to IN_PROGRESS. Just stamp quotedAt for reporting.
+    await tx.deal.update({
       where: { id: est.dealId },
-      select: { stage: true },
-    })) as { stage: string } | null;
-    if (deal && (deal.stage === "DRAFT" || deal.stage === null)) {
-      await tx.deal.update({
-        where: { id: est.dealId },
-        data: { stage: "QUOTED", quotedAt: now },
-      });
-    }
+      data: { quotedAt: now },
+    });
   });
 
   // Lost the race — another concurrent request already sent this estimate.
@@ -237,7 +233,7 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
     });
     await tx.deal.update({
       where: { id: est.dealId },
-      data: { stage: "APPROVED", approvedAt: now },
+      data: { stage: "IN_PROGRESS", approvedAt: now },
     });
   });
 
@@ -269,18 +265,17 @@ export async function unapproveEstimate(estimateId: string): Promise<EstimateMut
       where: { id: estimateId },
       data: { stage: "SENT", approvedAt: null },
     });
-    // Move the deal back from APPROVED → QUOTED so the deal stage chip is
-    // accurate. We do NOT touch IN_FULFILLMENT/DELIVERED/WON — if the
-    // fulfillment already started, the manager should handle that path
-    // manually rather than have us silently undo work.
+    // Roll deal back IN_PROGRESS → NEW. We don't touch WON/LOST: if the
+    // deal already closed, manager should reopen via the deal stage UI
+    // (setDealStage handles that path with its own audit trail).
     const deal = (await tx.deal.findUnique({
       where: { id: est.dealId },
       select: { stage: true },
     })) as { stage: string } | null;
-    if (deal && deal.stage === "APPROVED") {
+    if (deal && deal.stage === "IN_PROGRESS") {
       await tx.deal.update({
         where: { id: est.dealId },
-        data: { stage: "QUOTED", approvedAt: null },
+        data: { stage: "NEW", approvedAt: null },
       });
     }
   });

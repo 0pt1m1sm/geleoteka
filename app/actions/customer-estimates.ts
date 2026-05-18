@@ -73,7 +73,7 @@ export async function customerApproveEstimate(
     });
     await tx.deal.update({
       where: { id: est.dealId },
-      data: { stage: "APPROVED", approvedAt: now },
+      data: { stage: "IN_PROGRESS", approvedAt: now },
     });
   });
 

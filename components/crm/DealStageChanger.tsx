@@ -3,18 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui";
-import { setDealStage } from "@/app/actions/crm/deals";
+import { setDealStage, deleteDeal } from "@/app/actions/crm/deals";
 import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
 
-const STAGES = [
-  "DRAFT",
-  "QUOTED",
-  "APPROVED",
-  "IN_FULFILLMENT",
-  "DELIVERED",
-  "WON",
-  "LOST",
-];
+const STAGES = ["NEW", "IN_PROGRESS", "WON", "LOST"];
 
 export function DealStageChanger({
   dealId,
@@ -36,7 +28,6 @@ export function DealStageChanger({
       if (next === "LOST") {
         const reason = prompt("Причина проигрыша сделки:") ?? undefined;
         if (!reason || !reason.trim()) {
-          // Reset select state by routing refresh.
           router.refresh();
           return;
         }
@@ -48,6 +39,22 @@ export function DealStageChanger({
         router.refresh();
         return;
       }
+      router.refresh();
+    });
+  }
+
+  function handleDelete(): void {
+    if (!confirm("Удалить сделку безвозвратно? Сметы будут удалены, история работ сохранится.")) {
+      return;
+    }
+    startTransition(async () => {
+      setError(null);
+      const result = await deleteDeal(dealId);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      router.push("/admin/crm/deals");
       router.refresh();
     });
   }
@@ -67,6 +74,14 @@ export function DealStageChanger({
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        onClick={handleDelete}
+        disabled={pending}
+        className="btn btn-secondary text-xs w-full"
+      >
+        Удалить сделку
+      </button>
       {error ? <Alert variant="error">{error}</Alert> : null}
     </div>
   );

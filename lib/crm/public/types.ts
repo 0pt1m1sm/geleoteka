@@ -22,9 +22,9 @@ export interface CreateDealInput {
   channel: DealChannel;
   source: string;
   /**
-   * Initial commercial stage. Defaults to DRAFT — flows that are
+   * Initial commercial stage. Defaults to NEW — flows that are
    * point-of-sale (retail parts checkout, walk-in rental) should pass
-   * APPROVED so the deal is marked accepted on creation.
+   * IN_PROGRESS so the deal is marked accepted on creation.
    */
   initialStage?: DealStage;
   /**
