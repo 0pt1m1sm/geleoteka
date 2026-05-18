@@ -13,6 +13,7 @@ import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/cus
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
+import { DEAL_STAGE_LABELS, DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -54,7 +55,7 @@ export default async function CustomerDetailPage({ params }: Props) {
   }
   const { id } = await params;
 
-  const [customerRaw, availableTags, commLogs, tasks] = await Promise.all([
+  const [customerRaw, availableTags, commLogs, tasks, deals] = await Promise.all([
     db.user.findUnique({
       where: { id },
       include: {
@@ -115,6 +116,30 @@ export default async function CustomerDetailPage({ params }: Props) {
         deal: { select: { id: true, number: true } },
       },
     }),
+    db.deal.findMany({
+      where: { customerUserId: id },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+      select: {
+        id: true,
+        number: true,
+        stage: true,
+        channel: true,
+        total: true,
+        createdAt: true,
+        vehicle: { select: { make: true, model: true } },
+      },
+    }) as unknown as Promise<
+      Array<{
+        id: string;
+        number: string | null;
+        stage: string;
+        channel: string;
+        total: number;
+        createdAt: Date;
+        vehicle: { make: string; model: string } | null;
+      }>
+    >,
   ]);
   const nowMs = new Date().valueOf();
 
@@ -270,6 +295,43 @@ export default async function CustomerDetailPage({ params }: Props) {
         {customer.vehicles.length === 0 ? (
           <div className="card text-sm text-[var(--foreground-muted)]">— нет —</div>
         ) : null}
+      </div>
+
+      <div className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">Сделки</h2>
+        {deals.length === 0 ? (
+          <div className="card text-sm text-[var(--foreground-muted)]">
+            У клиента ещё нет сделок.
+          </div>
+        ) : (
+          <div className="card p-0">
+            <ul className="divide-y divide-[var(--border)]">
+              {deals.map((d) => (
+                <li key={d.id}>
+                  <Link
+                    href={`/admin/crm/deals/${d.id}`}
+                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-[var(--card-hover)]"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">
+                        {d.number ?? "Без номера"}
+                        {d.vehicle ? ` · ${d.vehicle.make} ${d.vehicle.model}` : ""}
+                      </div>
+                      <div className="text-xs text-[var(--foreground-muted)] mt-0.5 flex flex-wrap gap-x-3">
+                        <span>{DEAL_STAGE_LABELS[d.stage] ?? d.stage}</span>
+                        <span>{DEAL_CHANNEL_LABELS[d.channel] ?? d.channel}</span>
+                        <span>{formatDate(d.createdAt)}</span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium tabular-nums shrink-0 text-[var(--color-accent)]">
+                      {formatPrice(d.total)}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       <h2 className="text-lg font-semibold mb-3">История заказ-нарядов</h2>

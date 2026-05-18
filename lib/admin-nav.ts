@@ -108,6 +108,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Настройки",
     items: [
       { href: "/admin/settings/integrations", label: "Интеграции" },
+      { href: "/admin/settings/inbound-log", label: "Лог webhook-ов" },
     ],
   },
 ];

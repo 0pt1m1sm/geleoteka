@@ -185,6 +185,27 @@ enum InboxMessageStatus {
   ARCHIVED
 }
 
+/// Audit log of every POST to /api/email/inbound — successful or not.
+/// Lets the admin diagnose webhook chain problems (HMAC mismatch, wrong
+/// recipient, missing secret) without Railway log access. Rows live ~30
+/// days; cleanup is manual or via a future cron.
+model InboundAttempt {
+  id         String   @id @default(cuid())
+  receivedAt DateTime @default(now())
+  httpStatus Int
+  outcome    String   // accepted_thread / accepted_customer / accepted_inbox / duplicate / rejected_signature / ignored_recipient / ignored_type / error_no_secret / error_no_api_key / error_upstream / error_other
+  detail     String?
+  recipient  String?
+  fromEmail  String?
+  messageId  String?
+  hasSvixId  Boolean  @default(false)
+  hasSig     Boolean  @default(false)
+  hasTs      Boolean  @default(false)
+
+  @@index([receivedAt])
+  @@index([outcome])
+}
+
 /// Key-value store for runtime-mutable settings: integration secrets,
 /// webhook credentials, feature flags an admin should be able to change
 /// without redeploy. Read via lib/settings.ts:getSetting(key) which
