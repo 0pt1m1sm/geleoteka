@@ -143,65 +143,68 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
         };
       }
     | null;
-  if (emailPayload?.deal.customer.email) {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
-    const token = emailPayload.deal.claimToken;
-    const hasRealAccount = !emailPayload.deal.customer.isTempPassword;
-    let viewUrl: string | undefined;
-    let pdfUrl: string | undefined;
-    if (token) {
-      viewUrl = `${appUrl}/estimate/${token}?id=${estimateId}`;
-      pdfUrl = `${appUrl}/api/estimates/${estimateId}/pdf?token=${token}`;
-    } else if (hasRealAccount) {
-      viewUrl = `${appUrl}/cabinet/estimates/${estimateId}`;
-      pdfUrl = `${appUrl}/api/estimates/${estimateId}/pdf`;
-    }
-    if (viewUrl && pdfUrl) {
-      const {
-        sendEstimateSentEmail,
-        generateOutboundMessageId,
-        recordOutboundEmail,
-        markOutboundEmailFailed,
-        markOutboundEmailSent,
-        isPlausibleEmail,
-      } = await import("@/lib/email");
-      const estimateNumber = emailPayload.number ?? estimateId.slice(-6).toUpperCase();
-      const subject = `Geleoteka — смета №${estimateNumber} на согласование`;
-      const bodyText = `Здравствуйте, ${emailPayload.deal.customer.name}. Смета №${estimateNumber} на сумму ${(emailPayload.total / 100).toLocaleString("ru-RU")} ₽. Открыть: ${viewUrl}`;
-      const messageId = generateOutboundMessageId();
-      // Persist FIRST — primary threading anchor: customer replies to estimates
-      // most often, and we must capture externalId before Resend accepts.
-      if (isPlausibleEmail(emailPayload.deal.customer.email)) {
-        await recordOutboundEmail({
-          customerUserId: emailPayload.deal.customer.id,
-          dealId: emailPayload.deal.id,
-          authorUserId: session.id,
-          subject,
-          body: bodyText,
-          messageId,
-        });
-      }
-      void sendEstimateSentEmail(
-        emailPayload.deal.customer.email,
-        {
-          customerName: emailPayload.deal.customer.name,
-          estimateNumber,
-          total: emailPayload.total,
-          validUntil: emailPayload.validUntil,
-          viewUrl,
-          pdfUrl,
-        },
-        { messageId },
-      )
-        .then((result) => {
-          if (!result.success) return markOutboundEmailFailed(messageId, result.error);
-          return markOutboundEmailSent(messageId);
-        })
-        .catch((err) =>
-          markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
-        );
-    }
+  if (!emailPayload?.deal.customer.email) {
+    return { error: null, estimateId };
   }
+
+  const {
+    sendEstimateSentEmail,
+    generateOutboundMessageId,
+    recordOutboundEmail,
+    markOutboundEmailFailed,
+    markOutboundEmailSent,
+    isPlausibleEmail,
+  } = await import("@/lib/email");
+
+  if (!isPlausibleEmail(emailPayload.deal.customer.email)) {
+    return {
+      error: "У клиента не указан корректный email — отправьте смету ссылкой вручную",
+      estimateId,
+    };
+  }
+
+  const { buildEstimateEmailLinks } = await import("./estimates-email-links");
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+  const { viewUrl, pdfUrl } = buildEstimateEmailLinks({
+    appUrl,
+    estimateId,
+    dealClaimToken: emailPayload.deal.claimToken,
+  });
+
+  const estimateNumber = emailPayload.number ?? estimateId.slice(-6).toUpperCase();
+  const subject = `Geleoteka — смета №${estimateNumber} на согласование`;
+  const bodyText = `Здравствуйте, ${emailPayload.deal.customer.name}. Смета №${estimateNumber} на сумму ${(emailPayload.total / 100).toLocaleString("ru-RU")} ₽. Открыть: ${viewUrl}`;
+  const messageId = generateOutboundMessageId();
+  // Persist FIRST — primary threading anchor: customer replies to estimates
+  // most often, and we must capture externalId before Resend accepts.
+  await recordOutboundEmail({
+    customerUserId: emailPayload.deal.customer.id,
+    dealId: emailPayload.deal.id,
+    authorUserId: session.id,
+    subject,
+    body: bodyText,
+    messageId,
+  });
+
+  void sendEstimateSentEmail(
+    emailPayload.deal.customer.email,
+    {
+      customerName: emailPayload.deal.customer.name,
+      estimateNumber,
+      total: emailPayload.total,
+      validUntil: emailPayload.validUntil,
+      viewUrl,
+      pdfUrl,
+    },
+    { messageId },
+  )
+    .then((result) => {
+      if (!result.success) return markOutboundEmailFailed(messageId, result.error);
+      return markOutboundEmailSent(messageId);
+    })
+    .catch((err) =>
+      markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
+    );
 
   return { error: null, estimateId };
 }

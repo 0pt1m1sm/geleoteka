@@ -16,7 +16,8 @@
     "verify-email-log": "tsx scripts/verify-email-log.ts",
     "verify-email-inbound": "tsx scripts/verify-email-inbound.ts",
     "verify-email-resolve": "tsx scripts/verify-email-resolve.ts",
-    "verify-deal-estimate": "tsx scripts/verify-deal-estimate.ts"
+    "verify-deal-estimate": "tsx scripts/verify-deal-estimate.ts",
+    "verify-send-estimate": "tsx scripts/verify-send-estimate.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
