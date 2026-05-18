@@ -246,6 +246,78 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
   return { error: null, estimateId };
 }
 
+/**
+ * Roll an APPROVED estimate back to SENT. Used when the manager hit
+ * "Согласовать" by mistake — without this they'd be stuck (revise blocks
+ * APPROVED). Returns deal stage to QUOTED so the deal-stage chip matches.
+ * Strictly APPROVED-only: other stages stay immutable for audit.
+ */
+export async function unapproveEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const est = (await db.estimate.findUnique({
+    where: { id: estimateId },
+    select: { id: true, dealId: true, stage: true },
+  })) as { id: string; dealId: string; stage: string } | null;
+  if (!est) return { error: "Смета не найдена" };
+  if (est.stage !== "APPROVED") {
+    return { error: "Откатить согласование можно только у согласованной сметы" };
+  }
+
+  await db.$transaction(async (tx) => {
+    await tx.estimate.update({
+      where: { id: estimateId },
+      data: { stage: "SENT", approvedAt: null },
+    });
+    // Move the deal back from APPROVED → QUOTED so the deal stage chip is
+    // accurate. We do NOT touch IN_FULFILLMENT/DELIVERED/WON — if the
+    // fulfillment already started, the manager should handle that path
+    // manually rather than have us silently undo work.
+    const deal = (await tx.deal.findUnique({
+      where: { id: est.dealId },
+      select: { stage: true },
+    })) as { stage: string } | null;
+    if (deal && deal.stage === "APPROVED") {
+      await tx.deal.update({
+        where: { id: est.dealId },
+        data: { stage: "QUOTED", approvedAt: null },
+      });
+    }
+  });
+
+  revalidatePath(`/admin/crm/deals/${est.dealId}`);
+  revalidatePath(`/admin/crm/estimates/${estimateId}`);
+  return { error: null, estimateId };
+}
+
+/**
+ * Delete an estimate. Soft policy:
+ *   - DRAFT / SUPERSEDED → free deletion (no contract value)
+ *   - SENT / DECLINED / EXPIRED → permitted with manager confirm at UI
+ *   - APPROVED → blocked (contract integrity — must unapprove first)
+ *
+ * Cascade: EstimateLine[] dropped via Prisma's onDelete: Cascade.
+ * Revision chain: if `parentEstimateId` pointed at this row, children get
+ * their FK set to null (SetNull) — chain breaks but children survive.
+ */
+export async function deleteEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const est = (await db.estimate.findUnique({
+    where: { id: estimateId },
+    select: { id: true, dealId: true, stage: true },
+  })) as { id: string; dealId: string; stage: string } | null;
+  if (!est) return { error: "Смета не найдена" };
+  if (est.stage === "APPROVED") {
+    return { error: "Согласованную смету нельзя удалить. Сначала откатите согласование." };
+  }
+
+  await db.estimate.delete({ where: { id: estimateId } });
+
+  revalidatePath(`/admin/crm/deals/${est.dealId}`);
+  return { error: null, estimateId };
+}
+
 export async function declineEstimate(
   estimateId: string,
   reason: string,

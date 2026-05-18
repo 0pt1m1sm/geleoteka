@@ -11,6 +11,9 @@ import { SettingGroupForm } from "@/components/admin/settings/SettingGroupForm";
  * Integration secrets page — one card per integration (Resend / SMSC /
  * Yandex), single Save button per card. Source indicator on each field
  * shows whether the active value comes from DB, env var, or is missing.
+ *
+ * The Resend card also surfaces the webhook URL the operator must paste
+ * into Resend's dashboard (read-only with copy button).
  */
 export default async function IntegrationsSettingsPage() {
   const session = await getSession();
@@ -33,15 +36,30 @@ export default async function IntegrationsSettingsPage() {
     groups.set(s.group, list);
   }
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+  const inboundWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/email/inbound`;
+
+  // Per-group static info rows. Currently only Email (Resend) has one —
+  // the webhook URL operator must paste into the Resend dashboard.
+  const groupInfo: Record<string, Array<{ label: string; value: string; copyable?: boolean }>> = {
+    "Email (Resend)": [
+      {
+        label: "URL для Resend webhooks (вставьте в Resend dashboard → Webhooks)",
+        value: inboundWebhookUrl,
+        copyable: true,
+      },
+    ],
+  };
+
   return (
-    <div>
+    <div className="max-w-3xl mx-auto">
       <PageHeader
         eyebrow="Настройки"
         title="Интеграции"
         description="Секреты и креды для внешних сервисов. Изменения подхватываются всеми инстансами в течение 60 сек, без перезапуска. Пустое значение возвращает fallback на переменную окружения."
       />
 
-      <div className="space-y-6 max-w-2xl">
+      <div className="space-y-6">
         {Array.from(groups.entries()).map(([groupName, descriptors]) => {
           const fields = descriptors.map((s) => {
             const envName = s.envFallback ?? s.key;
@@ -53,7 +71,12 @@ export default async function IntegrationsSettingsPage() {
             return { descriptor: s, source };
           });
           return (
-            <SettingGroupForm key={groupName} groupName={groupName} fields={fields} />
+            <SettingGroupForm
+              key={groupName}
+              groupName={groupName}
+              fields={fields}
+              infoRows={groupInfo[groupName]}
+            />
           );
         })}
       </div>
