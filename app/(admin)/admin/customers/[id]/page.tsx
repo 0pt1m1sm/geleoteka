@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatDate, formatPrice } from "@/lib/utils";
@@ -123,6 +124,10 @@ export default async function CustomerDetailPage({ params }: Props) {
         total: true,
         createdAt: true,
         vehicle: { select: { make: true, model: true } },
+        tasks: {
+          where: { status: "OPEN" },
+          select: { id: true, dueAt: true },
+        },
       },
     }) as unknown as Promise<
       Array<{
@@ -133,6 +138,7 @@ export default async function CustomerDetailPage({ params }: Props) {
         total: number;
         createdAt: Date;
         vehicle: { make: string; model: string } | null;
+        tasks: Array<{ id: string; dueAt: Date }>;
       }>
     >,
   ]);
@@ -346,10 +352,33 @@ export default async function CustomerDetailPage({ params }: Props) {
                         {d.number ?? "Без номера"}
                         {d.vehicle ? ` · ${d.vehicle.make} ${d.vehicle.model}` : ""}
                       </div>
-                      <div className="text-xs text-[var(--foreground-muted)] mt-0.5 flex flex-wrap gap-x-3">
+                      <div className="text-xs text-[var(--foreground-muted)] mt-0.5 flex flex-wrap gap-x-3 items-center">
                         <span>{DEAL_STAGE_LABELS[d.stage] ?? d.stage}</span>
                         <span>{DEAL_CHANNEL_LABELS[d.channel] ?? d.channel}</span>
                         <span>{formatDate(d.createdAt)}</span>
+                        {(() => {
+                          const open = d.tasks.length;
+                          if (open === 0) return null;
+                          const overdue = d.tasks.filter((t) => t.dueAt.getTime() < nowMs).length;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                overdue > 0
+                                  ? "bg-[var(--color-error-bg)] text-[var(--color-error)]"
+                                  : "bg-[var(--background-secondary)] text-[var(--foreground)]"
+                              }`}
+                              title={
+                                overdue > 0
+                                  ? `${open} открытых задач, из них ${overdue} просрочено`
+                                  : `${open} открытых задач`
+                              }
+                            >
+                              <ListChecks size={12} aria-hidden />
+                              {open}
+                              {overdue > 0 ? ` · ${overdue} просроч.` : null}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                     <span className="text-sm font-medium tabular-nums shrink-0 text-[var(--color-accent)]">

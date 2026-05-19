@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
@@ -341,7 +342,36 @@ export default async function CrmDealDetailPage({ params }: Props) {
           </Card>
 
           <Card>
-            <h3 className="font-semibold mb-2">Стадия</h3>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <h3 className="font-semibold">Стадия</h3>
+              {(() => {
+                const open = deal.tasks.filter((t) => t.status === "OPEN").length;
+                if (open === 0) return null;
+                const nowMs = new Date().valueOf();
+                const overdue = deal.tasks.filter(
+                  (t) => t.status === "OPEN" && t.dueAt.getTime() < nowMs,
+                ).length;
+                return (
+                  <a
+                    href="#tasks"
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium active:opacity-70 transition-opacity ${
+                      overdue > 0
+                        ? "bg-[var(--color-error-bg)] text-[var(--color-error)]"
+                        : "bg-[var(--background-secondary)] text-[var(--foreground)]"
+                    }`}
+                    title={
+                      overdue > 0
+                        ? `${open} открытых задач, ${overdue} просрочено`
+                        : `${open} открытых задач`
+                    }
+                  >
+                    <ListChecks size={12} aria-hidden />
+                    {open}
+                    {overdue > 0 ? ` · ${overdue} просроч.` : null}
+                  </a>
+                );
+              })()}
+            </div>
             <DealStageChanger dealId={deal.id} currentStage={deal.stage} />
             <div className="mt-3 text-xs text-[var(--foreground-muted)]">
               Канал: {DEAL_CHANNEL_LABELS[deal.channel] ?? deal.channel}

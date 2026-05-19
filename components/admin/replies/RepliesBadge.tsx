@@ -30,12 +30,16 @@ async function fetchOpenTaskCount(): Promise<number> {
  * visiting the tasks page does NOT clear it.
  */
 export function RepliesBadge(): React.ReactElement | null {
+  // No initialData — React Query treats 0 as cached-fresh for staleTime and
+  // skips the on-mount fetch, leaving the badge empty for ~55s after a
+  // hard refresh. Letting `data` be undefined on first render keeps the
+  // badge hidden until the first fetch resolves (<200ms typical), then it
+  // appears. Polling continues every 60s afterwards.
   const { data } = useQuery({
     queryKey: ["admin-open-tasks-count"],
     queryFn: fetchOpenTaskCount,
     refetchInterval: 60_000,
-    staleTime: 55_000,
-    initialData: 0,
+    staleTime: 30_000,
   });
   if (!data || data <= 0) return null;
   return (

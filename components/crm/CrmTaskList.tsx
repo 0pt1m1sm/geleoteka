@@ -11,6 +11,9 @@ import {
   createCrmTask,
   reopenCrmTask,
 } from "@/app/actions/crm/tasks";
+import { CustomerSearchCombobox } from "@/components/admin/inbox/CustomerSearchCombobox";
+import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { formatPrice } from "@/lib/utils";
 import {
   CRM_TASK_KIND_LABELS,
   CRM_TASK_STATUS_LABELS,
@@ -109,6 +112,20 @@ function defaultDueAtLocal(): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+interface DealOption {
+  id: string;
+  number: string | null;
+  stage: string;
+  total: number;
+}
+
+interface PickedCustomer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+}
+
 function TaskForm({
   customerUserId,
   dealId,
@@ -123,6 +140,48 @@ function TaskForm({
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(createCrmTask, null);
 
+  // When the form is opened from a customer page or deal page, customer/deal
+  // come in as fixed props (hidden inputs). When opened from the standalone
+  // /admin/crm/tasks page they're both undefined — the manager picks them
+  // here. Picked state lives outside the form so re-render keeps selection.
+  const isContextBound = Boolean(customerUserId);
+  const [pickedCustomer, setPickedCustomer] = useState<PickedCustomer | null>(null);
+  const [pickedDealId, setPickedDealId] = useState<string>(dealId ?? "");
+  const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
+
+  const effectiveCustomerId = customerUserId ?? pickedCustomer?.id ?? "";
+  const effectiveDealId = dealId ?? pickedDealId ?? "";
+
+  // Load deals for the picked customer (only when not context-bound).
+  // Reset on customer-change is done in clearCustomer below, not here —
+  // putting setState in the effect body trips React 19's purity rule.
+  useEffect(() => {
+    if (isContextBound || !pickedCustomer) return;
+    const controller = new AbortController();
+    fetch(`/api/admin/customers/${pickedCustomer.id}/deals`, {
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setDealOptions(Array.isArray(data?.deals) ? data.deals : []);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [isContextBound, pickedCustomer]);
+
+  function clearCustomer(): void {
+    setPickedCustomer(null);
+    setDealOptions([]);
+    setPickedDealId("");
+  }
+
+  function selectCustomer(c: PickedCustomer): void {
+    setPickedCustomer(c);
+    setDealOptions([]);
+    setPickedDealId("");
+  }
+
   // React 19 forbids triggering parent setState during render — moved
   // to an effect so the onCreated callback and router.refresh fire
   // after the action result lands.
@@ -135,10 +194,60 @@ function TaskForm({
 
   return (
     <form action={formAction} className="card space-y-3">
-      {customerUserId ? (
-        <input type="hidden" name="customerUserId" value={customerUserId} />
+      <input type="hidden" name="customerUserId" value={effectiveCustomerId} />
+      <input type="hidden" name="dealId" value={effectiveDealId} />
+
+      {!isContextBound ? (
+        <div className="space-y-2">
+          <label className="text-sm font-medium block">Клиент</label>
+          {pickedCustomer ? (
+            <div className="flex items-center justify-between gap-3 border border-[var(--border)] rounded-[var(--radius-md)] px-3 py-2">
+              <div className="min-w-0">
+                <div className="font-medium truncate">{pickedCustomer.name}</div>
+                <div className="text-xs text-[var(--foreground-muted)] truncate">
+                  {pickedCustomer.email} · {pickedCustomer.phone}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={clearCustomer}
+                className="btn-icon shrink-0"
+                aria-label="Сбросить клиента"
+                title="Сменить клиента"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <CustomerSearchCombobox
+              onSelect={selectCustomer}
+              placeholder="Имя, email или телефон клиента"
+            />
+          )}
+        </div>
       ) : null}
-      {dealId ? <input type="hidden" name="dealId" value={dealId} /> : null}
+
+      {!isContextBound && pickedCustomer && dealOptions.length > 0 ? (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium" htmlFor="task-deal">
+            Сделка (опционально)
+          </label>
+          <select
+            id="task-deal"
+            value={pickedDealId}
+            onChange={(e) => setPickedDealId(e.target.value)}
+            className="input text-sm"
+          >
+            <option value="">— без привязки —</option>
+            {dealOptions.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.number ?? "—"} · {DEAL_STAGE_LABELS[d.stage] ?? d.stage}
+                {d.total ? ` · ${formatPrice(d.total)}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
 
       <Input
         label="Заголовок"
@@ -187,7 +296,14 @@ function TaskForm({
         <Button type="button" variant="secondary" onClick={onCancel} disabled={isPending}>
           Отмена
         </Button>
-        <Button type="submit" isLoading={isPending} disabled={isPending}>
+        <Button
+          type="submit"
+          isLoading={isPending}
+          disabled={isPending || (!isContextBound && !pickedCustomer)}
+          title={
+            !isContextBound && !pickedCustomer ? "Выберите клиента" : undefined
+          }
+        >
           Создать
         </Button>
       </div>

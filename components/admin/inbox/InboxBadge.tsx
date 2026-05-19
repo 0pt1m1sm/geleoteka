@@ -20,14 +20,19 @@ async function fetchPending(): Promise<number> {
 /**
  * Pending-count badge for the admin sidebar "Входящие" link. Polls every
  * 60 s; renders nothing when the count is 0 to keep the sidebar quiet.
+ *
+ * No initialData — React Query would treat 0 as cached-fresh for staleTime
+ * and skip the on-mount fetch, leaving the badge empty for ~55s after a
+ * hard refresh. Letting `data` be undefined on first render means the badge
+ * is hidden until the first fetch returns (typically < 200ms), which is the
+ * desired UX: no flash of zero, no 55s delay.
  */
 export function InboxBadge(): React.ReactElement | null {
   const { data } = useQuery({
     queryKey: ["admin-inbox-pending-count"],
     queryFn: fetchPending,
     refetchInterval: 60_000,
-    staleTime: 55_000,
-    initialData: 0,
+    staleTime: 30_000,
   });
   if (!data || data <= 0) return null;
   return (

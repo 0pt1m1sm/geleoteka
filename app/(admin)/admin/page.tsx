@@ -43,6 +43,8 @@ export default async function AdminDashboard() {
     openDealCount,
     wonLast30d,
     myOverdueCount,
+    teamOpenTaskCount,
+    teamOverdueTaskCount,
     recentTasks,
     openDeals,
   ] = await Promise.all([
@@ -81,6 +83,9 @@ export default async function AdminDashboard() {
     db.crmTask.count({
       where: { ownerUserId: session.id, status: "OPEN", dueAt: { lt: dayStart } },
     }),
+    // Team-wide totals — for the manager-team dashboard tile.
+    db.crmTask.count({ where: { status: "OPEN" } }),
+    db.crmTask.count({ where: { status: "OPEN", dueAt: { lt: dayStart } } }),
     db.crmTask.findMany({
       where: { ownerUserId: session.id, status: "OPEN" },
       orderBy: { dueAt: "asc" },
@@ -144,9 +149,21 @@ export default async function AdminDashboard() {
         <MetricCard label="Выручка (30 дн)" value={formatPrice(wonSum)} variant="accent" />
         <MetricCard label="Средний чек" value={formatPrice(avgTicket)} />
         <MetricCard
-          label="Просрочено задач"
+          label="Просрочено (мои)"
           value={myOverdueCount}
           variant={myOverdueCount > 0 ? "warning" : undefined}
+        />
+      </div>
+
+      <h2 className="text-xs uppercase tracking-wider text-[var(--foreground-muted)] mb-3">
+        CRM · Задачи команды
+      </h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <MetricCard label="Открытых задач" value={teamOpenTaskCount} />
+        <MetricCard
+          label="Просрочено (команда)"
+          value={teamOverdueTaskCount}
+          variant={teamOverdueTaskCount > 0 ? "warning" : undefined}
         />
       </div>
 
