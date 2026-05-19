@@ -7,6 +7,7 @@ import { ThemeInit } from "@/components/shared/ThemeInit";
 import { MyCarInit } from "@/components/shared/MyCarInit";
 import { ConfirmHost } from "@/components/ui/ConfirmHost";
 import { ToastHost } from "@/components/ui/ToastHost";
+import { NavigationProgress } from "@/components/shared/NavigationProgress";
 
 // Sync theme bootstrap. Must run before first paint to eliminate the
 // dark-flash FOUC on light-theme reloads. `<Script strategy="beforeInteractive">`
@@ -74,6 +75,11 @@ export default function RootLayout({
         {/* MyCarInit reads useSearchParams — must be wrapped in Suspense per Next.js. */}
         <Suspense fallback={null}>
           <MyCarInit />
+        </Suspense>
+        {/* Top-of-viewport progress bar — reads useSearchParams so it
+            must be wrapped in Suspense per Next.js App Router rules. */}
+        <Suspense fallback={null}>
+          <NavigationProgress />
         </Suspense>
         <Providers>{children}</Providers>
         <ConfirmHost />
