@@ -40,7 +40,15 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         <DialogPrimitive.Content
           ref={ref}
           data-dialog-content
-          className={`fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl p-6 ${className}`.trim()}
+          // Static -translate-x-1/2 -translate-y-1/2 keeps the dialog
+          // centered before the entry animation fires AND when the user
+          // has prefers-reduced-motion enabled (which disables the
+          // keyframe that otherwise carries the translate). Without it,
+          // the dialog top-left would anchor at viewport center on the
+          // first paint and slide back as the keyframe runs — visible
+          // jank, and on touch devices that hadn't installed the
+          // animation yet, the dialog floated off-screen.
+          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl p-6 ${className}`.trim()}
           {...props}
         >
           {children}
