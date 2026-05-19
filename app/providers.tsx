@@ -10,7 +10,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
         defaultOptions: {
           queries: {
             staleTime: 30 * 1000, // 30 seconds
-            refetchInterval: 30 * 1000, // polling interval for status tracking
+            // Default OFF — components that genuinely need polling
+            // (InboxBadge, RepliesBadge, StatusBoard) set their own interval
+            // explicitly. The previous 30s global default was a latent footgun:
+            // any new useQuery added without an override silently polled
+            // every 30s, each call going through requireRole → DB.
+            refetchInterval: false,
           },
         },
       })

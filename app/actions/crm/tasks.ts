@@ -13,8 +13,9 @@ function revalidateTaskPaths(opts: {
   customerUserId?: string | null;
   dealId?: string | null;
 }): void {
-  revalidatePath("/admin/crm/tasks");
-  revalidatePath("/admin/crm");
+  // /admin/crm/tasks and /admin/crm are force-dynamic (no RSC payload cache to
+  // evict). Skipping them — the client's router.refresh() after the action
+  // already re-renders whatever the manager is currently viewing.
   if (opts.customerUserId) revalidatePath(`/admin/customers/${opts.customerUserId}`);
   if (opts.dealId) revalidatePath(`/admin/crm/deals/${opts.dealId}`);
 }

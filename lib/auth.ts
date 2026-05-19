@@ -1,5 +1,6 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./db";
 
@@ -52,7 +53,7 @@ export async function clearSessionCookie(): Promise<void> {
 }
 
 /** Get current session user from cookie */
-export async function getSession(): Promise<SessionUser | null> {
+export const getSession = cache(async (): Promise<SessionUser | null> => {
   const cookieStore = await cookies();
   const token = cookieStore.get("session")?.value;
 
@@ -63,7 +64,7 @@ export async function getSession(): Promise<SessionUser | null> {
 
   const user = await db.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, email: true, phone: true, name: true, permissionRole: true, passwordHash: true },
+    select: { id: true, email: true, phone: true, name: true, permissionRole: true },
   });
 
   if (!user) return null;
@@ -78,7 +79,7 @@ export async function getSession(): Promise<SessionUser | null> {
     name: user.name,
     permissionRole: user.permissionRole,
   };
-}
+});
 
 /** Require authentication — redirects to /login if not authenticated */
 export async function requireAuth(): Promise<SessionUser> {

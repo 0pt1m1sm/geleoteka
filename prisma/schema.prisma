@@ -1214,6 +1214,10 @@ model Estimate {
   @@index([dealId])
   @@index([stage])
   @@index([number])
+  // Compound — covers the hot openOrCreateActiveEstimate path
+  // (findFirst dealId + stage="DRAFT" and dealId + stage != "SUPERSEDED")
+  // without forcing Postgres to pick a single-column index and post-filter.
+  @@index([dealId, stage])
 }
 
 model EstimateLine {

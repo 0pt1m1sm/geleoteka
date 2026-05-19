@@ -142,7 +142,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
           readAt: true,
         },
         orderBy: { createdAt: "desc" },
-        take: 50,
+        take: 20,
       },
       tasks: {
         select: {
@@ -159,7 +159,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
         },
         where: { status: { in: ["OPEN", "DONE"] } },
         orderBy: [{ status: "asc" }, { dueAt: "asc" }],
-        take: 50,
+        take: 20,
       },
     },
   })) as DealDetail | null;
