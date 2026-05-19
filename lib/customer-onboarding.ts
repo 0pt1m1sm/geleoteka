@@ -43,9 +43,24 @@ export async function findOrCreateGuestCustomer(input: {
   name: string;
   email: string;
   phone: string;
+  /** Marketing source applied only when a brand-new User row is created.
+      Returning customers (matched by session/email/phone) keep their
+      existing referralSource — never overwrite a real attribution. */
+  referralSource?:
+    | "YANDEX"
+    | "GOOGLE"
+    | "AVITO"
+    | "INSTAGRAM"
+    | "TELEGRAM_CHAN"
+    | "FRIEND"
+    | "REPEAT"
+    | "WALK_IN"
+    | "EMAIL"
+    | "OTHER";
 }): Promise<GuestCustomerResult> {
   const phone = normalizePhone(input.phone);
   const email = input.email.trim().toLowerCase();
+  const referralSource = input.referralSource ?? "WALK_IN";
 
   if (input.sessionUserId) {
     const u = (await db.user.findUnique({
@@ -105,6 +120,7 @@ export async function findOrCreateGuestCustomer(input: {
         isTempPassword: true,
         permissionRole: "CLIENT",
         isCustomer: true,
+        referralSource,
         customerProfile: { create: {} },
       },
     })) as { id: string };

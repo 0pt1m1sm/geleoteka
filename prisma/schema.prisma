@@ -267,6 +267,7 @@ enum ReferralSource {
   FRIEND
   REPEAT
   WALK_IN
+  EMAIL
   OTHER
 }
 

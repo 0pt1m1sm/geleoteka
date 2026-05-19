@@ -71,7 +71,7 @@ export function InboxActions({
 
   const createCustomerHref = `/admin/customers/new?email=${encodeURIComponent(fromEmail)}${
     fromName ? `&name=${encodeURIComponent(fromName)}` : ""
-  }`;
+  }&source=EMAIL`;
 
   return (
     <div className="space-y-3">

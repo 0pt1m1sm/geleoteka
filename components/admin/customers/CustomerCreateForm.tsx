@@ -11,12 +11,14 @@ interface CreateFormProps {
   defaultName?: string;
   defaultEmail?: string;
   defaultPhone?: string;
+  defaultReferralSource?: string;
 }
 
 function CreateForm({
   defaultName,
   defaultEmail,
   defaultPhone,
+  defaultReferralSource,
 }: CreateFormProps): React.ReactElement {
   const [state, formAction, isPending] = useActionState(createCustomer, null);
 
@@ -83,7 +85,7 @@ function CreateForm({
             id="referralSource"
             name="referralSource"
             className="input"
-            defaultValue=""
+            defaultValue={defaultReferralSource ?? ""}
           >
             <option value="">— не указано —</option>
             {REFERRAL_SOURCE_KEYS.map((k) => (
@@ -186,16 +188,19 @@ export function CustomerCreateForm({
   defaultName,
   defaultEmail,
   defaultPhone,
+  defaultReferralSource,
 }: {
   defaultName?: string;
   defaultEmail?: string;
   defaultPhone?: string;
+  defaultReferralSource?: string;
 } = {}): React.ReactElement {
   return (
     <CreateForm
       defaultName={defaultName}
       defaultEmail={defaultEmail}
       defaultPhone={defaultPhone}
+      defaultReferralSource={defaultReferralSource}
     />
   );
 }

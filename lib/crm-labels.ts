@@ -86,6 +86,7 @@ export const REFERRAL_SOURCE_LABELS: Record<string, string> = {
   FRIEND: "По рекомендации",
   REPEAT: "Постоянный клиент",
   WALK_IN: "Зашёл в сервис",
+  EMAIL: "Письмо на info@",
   OTHER: "Другое",
 };
 
@@ -98,6 +99,7 @@ export const REFERRAL_SOURCE_KEYS: ReadonlyArray<string> = [
   "FRIEND",
   "REPEAT",
   "WALK_IN",
+  "EMAIL",
   "OTHER",
 ];
 

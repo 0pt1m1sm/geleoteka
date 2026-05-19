@@ -42,6 +42,9 @@ export async function registerAction(_prevState: { error: string | null } | null
       passwordHash,
       name,
       isTempPassword: false,
+      // Self-registration from the public site without UTM tracking — default
+      // to WALK_IN. UTM-aware attribution can override later.
+      referralSource: "WALK_IN",
       customerProfile: { create: {} },
     },
   });
