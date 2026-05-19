@@ -24,13 +24,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
     className,
   ].filter(Boolean).join(" ");
   return (
-    <div className="flex flex-col gap-1.5">
+    // min-w-0 lets the wrapper shrink inside grid/flex parents. Without it,
+    // grid/flex items default to min-width:auto = intrinsic content width,
+    // which for iOS date/time inputs is the full formatted-date string and
+    // pushes the input past the container's right edge on mobile.
+    <div className="flex flex-col gap-1.5 min-w-0">
       {label ? (
         <label htmlFor={reactId} className="text-sm font-medium">
           {label}
         </label>
       ) : null}
-      <div className="relative">
+      <div className="relative min-w-0">
         {leftIcon ? (
           <span aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--foreground-muted)] pointer-events-none">
             {leftIcon}
