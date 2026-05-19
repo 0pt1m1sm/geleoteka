@@ -64,7 +64,16 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
 );
 
 export function DialogHeader({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  return <div className={`flex flex-col gap-1 mb-4 ${className}`.trim()}>{children}</div>;
+  // Sticky so the title stays visible while the body scrolls inside the
+  // dialog on tall forms. -mx-6/-mt-6/px-6/pt-6 pulls it edge-to-edge over
+  // the parent's padding; mb-4 keeps the visual gap to the body content.
+  return (
+    <div
+      className={`sticky top-0 z-[1] bg-[var(--card)] flex flex-col gap-1 -mx-6 -mt-6 px-6 pt-6 pb-4 mb-4 border-b border-[var(--border)] ${className}`.trim()}
+    >
+      {children}
+    </div>
+  );
 }
 
 export const DialogTitle = forwardRef<
@@ -94,8 +103,12 @@ export const DialogDescription = forwardRef<
 });
 
 export function DialogFooter({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
+  // Sticky so the action buttons stay reachable while a tall body scrolls.
+  // Mirror the DialogHeader edge-to-edge pull (-mx-6/-mb-6/px-6/pb-6).
   return (
-    <div className={`flex items-center justify-end gap-3 mt-6 pt-4 border-t border-[var(--border)] ${className}`.trim()}>
+    <div
+      className={`sticky bottom-0 z-[1] bg-[var(--card)] flex items-center justify-end gap-3 -mx-6 -mb-6 px-6 py-4 mt-6 border-t border-[var(--border)] ${className}`.trim()}
+    >
       {children}
     </div>
   );

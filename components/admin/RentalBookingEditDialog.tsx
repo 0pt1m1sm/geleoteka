@@ -157,6 +157,9 @@ export function RentalBookingEditDialog({ booking }: Props): React.ReactElement 
               required
               min="0"
               defaultValue={String(booking.totalCost)}
+              // job-line-num hides the native +/- spinner that pushes the
+              // value digits and looks noisy.
+              className="job-line-num"
             />
             <Textarea
               label="Заметка"
