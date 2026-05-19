@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { nextEstimateNumber } from "@/lib/crm/internal/next-number";
 
 interface EstimateMutationResult {
   error: string | null;
@@ -434,6 +435,7 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
   }
 
   const child = await db.$transaction(async (tx) => {
+    const number = await nextEstimateNumber(tx);
     const created = (await tx.estimate.create({
       data: {
         dealId: parent.dealId,
@@ -447,6 +449,7 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
         discount: parent.discount,
         tax: parent.tax,
         total: parent.total,
+        number,
         estimateLines: {
           create: parent.estimateLines.map((l) => ({
             sortOrder: l.sortOrder,

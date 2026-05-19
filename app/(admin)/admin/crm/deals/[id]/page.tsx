@@ -315,18 +315,20 @@ export default async function CrmDealDetailPage({ params }: Props) {
               >
                 {deal.customer.name}
               </Link>
-              <p className="text-xs text-[var(--foreground-muted)]">
-                <a href={`tel:${deal.customer.phone}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
+              <div className="text-xs text-[var(--foreground-muted)] flex flex-col gap-0.5 [overflow-wrap:anywhere]">
+                <a
+                  href={`tel:${deal.customer.phone}`}
+                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                >
                   {deal.customer.phone}
                 </a>
-                {" · "}
                 <a
                   href={`mailto:${deal.customer.email}`}
                   className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                 >
                   {deal.customer.email}
                 </a>
-              </p>
+              </div>
             </div>
             {deal.vehicle ? (
               <div className="mt-3 text-xs text-[var(--foreground-muted)]">

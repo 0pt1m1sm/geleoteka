@@ -8,6 +8,7 @@ import {
   generateClaimToken,
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
+import { nextRepairOrderNumber } from "@/lib/crm/internal/next-number";
 
 interface BookingInput {
   serviceIds: string[];
@@ -125,6 +126,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
     // Slot.dateTime is what actually prevents concurrent double-booking; if two
     // requests race, only one slot.create succeeds — the other rolls back its RO.
     const repairOrder = await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+      const roNumber = await nextRepairOrderNumber(tx);
       const ro = await tx.repairOrder.create({
         data: {
           userId,
@@ -135,6 +137,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
           claimToken,
           dealId: deal.id,
           notes: notes || null,
+          roNumber,
           jobLines: {
             create: services.map((s: { id: string; name: string; priceMin: number | null }, idx: number) => ({
               sortOrder: idx,

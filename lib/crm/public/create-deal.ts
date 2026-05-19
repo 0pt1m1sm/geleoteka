@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { recomputeDealTotals } from "@/lib/crm/internal/recompute-deal-totals";
+import { nextDealNumber, nextEstimateNumber } from "@/lib/crm/internal/next-number";
 import type { CreateDealInput, DealSummary } from "./types";
 
 /**
@@ -17,6 +18,11 @@ import type { CreateDealInput, DealSummary } from "./types";
  */
 export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
   const dealId = await db.$transaction(async (tx) => {
+    const [dealNumber, estimateNumber] = await Promise.all([
+      nextDealNumber(tx),
+      nextEstimateNumber(tx),
+    ]);
+
     const deal = (await tx.deal.create({
       data: {
         customerUserId: input.customerUserId,
@@ -27,6 +33,7 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
         stage: input.initialStage ?? "NEW",
         claimToken: input.claimToken ?? null,
         notes: input.notes ?? null,
+        number: dealNumber,
       },
       select: { id: true },
     })) as { id: string };
@@ -38,6 +45,7 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
       data: {
         dealId: deal.id,
         stage: "DRAFT",
+        number: estimateNumber,
       },
       select: { id: true },
     })) as { id: string };
