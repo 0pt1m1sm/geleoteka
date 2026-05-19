@@ -364,14 +364,14 @@ function TaskRow({
 
   return (
     <li
-      className="py-3 flex items-start gap-3 transition-opacity duration-300"
+      className="py-3 relative flex items-start gap-3 transition-opacity duration-300"
       data-done={showDoneStyling || undefined}
     >
       <button
         type="button"
         onClick={handleToggle}
         disabled={pending}
-        className="mt-0.5 shrink-0 relative"
+        className="mt-0.5 shrink-0 relative z-[1]"
         aria-label={isOpen ? "Отметить выполненной" : "Открыть задачу заново"}
         aria-pressed={!isOpen}
       >
@@ -479,7 +479,7 @@ function TaskRow({
           disabled={pending}
           data-loading={pending || undefined}
           aria-busy={pending || undefined}
-          className="btn-icon shrink-0"
+          className="btn-icon shrink-0 absolute top-3 right-0 z-[1] sm:static"
           aria-label="Отменить задачу"
           title="Отменить"
         >
@@ -492,7 +492,7 @@ function TaskRow({
           disabled={pending}
           data-loading={pending || undefined}
           aria-busy={pending || undefined}
-          className="btn-icon shrink-0"
+          className="btn-icon shrink-0 absolute top-3 right-0 z-[1] sm:static"
           aria-label="Восстановить"
           title="Восстановить"
         >

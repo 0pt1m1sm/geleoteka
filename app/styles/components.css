@@ -166,9 +166,14 @@
     transition: background var(--transition-base), box-shadow var(--transition-base),
       border-color var(--transition-base), transform var(--transition-fast);
   }
-  .card-hover:hover {
-    background: var(--card-hover);
-    box-shadow: var(--shadow-md);
+  /* Hover-only treatment — wrapped in `hover: hover` media query so iOS
+     doesn't leave the bg color stuck on after a tap (the well-known
+     "sticky hover" bug on touch devices). */
+  @media (hover: hover) {
+    .card-hover:hover {
+      background: var(--card-hover);
+      box-shadow: var(--shadow-md);
+    }
   }
   .card-hover:active {
     transform: scale(0.995);
@@ -190,9 +195,11 @@
     transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
     cursor: pointer;
   }
-  .back-link:hover {
-    color: var(--foreground);
-    background: var(--card-hover);
+  @media (hover: hover) {
+    .back-link:hover {
+      color: var(--foreground);
+      background: var(--card-hover);
+    }
   }
   .back-link:active {
     background: var(--color-secondary);
@@ -203,13 +210,17 @@
   }
 
   /* Row-clickable — for <Link> wrappers around list rows or table-like rows
-     that don't use .card-hover but still need press/hover feedback. */
+     that don't use .card-hover but still need press/hover feedback. Hover
+     bg is gated to devices with real hover so iOS doesn't leave the bg
+     stuck on after a tap. */
   .row-clickable {
     cursor: pointer;
     transition: background var(--transition-fast), transform var(--transition-fast);
   }
-  .row-clickable:hover {
-    background: var(--card-hover);
+  @media (hover: hover) {
+    .row-clickable:hover {
+      background: var(--card-hover);
+    }
   }
   .row-clickable:active {
     transform: scale(0.997);
