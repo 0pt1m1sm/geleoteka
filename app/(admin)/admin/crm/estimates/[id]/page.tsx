@@ -222,34 +222,36 @@ export default async function EstimateDetailPage({ params }: Props) {
               </div>
             )}
 
-            <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-1.5 text-sm">
-              <div className="flex justify-between text-[var(--foreground-muted)]">
-                <span>Работы</span>
-                <span className="tabular-nums">{formatPrice(estimate.subtotalLabor)}</span>
-              </div>
-              <div className="flex justify-between text-[var(--foreground-muted)]">
-                <span>Запчасти</span>
-                <span className="tabular-nums">{formatPrice(estimate.subtotalParts)}</span>
-              </div>
-              {estimate.subtotalRental ? (
+            {isDraft ? null : (
+              <div className="mt-4 pt-4 border-t border-[var(--border)] space-y-1.5 text-sm">
                 <div className="flex justify-between text-[var(--foreground-muted)]">
-                  <span>Аренда</span>
-                  <span className="tabular-nums">{formatPrice(estimate.subtotalRental)}</span>
+                  <span>Работы</span>
+                  <span className="tabular-nums">{formatPrice(estimate.subtotalLabor)}</span>
                 </div>
-              ) : null}
-              {estimate.discount ? (
                 <div className="flex justify-between text-[var(--foreground-muted)]">
-                  <span>Скидки</span>
-                  <span className="tabular-nums">{formatPrice(estimate.discount)}</span>
+                  <span>Запчасти</span>
+                  <span className="tabular-nums">{formatPrice(estimate.subtotalParts)}</span>
                 </div>
-              ) : null}
-              <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">
-                <span className="text-sm font-medium">Итого</span>
-                <span className="text-xl font-bold text-[var(--color-accent)] tabular-nums">
-                  {formatPrice(estimate.total)}
-                </span>
+                {estimate.subtotalRental ? (
+                  <div className="flex justify-between text-[var(--foreground-muted)]">
+                    <span>Аренда</span>
+                    <span className="tabular-nums">{formatPrice(estimate.subtotalRental)}</span>
+                  </div>
+                ) : null}
+                {estimate.discount ? (
+                  <div className="flex justify-between text-[var(--foreground-muted)]">
+                    <span>Скидки</span>
+                    <span className="tabular-nums">{formatPrice(estimate.discount)}</span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">
+                  <span className="text-sm font-medium">Итого</span>
+                  <span className="text-xl font-bold text-[var(--color-accent)] tabular-nums">
+                    {formatPrice(estimate.total)}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
           </Card>
 
           {estimate.declineReason ? (

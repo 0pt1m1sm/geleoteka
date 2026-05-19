@@ -29,13 +29,20 @@ interface Props {
 }
 
 const LINE_TYPES = ["LABOR", "PART", "RENTAL_DAY", "DISCOUNT", "FEE"];
-const SAVE_DEBOUNCE_MS = 800;
+// 400ms is fast enough that totals reflect typing within one breath, slow
+// enough that a 4-keystroke price entry collapses into one request.
+const SAVE_DEBOUNCE_MS = 400;
 
 interface Draft {
   type: string;
   description: string;
   qty: string;
   unitPrice: string;
+}
+
+interface LiveLineTotals {
+  type: string;
+  total: number;
 }
 
 function draftFrom(line: EstimateLineView): Draft {
@@ -72,6 +79,14 @@ export function EstimateLineEditor({
   const [rowStatuses, setRowStatuses] = useState<Map<string, SaveStatus>>(
     new Map(),
   );
+  // Live per-row totals reported up from EditRow on every keystroke. Used
+  // for the running totals strip so the running sums update instantly —
+  // independent of the debounced server save + router.refresh round trip
+  // (which previously meant rows 2+ "didn't count" until something else
+  // forced a refresh).
+  const [liveTotals, setLiveTotals] = useState<Map<string, LiveLineTotals>>(
+    () => new Map(initialLines.map((l) => [l.id, { type: l.type, total: l.total }])),
+  );
 
   function reportRowStatus(id: string, status: SaveStatus): void {
     setRowStatuses((prev) => {
@@ -82,7 +97,40 @@ export function EstimateLineEditor({
     });
   }
 
+  function reportRowTotal(id: string, totals: LiveLineTotals): void {
+    setLiveTotals((prev) => {
+      const existing = prev.get(id);
+      if (existing && existing.type === totals.type && existing.total === totals.total) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.set(id, totals);
+      return next;
+    });
+  }
+
   const aggregate = aggregateStatus(rowStatuses);
+
+  // Live aggregate from current drafts — independent of server-side
+  // recompute. Filters by id present in initialLines so a row deleted
+  // mid-session drops out immediately rather than waiting for refresh.
+  const validIds = new Set(initialLines.map((l) => l.id));
+  const liveSubtotals = (() => {
+    let labor = 0;
+    let parts = 0;
+    let rental = 0;
+    let discount = 0;
+    let total = 0;
+    for (const [id, t] of liveTotals) {
+      if (!validIds.has(id)) continue;
+      total += t.total;
+      if (t.type === "LABOR") labor += t.total;
+      else if (t.type === "PART") parts += t.total;
+      else if (t.type === "RENTAL_DAY") rental += t.total;
+      else if (t.type === "DISCOUNT") discount += t.total;
+    }
+    return { labor, parts, rental, discount, total };
+  })();
 
   return (
     <div className="space-y-4">
@@ -101,6 +149,7 @@ export function EstimateLineEditor({
                   line={line}
                   index={i}
                   onStatusChange={(s) => reportRowStatus(line.id, s)}
+                  onTotalChange={(t) => reportRowTotal(line.id, t)}
                 />
               ) : (
                 <ReadOnlyRow line={line} index={i} />
@@ -111,8 +160,60 @@ export function EstimateLineEditor({
       )}
 
       {editable ? (
-        <AddLineButton estimateId={estimateId} />
+        <>
+          <LiveTotalsStrip subtotals={liveSubtotals} pending={rowStatuses.size > 0} />
+          <AddLineButton estimateId={estimateId} />
+        </>
       ) : null}
+    </div>
+  );
+}
+
+function LiveTotalsStrip({
+  subtotals,
+  pending,
+}: {
+  subtotals: { labor: number; parts: number; rental: number; discount: number; total: number };
+  pending: boolean;
+}): React.ReactElement {
+  return (
+    <div
+      className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-3 space-y-1 text-sm"
+      aria-live="polite"
+    >
+      <div className="flex justify-between text-[var(--foreground-muted)]">
+        <span>Работы</span>
+        <span className="tabular-nums">{formatPrice(subtotals.labor)}</span>
+      </div>
+      <div className="flex justify-between text-[var(--foreground-muted)]">
+        <span>Запчасти</span>
+        <span className="tabular-nums">{formatPrice(subtotals.parts)}</span>
+      </div>
+      {subtotals.rental ? (
+        <div className="flex justify-between text-[var(--foreground-muted)]">
+          <span>Аренда</span>
+          <span className="tabular-nums">{formatPrice(subtotals.rental)}</span>
+        </div>
+      ) : null}
+      {subtotals.discount ? (
+        <div className="flex justify-between text-[var(--foreground-muted)]">
+          <span>Скидки</span>
+          <span className="tabular-nums">{formatPrice(subtotals.discount)}</span>
+        </div>
+      ) : null}
+      <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">
+        <span className="font-medium flex items-center gap-2">
+          Итого
+          {pending ? (
+            <span className="text-[10px] uppercase tracking-wider text-[var(--foreground-muted)] font-normal">
+              сохраняем…
+            </span>
+          ) : null}
+        </span>
+        <span className="text-lg font-bold text-[var(--color-accent)] tabular-nums">
+          {formatPrice(subtotals.total)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -147,10 +248,12 @@ function EditRow({
   line,
   index,
   onStatusChange,
+  onTotalChange,
 }: {
   line: EstimateLineView;
   index: number;
   onStatusChange: (s: SaveStatus) => void;
+  onTotalChange: (t: LiveLineTotals) => void;
 }): React.ReactElement {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(() => draftFrom(line));
@@ -160,6 +263,16 @@ function EditRow({
   const inFlightRef = useRef(false);
   const lastSavedRef = useRef<Draft>(draftFrom(line));
   const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Report live row total upward on every draft change so the editor's
+  // running totals strip reflects what the user just typed — independent
+  // of the debounced server save.
+  useEffect(() => {
+    onTotalChange({ type: draft.type, total: rowTotal(draft) });
+    // onTotalChange identity is stable across renders for our use; we don't
+    // want it triggering re-fires.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
 
   // Re-sync local draft when the parent re-fetches (e.g. after add/delete).
   // Avoid clobbering edits-in-flight: only reset when the prop changes AND
