@@ -69,10 +69,9 @@ export function EstimateActions({
     const stageRu =
       { DRAFT: "черновик", SENT: "отправленную смету", DECLINED: "отклонённую смету", EXPIRED: "истёкшую смету", SUPERSEDED: "пересмотренную смету" }[stage] ?? "эту смету";
     if (!confirm(`Удалить ${stageRu}? Это действие необратимо.`)) return;
-    // After delete, route back to the parent deal — the estimate page no
-    // longer exists. We can't read deal id from the action result reliably
-    // because the estimate is gone, but router.refresh would 404 here.
-    // Walk up via history instead.
+    // After delete the estimate's own URL 404s. The server action returns
+    // the parent dealId so we navigate directly — router.back() was unreliable
+    // (depends on browser history; direct loads / refreshes had no prior page).
     setError(null);
     startTransition(async () => {
       const res = await deleteEstimate(estimateId);
@@ -80,7 +79,13 @@ export function EstimateActions({
         setError(res.error);
         return;
       }
-      router.back();
+      if (res.dealId) {
+        router.push(`/admin/crm/deals/${res.dealId}`);
+        router.refresh();
+        return;
+      }
+      // Fallback (should never hit) — head to the deals list rather than 404.
+      router.push("/admin/crm/deals");
     });
   }
 

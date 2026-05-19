@@ -288,6 +288,12 @@ export async function unapproveEstimate(estimateId: string): Promise<EstimateMut
   return { error: null, estimateId };
 }
 
+export interface DeleteEstimateResult {
+  error: string | null;
+  /** Parent deal id — clients use this to navigate after the row is gone. */
+  dealId?: string;
+}
+
 /**
  * Delete an estimate. Soft policy:
  *   - DRAFT / SUPERSEDED → free deletion (no contract value)
@@ -297,8 +303,11 @@ export async function unapproveEstimate(estimateId: string): Promise<EstimateMut
  * Cascade: EstimateLine[] dropped via Prisma's onDelete: Cascade.
  * Revision chain: if `parentEstimateId` pointed at this row, children get
  * their FK set to null (SetNull) — chain breaks but children survive.
+ *
+ * Returns `dealId` so the caller (estimate detail page) can navigate to the
+ * parent deal — the estimate's own URL 404s the moment delete commits.
  */
-export async function deleteEstimate(estimateId: string): Promise<EstimateMutationResult> {
+export async function deleteEstimate(estimateId: string): Promise<DeleteEstimateResult> {
   await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
@@ -313,7 +322,7 @@ export async function deleteEstimate(estimateId: string): Promise<EstimateMutati
   await db.estimate.delete({ where: { id: estimateId } });
 
   revalidatePath(`/admin/crm/deals/${est.dealId}`);
-  return { error: null, estimateId };
+  return { error: null, dealId: est.dealId };
 }
 
 export async function declineEstimate(
