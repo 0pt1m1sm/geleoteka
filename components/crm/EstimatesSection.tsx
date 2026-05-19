@@ -200,7 +200,7 @@ function EstimateRow({
       />
       <Link
         href={`/admin/crm/estimates/${est.id}`}
-        className="flex-1 min-w-0 hover:text-[var(--color-accent)]"
+        className="row-clickable flex-1 min-w-0 hover:text-[var(--color-accent)] -mx-2 px-2 py-1 rounded"
       >
         <div className={compact ? "text-xs truncate" : "text-sm font-medium truncate"}>
           {est.number ?? "Без номера"} · {ESTIMATE_STAGE_LABELS[est.stage] ?? est.stage}

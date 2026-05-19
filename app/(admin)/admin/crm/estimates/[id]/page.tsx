@@ -190,29 +190,29 @@ export default async function EstimateDetailPage({ params }: Props) {
                 Смета пуста.
               </p>
             ) : (
-              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-hidden">
-                <table className="w-full text-sm">
+              <div className="rounded-[var(--radius-lg)] border border-[var(--border)] overflow-x-auto">
+                <table className="w-full text-sm min-w-[560px]">
                   <thead className="bg-[var(--background-secondary)] text-xs uppercase tracking-wider text-[var(--foreground-muted)]">
                     <tr>
-                      <th className="text-left px-4 py-2 font-medium">Тип</th>
-                      <th className="text-left px-4 py-2 font-medium">Описание</th>
-                      <th className="text-right px-4 py-2 font-medium">Кол-во</th>
-                      <th className="text-right px-4 py-2 font-medium">Цена</th>
-                      <th className="text-right px-4 py-2 font-medium">Сумма</th>
+                      <th className="text-left px-3 py-2 font-medium">Тип</th>
+                      <th className="text-left px-3 py-2 font-medium">Описание</th>
+                      <th className="text-right px-3 py-2 font-medium whitespace-nowrap">Кол-во</th>
+                      <th className="text-right px-3 py-2 font-medium">Цена</th>
+                      <th className="text-right px-3 py-2 font-medium">Сумма</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--border)]">
                     {estimate.estimateLines.map((line) => (
                       <tr key={line.id}>
-                        <td className="px-4 py-2 text-xs text-[var(--foreground-muted)]">
+                        <td className="px-3 py-2 text-xs text-[var(--foreground-muted)] whitespace-nowrap">
                           {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                         </td>
-                        <td className="px-4 py-2">{line.description}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">{line.qty}</td>
-                        <td className="px-4 py-2 text-right tabular-nums">
+                        <td className="px-3 py-2">{line.description}</td>
+                        <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">{line.qty}</td>
+                        <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                           {formatPrice(line.unitPrice)}
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums font-medium">
+                        <td className="px-3 py-2 text-right tabular-nums font-medium whitespace-nowrap">
                           {formatPrice(line.total)}
                         </td>
                       </tr>
