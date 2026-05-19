@@ -46,7 +46,7 @@ export function ConfirmHost(): React.ReactElement {
               <DialogTitle>{req.title ?? "Подтвердите действие"}</DialogTitle>
               <DialogDescription>{req.message}</DialogDescription>
             </DialogHeader>
-            <DialogFooter className="mt-4 pt-3">
+            <DialogFooter>
               <Button
                 type="button"
                 variant="secondary"

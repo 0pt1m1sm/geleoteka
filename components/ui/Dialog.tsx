@@ -40,20 +40,19 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         <DialogPrimitive.Content
           ref={ref}
           data-dialog-content
-          // Static -translate-x-1/2 -translate-y-1/2 keeps the dialog
-          // centered before the entry animation fires AND when the user
-          // has prefers-reduced-motion enabled (which disables the
-          // keyframe that otherwise carries the translate). Without it,
-          // the dialog top-left would anchor at viewport center on the
-          // first paint and slide back as the keyframe runs — visible
-          // jank, and on touch devices that hadn't installed the
-          // animation yet, the dialog floated off-screen.
-          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl p-6 ${className}`.trim()}
+          // Flex column with overflow-hidden lets DialogHeader / DialogBody /
+          // DialogFooter cooperate: header + footer are flex-shrink-0 (fixed
+          // bands), body is flex-1 with its own overflow-y-auto (scrollable
+          // middle). This is the standard modal layout — pin chrome, scroll
+          // content — and is more reliable than sticky-with-negative-margins.
+          // Static -translate keeps the dialog centered before the entry
+          // animation fires AND under prefers-reduced-motion.
+          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] flex flex-col overflow-hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl ${className}`.trim()}
           {...props}
         >
           {children}
           {hideCloseButton ? null : (
-            <DialogPrimitive.Close className="btn-icon absolute top-3 right-3" aria-label="Закрыть">
+            <DialogPrimitive.Close className="btn-icon absolute top-3 right-3 z-[2]" aria-label="Закрыть">
               <X size={18} aria-hidden />
             </DialogPrimitive.Close>
           )}
@@ -64,13 +63,27 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
 );
 
 export function DialogHeader({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  // Sticky so the title stays visible while the body scrolls inside the
-  // dialog on tall forms. -mx-6/-mt-6/px-6/pt-6 pulls it edge-to-edge over
-  // the parent's padding; mb-4 keeps the visual gap to the body content.
+  // shrink-0 keeps it from compressing when body content is tall — the
+  // flex column inside DialogContent gives this 'pinned at top' behaviour
+  // without any sticky / negative-margin trickery.
   return (
     <div
-      className={`sticky top-0 z-[1] bg-[var(--card)] flex flex-col gap-1 -mx-6 -mt-6 px-6 pt-6 pb-4 mb-4 border-b border-[var(--border)] ${className}`.trim()}
+      className={`shrink-0 flex flex-col gap-1 px-6 pt-6 pb-4 border-b border-[var(--border)] ${className}`.trim()}
     >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Scrollable middle section of a dialog. Use between DialogHeader and
+ * DialogFooter so the chrome stays pinned while only the body content
+ * scrolls. flex-1 takes all remaining vertical space; overflow-y-auto
+ * makes it the local scroll container.
+ */
+export function DialogBody({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
+  return (
+    <div className={`flex-1 overflow-y-auto px-6 py-4 ${className}`.trim()}>
       {children}
     </div>
   );
@@ -103,11 +116,10 @@ export const DialogDescription = forwardRef<
 });
 
 export function DialogFooter({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  // Sticky so the action buttons stay reachable while a tall body scrolls.
-  // Mirror the DialogHeader edge-to-edge pull (-mx-6/-mb-6/px-6/pb-6).
+  // shrink-0 pins to the bottom of the flex-column DialogContent.
   return (
     <div
-      className={`sticky bottom-0 z-[1] bg-[var(--card)] flex items-center justify-end gap-3 -mx-6 -mb-6 px-6 py-4 mt-6 border-t border-[var(--border)] ${className}`.trim()}
+      className={`shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[var(--border)] ${className}`.trim()}
     >
       {children}
     </div>

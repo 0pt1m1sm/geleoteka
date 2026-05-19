@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -106,16 +107,20 @@ export function RentalBookingEditDialog({ booking }: Props): React.ReactElement 
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Редактирование бронирования</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <Input
-              label="Имя клиента"
-              name="contactName"
-              required
-              defaultValue={booking.contactName}
-            />
+          {/* form wraps the whole thing so the Сохранить button in the footer
+              submits the inputs in the body. Inner layout uses the
+              header/body/footer triad — body scrolls, chrome pins. */}
+          <form onSubmit={handleSubmit} className="contents">
+            <DialogHeader>
+              <DialogTitle>Редактирование бронирования</DialogTitle>
+            </DialogHeader>
+            <DialogBody className="space-y-3">
+              <Input
+                label="Имя клиента"
+                name="contactName"
+                required
+                defaultValue={booking.contactName}
+              />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input
                 label="Телефон"
@@ -169,7 +174,8 @@ export function RentalBookingEditDialog({ booking }: Props): React.ReactElement 
               placeholder="Внутренний комментарий"
             />
             {error ? <Alert variant="error">{error}</Alert> : null}
-            <DialogFooter className="mt-2">
+            </DialogBody>
+            <DialogFooter>
               <Button
                 type="button"
                 variant="secondary"
