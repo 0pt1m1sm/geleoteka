@@ -113,7 +113,7 @@ export default async function CrmDealsPage({ searchParams }: Props) {
             <li key={d.id}>
               <Link
                 href={`/admin/crm/deals/${d.id}`}
-                className="card flex items-start justify-between gap-4 hover:border-[var(--border-hover)]"
+                className="card card-hover flex items-start justify-between gap-4"
               >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{d.customer.name}</div>

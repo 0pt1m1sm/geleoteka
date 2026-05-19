@@ -109,7 +109,7 @@ export default async function InboxPage({ searchParams }: Props) {
               <li key={row.id}>
                 <Link
                   href={`/admin/crm/inbox/${row.id}`}
-                  className="flex items-start gap-4 px-4 py-3 hover:bg-[var(--background-elevated)]"
+                  className="row-clickable flex items-start gap-4 px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate">

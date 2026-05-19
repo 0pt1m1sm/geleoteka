@@ -41,6 +41,28 @@
     opacity: 0.6;
     cursor: not-allowed;
   }
+  /* CSS-only loading spinner for raw `<button class="btn" data-loading="true">`
+     callsites that don't go through the Button primitive. Renders a small
+     spinning ring before the label. The Button primitive renders its own
+     lucide Loader2 and never sets data-loading on a raw element, so the two
+     paths don't double-up. */
+  .btn[data-loading="true"]:not(:has(svg.lucide))::before {
+    content: "";
+    width: 0.875em;
+    height: 0.875em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    display: inline-block;
+    animation: btn-spin 0.7s linear infinite;
+  }
+  @keyframes btn-spin {
+    to { transform: rotate(360deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .btn:active:not(:disabled) { transform: none; }
+    .btn[data-loading="true"]::before { animation: none; }
+  }
 
   .btn-primary {
     background: var(--color-accent);
@@ -121,9 +143,40 @@
     transition: all var(--transition-base);
   }
   .card:hover { border-color: var(--border-hover); }
+  .card-hover {
+    cursor: pointer;
+    transition: background var(--transition-base), box-shadow var(--transition-base),
+      border-color var(--transition-base), transform var(--transition-fast);
+  }
   .card-hover:hover {
     background: var(--card-hover);
     box-shadow: var(--shadow-md);
+  }
+  .card-hover:active {
+    transform: scale(0.995);
+    background: var(--card-hover);
+  }
+
+  /* Row-clickable — for <Link> wrappers around list rows or table-like rows
+     that don't use .card-hover but still need press/hover feedback. */
+  .row-clickable {
+    cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+  }
+  .row-clickable:hover {
+    background: var(--card-hover);
+  }
+  .row-clickable:active {
+    transform: scale(0.997);
+    background: var(--card-hover);
+    filter: brightness(0.95);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-hover:active,
+    .row-clickable:active {
+      transform: none;
+    }
   }
 
   /* Input */

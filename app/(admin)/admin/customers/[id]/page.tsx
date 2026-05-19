@@ -339,7 +339,7 @@ export default async function CustomerDetailPage({ params }: Props) {
                 <li key={d.id}>
                   <Link
                     href={`/admin/crm/deals/${d.id}`}
-                    className="flex items-center justify-between gap-4 px-4 py-3 hover:bg-[var(--card-hover)]"
+                    className="row-clickable flex items-center justify-between gap-4 px-4 py-3"
                   >
                     <div className="min-w-0">
                       <div className="font-medium truncate">

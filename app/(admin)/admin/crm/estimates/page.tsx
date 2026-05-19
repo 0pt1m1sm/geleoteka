@@ -147,7 +147,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
             <li key={est.id}>
               <Link
                 href={`/admin/crm/estimates/${est.id}`}
-                className="card flex items-start justify-between gap-4 hover:border-[var(--border-hover)]"
+                className="card card-hover flex items-start justify-between gap-4"
               >
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">
@@ -227,7 +227,7 @@ function EmptyState({ deals, stageLabel }: { deals: DealRow[]; stageLabel: strin
           <li key={d.id}>
             <Link
               href={`/admin/crm/deals/${d.id}`}
-              className="flex items-start justify-between gap-4 py-3 hover:bg-[var(--card-hover)] -mx-3 px-3 rounded"
+              className="row-clickable flex items-start justify-between gap-4 py-3 -mx-3 px-3 rounded"
             >
               <div className="flex-1 min-w-0">
                 <div className="font-medium truncate">
