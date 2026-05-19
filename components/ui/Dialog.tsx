@@ -20,7 +20,8 @@ export const DialogOverlay = forwardRef<
   return (
     <DialogPrimitive.Overlay
       ref={ref}
-      className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-fade-in ${className}`.trim()}
+      data-dialog-overlay
+      className={`fixed inset-0 z-50 bg-black/70 backdrop-blur-sm ${className}`.trim()}
       {...props}
     />
   );
@@ -38,7 +39,8 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         <DialogOverlay />
         <DialogPrimitive.Content
           ref={ref}
-          className={`fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[92vw] max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl p-6 data-[state=open]:animate-fade-in ${className}`.trim()}
+          data-dialog-content
+          className={`fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] overflow-y-auto bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl p-6 ${className}`.trim()}
           {...props}
         >
           {children}

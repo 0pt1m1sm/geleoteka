@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { updateRepairOrderStatus } from "@/app/actions/admin";
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { toast } from "@/lib/ui/toast";
 
 const STATUSES = ["SCHEDULED", "IN_PROGRESS", "READY", "COMPLETED", "CANCELLED"];
 
@@ -17,6 +18,7 @@ export function StatusChanger({
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     await updateRepairOrderStatus(repairOrderId, e.target.value);
+    toast.success("Статус обновлён");
     router.refresh();
   }
 

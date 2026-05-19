@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { deleteVacancy } from "@/app/actions/vacancies";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 export function DeleteVacancyButton({
   vacancyId,
@@ -16,6 +17,7 @@ export function DeleteVacancyButton({
   async function handleDelete() {
     if (!(await confirm({ message: `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`, danger: true }))) return;
     await deleteVacancy(vacancyId);
+    toast.success("Вакансия удалена");
     router.refresh();
   }
 

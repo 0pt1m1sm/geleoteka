@@ -371,6 +371,7 @@ function EditRow({
         toast.error(result.error);
         return;
       }
+      toast.success("Строка удалена");
       router.refresh();
     });
   }
@@ -421,8 +422,10 @@ function AddLineButton({ estimateId }: { estimateId: string }): React.ReactEleme
       const result = await addEstimateLine(null, fd);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Строка добавлена");
       router.refresh();
     });
   }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, AlertCircle, Info, X } from "lucide-react";
 import {
   dismissToast,
+  dismissToastAnimated,
   subscribeToasts,
   type ToastEntry,
   type ToastVariant,
@@ -46,13 +47,15 @@ export function ToastHost(): React.ReactElement {
           <div
             key={t.id}
             role="status"
-            className={`pointer-events-auto rounded-[var(--radius-lg)] border ${cfg.border} ${cfg.bg} px-3 py-2.5 flex items-start gap-2.5 shadow-lg animate-fade-in`}
+            className={`pointer-events-auto rounded-[var(--radius-lg)] border ${cfg.border} ${cfg.bg} px-3 py-2.5 flex items-start gap-2.5 shadow-lg will-change-transform ${
+              t.exiting ? "animate-toast-out" : "animate-toast-in"
+            }`}
           >
             <Icon size={16} aria-hidden className="shrink-0 mt-0.5" />
             <p className="flex-1 text-sm">{t.message}</p>
             <button
               type="button"
-              onClick={() => dismissToast(t.id)}
+              onClick={() => (t.exiting ? dismissToast(t.id) : dismissToastAnimated(t.id))}
               className="btn-icon shrink-0 -my-1 -mr-1"
               aria-label="Закрыть"
             >

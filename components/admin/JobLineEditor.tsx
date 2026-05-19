@@ -4,6 +4,7 @@ import { useActionState, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Alert, Button, Input } from "@/components/ui";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import {
   addJobLine,
   deleteJobLine,
@@ -153,6 +154,7 @@ function JobLineRow({
     if (!(await confirm({ message: "Удалить эту работу?", danger: true, confirmText: "Удалить" }))) return;
     startDelete(async () => {
       await deleteJobLine(job.id);
+      toast.success("Работа удалена");
     });
   }
 

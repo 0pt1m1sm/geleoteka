@@ -15,6 +15,8 @@ import {
   CRM_TASK_KIND_LABELS,
   CRM_TASK_STATUS_LABELS,
 } from "@/lib/crm-labels";
+import { toast } from "@/lib/ui/toast";
+import { confirm } from "@/lib/ui/confirm";
 import { formatDateTime } from "@/lib/utils";
 
 interface TaskView {
@@ -210,15 +212,20 @@ function TaskRow({
   // Reverts on error.
   const [optimisticDone, setOptimisticDone] = useState<boolean | null>(null);
 
-  function run(action: () => Promise<{ error: string | null }>): void {
+  function run(
+    action: () => Promise<{ error: string | null }>,
+    successToast?: string,
+  ): void {
     setError(null);
     startTransition(async () => {
       const res = await action();
       if (res.error) {
         setError(res.error);
         setOptimisticDone(null);
+        toast.error(res.error);
         return;
       }
+      if (successToast) toast.success(successToast);
       router.refresh();
     });
   }
@@ -322,7 +329,16 @@ function TaskRow({
       {isOpen ? (
         <button
           type="button"
-          onClick={() => run(() => cancelCrmTask(task.id))}
+          onClick={async () => {
+            const ok = await confirm({
+              message: "Отменить задачу?",
+              danger: true,
+              confirmText: "Отменить задачу",
+              cancelText: "Не отменять",
+            });
+            if (!ok) return;
+            run(() => cancelCrmTask(task.id), "Задача отменена");
+          }}
           disabled={pending}
           className="btn-icon shrink-0"
           aria-label="Отменить задачу"
@@ -333,7 +349,7 @@ function TaskRow({
       ) : task.status === "CANCELLED" ? (
         <button
           type="button"
-          onClick={() => run(() => reopenCrmTask(task.id))}
+          onClick={() => run(() => reopenCrmTask(task.id), "Задача восстановлена")}
           disabled={pending}
           className="btn-icon shrink-0"
           aria-label="Восстановить"

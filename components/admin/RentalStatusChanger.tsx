@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { updateRentalBookingStatus } from "@/app/actions/rentals";
+import { toast } from "@/lib/ui/toast";
 
 const STATUSES = ["BOOKED", "ACTIVE", "RETURNED", "CANCELLED"];
 const LABELS: Record<string, string> = {
@@ -16,6 +17,7 @@ export function RentalStatusChanger({ bookingId, currentStatus }: { bookingId: s
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     await updateRentalBookingStatus(bookingId, e.target.value);
+    toast.success("Статус бронирования обновлён");
     router.refresh();
   }
 

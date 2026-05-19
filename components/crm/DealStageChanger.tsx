@@ -38,9 +38,11 @@ export function DealStageChanger({
       const result = await setDealStage(dealId, next, lostReason);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         router.refresh();
         return;
       }
+      toast.success(`Стадия: ${DEAL_STAGE_LABELS[next] ?? next}`);
       router.refresh();
     });
   }

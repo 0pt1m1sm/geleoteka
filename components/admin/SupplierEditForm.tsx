@@ -6,6 +6,7 @@ import { updateSupplier, deleteSupplier } from "@/app/actions/suppliers";
 import { AdminFormShell } from "./AdminFormShell";
 import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 interface SupplierData {
   id: string;
@@ -28,6 +29,7 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
     if (!(await confirm({ message: `Деактивировать поставщика "${supplier.name}"?`, danger: true, confirmText: "Деактивировать" }))) return;
     startDelete(async () => {
       await deleteSupplier(supplier.id);
+      toast.success("Поставщик деактивирован");
       router.push("/admin/suppliers");
     });
   }

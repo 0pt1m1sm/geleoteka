@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteCustomer } from "@/app/actions/crm/customers";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 interface Props {
   customerUserId: string;
@@ -27,8 +28,10 @@ export function DeleteCustomerButton({ customerUserId, isGuest }: Props) {
       const result = await deleteCustomer(customerUserId);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success(result.hardDeleted ? "Клиент удалён" : "Клиент скрыт из CRM");
       router.push("/admin/customers");
       router.refresh();
     });

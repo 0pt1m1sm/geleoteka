@@ -184,8 +184,11 @@ function LogForm({
   // component"). Defer to commit phase via useEffect.
   useEffect(() => {
     if (state?.id && !state?.error && !isPending) {
+      toast.success("Запись добавлена");
       onLogged();
       router.refresh();
+    } else if (state?.error && !isPending) {
+      toast.error(state.error);
     }
   }, [state, isPending, onLogged, router]);
 
@@ -315,8 +318,10 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
       const result = await updateCommunicationDate(entry.id, value);
       if (result.error) {
         setDateError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Дата обновлена");
       setEditing(false);
       router.refresh();
     });

@@ -21,6 +21,8 @@ export interface ToastEntry {
   variant: ToastVariant;
   message: string;
   duration: number;
+  /** Set true once dismissal is in flight so the host can swap the animation. */
+  exiting?: boolean;
 }
 
 type Listener = (toasts: ToastEntry[]) => void;
@@ -45,6 +47,18 @@ export function dismissToast(id: number): void {
   notify();
 }
 
+const EXIT_DURATION_MS = 200;
+
+export function dismissToastAnimated(id: number): void {
+  // Mark for exit; the host will swap the animation class. Real removal
+  // happens after the animation finishes so React doesn't unmount mid-flight.
+  toasts = toasts.map((t) => (t.id === id ? { ...t, exiting: true } : t));
+  notify();
+  if (typeof window !== "undefined") {
+    window.setTimeout(() => dismissToast(id), EXIT_DURATION_MS);
+  }
+}
+
 function push(variant: ToastVariant, message: string, opts: ToastOptions = {}): number {
   if (typeof window === "undefined") return 0;
   const id = nextId++;
@@ -52,7 +66,7 @@ function push(variant: ToastVariant, message: string, opts: ToastOptions = {}): 
   toasts = [...toasts, { id, variant, message, duration }];
   notify();
   if (duration > 0) {
-    window.setTimeout(() => dismissToast(id), duration);
+    window.setTimeout(() => dismissToastAnimated(id), duration);
   }
   return id;
 }

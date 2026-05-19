@@ -37,16 +37,21 @@ export function EstimateActions({
   const [declineOpen, setDeclineOpen] = useState(false);
   const [declineReason, setDeclineReason] = useState("");
 
-  function run(action: () => Promise<ActionResult>, onSuccessRedirect?: string): void {
+  function run(
+    action: () => Promise<ActionResult>,
+    onSuccess?: { redirect?: string; toast?: string },
+  ): void {
     setError(null);
     startTransition(async () => {
       const res = await action();
       if (res.error) {
         setError(res.error);
+        toast.error(res.error);
         return;
       }
-      if (onSuccessRedirect) {
-        router.push(onSuccessRedirect);
+      if (onSuccess?.toast) toast.success(onSuccess.toast);
+      if (onSuccess?.redirect) {
+        router.push(onSuccess.redirect);
         return;
       }
       // Revision creates a child estimate; navigate there.
@@ -64,7 +69,7 @@ export function EstimateActions({
       setError("Укажите причину отказа");
       return;
     }
-    run(() => declineEstimate(estimateId, reason));
+    run(() => declineEstimate(estimateId, reason), { toast: "Отказ зафиксирован" });
   }
 
   async function handleDelete(): Promise<void> {
@@ -107,7 +112,7 @@ export function EstimateActions({
             type="button"
             isLoading={pending}
             disabled={pending}
-            onClick={() => run(() => sendEstimate(estimateId))}
+            onClick={() => run(() => sendEstimate(estimateId), { toast: "Смета отправлена клиенту" })}
           >
             Отправить клиенту
           </Button>
@@ -115,7 +120,7 @@ export function EstimateActions({
             type="button"
             variant="secondary"
             disabled={pending}
-            onClick={() => run(() => approveEstimate(estimateId))}
+            onClick={() => run(() => approveEstimate(estimateId), { toast: "Смета согласована" })}
           >
             Согласовать
           </Button>
@@ -128,7 +133,7 @@ export function EstimateActions({
             type="button"
             isLoading={pending}
             disabled={pending}
-            onClick={() => run(() => approveEstimate(estimateId))}
+            onClick={() => run(() => approveEstimate(estimateId), { toast: "Согласие клиента зафиксировано" })}
           >
             Клиент согласен
           </Button>
@@ -144,7 +149,7 @@ export function EstimateActions({
             type="button"
             variant="secondary"
             disabled={pending}
-            onClick={() => run(() => reviseEstimate(estimateId))}
+            onClick={() => run(() => reviseEstimate(estimateId), { toast: "Создан новый черновик на основе текущей сметы" })}
           >
             Пересмотреть
           </Button>
@@ -156,7 +161,7 @@ export function EstimateActions({
           type="button"
           variant="secondary"
           disabled={pending}
-          onClick={() => run(() => unapproveEstimate(estimateId))}
+          onClick={() => run(() => unapproveEstimate(estimateId), { toast: "Согласование откатано" })}
         >
           Откатить согласование
         </Button>

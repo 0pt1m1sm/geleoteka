@@ -6,6 +6,7 @@ import ReactMarkdown from "react-markdown";
 import { addCustomerNote, deleteCustomerNote } from "@/app/actions/customers";
 import { useFormAction } from "@/lib/use-form-action";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 export interface TimelineNote {
   id: string;
@@ -47,7 +48,8 @@ export function CustomerNotesTimeline({
       const fd = new FormData();
       fd.set("body", trimmed);
       const res = await addCustomerNote(customerUserId, null, fd);
-      if (!res.ok) throw new Error(res.error);
+      if (!res.ok) { toast.error(res.error); throw new Error(res.error); }
+      toast.success("Заметка добавлена");
       setBody("");
       router.refresh();
     });
@@ -57,7 +59,8 @@ export function CustomerNotesTimeline({
     if (!(await confirm({ message: "Удалить заметку?", danger: true }))) return;
     runAction(async () => {
       const res = await deleteCustomerNote(noteId);
-      if (!res.ok) throw new Error(res.error);
+      if (!res.ok) { toast.error(res.error); throw new Error(res.error); }
+      toast.success("Заметка удалена");
       router.refresh();
     });
   }

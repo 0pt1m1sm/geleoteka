@@ -7,6 +7,7 @@ import { updateRentalCar, deleteRentalCar } from "@/app/actions/rentals";
 import { AdminFormShell } from "./AdminFormShell";
 import { PhotoUploader } from "./PhotoUploader";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 interface CarData {
   id: string;
@@ -36,6 +37,7 @@ export function RentalEditForm({ car }: { car: CarData }) {
     if (!(await confirm({ message: `Удалить Mercedes-Benz ${car.model} из автопарка?`, danger: true, confirmText: "Удалить" }))) return;
     startDelete(async () => {
       await deleteRentalCar(car.id);
+      toast.success("Mercedes-Benz удалён из автопарка");
       router.push("/admin/rentals");
     });
   }

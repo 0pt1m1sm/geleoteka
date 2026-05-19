@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import {
   createModel,
   updateModel,
@@ -83,6 +84,7 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
     if (!(await confirm({ message: `Удалить модель "${initial.name}"? Это удалит все её поколения. Запчасти останутся.`, danger: true, confirmText: "Удалить" }))) return;
     runAction(async () => {
       await deleteModel(initial.id);
+      toast.success("Модель удалена");
       router.push("/admin/models");
     });
   }

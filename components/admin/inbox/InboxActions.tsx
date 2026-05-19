@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Alert, Button } from "@/components/ui";
 import { CustomerSearchCombobox } from "./CustomerSearchCombobox";
 import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import {
   linkInboxMessageToCustomer,
   markInboxMessageSpam,
@@ -41,8 +42,10 @@ export function InboxActions({
       const result = await linkInboxMessageToCustomer(inboxMessageId, customer.id, null);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Письмо привязано к клиенту");
       router.push(`/admin/customers/${customer.id}`);
     });
   }
@@ -53,8 +56,10 @@ export function InboxActions({
       const result = await markInboxMessageSpam(inboxMessageId);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Помечено как спам");
       router.push("/admin/crm/inbox?status=SPAM");
     });
   }
@@ -64,8 +69,10 @@ export function InboxActions({
       const result = await archiveInboxMessage(inboxMessageId);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Письмо в архиве");
       router.push("/admin/crm/inbox?status=ARCHIVED");
     });
   }

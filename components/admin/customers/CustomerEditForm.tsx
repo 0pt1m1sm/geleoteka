@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateCustomer } from "@/app/actions/customers";
 import { useFormAction } from "@/lib/use-form-action";
+import { toast } from "@/lib/ui/toast";
 import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
 
 interface InitialValues {
@@ -49,8 +50,10 @@ export function CustomerEditForm({ customerUserId, initial }: Props): React.Reac
       if (blacklisted) fd.set("blacklisted", "on");
       const res = await updateCustomer(customerUserId, null, fd);
       if (!res.ok) {
+        toast.error(res.error);
         throw new Error(res.error);
       }
+      toast.success("Контакты сохранены");
       setMode("view");
       router.refresh();
     });

@@ -43,6 +43,41 @@
   to { opacity: 1; transform: translateX(0); }
 }
 
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(110%) scale(0.95); }
+  60%  { opacity: 1; transform: translateX(-2%) scale(1.01); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes toastOut {
+  to { opacity: 0; transform: translateX(110%) scale(0.95); }
+}
+
+@keyframes dialogIn {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes dialogOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to   { opacity: 0; transform: translate(-50%, -50%) scale(0.97); }
+}
+
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes overlayOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes rowCollapse {
+  from { opacity: 1; max-height: 200px; margin-top: 0; margin-bottom: 0; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+  to   { opacity: 0; max-height: 0; margin-top: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
 }
@@ -55,6 +90,51 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-slide-in { animation: none; opacity: 1; transform: none; }
+}
+
+.animate-toast-in {
+  animation: toastIn 320ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-toast-out {
+  animation: toastOut 200ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-toast-in,
+  .animate-toast-out { animation: none; opacity: 1; transform: none; }
+}
+
+/* Radix data-state hooks for the Dialog primitive (Confirm dialog uses it). */
+[data-radix-popper-content-wrapper] { z-index: 50 !important; }
+
+[data-state="open"][data-dialog-overlay],
+[data-state="open"][data-dialog-content] {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+[data-state="closed"][data-dialog-overlay],
+[data-state="closed"][data-dialog-content] {
+  animation-duration: 160ms;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+[data-state="open"][data-dialog-overlay] { animation-name: overlayIn; }
+[data-state="closed"][data-dialog-overlay] { animation-name: overlayOut; }
+[data-state="open"][data-dialog-content] { animation-name: dialogIn; }
+[data-state="closed"][data-dialog-content] { animation-name: dialogOut; }
+@media (prefers-reduced-motion: reduce) {
+  [data-dialog-overlay],
+  [data-dialog-content] { animation: none !important; }
+}
+
+/* List-row collapse animation for client-side optimistic removal
+   (e.g. completed task fading out before server commit refreshes the list). */
+.animate-row-collapse {
+  overflow: hidden;
+  animation: rowCollapse 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-row-collapse { animation: none; opacity: 0; }
 }
 
 /* View Transitions — page-to-page cross-fade and shared-element morphs.

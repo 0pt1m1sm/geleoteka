@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { updatePartOrderStatus } from "@/app/actions/part-order-admin";
+import { toast } from "@/lib/ui/toast";
 
 const STATUSES = ["PROCESSING", "SHIPPED", "COMPLETED", "CANCELLED"];
 const LABELS: Record<string, string> = {
@@ -22,6 +23,7 @@ export function OrderStatusChanger({
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     await updatePartOrderStatus(orderId, e.target.value);
+    toast.success("Статус заказа обновлён");
     router.refresh();
   }
 
