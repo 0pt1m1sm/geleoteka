@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { RentalStatusChanger } from "@/components/admin/RentalStatusChanger";
+import { RentalBookingEditDialog } from "@/components/admin/RentalBookingEditDialog";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function RentalBookingsPage() {
@@ -47,13 +48,25 @@ export default async function RentalBookingsPage() {
                       {b.contactPhone as string} · {b.contactEmail as string}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-2">
                     <p className="font-bold text-[var(--color-accent)]">
                       {formatPrice(b.totalCost as number)}
                     </p>
                     <RentalStatusChanger
                       bookingId={b.id as string}
                       currentStatus={b.status as string}
+                    />
+                    <RentalBookingEditDialog
+                      booking={{
+                        id: b.id as string,
+                        startDate: b.startDate as Date,
+                        endDate: b.endDate as Date,
+                        totalCost: b.totalCost as number,
+                        contactName: b.contactName as string,
+                        contactPhone: b.contactPhone as string,
+                        contactEmail: b.contactEmail as string,
+                        notes: (b.notes as string | null) ?? null,
+                      }}
                     />
                   </div>
                 </div>

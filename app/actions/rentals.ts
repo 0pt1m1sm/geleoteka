@@ -120,6 +120,81 @@ export async function updateRentalBookingStatus(
   });
 }
 
+export interface UpdateRentalBookingResult {
+  error: string | null;
+}
+
+/**
+ * Admin edit of a RentalBooking — dates, contact info, total, notes.
+ * Vehicle reassignment is intentionally out of scope (would require
+ * re-checking slot availability against other bookings — overkill for
+ * the common case where the manager just needs to fix a typo or shift
+ * dates). For a vehicle change, delete + recreate.
+ */
+export async function updateRentalBooking(
+  bookingId: string,
+  formData: FormData,
+): Promise<UpdateRentalBookingResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const startRaw = ((formData.get("startDate") as string | null) ?? "").trim();
+  const endRaw = ((formData.get("endDate") as string | null) ?? "").trim();
+  const contactName = ((formData.get("contactName") as string | null) ?? "").trim();
+  const contactPhoneRaw = ((formData.get("contactPhone") as string | null) ?? "").trim();
+  const contactEmail = ((formData.get("contactEmail") as string | null) ?? "").trim().toLowerCase();
+  const totalCostRaw = ((formData.get("totalCost") as string | null) ?? "").trim();
+  const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
+
+  if (!contactName) return { error: "Имя обязательно" };
+  if (!isValidRussianPhone(contactPhoneRaw)) {
+    return { error: "Телефон должен быть в формате +7XXXXXXXXXX" };
+  }
+  if (!startRaw || !endRaw) return { error: "Укажите даты начала и конца" };
+  const startDate = new Date(startRaw);
+  const endDate = new Date(endRaw);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    return { error: "Некорректные даты" };
+  }
+  if (endDate <= startDate) return { error: "Дата возврата должна быть позже даты выдачи" };
+  const totalCost = Number.parseInt(totalCostRaw, 10);
+  if (!Number.isFinite(totalCost) || totalCost < 0) {
+    return { error: "Некорректная сумма" };
+  }
+
+  await db.rentalBooking.update({
+    where: { id: bookingId },
+    data: {
+      startDate,
+      endDate,
+      contactName,
+      contactPhone: normalizePhone(contactPhoneRaw),
+      contactEmail,
+      totalCost,
+      notes,
+    },
+  });
+
+  return { error: null };
+}
+
+/**
+ * Hard-delete a RentalBooking. The parent Deal stays (dealId is SetNull
+ * on cascade) — deals are independent commercial records that survive
+ * fulfillment changes.
+ */
+export async function deleteRentalBooking(
+  bookingId: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  try {
+    await db.rentalBooking.delete({ where: { id: bookingId } });
+  } catch (err) {
+    console.error("[deleteRentalBooking]", err);
+    return { error: "Не удалось удалить бронирование" };
+  }
+  return { error: null };
+}
+
 interface RentalBookingInput {
   carId: string; // Vehicle.id
   startDate: string;
