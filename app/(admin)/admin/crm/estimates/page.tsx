@@ -8,6 +8,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
+import { NewEstimateForDealDialog } from "@/components/crm/NewEstimateForDealDialog";
 
 interface CustomerOption {
   id: string;
@@ -54,7 +55,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
   const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "active";
   const stages = STAGE_GROUPS[stageKey];
 
-  const [estimates, customers, dealsWithoutEstimate] = await Promise.all([
+  const [estimates, customers, dealsWithoutEstimate, openDeals] = await Promise.all([
     db.estimate.findMany({
       where: { stage: { in: stages as never[] } },
       orderBy: { createdAt: "desc" },
@@ -120,6 +121,35 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
         vehicle: { make: string; model: string } | null;
       }>
     >,
+    // All open deals — fuel for the "Смета к сделке" deal-picker dialog.
+    // Includes deals that already have an estimate; picking one opens or
+    // revises (openOrCreateActiveEstimate handles both cases).
+    db.deal.findMany({
+      where: { stage: { in: ["NEW", "IN_PROGRESS"] } },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+      select: {
+        id: true,
+        number: true,
+        stage: true,
+        channel: true,
+        total: true,
+        updatedAt: true,
+        customer: { select: { id: true, name: true } },
+        vehicle: { select: { make: true, model: true } },
+      },
+    }) as Promise<
+      Array<{
+        id: string;
+        number: string | null;
+        stage: string;
+        channel: string;
+        total: number;
+        updatedAt: Date;
+        customer: { id: string; name: string };
+        vehicle: { make: string; model: string } | null;
+      }>
+    >,
   ]);
 
   return (
@@ -129,11 +159,13 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
         title="Сметы"
         description="Все сметы по всем сделкам. Каждая смета привязана к одной сделке — открыть, скачать PDF или пересмотреть можно из карточки сметы."
         actions={
-          <NewDealDialog
-            customers={customers}
-            triggerLabel="Новая смета"
-            dialogTitle="Новая смета (через сделку)"
-          />
+          <div className="flex flex-wrap gap-2">
+            <NewEstimateForDealDialog deals={openDeals} />
+            <NewDealDialog
+              customers={customers}
+              triggerLabel="Новая сделка"
+            />
+          </div>
         }
       />
 
