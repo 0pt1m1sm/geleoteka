@@ -393,7 +393,7 @@ function TaskRow({
         </span>
       </button>
 
-      <div className="flex-1 min-w-0">
+      <TaskBodyLink task={task} showLinks={showLinks}>
         <div
           className={`text-sm font-medium transition-all duration-300 ${
             showDoneStyling ? "line-through text-[var(--foreground-muted)] opacity-70" : ""
@@ -417,30 +417,16 @@ function TaskRow({
             {task.body}
           </p>
         ) : null}
-        {showLinks ? (
+        {showLinks && (task.customer || task.deal) ? (
           <div className="mt-1 text-xs flex flex-wrap gap-x-3 text-[var(--foreground-muted)]">
-            {task.customer ? (
-              <Link
-                href={`/admin/customers/${task.customer.id}`}
-                className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-              >
-                Клиент: {task.customer.name}
-              </Link>
-            ) : null}
-            {task.deal ? (
-              <Link
-                href={`/admin/crm/deals/${task.deal.id}`}
-                className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-              >
-                Сделка: {task.deal.number ?? "—"}
-              </Link>
-            ) : null}
+            {task.customer ? <span>Клиент: {task.customer.name}</span> : null}
+            {task.deal ? <span>Сделка: {task.deal.number ?? "—"}</span> : null}
           </div>
         ) : null}
         {error ? (
           <div className="text-xs text-[var(--color-error)] mt-1">{error}</div>
         ) : null}
-      </div>
+      </TaskBodyLink>
 
       {isOpen ? (
         <button
@@ -479,5 +465,46 @@ function TaskRow({
         </button>
       ) : null}
     </li>
+  );
+}
+
+/**
+ * Wraps the task title/meta/body in a Link to the deal (or customer
+ * fallback) so the entire row content is a tap target — not just the
+ * checkbox. Falls back to a plain div when neither deal nor customer
+ * is set, so unlinked tasks still render but aren't navigable.
+ */
+function TaskBodyLink({
+  task,
+  showLinks,
+  children,
+}: {
+  task: TaskView;
+  showLinks: boolean;
+  children: React.ReactNode;
+}): React.ReactElement {
+  const target = task.deal
+    ? `/admin/crm/deals/${task.deal.id}`
+    : task.customer
+      ? `/admin/customers/${task.customer.id}`
+      : null;
+
+  if (!target) {
+    return <div className="flex-1 min-w-0">{children}</div>;
+  }
+  return (
+    <Link
+      href={target}
+      className="row-clickable flex-1 min-w-0 -mx-2 px-2 py-1 rounded"
+      aria-label={
+        showLinks && task.deal
+          ? `Открыть сделку ${task.deal.number ?? ""}`.trim()
+          : showLinks && task.customer
+            ? `Открыть карточку клиента ${task.customer.name}`
+            : "Открыть"
+      }
+    >
+      {children}
+    </Link>
   );
 }
