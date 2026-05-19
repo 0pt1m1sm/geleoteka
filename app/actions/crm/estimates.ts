@@ -49,17 +49,29 @@ export async function openOrCreateActiveEstimate(
     return { error: null, estimateId: existingDraft.id };
   }
 
-  // No DRAFT — find the latest non-SUPERSEDED estimate and revise it.
+  // No DRAFT — find the latest non-SUPERSEDED estimate.
   const latest = (await db.estimate.findFirst({
     where: { dealId, stage: { not: "SUPERSEDED" } },
     orderBy: { createdAt: "desc" },
-    select: { id: true },
-  })) as { id: string } | null;
-  if (latest) {
+    select: { id: true, stage: true },
+  })) as { id: string; stage: string } | null;
+
+  // SENT / DECLINED / EXPIRED → revise: clone into a new DRAFT child and
+  // mark the parent SUPERSEDED. The lifecycle says these stages are
+  // either still live or already settled-negative — overwriting them is
+  // fine.
+  //
+  // APPROVED → DO NOT revise. Revision marks the parent SUPERSEDED, which
+  // destroys the contract-signed snapshot. Instead, create a fresh blank
+  // DRAFT as a sibling. Manager keeps the approved contract intact and
+  // builds a new estimate from scratch. recompute-deal-totals will pick
+  // the DRAFT as active (DRAFT > APPROVED in its priority table), so the
+  // deal total reflects the work-in-progress view.
+  if (latest && latest.stage !== "APPROVED") {
     return reviseEstimate(latest.id);
   }
 
-  // Legacy fallback: no estimates exist for this deal. Create a blank DRAFT.
+  // No estimates yet, OR latest is APPROVED — create a blank DRAFT.
   const created = (await db.estimate.create({
     data: { dealId, stage: "DRAFT", preparedByUserId: session.id },
     select: { id: true },
