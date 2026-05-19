@@ -10,6 +10,8 @@ import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
+import { DeleteCustomerButton } from "@/components/admin/customers/DeleteCustomerButton";
+import { RestoreCustomerButton } from "@/components/admin/customers/RestoreCustomerButton";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
@@ -25,6 +27,8 @@ interface RawCustomer {
   phone: string;
   email: string;
   referralSource: string | null;
+  isTempPassword: boolean;
+  deletedAt: Date | null;
   vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
   loyaltyAccount: { points: number } | null;
   customerProfile: { blacklisted: boolean; notes: string | null } | null;
@@ -152,6 +156,11 @@ export default async function CustomerDetailPage({ params }: Props) {
 
   return (
     <div>
+      {customer.deletedAt ? (
+        <div className="alert-error mb-4 text-sm">
+          Клиент удалён {formatDate(customer.deletedAt)}. Скрыт из списков; история сохранена.
+        </div>
+      ) : null}
       <div className="mb-6">
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <h1 className="text-display text-2xl font-bold">{customer.name}</h1>
@@ -218,6 +227,34 @@ export default async function CustomerDetailPage({ params }: Props) {
           <p className="text-2xl font-bold">{points}</p>
         </div>
       </div>
+
+      {session.permissionRole === "ADMIN" ? (
+        <div className="card mb-8 border-[var(--color-error)]/30">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-error)] mb-2">
+            Опасная зона
+          </h2>
+          {customer.deletedAt ? (
+            <>
+              <p className="text-sm text-[var(--foreground-muted)] mb-3">
+                Клиент скрыт из CRM. Восстановление вернёт его в списки.
+              </p>
+              <RestoreCustomerButton customerUserId={customer.id} />
+            </>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--foreground-muted)] mb-3">
+                {customer.isTempPassword
+                  ? "Это гостевая запись (без пароля). Удаление безвозвратное — связанные данные тоже исчезнут."
+                  : "Удаление скроет клиента из списков. История сделок и заказ-нарядов сохранится."}
+              </p>
+              <DeleteCustomerButton
+                customerUserId={customer.id}
+                isGuest={customer.isTempPassword}
+              />
+            </>
+          )}
+        </div>
+      ) : null}
 
       <div className="mb-8">
         <CustomerNotesTimeline

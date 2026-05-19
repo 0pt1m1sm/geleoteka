@@ -55,6 +55,7 @@ export async function loadCustomersForList(
   const where: Record<string, unknown> = {
     isCustomer: true,
     permissionRole: { in: ["CLIENT", "NONE"] as const },
+    deletedAt: null,
   };
 
   if (filter.tagId) {

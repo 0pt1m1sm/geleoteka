@@ -78,7 +78,7 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
       },
     }) as unknown as Promise<EstimateRow[]>,
     db.user.findMany({
-      where: { isCustomer: true },
+      where: { isCustomer: true, deletedAt: null },
       orderBy: { name: "asc" },
       take: 500,
       select: {

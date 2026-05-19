@@ -73,7 +73,7 @@ export default async function CrmDealsPage({ searchParams }: Props) {
       },
     }),
     db.user.findMany({
-      where: { isCustomer: true },
+      where: { isCustomer: true, deletedAt: null },
       orderBy: { name: "asc" },
       take: 500,
       select: {

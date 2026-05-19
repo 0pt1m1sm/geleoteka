@@ -300,6 +300,11 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Soft-delete timestamp. NULL = active; non-NULL = hidden from CRM lists.
+  // Hard delete (db.user.delete) is used only for guest accounts (isTempPassword=true);
+  // every other delete sets this field so deal/RO history stays intact.
+  deletedAt DateTime?
+
   // Optional 1:1 profile extensions (only present when corresponding flag = true)
   customerProfile CustomerProfile?
   masterProfile   MasterProfile?
@@ -364,6 +369,7 @@ model User {
   @@index([isSupplier])
   @@index([permissionRole])
   @@index([isCustomer, permissionRole])
+  @@index([deletedAt])
 }
 
 model CustomerProfile {

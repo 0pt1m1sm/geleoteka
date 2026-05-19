@@ -24,6 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const results = (await db.user.findMany({
     where: {
       isCustomer: true,
+      deletedAt: null,
       OR: [
         { name: { contains: q, mode: "insensitive" } },
         { email: { contains: q, mode: "insensitive" } },
