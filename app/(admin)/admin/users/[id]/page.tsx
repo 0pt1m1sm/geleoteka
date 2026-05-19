@@ -75,7 +75,7 @@ export default async function UserDetailPage({ params }: Props) {
         title={user.name}
         description={`${roleLabel}${flags.length > 0 ? ` · ${flags.join(", ")}` : ""}`}
         actions={
-          <Link href="/admin/users" className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]">
+          <Link href="/admin/users" className="back-link">
             ← К списку
           </Link>
         }

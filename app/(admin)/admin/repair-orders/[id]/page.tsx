@@ -130,10 +130,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
         title={`Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`}
         description={`${statusLabel} · ${formatDateTime(ro.dateTime)} · ${formatPrice(ro.total)}`}
         actions={
-          <Link
-            href="/admin/repair-orders"
-            className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-          >
+          <Link href="/admin/repair-orders" className="back-link">
             ← К списку
           </Link>
         }

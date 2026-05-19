@@ -38,7 +38,7 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/admin/suppliers/orders" className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]">
+        <Link href="/admin/suppliers/orders" className="back-link">
           ← К списку заказов
         </Link>
         <div className="flex items-start justify-between gap-4 mt-2">

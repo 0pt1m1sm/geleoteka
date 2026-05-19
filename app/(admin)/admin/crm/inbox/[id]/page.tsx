@@ -86,10 +86,7 @@ export default async function InboxMessagePage({ params }: Props) {
         title={msg.subject || "(без темы)"}
         description={`От: ${msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail} · ${formatDateTime(msg.receivedAt)}`}
         actions={
-          <Link
-            href="/admin/crm/inbox"
-            className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-          >
+          <Link href="/admin/crm/inbox" className="back-link">
             ← К списку
           </Link>
         }

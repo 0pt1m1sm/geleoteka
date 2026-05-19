@@ -157,6 +157,33 @@
     background: var(--card-hover);
   }
 
+  /* Back-link — small inline navigation link ("← К списку"). Pads the tap
+     target without visually inflating it, and supplies hover + press
+     feedback consistent with the rest of the design system. */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    color: var(--foreground-muted);
+    padding: 0.25rem 0.5rem;
+    margin: -0.25rem -0.5rem;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+    cursor: pointer;
+  }
+  .back-link:hover {
+    color: var(--foreground);
+    background: var(--card-hover);
+  }
+  .back-link:active {
+    background: var(--color-secondary);
+    transform: scale(0.96);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .back-link:active { transform: none; }
+  }
+
   /* Row-clickable — for <Link> wrappers around list rows or table-like rows
      that don't use .card-hover but still need press/hover feedback. */
   .row-clickable {

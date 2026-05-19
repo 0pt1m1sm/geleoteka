@@ -181,10 +181,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
         title={deal.customer.name}
         description={`${DEAL_CHANNEL_LABELS[deal.channel] ?? deal.channel} · ${formatDateTime(deal.createdAt)}`}
         actions={
-          <Link
-            href="/admin/crm/deals"
-            className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-          >
+          <Link href="/admin/crm/deals" className="back-link">
             ← К списку
           </Link>
         }

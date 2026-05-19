@@ -93,10 +93,7 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
   return (
     <div>
       <div className="mb-4 text-xs">
-        <Link
-          href="/cabinet/estimates"
-          className="text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-        >
+        <Link href="/cabinet/estimates" className="back-link">
           ← К списку смет
         </Link>
       </div>
