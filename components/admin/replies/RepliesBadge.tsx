@@ -6,7 +6,7 @@ interface CountResponse {
   count?: number;
 }
 
-async function fetchOpenFollowUps(): Promise<number> {
+async function fetchOpenTaskCount(): Promise<number> {
   try {
     const res = await fetch("/api/admin/replies/count", { cache: "no-store" });
     if (!res.ok) return 0;
@@ -18,18 +18,21 @@ async function fetchOpenFollowUps(): Promise<number> {
 }
 
 /**
- * Open FOLLOW_UP-task badge for the admin sidebar "Задачи" link. Polls every
- * 60 s; renders nothing when the count is 0 to keep the sidebar quiet.
+ * Open-task badge for the admin sidebar "Задачи" link. Polls every 60 s;
+ * renders nothing when the count is 0 to keep the sidebar quiet.
  *
  * Per-user: each admin/manager sees only their own count — derived from
- * CrmTask.ownerUserId == session.userId on the server. Tasks are auto-created
- * by `ensureFollowUpTask` when known customers reply via email, owned by the
- * deal's owner (or first ADMIN fallback when no deal owner).
+ * CrmTask.ownerUserId == session.userId on the server. Includes every
+ * open task kind (FOLLOW_UP auto-created from inbound email,
+ * manager-created GENERIC / CALLBACK / PAYMENT_REMINDER, etc.) so the
+ * badge equals what the user sees under "Мои · Все открытые" on
+ * /admin/crm/tasks. Persists until each task is completed or cancelled —
+ * visiting the tasks page does NOT clear it.
  */
 export function RepliesBadge(): React.ReactElement | null {
   const { data } = useQuery({
-    queryKey: ["admin-followup-tasks-count"],
-    queryFn: fetchOpenFollowUps,
+    queryKey: ["admin-open-tasks-count"],
+    queryFn: fetchOpenTaskCount,
     refetchInterval: 60_000,
     staleTime: 55_000,
     initialData: 0,
@@ -38,7 +41,7 @@ export function RepliesBadge(): React.ReactElement | null {
   return (
     <span
       className="ml-2 inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-[11px] font-medium rounded bg-[var(--color-accent)] text-[var(--background)]"
-      aria-label={`Открытых задач-ответов: ${data}`}
+      aria-label={`Открытых задач: ${data}`}
     >
       {data > 99 ? "99+" : data}
     </span>
