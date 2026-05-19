@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { deleteRepairOrder } from "@/app/actions/admin";
+import { confirm } from "@/lib/ui/confirm";
 
 export function DeleteRepairOrderButton({
   repairOrderId,
@@ -13,7 +14,7 @@ export function DeleteRepairOrderButton({
   const router = useRouter();
 
   async function handleDelete() {
-    if (!confirm(`Удалить заказ-наряд ${customerName}? Действие необратимо.`)) return;
+    if (!(await confirm({ message: `Удалить заказ-наряд ${customerName}? Действие необратимо.`, danger: true }))) return;
     await deleteRepairOrder(repairOrderId);
     router.refresh();
   }

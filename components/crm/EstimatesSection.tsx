@@ -10,6 +10,8 @@ import {
   openOrCreateActiveEstimate,
   sendEstimate,
 } from "@/app/actions/crm/estimates";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
 import { formatDate, formatPrice } from "@/lib/utils";
 
@@ -174,19 +176,31 @@ function EstimateRow({
     });
   }
 
-  function handleDelete(): void {
+  async function handleDelete(): Promise<void> {
     const stageRu =
       ESTIMATE_STAGE_LABELS[est.stage]?.toLowerCase() ?? "эту смету";
-    if (!confirm(`Удалить ${stageRu === "пересмотрена" ? "пересмотренную смету" : stageRu === "одобрена" ? "согласованную смету" : `смету (${stageRu})`}? Действие необратимо.`)) {
-      return;
-    }
+    const which =
+      stageRu === "пересмотрена"
+        ? "пересмотренную смету"
+        : stageRu === "одобрена"
+          ? "согласованную смету"
+          : `смету (${stageRu})`;
+    const ok = await confirm({
+      title: "Удалить смету",
+      message: `Удалить ${which}? Действие необратимо.`,
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     setError(null);
     startDelete(async () => {
       const res = await deleteEstimate(est.id);
       if (res.error) {
         setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success("Смета удалена");
       router.refresh();
     });
   }
@@ -200,7 +214,7 @@ function EstimateRow({
       />
       <Link
         href={`/admin/crm/estimates/${est.id}`}
-        className="row-clickable flex-1 min-w-0 hover:text-[var(--color-accent)] -mx-2 px-2 py-1 rounded"
+        className="row-clickable flex-1 min-w-0 hover:text-[var(--color-accent)] -mx-2 px-2 py-1 rounded active:opacity-70 transition-opacity"
       >
         <div className={compact ? "text-xs truncate" : "text-sm font-medium truncate"}>
           {est.number ?? "Без номера"} · {ESTIMATE_STAGE_LABELS[est.stage] ?? est.stage}

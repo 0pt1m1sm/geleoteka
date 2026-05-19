@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui";
 import { setDealStage, deleteDeal } from "@/app/actions/crm/deals";
 import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 const STAGES = ["NEW", "IN_PROGRESS", "WON", "LOST"];
 
@@ -43,17 +45,23 @@ export function DealStageChanger({
     });
   }
 
-  function handleDelete(): void {
-    if (!confirm("Удалить сделку безвозвратно? Сметы будут удалены, история работ сохранится.")) {
-      return;
-    }
+  async function handleDelete(): Promise<void> {
+    const ok = await confirm({
+      title: "Удалить сделку",
+      message: "Удалить сделку безвозвратно? Сметы будут удалены, история работ сохранится.",
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     startTransition(async () => {
       setError(null);
       const result = await deleteDeal(dealId);
       if (result.error) {
         setError(result.error);
+        toast.error(result.error);
         return;
       }
+      toast.success("Сделка удалена");
       router.push("/admin/crm/deals");
       router.refresh();
     });

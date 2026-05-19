@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteCustomer } from "@/app/actions/crm/customers";
+import { confirm } from "@/lib/ui/confirm";
 
 interface Props {
   customerUserId: string;
@@ -14,12 +15,12 @@ export function DeleteCustomerButton({ customerUserId, isGuest }: Props) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  function handleClick() {
+  async function handleClick() {
     const confirmMessage = isGuest
       ? "Удалить гостевую запись безвозвратно? Связанные данные тоже удалятся."
       : "Удалить клиента? История сделок и заказ-нарядов сохранится, но клиент исчезнет из списков.";
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!(await confirm({ message: confirmMessage, danger: true, confirmText: "Удалить" }))) return;
 
     setError(null);
     startTransition(async () => {

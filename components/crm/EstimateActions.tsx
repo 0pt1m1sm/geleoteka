@@ -11,6 +11,8 @@ import {
   sendEstimate,
   unapproveEstimate,
 } from "@/app/actions/crm/estimates";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 interface Props {
   estimateId: string;
@@ -65,10 +67,16 @@ export function EstimateActions({
     run(() => declineEstimate(estimateId, reason));
   }
 
-  function handleDelete(): void {
+  async function handleDelete(): Promise<void> {
     const stageRu =
       { DRAFT: "черновик", SENT: "отправленную смету", DECLINED: "отклонённую смету", EXPIRED: "истёкшую смету", SUPERSEDED: "пересмотренную смету" }[stage] ?? "эту смету";
-    if (!confirm(`Удалить ${stageRu}? Это действие необратимо.`)) return;
+    const ok = await confirm({
+      title: "Удалить смету",
+      message: `Удалить ${stageRu}? Действие необратимо.`,
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     // After delete the estimate's own URL 404s. The server action returns
     // the parent dealId so we navigate directly — router.back() was unreliable
     // (depends on browser history; direct loads / refreshes had no prior page).
@@ -77,8 +85,10 @@ export function EstimateActions({
       const res = await deleteEstimate(estimateId);
       if (res.error) {
         setError(res.error);
+        toast.error(res.error);
         return;
       }
+      toast.success("Смета удалена");
       if (res.dealId) {
         router.push(`/admin/crm/deals/${res.dealId}`);
         router.refresh();

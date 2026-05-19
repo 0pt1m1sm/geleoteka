@@ -271,7 +271,7 @@ export default async function EstimateDetailPage({ params }: Props) {
                   <li key={r.id}>
                     <Link
                       href={`/admin/crm/estimates/${r.id}`}
-                      className="hover:text-[var(--color-accent)]"
+                      className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                     >
                       {ESTIMATE_STAGE_LABELS[r.stage] ?? r.stage} · {formatDateTime(r.createdAt)} ↗
                     </Link>
@@ -301,7 +301,7 @@ export default async function EstimateDetailPage({ params }: Props) {
             <h3 className="font-semibold mb-2">Сделка</h3>
             <Link
               href={`/admin/crm/deals/${estimate.deal.id}`}
-              className="text-sm hover:text-[var(--color-accent)]"
+              className="text-sm hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
             >
               {estimate.deal.number ?? "Без номера"} · {estimate.deal.channel}
             </Link>
@@ -310,7 +310,7 @@ export default async function EstimateDetailPage({ params }: Props) {
                 Клиент:{" "}
                 <Link
                   href={`/admin/customers/${estimate.deal.customer.id}`}
-                  className="hover:text-[var(--color-accent)]"
+                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                 >
                   {estimate.deal.customer.name}
                 </Link>
@@ -318,7 +318,7 @@ export default async function EstimateDetailPage({ params }: Props) {
               <div>
                 <a
                   href={`tel:${estimate.deal.customer.phone}`}
-                  className="font-mono hover:text-[var(--color-accent)]"
+                  className="font-mono hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                 >
                   {estimate.deal.customer.phone}
                 </a>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Alert, Button } from "@/components/ui";
 import { CustomerSearchCombobox } from "./CustomerSearchCombobox";
+import { confirm } from "@/lib/ui/confirm";
 import {
   linkInboxMessageToCustomer,
   markInboxMessageSpam,
@@ -46,8 +47,8 @@ export function InboxActions({
     });
   }
 
-  function onSpam(): void {
-    if (!confirm("Пометить как спам?")) return;
+  async function onSpam(): Promise<void> {
+    if (!(await confirm({ message: "Пометить как спам?" }))) return;
     startTransition(async () => {
       const result = await markInboxMessageSpam(inboxMessageId);
       if (result.error) {

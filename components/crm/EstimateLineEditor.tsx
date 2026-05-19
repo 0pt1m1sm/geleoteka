@@ -11,6 +11,8 @@ import {
 } from "@/app/actions/crm/estimate-lines";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
 import { formatPrice } from "@/lib/utils";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 
 interface EstimateLineView {
   id: string;
@@ -355,11 +357,20 @@ function EditRow({
     setDraft((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleDelete(): void {
-    if (!confirm("Удалить строку?")) return;
+  async function handleDelete(): Promise<void> {
+    const ok = await confirm({
+      message: "Удалить строку?",
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     startDelete(async () => {
       onStatusChange("clean");
-      await deleteEstimateLine(line.id);
+      const result = await deleteEstimateLine(line.id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
       router.refresh();
     });
   }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { confirm } from "@/lib/ui/confirm";
 import {
   resetUserPassword,
   changeUserRole,
@@ -47,9 +48,7 @@ export function UserAdminActions({
 
   async function handleReset(): Promise<void> {
     if (
-      !confirm(
-        `Сбросить пароль для «${userName}»? Будет сгенерирован новый временный пароль и отправлен по SMS.`,
-      )
+      !(await confirm({ message: `Сбросить пароль для «${userName}»? Будет сгенерирован новый временный пароль и отправлен по SMS.` }))
     ) {
       return;
     }
@@ -70,11 +69,11 @@ export function UserAdminActions({
 
   async function handleRoleChange(): Promise<void> {
     if (role === currentRole) return;
-    if (
-      !confirm(
-        `Изменить роль «${userName}» на ${ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role}?`,
-      )
-    ) {
+    const nextLabel = ROLE_OPTIONS.find((r) => r.value === role)?.label ?? role;
+    const ok = await confirm({
+      message: `Изменить роль «${userName}» на ${nextLabel}?`,
+    });
+    if (!ok) {
       setRole(currentRole);
       return;
     }
@@ -96,7 +95,7 @@ export function UserAdminActions({
   async function handleDisableToggle(): Promise<void> {
     const next = !isDisabled;
     const verb = next ? "Заблокировать" : "Разблокировать";
-    if (!confirm(`${verb} аккаунт «${userName}»?`)) return;
+    if (!(await confirm({ message: `${verb} аккаунт «${userName}»?` }))) return;
     setError(null);
     setPending("disable");
     try {

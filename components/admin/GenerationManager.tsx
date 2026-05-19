@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, X } from "lucide-react";
+import { confirm } from "@/lib/ui/confirm";
 import {
   createGeneration,
   updateGeneration,
@@ -101,8 +102,13 @@ export function GenerationManager({ modelId, generations }: Props): React.ReactE
     });
   }
 
-  function handleDelete(g: Generation): void {
-    if (!confirm(`Удалить поколение "${g.code} (${g.yearFrom}–${g.yearTo ?? "н.в."})"?`)) return;
+  async function handleDelete(g: Generation): Promise<void> {
+    const ok = await confirm({
+      message: `Удалить поколение "${g.code} (${g.yearFrom}–${g.yearTo ?? "н.в."})"?`,
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     runAction(async () => {
       await deleteGeneration(g.id);
       router.refresh();

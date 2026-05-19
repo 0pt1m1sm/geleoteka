@@ -10,6 +10,8 @@ import {
   markRepliesRead,
   updateCommunicationDate,
 } from "@/app/actions/crm/communications";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import {
   COMM_CHANNEL_LABELS,
   COMM_OUTCOME_LABELS,
@@ -287,10 +289,16 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
   // serialized from a server component — both undefined and null count as unread.
   const isUnread = isInbound && (entry.readAt == null);
 
-  function handleDelete(): void {
-    if (!confirm("Удалить эту запись?")) return;
+  async function handleDelete(): Promise<void> {
+    const ok = await confirm({
+      message: "Удалить эту запись?",
+      danger: true,
+      confirmText: "Удалить",
+    });
+    if (!ok) return;
     startDelete(async () => {
       await deleteCommunication(entry.id);
+      toast.success("Запись удалена");
     });
   }
 
@@ -385,7 +393,7 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="inline-flex items-center hover:text-[var(--color-accent)]"
+                  className="inline-flex items-center hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                   aria-label="Изменить дату записи"
                   title="Изменить дату записи"
                 >
@@ -451,7 +459,7 @@ function EntryBody({ body, truncate }: { body: string; truncate: boolean }): Rea
   const visible = !isLong || expanded ? body : body.slice(0, LIMIT) + "…";
   return (
     <>
-      <p className="mt-1.5 text-sm whitespace-pre-wrap">{visible}</p>
+      <p className="mt-1.5 text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{visible}</p>
       {isLong ? (
         <button
           type="button"

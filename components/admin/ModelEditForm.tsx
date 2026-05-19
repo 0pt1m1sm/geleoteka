@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { confirm } from "@/lib/ui/confirm";
 import {
   createModel,
   updateModel,
@@ -77,9 +78,9 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
     });
   }
 
-  function handleDelete(): void {
+  async function handleDelete(): Promise<void> {
     if (!initial) return;
-    if (!confirm(`Удалить модель "${initial.name}"? Это удалит все её поколения. Запчасти останутся.`)) return;
+    if (!(await confirm({ message: `Удалить модель "${initial.name}"? Это удалит все её поколения. Запчасти останутся.`, danger: true, confirmText: "Удалить" }))) return;
     runAction(async () => {
       await deleteModel(initial.id);
       router.push("/admin/models");

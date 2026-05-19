@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { deleteService } from "@/app/actions/services";
+import { confirm } from "@/lib/ui/confirm";
 
 export function DeleteServiceButton({
   serviceId,
@@ -13,7 +14,7 @@ export function DeleteServiceButton({
   const router = useRouter();
 
   async function handleDelete() {
-    if (!confirm(`Удалить услугу «${serviceName}»? Действие необратимо.`)) return;
+    if (!(await confirm({ message: `Удалить услугу «${serviceName}»? Действие необратимо.`, danger: true }))) return;
     await deleteService(serviceId);
     router.refresh();
   }

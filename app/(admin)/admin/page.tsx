@@ -190,7 +190,7 @@ export default async function AdminDashboard() {
                 <li key={d.id} className="py-2 flex items-center justify-between gap-3">
                   <Link
                     href={`/admin/crm/deals/${d.id}`}
-                    className="flex-1 min-w-0 hover:text-[var(--color-accent)]"
+                    className="flex-1 min-w-0 hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                   >
                     <div className="font-medium truncate">{d.customer.name}</div>
                     <div className="text-xs text-[var(--foreground-muted)]">

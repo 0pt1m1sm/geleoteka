@@ -5,6 +5,8 @@ import { Suspense } from "react";
 import { Providers } from "./providers";
 import { ThemeInit } from "@/components/shared/ThemeInit";
 import { MyCarInit } from "@/components/shared/MyCarInit";
+import { ConfirmHost } from "@/components/ui/ConfirmHost";
+import { ToastHost } from "@/components/ui/ToastHost";
 
 // Sync theme bootstrap. Must run before first paint to eliminate the
 // dark-flash FOUC on light-theme reloads. `<Script strategy="beforeInteractive">`
@@ -74,6 +76,8 @@ export default function RootLayout({
           <MyCarInit />
         </Suspense>
         <Providers>{children}</Providers>
+        <ConfirmHost />
+        <ToastHost />
       </body>
     </html>
   );

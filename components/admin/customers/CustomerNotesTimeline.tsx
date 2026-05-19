@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { addCustomerNote, deleteCustomerNote } from "@/app/actions/customers";
 import { useFormAction } from "@/lib/use-form-action";
+import { confirm } from "@/lib/ui/confirm";
 
 export interface TimelineNote {
   id: string;
@@ -52,8 +53,8 @@ export function CustomerNotesTimeline({
     });
   }
 
-  function remove(noteId: string): void {
-    if (!confirm("Удалить заметку?")) return;
+  async function remove(noteId: string): Promise<void> {
+    if (!(await confirm({ message: "Удалить заметку?", danger: true }))) return;
     runAction(async () => {
       const res = await deleteCustomerNote(noteId);
       if (!res.ok) throw new Error(res.error);

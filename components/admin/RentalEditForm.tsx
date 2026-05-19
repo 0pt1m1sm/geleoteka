@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { updateRentalCar, deleteRentalCar } from "@/app/actions/rentals";
 import { AdminFormShell } from "./AdminFormShell";
 import { PhotoUploader } from "./PhotoUploader";
+import { confirm } from "@/lib/ui/confirm";
 
 interface CarData {
   id: string;
@@ -30,10 +31,13 @@ export function RentalEditForm({ car }: { car: CarData }) {
   const boundAction = updateRentalCar.bind(null, car.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
+  const [isDeleting, startDelete] = useTransition();
   async function handleDelete() {
-    if (!confirm(`Удалить Mercedes-Benz ${car.model} из автопарка?`)) return;
-    await deleteRentalCar(car.id);
-    router.push("/admin/rentals");
+    if (!(await confirm({ message: `Удалить Mercedes-Benz ${car.model} из автопарка?`, danger: true, confirmText: "Удалить" }))) return;
+    startDelete(async () => {
+      await deleteRentalCar(car.id);
+      router.push("/admin/rentals");
+    });
   }
 
   return (
@@ -116,8 +120,15 @@ export function RentalEditForm({ car }: { car: CarData }) {
       </label>
 
       <div className="flex gap-4 pt-4 border-t border-[var(--border)]">
-        <button type="button" onClick={handleDelete} className="btn btn-secondary text-sm text-[var(--color-error)]">
-          Удалить
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          data-loading={isDeleting || undefined}
+          aria-busy={isDeleting || undefined}
+          className="btn btn-secondary text-sm text-[var(--color-error)]"
+        >
+          {isDeleting ? "Удаление…" : "Удалить"}
         </button>
         <div className="flex-1" />
         <Link href="/admin/rentals" className="btn btn-secondary">Отмена</Link>

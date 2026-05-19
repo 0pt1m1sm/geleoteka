@@ -207,18 +207,18 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
             <div className="text-sm space-y-1">
               <Link
                 href={`/admin/customers/${ro.user.id}`}
-                className="font-medium hover:text-[var(--color-accent)]"
+                className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
               >
                 {ro.user.name}
               </Link>
               <p className="text-xs text-[var(--foreground-muted)]">
-                <a href={`tel:${ro.user.phone}`} className="hover:text-[var(--color-accent)]">
+                <a href={`tel:${ro.user.phone}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
                   {ro.user.phone}
                 </a>
                 {" · "}
                 <a
                   href={`mailto:${ro.user.email}`}
-                  className="hover:text-[var(--color-accent)]"
+                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                 >
                   {ro.user.email}
                 </a>

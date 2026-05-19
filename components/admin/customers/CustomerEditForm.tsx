@@ -170,7 +170,14 @@ export function CustomerEditForm({ customerUserId, initial }: Props): React.Reac
           Отмена
         </button>
         <div className="flex-1" />
-        <button type="button" onClick={save} className="btn btn-primary text-sm" disabled={pending}>
+        <button
+          type="button"
+          onClick={save}
+          className="btn btn-primary text-sm"
+          disabled={pending}
+          data-loading={pending || undefined}
+          aria-busy={pending || undefined}
+        >
           {pending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>

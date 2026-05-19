@@ -205,6 +205,10 @@ function TaskRow({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // Optimistic local override for the checkbox so the user sees the check
+  // and strikethrough animate in immediately, before the server confirms.
+  // Reverts on error.
+  const [optimisticDone, setOptimisticDone] = useState<boolean | null>(null);
 
   function run(action: () => Promise<{ error: string | null }>): void {
     setError(null);
@@ -212,6 +216,7 @@ function TaskRow({
       const res = await action();
       if (res.error) {
         setError(res.error);
+        setOptimisticDone(null);
         return;
       }
       router.refresh();
@@ -219,31 +224,56 @@ function TaskRow({
   }
 
   const isOverdue = task.status === "OPEN" && task.dueAt.getTime() < nowMs;
-  const isOpen = task.status === "OPEN";
+  const isOpenRaw = task.status === "OPEN";
+  // Apply optimistic toggle on top of server-truth status.
+  const isOpen = optimisticDone === null ? isOpenRaw : !optimisticDone;
+  const showDoneStyling = !isOpen;
+
+  function handleToggle(): void {
+    if (isOpenRaw) {
+      setOptimisticDone(true);
+      run(() => completeCrmTask(task.id));
+    } else {
+      setOptimisticDone(false);
+      run(() => reopenCrmTask(task.id));
+    }
+  }
 
   return (
-    <li className="py-3 flex items-start gap-3">
+    <li
+      className="py-3 flex items-start gap-3 transition-opacity duration-300"
+      data-done={showDoneStyling || undefined}
+    >
       <button
         type="button"
-        onClick={() => {
-          if (isOpen) run(() => completeCrmTask(task.id));
-          else run(() => reopenCrmTask(task.id));
-        }}
+        onClick={handleToggle}
         disabled={pending}
-        className="mt-0.5 shrink-0"
+        className="mt-0.5 shrink-0 relative"
         aria-label={isOpen ? "Отметить выполненной" : "Открыть задачу заново"}
+        aria-pressed={!isOpen}
       >
-        {isOpen ? (
-          <span className="inline-block w-4 h-4 rounded-full border-2 border-[var(--border-hover)] hover:border-[var(--color-accent)]" />
-        ) : (
-          <CheckCircle2 size={18} className="text-[var(--color-success)]" />
-        )}
+        <span
+          className={`inline-flex items-center justify-center w-[18px] h-[18px] rounded-full border-2 transition-all duration-300 ${
+            isOpen
+              ? "border-[var(--border-hover)] hover:border-[var(--color-accent)] bg-transparent"
+              : "border-[var(--color-success,#22c55e)] bg-[var(--color-success,#22c55e)] scale-110"
+          }`}
+        >
+          <CheckCircle2
+            size={14}
+            className={`text-white transition-opacity duration-300 ${
+              isOpen ? "opacity-0" : "opacity-100"
+            }`}
+            strokeWidth={3}
+            aria-hidden
+          />
+        </span>
       </button>
 
       <div className="flex-1 min-w-0">
         <div
-          className={`text-sm font-medium ${
-            task.status === "DONE" ? "line-through text-[var(--foreground-muted)]" : ""
+          className={`text-sm font-medium transition-all duration-300 ${
+            showDoneStyling ? "line-through text-[var(--foreground-muted)] opacity-70" : ""
           }`}
         >
           {task.title}
@@ -269,7 +299,7 @@ function TaskRow({
             {task.customer ? (
               <Link
                 href={`/admin/customers/${task.customer.id}`}
-                className="hover:text-[var(--color-accent)]"
+                className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
               >
                 Клиент: {task.customer.name}
               </Link>
@@ -277,7 +307,7 @@ function TaskRow({
             {task.deal ? (
               <Link
                 href={`/admin/crm/deals/${task.deal.id}`}
-                className="hover:text-[var(--color-accent)]"
+                className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
               >
                 Сделка: {task.deal.number ?? "—"}
               </Link>

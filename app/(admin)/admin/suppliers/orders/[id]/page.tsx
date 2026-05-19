@@ -47,7 +47,7 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
               Заказ {order.orderNumber ? `#${order.orderNumber}` : ""}
             </h1>
             <p className="text-sm text-[var(--foreground-muted)] mt-1">
-              <Link href={`/admin/suppliers/${order.supplier.id}`} className="hover:text-[var(--color-accent)]">
+              <Link href={`/admin/suppliers/${order.supplier.id}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
                 {order.supplier.name}
               </Link>
               {" · "}

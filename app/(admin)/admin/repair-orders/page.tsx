@@ -73,14 +73,14 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                     <div>
                       <Link
                         href={`/admin/repair-orders/${ro.id as string}`}
-                        className="font-medium hover:text-[var(--color-accent)]"
+                        className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                       >
                         {user.name}
                       </Link>
                       {user.phone && (
                         <a
                           href={`tel:${user.phone}`}
-                          className="block text-xs text-[var(--foreground-muted)] hover:text-[var(--color-accent)] font-mono"
+                          className="block text-xs text-[var(--foreground-muted)] hover:text-[var(--color-accent)] font-mono active:opacity-70 transition-opacity"
                         >
                           {user.phone}
                         </a>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { deleteVacancy } from "@/app/actions/vacancies";
+import { confirm } from "@/lib/ui/confirm";
 
 export function DeleteVacancyButton({
   vacancyId,
@@ -13,7 +14,7 @@ export function DeleteVacancyButton({
   const router = useRouter();
 
   async function handleDelete() {
-    if (!confirm(`Удалить вакансию «${vacancyTitle}»? Действие необратимо.`)) return;
+    if (!(await confirm({ message: `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`, danger: true }))) return;
     await deleteVacancy(vacancyId);
     router.refresh();
   }

@@ -268,7 +268,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
                   <li key={ro.id}>
                     <Link
                       href={`/admin/repair-orders/${ro.id}`}
-                      className="hover:text-[var(--color-accent)]"
+                      className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                     >
                       {ro.roNumber ?? "Без номера"} · {ro.status} · {formatDateTime(ro.dateTime)} ↗
                     </Link>
@@ -311,18 +311,18 @@ export default async function CrmDealDetailPage({ params }: Props) {
             <div className="text-sm space-y-1">
               <Link
                 href={`/admin/customers/${deal.customer.id}`}
-                className="font-medium hover:text-[var(--color-accent)]"
+                className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
               >
                 {deal.customer.name}
               </Link>
               <p className="text-xs text-[var(--foreground-muted)]">
-                <a href={`tel:${deal.customer.phone}`} className="hover:text-[var(--color-accent)]">
+                <a href={`tel:${deal.customer.phone}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
                   {deal.customer.phone}
                 </a>
                 {" · "}
                 <a
                   href={`mailto:${deal.customer.email}`}
-                  className="hover:text-[var(--color-accent)]"
+                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                 >
                   {deal.customer.email}
                 </a>

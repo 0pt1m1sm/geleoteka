@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { Alert, Button } from "@/components/ui";
+import { confirm } from "@/lib/ui/confirm";
 import {
   addRepairOrderPhoto,
   deleteRepairOrderPhoto,
@@ -88,7 +89,7 @@ export function WorkPhotosManager({
   }
 
   async function handleDelete(photoId: string): Promise<void> {
-    if (!confirm("Удалить это фото? Действие необратимо.")) return;
+    if (!(await confirm({ message: "Удалить это фото? Действие необратимо.", danger: true }))) return;
     setError(null);
     const res = await deleteRepairOrderPhoto(photoId);
     if (!res.ok) setError(res.error);

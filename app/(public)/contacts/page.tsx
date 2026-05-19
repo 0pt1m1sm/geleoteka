@@ -120,7 +120,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
                 <p className="text-sm text-[var(--foreground-muted)]">Телефон</p>
                 <a
                   href={telHref(cms["contacts.phone.service"])}
-                  className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors"
+                  className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors active:opacity-70"
                 >
                   {cms["contacts.phone.service"]}
                 </a>
@@ -139,7 +139,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
                 <p className="text-sm text-[var(--foreground-muted)]">Телефон</p>
                 <a
                   href={telHref(cms["contacts.phone.parts"])}
-                  className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors"
+                  className="text-lg font-medium hover:text-[var(--color-accent)] transition-colors active:opacity-70"
                 >
                   {cms["contacts.phone.parts"]}
                 </a>
@@ -158,7 +158,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
                 <p className="text-sm text-[var(--foreground-muted)]">Email</p>
                 <a
                   href={`mailto:${cms["contacts.email"]}`}
-                  className="font-medium hover:text-[var(--color-accent)] transition-colors"
+                  className="font-medium hover:text-[var(--color-accent)] transition-colors active:opacity-70"
                 >
                   {cms["contacts.email"]}
                 </a>

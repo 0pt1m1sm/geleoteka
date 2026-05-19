@@ -99,7 +99,7 @@ export function PartTrimPicker({ name, initial, models }: Props): React.ReactEle
               open={hasAnyInModel}
               className="rounded-lg border border-[var(--border)] bg-[var(--background-secondary)]/40"
             >
-              <summary className="cursor-pointer px-3 py-2 text-sm font-medium hover:text-[var(--color-accent)]">
+              <summary className="cursor-pointer px-3 py-2 text-sm font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
                 {m.name}
               </summary>
               <div className="px-3 pb-3 space-y-3">

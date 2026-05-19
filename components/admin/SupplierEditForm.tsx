@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { updateSupplier, deleteSupplier } from "@/app/actions/suppliers";
 import { AdminFormShell } from "./AdminFormShell";
 import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
+import { confirm } from "@/lib/ui/confirm";
 
 interface SupplierData {
   id: string;
@@ -22,10 +23,13 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
   const boundAction = updateSupplier.bind(null, supplier.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
+  const [isDeleting, startDelete] = useTransition();
   async function handleDelete() {
-    if (!confirm(`Деактивировать поставщика "${supplier.name}"?`)) return;
-    await deleteSupplier(supplier.id);
-    router.push("/admin/suppliers");
+    if (!(await confirm({ message: `Деактивировать поставщика "${supplier.name}"?`, danger: true, confirmText: "Деактивировать" }))) return;
+    startDelete(async () => {
+      await deleteSupplier(supplier.id);
+      router.push("/admin/suppliers");
+    });
   }
 
   return (
@@ -87,8 +91,15 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
       </label>
 
       <div className="flex gap-4 pt-4 border-t border-[var(--border)]">
-        <button type="button" onClick={handleDelete} className="btn btn-secondary text-sm text-[var(--color-error)]">
-          Деактивировать
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          data-loading={isDeleting || undefined}
+          aria-busy={isDeleting || undefined}
+          className="btn btn-secondary text-sm text-[var(--color-error)]"
+        >
+          {isDeleting ? "Деактивация…" : "Деактивировать"}
         </button>
         <div className="flex-1" />
         <button type="submit" disabled={isPending} className="btn btn-primary">

@@ -54,7 +54,7 @@ export function EstimateLineageBreadcrumb({
             ) : (
               <Link
                 href={hrefBuilder(node.id)}
-                className="hover:text-[var(--color-accent)] hover:underline"
+                className="hover:text-[var(--color-accent)] hover:underline active:opacity-70 transition-opacity"
               >
                 №{label} · {stage}
               </Link>
