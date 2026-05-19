@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { parseOccurredAt } from "@/lib/crm/occurred-at";
 
 interface CommResult {
   error: string | null;
@@ -28,6 +29,13 @@ export async function logCommunication(
   const durationRaw = ((formData.get("durationSec") as string | null) ?? "").trim();
   const durationSec = durationRaw ? Number.parseInt(durationRaw, 10) : null;
 
+  // Optional backdating: form sends `occurredAt` as a datetime-local string
+  // (YYYY-MM-DDTHH:mm, local time). parseOccurredAt clamps future to now and
+  // rejects garbage; empty leaves createdAt unset so Prisma's default fires.
+  const parsedOccurredAt = parseOccurredAt(formData.get("occurredAt") as string | null);
+  if (!parsedOccurredAt.ok) return { error: parsedOccurredAt.error };
+  const createdAt = parsedOccurredAt.value;
+
   const log = (await db.communicationLog.create({
     data: {
       customerUserId,
@@ -37,6 +45,7 @@ export async function logCommunication(
       outcome: outcome as never,
       body,
       durationSec: durationSec && !Number.isNaN(durationSec) ? durationSec : null,
+      ...(createdAt ? { createdAt } : {}),
     },
     select: { id: true },
   })) as { id: string };
@@ -78,6 +87,38 @@ export async function markRepliesRead(customerUserId: string): Promise<void> {
     where: { customerUserId, channel: "EMAIL_INBOUND", readAt: null },
     data: { readAt: new Date() },
   });
+}
+
+/**
+ * Edit the `createdAt` (occurred-at) of a previously-logged communication.
+ * Used when the manager realises they backdated wrong or logged in real time
+ * but the actual call was earlier. Future dates clamped to now.
+ */
+export async function updateCommunicationDate(
+  id: string,
+  occurredAtIso: string,
+): Promise<CommResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const parsed = parseOccurredAt(occurredAtIso);
+  if (!parsed.ok) return { error: parsed.error };
+  if (!parsed.value) return { error: "Укажите дату" };
+  const newCreatedAt = parsed.value;
+
+  const existing = (await db.communicationLog.findUnique({
+    where: { id },
+    select: { customerUserId: true, dealId: true },
+  })) as { customerUserId: string; dealId: string | null } | null;
+  if (!existing) return { error: "Запись не найдена" };
+
+  await db.communicationLog.update({
+    where: { id },
+    data: { createdAt: newCreatedAt },
+  });
+
+  revalidatePath(`/admin/customers/${existing.customerUserId}`);
+  if (existing.dealId) revalidatePath(`/admin/crm/deals/${existing.dealId}`);
+  return { error: null, id };
 }
 
 export async function deleteCommunication(id: string): Promise<void> {

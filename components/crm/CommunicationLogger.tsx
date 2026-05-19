@@ -2,12 +2,13 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDownLeft, ArrowUpRight, Phone, Trash2 } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil, Phone, Trash2 } from "lucide-react";
 import { Alert, Button, Input, Textarea } from "@/components/ui";
 import {
   deleteCommunication,
   logCommunication,
   markRepliesRead,
+  updateCommunicationDate,
 } from "@/app/actions/crm/communications";
 import {
   COMM_CHANNEL_LABELS,
@@ -236,6 +237,13 @@ function LogForm({
         />
       ) : null}
 
+      <Input
+        label="Когда состоялось (оставьте пустым = сейчас)"
+        name="occurredAt"
+        type="datetime-local"
+        max={localDateTimeNow()}
+      />
+
       <Textarea
         label="Содержание / суть разговора"
         name="body"
@@ -265,7 +273,11 @@ interface EntryRowProps {
 }
 
 function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React.ReactElement {
+  const router = useRouter();
   const [pending, startDelete] = useTransition();
+  const [editing, setEditing] = useState(false);
+  const [savingDate, startSaveDate] = useTransition();
+  const [dateError, setDateError] = useState<string | null>(null);
   const isEmail = isEmailChannel(entry.channel);
   const isInbound = isInboundEmailChannel(entry.channel);
   const isOutbound = isOutboundEmailChannel(entry.channel);
@@ -279,6 +291,26 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
     if (!confirm("Удалить эту запись?")) return;
     startDelete(async () => {
       await deleteCommunication(entry.id);
+    });
+  }
+
+  function handleSaveDate(form: HTMLFormElement): void {
+    const value = (
+      new FormData(form).get("occurredAt") as string | null
+    )?.trim() ?? "";
+    if (!value) {
+      setDateError("Укажите дату");
+      return;
+    }
+    setDateError(null);
+    startSaveDate(async () => {
+      const result = await updateCommunicationDate(entry.id, value);
+      if (result.error) {
+        setDateError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
     });
   }
 
@@ -311,10 +343,61 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
               </span>
             ) : null}
           </div>
-          <div className="text-xs text-[var(--foreground-muted)] mt-0.5">
-            {formatDateTime(entry.createdAt)}
-            {entry.author ? ` · ${entry.author.name}` : ""}
-            {entry.durationSec ? ` · ${formatDuration(entry.durationSec)}` : ""}
+          <div className="text-xs text-[var(--foreground-muted)] mt-0.5 flex items-center gap-1.5 flex-wrap">
+            {editing ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSaveDate(e.currentTarget);
+                }}
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  type="datetime-local"
+                  name="occurredAt"
+                  defaultValue={toLocalDateTimeValue(entry.createdAt)}
+                  max={localDateTimeNow()}
+                  className="input input-sm text-xs py-0.5 px-1.5"
+                  disabled={savingDate}
+                />
+                <button
+                  type="submit"
+                  disabled={savingDate}
+                  className="text-[var(--color-accent)] hover:underline"
+                >
+                  Сохранить
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditing(false);
+                    setDateError(null);
+                  }}
+                  disabled={savingDate}
+                  className="hover:underline"
+                >
+                  Отмена
+                </button>
+              </form>
+            ) : (
+              <>
+                <span>{formatDateTime(entry.createdAt)}</span>
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center hover:text-[var(--color-accent)]"
+                  aria-label="Изменить дату записи"
+                  title="Изменить дату записи"
+                >
+                  <Pencil size={11} />
+                </button>
+              </>
+            )}
+            {entry.author ? <span>· {entry.author.name}</span> : null}
+            {entry.durationSec ? <span>· {formatDuration(entry.durationSec)}</span> : null}
+            {dateError ? (
+              <span className="text-[var(--color-error)]">{dateError}</span>
+            ) : null}
           </div>
           {isEmail && entry.subject ? (
             <p className="mt-1.5 text-sm font-medium">{entry.subject}</p>
@@ -386,4 +469,23 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m} мин ${s} сек` : `${s} сек`;
+}
+
+/** datetime-local needs `YYYY-MM-DDTHH:mm` in LOCAL time (no Z suffix). */
+function localDateTimeNow(): string {
+  const d = new Date();
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return (
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+    `T${pad(d.getHours())}:${pad(d.getMinutes())}`
+  );
+}
+
+function toLocalDateTimeValue(d: Date | string): string {
+  const date = typeof d === "string" ? new Date(d) : d;
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  );
 }
