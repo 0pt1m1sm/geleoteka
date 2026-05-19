@@ -860,6 +860,10 @@ model Part {
 
 model PartOrder {
   id           String          @id @default(cuid())
+  // Human-readable PO-NNNN — generated via Postgres sequence in
+  // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
+  // inserts always carry a value.
+  orderNumber  String?         @unique
   userId       String?
   status       PartOrderStatus @default(PROCESSING)
   total        Int             @default(0)
@@ -908,7 +912,11 @@ model PartOrderItem {
 // ============================================
 
 model RentalBooking {
-  id           String              @id @default(cuid())
+  id             String              @id @default(cuid())
+  // Human-readable RB-NNNN — generated via Postgres sequence in
+  // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
+  // inserts always carry a value.
+  bookingNumber  String?             @unique
   vehicleId    String // Was carId — now references Vehicle
   userId       String?
   status       RentalBookingStatus @default(BOOKED)

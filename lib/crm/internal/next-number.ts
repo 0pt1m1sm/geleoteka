@@ -45,3 +45,11 @@ export async function nextEstimateNumber(client?: TxOrDb): Promise<string> {
 export async function nextRepairOrderNumber(client?: TxOrDb): Promise<string> {
   return format("RO", await nextSeqValue("RepairOrder_number_seq", client));
 }
+
+export async function nextPartOrderNumber(client?: TxOrDb): Promise<string> {
+  return format("PO", await nextSeqValue("PartOrder_number_seq", client));
+}
+
+export async function nextRentalBookingNumber(client?: TxOrDb): Promise<string> {
+  return format("RB", await nextSeqValue("RentalBooking_number_seq", client));
+}

@@ -8,6 +8,7 @@ import {
   generateClaimToken,
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
+import { nextPartOrderNumber } from "@/lib/crm/internal/next-number";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -103,6 +104,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
 
     // Create order + decrement stock in transaction
     const order = await db.$transaction(async (tx) => {
+      const orderNumber = await nextPartOrderNumber(tx);
       const created = await tx.partOrder.create({
         data: {
           userId: guestResult.userId,
@@ -113,6 +115,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
           contactEmail: contactEmail.trim().toLowerCase(),
           claimToken,
           notes: notes || null,
+          orderNumber,
           items: { create: orderItems },
         },
       });

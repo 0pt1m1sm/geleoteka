@@ -7,6 +7,7 @@ import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
+import { nextRentalBookingNumber } from "@/lib/crm/internal/next-number";
 
 interface VehicleFormData {
   model: string;
@@ -225,6 +226,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
       ],
     });
 
+    const bookingNumber = await nextRentalBookingNumber();
     const booking = await db.rentalBooking.create({
       data: {
         vehicleId: carId,
@@ -238,6 +240,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
         contactEmail: contactEmail.trim().toLowerCase(),
         claimToken,
         notes: notes || null,
+        bookingNumber,
       },
     });
 
