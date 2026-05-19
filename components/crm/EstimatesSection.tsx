@@ -3,9 +3,10 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Plus } from "lucide-react";
+import { FileText, Plus, Trash2 } from "lucide-react";
 import { Alert, Button } from "@/components/ui";
 import {
+  deleteEstimate,
   openOrCreateActiveEstimate,
   sendEstimate,
 } from "@/app/actions/crm/estimates";
@@ -86,20 +87,83 @@ export function EstimatesSection({
           Сметы по этой сделке ещё не созданы.
         </p>
       ) : (
-        <ul className="mt-3 divide-y divide-[var(--border)]">
-          {estimates.map((est) => (
-            <EstimateRow key={est.id} est={est} />
-          ))}
-        </ul>
+        <EstimatesList estimates={estimates} />
       )}
     </div>
   );
 }
 
-function EstimateRow({ est }: { est: EstimateView }): React.ReactElement {
+function EstimatesList({ estimates }: { estimates: EstimateView[] }): React.ReactElement {
+  // SUPERSEDED rows are previous revisions of the active estimate (reviseEstimate
+  // marks the parent SUPERSEDED whenever a new DRAFT child is cloned). Collapse
+  // them into a single "История версий (N)" expander so the list isn't dominated
+  // by clones at the same price. Active rows render first, freshest on top.
+  const active = estimates.filter((e) => e.stage !== "SUPERSEDED");
+  const superseded = estimates.filter((e) => e.stage === "SUPERSEDED");
+  // Version numbers go oldest=v1 → newest=vN across the whole timeline.
+  // estimates arrive createdAt desc, so reverse-index by length.
+  const versionByCreatedAt = new Map<string, number>();
+  [...estimates]
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    .forEach((e, i) => versionByCreatedAt.set(e.id, i + 1));
+
+  return (
+    <div className="mt-3">
+      {active.length > 0 ? (
+        <ul className="divide-y divide-[var(--border)]">
+          {active.map((est) => (
+            <EstimateRow
+              key={est.id}
+              est={est}
+              version={versionByCreatedAt.get(est.id)}
+              totalVersions={estimates.length}
+            />
+          ))}
+        </ul>
+      ) : null}
+
+      {superseded.length > 0 ? (
+        <details className="mt-2 group">
+          <summary className="cursor-pointer list-none text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)] py-2 flex items-center gap-1.5 select-none">
+            <span className="inline-block transition-transform group-open:rotate-90">›</span>
+            История версий ({superseded.length})
+          </summary>
+          <ul className="divide-y divide-[var(--border)] border-t border-[var(--border)] pt-1">
+            {superseded.map((est) => (
+              <EstimateRow
+                key={est.id}
+                est={est}
+                version={versionByCreatedAt.get(est.id)}
+                totalVersions={estimates.length}
+                compact
+              />
+            ))}
+          </ul>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
+function EstimateRow({
+  est,
+  version,
+  totalVersions,
+  compact = false,
+}: {
+  est: EstimateView;
+  version?: number;
+  totalVersions?: number;
+  compact?: boolean;
+}): React.ReactElement {
   const router = useRouter();
   const [pending, startSend] = useTransition();
+  const [deleting, startDelete] = useTransition();
   const [error, setError] = useState<string | null>(null);
+
+  const canDelete = est.stage !== "APPROVED";
+  const versionLabel =
+    version && totalVersions && totalVersions > 1 ? `v${version}` : null;
 
   function handleSend(): void {
     setError(null);
@@ -110,10 +174,27 @@ function EstimateRow({ est }: { est: EstimateView }): React.ReactElement {
     });
   }
 
+  function handleDelete(): void {
+    const stageRu =
+      ESTIMATE_STAGE_LABELS[est.stage]?.toLowerCase() ?? "эту смету";
+    if (!confirm(`Удалить ${stageRu === "пересмотрена" ? "пересмотренную смету" : stageRu === "одобрена" ? "согласованную смету" : `смету (${stageRu})`}? Действие необратимо.`)) {
+      return;
+    }
+    setError(null);
+    startDelete(async () => {
+      const res = await deleteEstimate(est.id);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      router.refresh();
+    });
+  }
+
   return (
-    <li className="py-2 flex items-center gap-3">
+    <li className={compact ? "py-1.5 flex items-center gap-2" : "py-2 flex items-center gap-3"}>
       <FileText
-        size={16}
+        size={compact ? 14 : 16}
         className="text-[var(--foreground-muted)] shrink-0"
         aria-hidden
       />
@@ -121,18 +202,25 @@ function EstimateRow({ est }: { est: EstimateView }): React.ReactElement {
         href={`/admin/crm/estimates/${est.id}`}
         className="flex-1 min-w-0 hover:text-[var(--color-accent)]"
       >
-        <div className="text-sm font-medium truncate">
+        <div className={compact ? "text-xs truncate" : "text-sm font-medium truncate"}>
           {est.number ?? "Без номера"} · {ESTIMATE_STAGE_LABELS[est.stage] ?? est.stage}
+          {versionLabel ? (
+            <span className="ml-1.5 text-[10px] text-[var(--foreground-muted)] font-normal">
+              {versionLabel}
+            </span>
+          ) : null}
         </div>
-        <div className="text-xs text-[var(--foreground-muted)]">
-          {est.sentAt ? `Отправлена ${formatDate(est.sentAt)}` : `Создана ${formatDate(est.createdAt)}`}
-          {est.validUntil ? ` · действует до ${formatDate(est.validUntil)}` : ""}
-        </div>
+        {!compact ? (
+          <div className="text-xs text-[var(--foreground-muted)]">
+            {est.sentAt ? `Отправлена ${formatDate(est.sentAt)}` : `Создана ${formatDate(est.createdAt)}`}
+            {est.validUntil ? ` · действует до ${formatDate(est.validUntil)}` : ""}
+          </div>
+        ) : null}
         {error ? (
           <div className="text-xs text-[var(--color-error)] mt-0.5">{error}</div>
         ) : null}
       </Link>
-      <div className="text-sm font-medium tabular-nums shrink-0">
+      <div className={compact ? "text-xs tabular-nums shrink-0 text-[var(--foreground-muted)]" : "text-sm font-medium tabular-nums shrink-0"}>
         {formatPrice(est.total)}
       </div>
       <a
@@ -144,17 +232,29 @@ function EstimateRow({ est }: { est: EstimateView }): React.ReactElement {
       >
         PDF ↗
       </a>
-      {est.stage === "DRAFT" ? (
+      {!compact && est.stage === "DRAFT" ? (
         <Button
           type="button"
           variant="secondary"
           size="sm"
           isLoading={pending}
-          disabled={pending}
+          disabled={pending || deleting}
           onClick={handleSend}
         >
           Отправить
         </Button>
+      ) : null}
+      {canDelete ? (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting || pending}
+          aria-label="Удалить смету"
+          title="Удалить смету"
+          className="btn-icon shrink-0 hover:text-[var(--color-error)]"
+        >
+          <Trash2 size={compact ? 12 : 14} />
+        </button>
       ) : null}
     </li>
   );
