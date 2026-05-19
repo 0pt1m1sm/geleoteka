@@ -394,38 +394,73 @@ function TaskRow({
       </button>
 
       <TaskBodyLink task={task} showLinks={showLinks}>
-        <div
-          className={`text-sm font-medium transition-all duration-300 ${
-            showDoneStyling ? "line-through text-[var(--foreground-muted)] opacity-70" : ""
-          }`}
-        >
-          {task.title}
-        </div>
-        <div className="text-xs text-[var(--foreground-muted)] mt-0.5 flex flex-wrap gap-x-3">
-          <span>{CRM_TASK_KIND_LABELS[task.kind] ?? task.kind}</span>
-          <span className={isOverdue ? "text-[var(--color-error)] font-medium" : ""}>
-            {isOverdue ? "Просрочена · " : ""}
-            {formatDateTime(task.dueAt)}
-          </span>
-          <span>{task.owner.name}</span>
-          {task.status !== "OPEN" ? (
-            <span>{CRM_TASK_STATUS_LABELS[task.status] ?? task.status}</span>
-          ) : null}
-        </div>
-        {task.body ? (
-          <p className="mt-1 text-sm text-[var(--foreground-muted)] whitespace-pre-wrap">
-            {task.body}
-          </p>
-        ) : null}
-        {showLinks && (task.customer || task.deal) ? (
-          <div className="mt-1 text-xs flex flex-wrap gap-x-3 text-[var(--foreground-muted)]">
-            {task.customer ? <span>Клиент: {task.customer.name}</span> : null}
-            {task.deal ? <span>Сделка: {task.deal.number ?? "—"}</span> : null}
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto] gap-x-6 gap-y-1 w-full">
+          {/* LEFT: title + body */}
+          <div className="min-w-0 max-w-prose">
+            <div
+              className={`text-sm font-medium transition-all duration-300 ${
+                showDoneStyling ? "line-through text-[var(--foreground-muted)] opacity-70" : ""
+              }`}
+            >
+              {task.title}
+            </div>
+            <div className="text-xs text-[var(--foreground-muted)] mt-0.5 sm:hidden flex flex-wrap gap-x-3">
+              <span>{CRM_TASK_KIND_LABELS[task.kind] ?? task.kind}</span>
+              <span className={isOverdue ? "text-[var(--color-error)] font-medium" : ""}>
+                {isOverdue ? "Просрочена · " : ""}
+                {formatDateTime(task.dueAt)}
+              </span>
+            </div>
+            {task.body ? (
+              <p className="mt-1.5 text-sm text-[var(--foreground-muted)] whitespace-pre-wrap [overflow-wrap:anywhere]">
+                {task.body}
+              </p>
+            ) : null}
+            {error ? (
+              <div className="text-xs text-[var(--color-error)] mt-1">{error}</div>
+            ) : null}
           </div>
-        ) : null}
-        {error ? (
-          <div className="text-xs text-[var(--color-error)] mt-1">{error}</div>
-        ) : null}
+
+          {/* RIGHT: meta — desktop only (mobile shows inline above) */}
+          <div className="hidden sm:flex flex-col items-end gap-1 text-xs text-[var(--foreground-muted)] shrink-0 min-w-[180px]">
+            <span
+              className={
+                isOverdue
+                  ? "text-[var(--color-error)] font-medium"
+                  : "text-[var(--foreground)]"
+              }
+            >
+              {isOverdue ? "Просрочена · " : ""}
+              {formatDateTime(task.dueAt)}
+            </span>
+            <span>
+              {CRM_TASK_KIND_LABELS[task.kind] ?? task.kind}
+              {" · "}
+              {task.owner.name}
+            </span>
+            {task.status !== "OPEN" ? (
+              <span className="uppercase tracking-wider text-[10px]">
+                {CRM_TASK_STATUS_LABELS[task.status] ?? task.status}
+              </span>
+            ) : null}
+            {showLinks && (task.customer || task.deal) ? (
+              <span className="flex flex-wrap gap-x-2 justify-end">
+                {task.customer ? <span>· {task.customer.name}</span> : null}
+                {task.deal ? <span>· {task.deal.number ?? "—"}</span> : null}
+              </span>
+            ) : null}
+          </div>
+
+          {/* Mobile-only owner / chips row (since right column is hidden) */}
+          <div className="sm:hidden text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3">
+            <span>{task.owner.name}</span>
+            {task.status !== "OPEN" ? (
+              <span>{CRM_TASK_STATUS_LABELS[task.status] ?? task.status}</span>
+            ) : null}
+            {showLinks && task.customer ? <span>Клиент: {task.customer.name}</span> : null}
+            {showLinks && task.deal ? <span>Сделка: {task.deal.number ?? "—"}</span> : null}
+          </div>
+        </div>
       </TaskBodyLink>
 
       {isOpen ? (
