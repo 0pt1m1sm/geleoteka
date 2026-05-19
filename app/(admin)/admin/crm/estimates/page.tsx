@@ -128,7 +128,13 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
         eyebrow="CRM · Коммерция"
         title="Сметы"
         description="Все сметы по всем сделкам. Каждая смета привязана к одной сделке — открыть, скачать PDF или пересмотреть можно из карточки сметы."
-        actions={<NewDealDialog customers={customers} />}
+        actions={
+          <NewDealDialog
+            customers={customers}
+            triggerLabel="Новая смета"
+            dialogTitle="Новая смета (через сделку)"
+          />
+        }
       />
 
       <div className="flex flex-wrap gap-2 mb-4">

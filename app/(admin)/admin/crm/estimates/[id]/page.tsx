@@ -113,7 +113,12 @@ export default async function EstimateDetailPage({ params }: Props) {
   })) as EstimateDetail | null;
   if (!estimate) notFound();
 
-  const isTerminal = ["APPROVED", "DECLINED", "EXPIRED", "SUPERSEDED"].includes(
+  // APPROVED is NOT terminal — manager may need to undo the approval to
+  // fix a mistake. EstimateActions itself decides which buttons each stage
+  // exposes (APPROVED → "Откатить согласование" only; DECLINED/EXPIRED/
+  // SUPERSEDED → "Удалить" only). Leaving SUPERSEDED/DECLINED/EXPIRED in
+  // hides the Действия card entirely on truly inert stages.
+  const isTerminal = ["DECLINED", "EXPIRED", "SUPERSEDED"].includes(
     estimate.stage,
   );
   const isDraft = estimate.stage === "DRAFT";

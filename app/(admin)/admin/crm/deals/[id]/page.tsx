@@ -224,7 +224,16 @@ export default async function CrmDealDetailPage({ params }: Props) {
             <EstimatesSection
               dealId={deal.id}
               estimates={deal.estimates}
-              canCreate={deal.stage === "NEW"}
+              // Allow create whenever the deal is open AND there's no live
+              // active estimate. Without the second clause, a deal whose
+              // single estimate was revised + the child deleted (leaving only
+              // a SUPERSEDED parent) gets stuck — no active estimate AND no
+              // way to make one. WON / LOST deals stay locked.
+              canCreate={
+                deal.stage !== "WON" &&
+                deal.stage !== "LOST" &&
+                (deal.stage === "NEW" || !activeEstimate)
+              }
             />
           </Card>
 

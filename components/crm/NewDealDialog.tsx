@@ -17,6 +17,13 @@ interface CustomerOption {
 
 interface Props {
   customers: CustomerOption[];
+  /** Trigger button label. Default "Новая сделка". Pages that conceptually
+      create an estimate (e.g. /admin/crm/estimates) can override to
+      "Новая смета" — the underlying entity is still a Deal with an
+      auto-attached DRAFT estimate. */
+  triggerLabel?: string;
+  /** Modal heading. Default mirrors triggerLabel when set. */
+  dialogTitle?: string;
 }
 
 const CHANNEL_OPTIONS = [
@@ -36,7 +43,11 @@ const CHANNEL_OPTIONS = [
  * point for new commerce — booking/parts/rentals flows still create
  * deals automatically; this form covers walk-ins and phone-leads.
  */
-export function NewDealDialog({ customers }: Props): React.ReactElement {
+export function NewDealDialog({
+  customers,
+  triggerLabel = "Новая сделка",
+  dialogTitle,
+}: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(createDealManually, null);
   const [customerUserId, setCustomerUserId] = useState("");
@@ -63,7 +74,7 @@ export function NewDealDialog({ customers }: Props): React.ReactElement {
         leftIcon={<Plus size={14} />}
         onClick={() => setOpen(true)}
       >
-        Новая сделка
+        {triggerLabel}
       </Button>
     );
   }
@@ -76,7 +87,7 @@ export function NewDealDialog({ customers }: Props): React.ReactElement {
     >
       <div className="w-full max-w-lg my-12 card bg-[var(--card)] space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-lg">Новая сделка</h3>
+          <h3 className="font-semibold text-lg">{dialogTitle ?? triggerLabel}</h3>
           <button
             type="button"
             onClick={closeDialog}
