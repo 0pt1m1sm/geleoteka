@@ -115,7 +115,7 @@ export function AddCarForm({ modelNames }: Props): React.ReactElement {
         <Link href="/cabinet/cars" className="btn btn-secondary">
           Отмена
         </Link>
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
           {isPending ? "Сохранение..." : "Добавить"}
         </button>
       </div>

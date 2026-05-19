@@ -110,7 +110,7 @@ function CreateForm({
         </div>
 
         <div className="flex justify-end pt-2 border-t border-[var(--border)]">
-          <button type="submit" disabled={isPending} className="btn btn-primary">
+          <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
             {isPending ? "Создание..." : "Создать"}
           </button>
         </div>

@@ -69,7 +69,7 @@ export default function ConfirmResetPasswordPage() {
           />
         </div>
 
-        <button type="submit" disabled={isPending} className="btn btn-primary w-full">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary w-full">
           {isPending ? "Сохранение..." : "Изменить пароль"}
         </button>
 

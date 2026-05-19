@@ -340,6 +340,8 @@ function TaskRow({
             run(() => cancelCrmTask(task.id), "Задача отменена");
           }}
           disabled={pending}
+          data-loading={pending || undefined}
+          aria-busy={pending || undefined}
           className="btn-icon shrink-0"
           aria-label="Отменить задачу"
           title="Отменить"
@@ -351,6 +353,8 @@ function TaskRow({
           type="button"
           onClick={() => run(() => reopenCrmTask(task.id), "Задача восстановлена")}
           disabled={pending}
+          data-loading={pending || undefined}
+          aria-busy={pending || undefined}
           className="btn-icon shrink-0"
           aria-label="Восстановить"
           title="Восстановить"

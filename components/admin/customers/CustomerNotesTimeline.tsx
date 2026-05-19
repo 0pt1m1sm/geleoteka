@@ -86,6 +86,8 @@ export function CustomerNotesTimeline({
             type="button"
             onClick={submit}
             disabled={pending || body.trim().length === 0}
+            data-loading={pending || undefined}
+            aria-busy={pending || undefined}
             className="btn btn-primary text-sm"
           >
             {pending ? "Добавление..." : "Добавить"}

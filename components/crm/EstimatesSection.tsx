@@ -263,6 +263,8 @@ function EstimateRow({
           type="button"
           onClick={handleDelete}
           disabled={deleting || pending}
+          data-loading={deleting || undefined}
+          aria-busy={deleting || undefined}
           aria-label="Удалить смету"
           title="Удалить смету"
           className="btn-icon shrink-0 hover:text-[var(--color-error)]"

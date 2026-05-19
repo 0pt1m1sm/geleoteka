@@ -133,6 +133,24 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+  /* CSS-only spinner for icon-only buttons during async work. The icon
+     inside is hidden and a spinning ring renders in its place — works
+     without each callsite swapping its JSX. */
+  .btn-icon[data-loading="true"] > * { opacity: 0; }
+  .btn-icon[data-loading="true"]::after {
+    content: "";
+    position: absolute;
+    width: 0.875em;
+    height: 0.875em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-spin 0.7s linear infinite;
+  }
+  .btn-icon { position: relative; }
+  @media (prefers-reduced-motion: reduce) {
+    .btn-icon[data-loading="true"]::after { animation: none; }
+  }
 
   /* Card */
   .card {

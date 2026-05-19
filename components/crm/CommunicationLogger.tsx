@@ -446,6 +446,8 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
           type="button"
           onClick={handleDelete}
           disabled={pending}
+          data-loading={pending || undefined}
+          aria-busy={pending || undefined}
           className="btn-icon shrink-0"
           aria-label="Удалить запись"
         >

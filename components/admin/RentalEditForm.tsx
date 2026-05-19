@@ -134,7 +134,7 @@ export function RentalEditForm({ car }: { car: CarData }) {
         </button>
         <div className="flex-1" />
         <Link href="/admin/rentals" className="btn btn-secondary">Отмена</Link>
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
           {isPending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>

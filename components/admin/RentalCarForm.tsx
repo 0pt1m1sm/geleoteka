@@ -93,7 +93,7 @@ export function RentalCarForm() {
 
       <div className="flex gap-4 pt-2">
         <Link href="/admin/rentals" className="btn btn-secondary">Отмена</Link>
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
           {isPending ? "Сохранение..." : "Добавить"}
         </button>
       </div>

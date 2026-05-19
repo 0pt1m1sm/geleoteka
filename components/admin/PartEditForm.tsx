@@ -101,7 +101,7 @@ export function PartEditForm({ part, categories, models }: Props) {
 
       <div className="flex gap-4 pt-2">
         <Link href="/admin/parts" className="btn btn-secondary">Отмена</Link>
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
           {isPending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>

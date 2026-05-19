@@ -88,7 +88,7 @@ export function PhoneCollisionLoginPanel({ phone, onLoggedIn }: Props): React.Re
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3">
-          <button type="submit" disabled={submitting} className="btn btn-primary">
+          <button type="submit" disabled={submitting} data-loading={submitting || undefined} aria-busy={submitting || undefined} className="btn btn-primary">
             {submitting ? "Входим…" : "Войти и продолжить"}
           </button>
           <a

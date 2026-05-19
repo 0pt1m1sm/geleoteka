@@ -61,7 +61,7 @@ export default function ImportPartsPage() {
 
         <div className="flex gap-4">
           <Link href="/admin/parts" className="btn btn-secondary">Отмена</Link>
-          <button type="submit" disabled={uploading} className="btn btn-primary">
+          <button type="submit" disabled={uploading} data-loading={uploading || undefined} aria-busy={uploading || undefined} className="btn btn-primary">
             {uploading ? "Импорт..." : "Загрузить"}
           </button>
         </div>

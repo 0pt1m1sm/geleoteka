@@ -527,6 +527,8 @@ function RowFields({
             type="button"
             onClick={onRemove}
             disabled={removeDisabled}
+            data-loading={removeDisabled || undefined}
+            aria-busy={removeDisabled || undefined}
             className="btn-icon"
             aria-label={`Удалить строку #${index + 1}`}
           >

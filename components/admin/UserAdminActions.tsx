@@ -138,6 +138,8 @@ export function UserAdminActions({
           type="button"
           onClick={handleReset}
           disabled={pending !== null || isDisabled}
+          data-loading={pending === "reset" || undefined}
+          aria-busy={pending === "reset" || undefined}
           className="btn btn-secondary text-sm"
         >
           {pending === "reset" ? "Создаём…" : "Создать новый пароль"}
@@ -170,6 +172,8 @@ export function UserAdminActions({
             type="button"
             onClick={handleRoleChange}
             disabled={!viewerIsAdmin || isSelf || pending !== null || role === currentRole}
+            data-loading={pending === "role" || undefined}
+            aria-busy={pending === "role" || undefined}
             className="btn btn-secondary text-sm"
           >
             {pending === "role" ? "Сохраняем…" : "Применить"}
@@ -193,6 +197,8 @@ export function UserAdminActions({
           type="button"
           onClick={handleDisableToggle}
           disabled={!viewerIsAdmin || isSelf || pending !== null}
+          data-loading={pending === "disable" || undefined}
+          aria-busy={pending === "disable" || undefined}
           className={`btn text-sm ${isDisabled ? "btn-primary" : "btn-secondary"}`}
         >
           {pending === "disable"

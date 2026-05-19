@@ -104,7 +104,7 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
           {isDeleting ? "Деактивация…" : "Деактивировать"}
         </button>
         <div className="flex-1" />
-        <button type="submit" disabled={isPending} className="btn btn-primary">
+        <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">
           {isPending ? "Сохранение..." : "Сохранить"}
         </button>
       </div>

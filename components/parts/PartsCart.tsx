@@ -204,7 +204,7 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
             onChange={(e) => persistDraft("notes", e.target.value)}
           />
         </div>
-        <button type="submit" disabled={submitting} className="btn btn-primary w-full">
+        <button type="submit" disabled={submitting} data-loading={submitting || undefined} aria-busy={submitting || undefined} className="btn btn-primary w-full">
           {submitting ? "Оформление..." : `Оформить заказ — ${formatPrice(total)}`}
         </button>
       </form>
