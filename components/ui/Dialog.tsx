@@ -40,14 +40,18 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         <DialogPrimitive.Content
           ref={ref}
           data-dialog-content
-          // Flex column with overflow-hidden lets DialogHeader / DialogBody /
-          // DialogFooter cooperate: header + footer are flex-shrink-0 (fixed
-          // bands), body is flex-1 with its own overflow-y-auto (scrollable
-          // middle). This is the standard modal layout — pin chrome, scroll
-          // content — and is more reliable than sticky-with-negative-margins.
-          // Static -translate keeps the dialog centered before the entry
-          // animation fires AND under prefers-reduced-motion.
-          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] flex flex-col overflow-hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl ${className}`.trim()}
+          // Centering: `inset-0 m-auto` (transform-FREE) instead of the
+          // classic top-1/2 + -translate-y-1/2. The translate approach broke
+          // here — combined with the entry-animation keyframe's own transform
+          // it double-applied and pushed the dialog ~half its height off the
+          // top of the viewport on tall content. inset-0 + margin-auto centers
+          // a max-height-capped box reliably with no transform involved, so
+          // the animation keyframe (scale + opacity only now) can't fight it.
+          //
+          // Flex column + overflow-hidden: DialogHeader / DialogFooter are
+          // shrink-0 (pinned bands), DialogBody is flex-1 + min-h-0 +
+          // overflow-y-auto (scrolling middle). Standard modal layout.
+          className={`fixed inset-0 m-auto z-50 h-fit w-[92vw] max-w-lg max-h-[90vh] flex flex-col overflow-hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl ${className}`.trim()}
           {...props}
         >
           {children}
@@ -83,7 +87,9 @@ export function DialogHeader({ children, className = "" }: { children: ReactNode
  */
 export function DialogBody({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
   return (
-    <div className={`flex-1 overflow-y-auto px-6 py-4 ${className}`.trim()}>
+    // min-h-0 is required — a flex item defaults to min-height:auto which
+    // refuses to shrink below content size, defeating overflow-y-auto.
+    <div className={`flex-1 min-h-0 overflow-y-auto px-6 py-4 ${className}`.trim()}>
       {children}
     </div>
   );
