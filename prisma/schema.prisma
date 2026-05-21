@@ -326,6 +326,11 @@ model User {
   authoredCustomerNotes CustomerNote[]           @relation("CustomerNoteAuthor")
   tagAssignments       CustomerTagAssignment[]
 
+  // Secondary email/phone aliases — a customer who writes from a new
+  // address gets it added here so future inbound auto-matches them.
+  // The primary email/phone stay on this model; aliases are extras.
+  contacts             CustomerContact[]
+
   // Relations — as master/technician
   assignedRepairOrders RepairOrder[] @relation("RepairOrderMaster")
   assignedLaborLines   LaborLine[]   @relation("LaborLineTechnician")
@@ -380,6 +385,32 @@ model CustomerProfile {
   notes                 String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum ContactType {
+  EMAIL
+  PHONE
+}
+
+// Secondary contact aliases for a customer. The primary email/phone live
+// on User; these are additional addresses/numbers the same person uses.
+// Inbound email resolution (lib/email/resolve.ts) matches the sender
+// against User.email OR a CustomerContact EMAIL value, so a known customer
+// writing from a new address is auto-attached once that address is added.
+model CustomerContact {
+  id        String      @id @default(cuid())
+  userId    String
+  type      ContactType
+  value     String // normalized: lowercased email / normalizePhone'd number
+  label     String? // optional human label ("рабочий", "личный")
+  createdAt DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A given email/phone belongs to at most one customer alias — prevents
+  // the same address pointing at two customers.
+  @@unique([type, value])
+  @@index([userId])
 }
 
 // CRM — manager-authored timeline notes attached to a customer User.

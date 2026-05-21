@@ -56,6 +56,7 @@ export async function linkInboxMessageToCustomer(
       attachments: true,
       resendEmailId: true,
       status: true,
+      fromEmail: true,
     },
   })) as
     | {
@@ -66,12 +67,30 @@ export async function linkInboxMessageToCustomer(
         attachments: unknown;
         resendEmailId: string;
         status: string;
+        fromEmail: string;
       }
     | null;
   if (!msg) return { error: "Сообщение не найдено" };
   if (msg.status !== "PENDING") {
     return { error: "Уже привязано другим менеджером — обновите страницу" };
   }
+
+  // Decide whether to register the sender address as a secondary contact
+  // so future inbound from it auto-matches this customer. Skip if it's
+  // already the customer's primary email or already an alias (on anyone).
+  const senderEmail = msg.fromEmail.trim().toLowerCase();
+  const customer = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { email: true },
+  })) as { email: string } | null;
+  const isPrimary = customer?.email.toLowerCase() === senderEmail;
+  const existingAlias = isPrimary
+    ? true
+    : (await db.customerContact.findUnique({
+        where: { type_value: { type: "EMAIL", value: senderEmail } },
+        select: { id: true },
+      })) !== null;
+  const shouldAddAlias = Boolean(senderEmail) && !isPrimary && !existingAlias;
 
   try {
     const result = await db.$transaction(async (tx) => {
@@ -103,6 +122,13 @@ export async function linkInboxMessageToCustomer(
       if (flip.count === 0) {
         // Optimistic concurrency lost. Roll the transaction back.
         throw new Error("RACE");
+      }
+
+      // Register sender as a secondary email so future inbound auto-matches.
+      if (shouldAddAlias) {
+        await tx.customerContact.create({
+          data: { userId: customerUserId, type: "EMAIL", value: senderEmail },
+        });
       }
       return log.id;
     });

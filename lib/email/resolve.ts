@@ -64,12 +64,23 @@ export async function resolveInboundEmail(input: {
     }
   }
 
-  // Step 2: Sender email match.
+  // Step 2: Sender email match — primary User.email OR a secondary
+  // CustomerContact EMAIL alias (added when a manager linked an inbox
+  // message from this address to the customer).
   const { email: senderEmail } = parseFromAddress(envelope.data.from);
-  const customer = (await db.user.findFirst({
+  let customer = (await db.user.findFirst({
     where: { email: { equals: senderEmail, mode: "insensitive" }, isCustomer: true },
     select: { id: true, name: true },
   })) as { id: string; name: string } | null;
+  if (!customer) {
+    const alias = (await db.customerContact.findFirst({
+      where: { type: "EMAIL", value: senderEmail.toLowerCase() },
+      select: { user: { select: { id: true, name: true, isCustomer: true } } },
+    })) as { user: { id: string; name: string; isCustomer: boolean } } | null;
+    if (alias && alias.user.isCustomer) {
+      customer = { id: alias.user.id, name: alias.user.name };
+    }
+  }
   if (customer) {
     const openDeal = (await db.deal.findFirst({
       where: { customerUserId: customer.id, stage: { notIn: ["WON", "LOST"] } },
