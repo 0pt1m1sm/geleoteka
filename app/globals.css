@@ -53,17 +53,18 @@
   to { opacity: 0; transform: translateX(110%) scale(0.95); }
 }
 
-/* Positioning is transform-free now (inset-0 + margin auto in Dialog.tsx),
-   so the entry/exit keyframes animate scale + opacity only — no translate
-   to fight the centering. */
+/* Dialog is centered with left-1/2 top-1/2 + -translate-x/y-1/2 (the most
+   browser-reliable method). The keyframes therefore must NOT touch the
+   transform property — they animate opacity only, so the centering
+   translate from the className stays applied throughout. */
 @keyframes dialogIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to   { opacity: 1; transform: scale(1); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes dialogOut {
-  from { opacity: 1; transform: scale(1); }
-  to   { opacity: 0; transform: scale(0.97); }
+  from { opacity: 1; }
+  to   { opacity: 0; }
 }
 
 @keyframes overlayIn {

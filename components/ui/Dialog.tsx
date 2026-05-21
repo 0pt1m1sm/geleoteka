@@ -40,18 +40,17 @@ export const DialogContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
         <DialogPrimitive.Content
           ref={ref}
           data-dialog-content
-          // Centering: `inset-0 m-auto` (transform-FREE) instead of the
-          // classic top-1/2 + -translate-y-1/2. The translate approach broke
-          // here — combined with the entry-animation keyframe's own transform
-          // it double-applied and pushed the dialog ~half its height off the
-          // top of the viewport on tall content. inset-0 + margin-auto centers
-          // a max-height-capped box reliably with no transform involved, so
-          // the animation keyframe (scale + opacity only now) can't fight it.
+          // Centering: classic left-1/2 top-1/2 + -translate-x/y-1/2 — the
+          // most browser-reliable method (Safari/Chrome consistent). The
+          // earlier inset-0 + margin-auto approach centered fine in Chrome
+          // but drifted bottom-right in other engines (margin-auto centering
+          // with h-fit height is under-specified). The entry/exit keyframes
+          // animate OPACITY ONLY now, so they never overwrite this transform.
           //
           // Flex column + overflow-hidden: DialogHeader / DialogFooter are
           // shrink-0 (pinned bands), DialogBody is flex-1 + min-h-0 +
           // overflow-y-auto (scrolling middle). Standard modal layout.
-          className={`fixed inset-0 m-auto z-50 h-fit w-[92vw] max-w-lg max-h-[90vh] flex flex-col overflow-hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl ${className}`.trim()}
+          className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[92vw] max-w-lg max-h-[90vh] flex flex-col overflow-hidden bg-[var(--card)] border border-[var(--border)] rounded-[var(--radius-xl)] shadow-2xl ${className}`.trim()}
           {...props}
         >
           {children}
