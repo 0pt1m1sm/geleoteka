@@ -10,6 +10,7 @@ import { getAllCustomerTags } from "@/lib/customer-queries";
 import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
+import { CustomerContactsManager } from "@/components/admin/customers/CustomerContactsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 import { DeleteCustomerButton } from "@/components/admin/customers/DeleteCustomerButton";
 import { RestoreCustomerButton } from "@/components/admin/customers/RestoreCustomerButton";
@@ -44,6 +45,7 @@ interface RawCustomer {
   tagAssignments: Array<{
     tag: { id: string; name: string; colorSlug: string };
   }>;
+  contacts: Array<{ id: string; type: "EMAIL" | "PHONE"; value: string }>;
 }
 
 export default async function CustomerDetailPage({ params }: Props) {
@@ -72,6 +74,10 @@ export default async function CustomerDetailPage({ params }: Props) {
         },
         tagAssignments: {
           include: { tag: { select: { id: true, name: true, colorSlug: true } } },
+        },
+        contacts: {
+          select: { id: true, type: true, value: true },
+          orderBy: { createdAt: "asc" },
         },
       },
     }),
@@ -216,6 +222,11 @@ export default async function CustomerDetailPage({ params }: Props) {
           customerUserId={customer.id}
           assigned={assignedTags}
           availableTags={availableTags}
+        />
+
+        <CustomerContactsManager
+          customerUserId={customer.id}
+          contacts={customer.contacts}
         />
       </div>
 

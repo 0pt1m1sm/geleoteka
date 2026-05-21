@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { normalizePhone } from "@/lib/utils";
 
 export interface DeleteCustomerResult {
   error: string | null;
@@ -79,5 +80,68 @@ export async function restoreCustomer(
 
   revalidatePath("/admin/customers");
   revalidatePath(`/admin/customers/${customerUserId}`);
+  return { error: null };
+}
+
+// ── Contact aliases (secondary email/phone) ──────────────────────────────
+
+/** Add a secondary email or phone for a customer. ADMIN/MANAGER. */
+export async function addCustomerContact(
+  customerUserId: string,
+  type: "EMAIL" | "PHONE",
+  rawValue: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const value =
+    type === "EMAIL"
+      ? rawValue.trim().toLowerCase()
+      : normalizePhone(rawValue.trim());
+  if (!value) return { error: "Пустое значение" };
+  if (type === "EMAIL" && !value.includes("@")) {
+    return { error: "Некорректный email" };
+  }
+
+  // Don't duplicate the customer's own primary contact.
+  const owner = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { email: true, phone: true },
+  })) as { email: string; phone: string } | null;
+  if (!owner) return { error: "Клиент не найден" };
+  if (type === "EMAIL" && owner.email.toLowerCase() === value) {
+    return { error: "Это основной email клиента" };
+  }
+  if (type === "PHONE" && owner.phone === value) {
+    return { error: "Это основной телефон клиента" };
+  }
+
+  try {
+    await db.customerContact.create({
+      data: { userId: customerUserId, type, value },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("Unique constraint")) {
+      return { error: "Этот контакт уже привязан к клиенту" };
+    }
+    console.error("[addCustomerContact]", err);
+    return { error: "Не удалось добавить контакт" };
+  }
+
+  revalidatePath(`/admin/customers/${customerUserId}`);
+  return { error: null };
+}
+
+/** Remove a secondary contact alias. ADMIN/MANAGER. */
+export async function deleteCustomerContact(
+  contactId: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const existing = (await db.customerContact.findUnique({
+    where: { id: contactId },
+    select: { userId: true },
+  })) as { userId: string } | null;
+  if (!existing) return { error: "Контакт не найден" };
+  await db.customerContact.delete({ where: { id: contactId } });
+  revalidatePath(`/admin/customers/${existing.userId}`);
   return { error: null };
 }
