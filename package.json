@@ -8,6 +8,7 @@
     "start": "next start -H 0.0.0.0 -p ${PORT:-443}",
     "lint": "eslint",
     "migrate-static-photos": "tsx scripts/migrate-static-photos.ts",
+    "backfill-fulfillment-deals": "tsx scripts/backfill-fulfillment-deals.ts",
     "verify-vehicle-catalog": "tsx scripts/verify-vehicle-catalog.ts",
     "verify-vehicle-trims": "tsx scripts/verify-vehicle-trims.ts",
     "verify-cms": "tsx scripts/verify-cms.ts",

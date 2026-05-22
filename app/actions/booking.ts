@@ -8,7 +8,7 @@ import {
   generateClaimToken,
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
-import { nextRepairOrderNumber } from "@/lib/crm/internal/next-number";
+import { nextRepairOrderNumber } from "@/lib/crm/public";
 
 interface BookingInput {
   serviceIds: string[];

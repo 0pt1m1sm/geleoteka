@@ -12,6 +12,7 @@ import {
   DEAL_STAGE_LABELS,
 } from "@/lib/deal-stage-labels";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
+import { DealKanban, type KanbanDeal } from "@/components/crm/DealKanban";
 
 interface CustomerOption {
   id: string;
@@ -41,7 +42,7 @@ interface DealRow {
 }
 
 interface Props {
-  searchParams: Promise<{ stage?: string; channel?: string }>;
+  searchParams: Promise<{ stage?: string; channel?: string; view?: string }>;
 }
 
 export default async function CrmDealsPage({ searchParams }: Props) {
@@ -50,9 +51,11 @@ export default async function CrmDealsPage({ searchParams }: Props) {
     redirect("/login");
   }
 
-  const { stage: stageParam, channel } = await searchParams;
+  const { stage: stageParam, channel, view: viewParam } = await searchParams;
+  const isKanban = viewParam === "kanban";
   const stageKey = stageParam && stageParam in STAGE_GROUPS ? stageParam : "active";
-  const stagesFilter = STAGE_GROUPS[stageKey];
+  // Kanban shows all four stage columns; the list view honours the chip filter.
+  const stagesFilter = isKanban ? STAGE_GROUPS.all : STAGE_GROUPS[stageKey];
 
   const where: Record<string, unknown> = { stage: { in: stagesFilter } };
   if (channel) where.channel = channel;
@@ -101,6 +104,17 @@ export default async function CrmDealsPage({ searchParams }: Props) {
   // other admin pages (customers/[id], crm/tasks, crm/deals/[id]).
   const nowMs = new Date().valueOf();
 
+  const kanbanDeals: KanbanDeal[] = deals.map((d) => ({
+    id: d.id,
+    number: d.number,
+    stage: d.stage,
+    channel: d.channel,
+    total: d.total,
+    customerName: d.customer.name,
+    vehicle: d.vehicle ? `${d.vehicle.make} ${d.vehicle.model}` : null,
+    openTasks: d.tasks.length,
+  }));
+
   return (
     <div>
       <PageHeader
@@ -109,14 +123,34 @@ export default async function CrmDealsPage({ searchParams }: Props) {
         actions={<NewDealDialog customers={customers} />}
       />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <StageChip current={stageKey} value="active" label="Активные" />
-        <StageChip current={stageKey} value="won" label="Выиграны" />
-        <StageChip current={stageKey} value="lost" label="Проиграны" />
-        <StageChip current={stageKey} value="all" label="Все" />
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {!isKanban ? (
+          <>
+            <StageChip current={stageKey} value="active" label="Активные" />
+            <StageChip current={stageKey} value="won" label="Выиграны" />
+            <StageChip current={stageKey} value="lost" label="Проиграны" />
+            <StageChip current={stageKey} value="all" label="Все" />
+          </>
+        ) : null}
+        <div className="ml-auto flex gap-2">
+          <Link
+            href="/admin/crm/deals"
+            className={`badge border ${!isKanban ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] border-[var(--color-accent)]" : "bg-[var(--background-secondary)] border-[var(--border)]"}`}
+          >
+            Список
+          </Link>
+          <Link
+            href="/admin/crm/deals?view=kanban"
+            className={`badge border ${isKanban ? "bg-[var(--color-accent)] text-[var(--color-accent-foreground)] border-[var(--color-accent)]" : "bg-[var(--background-secondary)] border-[var(--border)]"}`}
+          >
+            Канбан
+          </Link>
+        </div>
       </div>
 
-      {deals.length === 0 ? (
+      {isKanban ? (
+        <DealKanban deals={kanbanDeals} />
+      ) : deals.length === 0 ? (
         <Card className="text-center py-12">
           <p className="text-[var(--foreground-muted)]">Сделок нет.</p>
         </Card>

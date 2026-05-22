@@ -13,6 +13,7 @@ import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
 import { formatPrice } from "@/lib/utils";
 import { confirm } from "@/lib/ui/confirm";
 import { toast } from "@/lib/ui/toast";
+import { EstimatePartPicker } from "@/components/crm/EstimatePartPicker";
 
 interface EstimateLineView {
   id: string;
@@ -164,7 +165,10 @@ export function EstimateLineEditor({
       {editable ? (
         <>
           <LiveTotalsStrip subtotals={liveSubtotals} pending={rowStatuses.size > 0} />
-          <AddLineButton estimateId={estimateId} />
+          <div className="flex flex-wrap items-start gap-2">
+            <AddLineButton estimateId={estimateId} />
+            <EstimatePartPicker estimateId={estimateId} />
+          </div>
         </>
       ) : null}
     </div>

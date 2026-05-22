@@ -25,7 +25,8 @@ interface BookingForEdit {
   id: string;
   startDate: Date;
   endDate: Date;
-  totalCost: number;
+  /** Read-only — the rental price lives on the deal's estimate, not here. */
+  dealTotal: number;
   contactName: string;
   contactPhone: string;
   contactEmail: string;
@@ -154,18 +155,15 @@ export function RentalBookingEditDialog({ booking }: Props): React.ReactElement 
                 defaultValue={toLocalDate(booking.endDate)}
               />
             </div>
-            <Input
-              label="Стоимость, ₽"
-              name="totalCost"
-              type="number"
-              inputMode="numeric"
-              required
-              min="0"
-              defaultValue={String(booking.totalCost)}
-              // job-line-num hides the native +/- spinner that pushes the
-              // value digits and looks noisy.
-              className="job-line-num"
-            />
+            <div>
+              <label className="block text-sm text-[var(--foreground-muted)] mb-1">Стоимость</label>
+              <p className="text-lg font-semibold tabular-nums text-[var(--color-accent)]">
+                {new Intl.NumberFormat("ru-RU").format(booking.dealTotal)} ₽
+              </p>
+              <p className="text-xs text-[var(--foreground-muted)] mt-1">
+                Цена берётся из сметы сделки — измените её в смете.
+              </p>
+            </div>
             <Textarea
               label="Заметка"
               name="notes"

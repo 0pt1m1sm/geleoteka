@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseOccurredAt } from "@/lib/crm/occurred-at";
+import { bumpLastTouch } from "@/lib/crm/public";
 
 interface CommResult {
   error: string | null;
@@ -49,6 +50,8 @@ export async function logCommunication(
     },
     select: { id: true },
   })) as { id: string };
+
+  await bumpLastTouch(customerUserId);
 
   revalidatePath(`/admin/customers/${customerUserId}`);
   if (dealId) revalidatePath(`/admin/crm/deals/${dealId}`);

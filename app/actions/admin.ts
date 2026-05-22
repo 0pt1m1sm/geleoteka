@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { consumeApprovedEstimateParts } from "@/lib/fulfillment/consume-parts";
+import { actorId } from "@/lib/wms-host";
 
 async function recomputeRepairOrderTotals(repairOrderId: string): Promise<void> {
   const allJobs = await db.jobLine.findMany({
@@ -33,16 +35,32 @@ export async function updateRepairOrderStatus(
   repairOrderId: string,
   newStatus: string
 ): Promise<void> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const updateData: Record<string, unknown> = { status: newStatus };
   if (newStatus === "COMPLETED") {
     updateData.completedAt = new Date();
   }
 
-  await db.repairOrder.update({
+  // Detect the entry into COMPLETED so parts are consumed exactly once
+  // (recordMovement's idempotency key also guards a re-fire).
+  const prior = (await db.repairOrder.findUnique({
     where: { id: repairOrderId },
-    data: updateData,
+    select: { status: true, dealId: true },
+  })) as { status: string; dealId: string } | null;
+  const enteringCompleted =
+    newStatus === "COMPLETED" && prior !== null && prior.status !== "COMPLETED";
+
+  await db.$transaction(async (tx) => {
+    await tx.repairOrder.update({ where: { id: repairOrderId }, data: updateData });
+    if (enteringCompleted && prior) {
+      await consumeApprovedEstimateParts(tx, {
+        dealId: prior.dealId,
+        sourceType: "RepairOrder",
+        sourceId: repairOrderId,
+        actorId: actorId(session),
+      });
+    }
   });
 
   // Cancelled ROs release their slot so the time becomes bookable again.

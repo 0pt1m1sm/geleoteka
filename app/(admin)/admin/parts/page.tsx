@@ -11,16 +11,21 @@ export default async function AdminPartsPage() {
   await requireRole(["ADMIN", "MANAGER"]);
 
   const parts = await db.part.findMany({
-    include: { category: { select: { name: true } } },
+    include: {
+      category: { select: { name: true } },
+      stockItem: { select: { quantity: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
+  const onHandOf = (p: Record<string, unknown>): number =>
+    (p.stockItem as { quantity: number } | null)?.quantity ?? 0;
 
   return (
     <div>
       <PageHeader
         eyebrow="Запчасти"
         title="Каталог"
-        description={`Всего: ${parts.length} · В наличии: ${parts.filter((p: Record<string, unknown>) => (p.quantity as number) > 0).length}`}
+        description={`Всего: ${parts.length} · В наличии: ${parts.filter((p: Record<string, unknown>) => onHandOf(p) > 0).length}`}
         actions={
           <div className="flex gap-2">
             <Link href="/admin/parts/import">
@@ -66,8 +71,8 @@ export default async function AdminPartsPage() {
                   <p className="font-bold text-[var(--color-accent)]">
                     {formatPrice(part.price as number)}
                   </p>
-                  <p className={`text-xs ${(part.quantity as number) > 0 ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}>
-                    {(part.quantity as number) > 0 ? `${part.quantity} шт.` : "Нет в наличии"}
+                  <p className={`text-xs ${onHandOf(part) > 0 ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}>
+                    {onHandOf(part) > 0 ? `${onHandOf(part)} шт.` : "Нет в наличии"}
                   </p>
                 </div>
               </Link>

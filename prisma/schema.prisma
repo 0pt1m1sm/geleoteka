@@ -318,7 +318,7 @@ model User {
   notifications  Notification[]
   passwordResets PasswordReset[]
   blogPosts      BlogPost[]
-  partOrders     PartOrder[]
+  partShipments  PartShipment[]
   rentalBookings RentalBooking[]
 
   // CRM — manager timeline notes about this customer + tag assignments
@@ -383,6 +383,14 @@ model CustomerProfile {
   preferredMasterUserId String?
   blacklisted           Boolean @default(false)
   notes                 String?
+
+  // CRM analytics (Phase 3). Maintained incrementally: lastTouchAt on each
+  // communication, lifetimeValue on WON-deal transitions. Backfilled from
+  // history at migration time.
+  source        String? // earliest deal.source ("booking-form" | "parts-cart" | ...)
+  firstSeenAt   DateTime?
+  lastTouchAt   DateTime?
+  lifetimeValue Int       @default(0) // Σ WON deal totals, kopecks
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -868,7 +876,6 @@ model Part {
   description    String?
   price          Int
   compareAtPrice Int?
-  quantity       Int      @default(0)
   isOEM          Boolean  @default(true)
   photos         String[]
   categoryId     String?
@@ -882,6 +889,7 @@ model Part {
   partLines          PartLine[]
   partTrims          PartTrim[]
   estimateLines      EstimateLine[]
+  stockItem          StockItem?
 
   @@index([slug])
   @@index([article])
@@ -889,7 +897,66 @@ model Part {
   @@index([isActive])
 }
 
-model PartOrder {
+// ============================================
+// WMS — Warehouse stock (extractable core; see docs/design/2026-05-22-wms-module-seam.md)
+// StockItem owns physical stock (on-hand/reserved) keyed 1:1 to a Part.
+// StockMovement is the append-only audit ledger. tenantKey is the single-tenant
+// discriminator now (default "geleoteka"); all future tenant scoping funnels
+// through these two tables + lib/wms/internal/repository.ts.
+// ============================================
+
+enum StockMovementReason {
+  RECEIPT // inbound on-hand (supplier receipt)
+  CONSUMPTION // outbound on-hand (RO close / shipment / retail sale)
+  ADJUSTMENT // manual correction (the only reason allowed a null source)
+  RESERVATION // raise reserved, leave on-hand
+  RELEASE // lower reserved, leave on-hand
+}
+
+model StockItem {
+  id        String   @id @default(cuid())
+  partId    String   @unique
+  quantity  Int      @default(0) // physical on-hand
+  reserved  Int      @default(0) // held by open reservations; available = quantity - reserved
+  barcode   String?
+  gtin      String?
+  tenantKey String   @default("geleoteka")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  part      Part            @relation(fields: [partId], references: [id], onDelete: Cascade)
+  movements StockMovement[]
+
+  @@index([tenantKey, partId])
+  @@index([barcode])
+}
+
+model StockMovement {
+  id            String              @id @default(cuid())
+  itemId        String
+  reason        StockMovementReason
+  quantityDelta Int                 @default(0) // signed on-hand delta
+  reservedDelta Int                 @default(0) // signed reserved delta
+  sourceType    String
+  sourceId      String?
+  actorUserId   String?
+  note          String?
+  tenantKey     String              @default("geleoteka")
+  createdAt     DateTime            @default(now())
+
+  item StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Idempotency: a given (tenant, source, reason) applies at most once.
+  // sourceId is nullable (manual ADJUSTMENT); NULLs are distinct in PG so the
+  // recordMovement guard forbids null sourceId for all reasons except ADJUSTMENT.
+  @@unique([tenantKey, sourceType, sourceId, reason])
+  @@index([tenantKey, itemId, createdAt])
+}
+
+// Parts fulfillment / shipment for a Deal (channel PARTS_*). Renamed from
+// PartOrder (the Deal is now the "order"); @@map keeps the DB table "PartOrder"
+// so no data moves. The PO-NNNN number + PartOrder_number_seq are unchanged.
+model PartShipment {
   id           String          @id @default(cuid())
   // Human-readable PO-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
@@ -909,19 +976,19 @@ model PartOrder {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
-  // backfill is verified. PartOrder is renamed to PartShipment in a
-  // later migration; the route is preserved via @@map.
-  dealId String?
+  // Deal+Fulfillment: NOT NULL after the backfill (scripts/backfill-fulfillment-deals.ts)
+  // guaranteed every row carries a dealId.
+  dealId String
 
   user  User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
-  deal  Deal?           @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  deal  Deal            @relation(fields: [dealId], references: [id], onDelete: Cascade)
   items PartOrderItem[]
 
   @@index([userId])
   @@index([status])
   @@index([claimToken])
   @@index([dealId])
+  @@map("PartOrder")
 }
 
 model PartOrderItem {
@@ -931,8 +998,8 @@ model PartOrderItem {
   quantity  Int    @default(1)
   unitPrice Int
 
-  order PartOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  part  Part      @relation(fields: [partId], references: [id], onDelete: Cascade)
+  order PartShipment @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  part  Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([partId])
@@ -953,7 +1020,8 @@ model RentalBooking {
   status       RentalBookingStatus @default(BOOKED)
   startDate    DateTime
   endDate      DateTime
-  totalCost    Int
+  // Rental cost is NOT denormalized here — it lives on the deal's active
+  // estimate (RENTAL_DAY line) and Deal.total. Read it via the deal.
   contactName  String
   contactPhone String
   contactEmail String
@@ -966,13 +1034,13 @@ model RentalBooking {
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
-  // Phase 0 of Deal+Fulfillment migration: nullable now, NOT NULL once
-  // backfill is verified.
-  dealId String?
+  // Deal+Fulfillment: NOT NULL after the backfill (scripts/backfill-fulfillment-deals.ts)
+  // guaranteed every row carries a dealId.
+  dealId String
 
   vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
-  deal    Deal?   @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  deal    Deal    @relation(fields: [dealId], references: [id], onDelete: Cascade)
 
   @@index([vehicleId])
   @@index([userId])
@@ -1197,7 +1265,7 @@ model Deal {
   owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   estimates        Estimate[]
   repairOrders     RepairOrder[]
-  partOrders       PartOrder[]
+  partShipments    PartShipment[]
   rentalBookings   RentalBooking[]
   communicationLogs CommunicationLog[]
   tasks            CrmTask[]

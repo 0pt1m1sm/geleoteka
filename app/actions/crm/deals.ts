@@ -93,8 +93,8 @@ export async function setDealStage(
 
   const deal = (await db.deal.findUnique({
     where: { id: dealId },
-    select: { stage: true },
-  })) as { stage: string } | null;
+    select: { stage: true, total: true, customerUserId: true },
+  })) as { stage: string; total: number; customerUserId: string } | null;
   if (!deal) return { error: "Сделка не найдена" };
 
   const allowed = FORWARD_FROM[deal.stage] ?? [];
@@ -122,6 +122,23 @@ export async function setDealStage(
   }
 
   await db.deal.update({ where: { id: dealId }, data });
+
+  // Maintain CustomerProfile.lifetimeValue across the WON boundary so it stays
+  // in sync without a full recompute (mirrors the WON/rollback transitions).
+  if (nextStage === "WON" && deal.stage !== "WON") {
+    await db.customerProfile.upsert({
+      where: { userId: deal.customerUserId },
+      update: { lifetimeValue: { increment: deal.total }, lastTouchAt: now },
+      create: { userId: deal.customerUserId, lifetimeValue: deal.total, lastTouchAt: now, firstSeenAt: now },
+    });
+  } else if (deal.stage === "WON" && nextStage !== "WON") {
+    await db.customerProfile.upsert({
+      where: { userId: deal.customerUserId },
+      update: { lifetimeValue: { decrement: deal.total }, lastTouchAt: now },
+      create: { userId: deal.customerUserId, lifetimeValue: 0, lastTouchAt: now, firstSeenAt: now },
+    });
+  }
+
   revalidatePath(`/admin/crm/deals/${dealId}`);
   revalidatePath("/admin/crm/deals");
   return { error: null };

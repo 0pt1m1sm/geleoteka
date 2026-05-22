@@ -3,7 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { nextEstimateNumber } from "@/lib/crm/internal/next-number";
+import { nextEstimateNumber, dispatchFulfillment } from "@/lib/crm/public";
+import {
+  releasePartLinesForEstimate,
+  reservePartLinesForEstimate,
+} from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 interface EstimateMutationResult {
   error: string | null;
@@ -234,8 +239,36 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
 
   const est = (await db.estimate.findUnique({
     where: { id: estimateId },
-    select: { id: true, dealId: true, stage: true },
-  })) as { id: string; dealId: string; stage: string } | null;
+    select: {
+      id: true,
+      stage: true,
+      total: true,
+      deal: {
+        select: {
+          id: true,
+          channel: true,
+          customerUserId: true,
+          vehicleId: true,
+          customer: { select: { name: true, phone: true, email: true } },
+          repairOrders: { select: { id: true }, take: 1 },
+          partShipments: { select: { id: true }, take: 1 },
+        },
+      },
+    },
+  })) as {
+    id: string;
+    stage: string;
+    total: number;
+    deal: {
+      id: string;
+      channel: string;
+      customerUserId: string;
+      vehicleId: string | null;
+      customer: { name: string; phone: string; email: string };
+      repairOrders: Array<{ id: string }>;
+      partShipments: Array<{ id: string }>;
+    };
+  } | null;
   if (!est) return { error: "Смета не найдена" };
   if (est.stage !== "DRAFT" && est.stage !== "SENT") {
     return { error: "Смету в этой стадии нельзя согласовать" };
@@ -248,12 +281,23 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
       data: { stage: "APPROVED", approvedAt: now },
     });
     await tx.deal.update({
-      where: { id: est.dealId },
+      where: { id: est.deal.id },
       data: { stage: "IN_PROGRESS", approvedAt: now },
+    });
+    // Auto-create the channel's fulfillment if the deal doesn't have one yet.
+    await dispatchFulfillment(tx, {
+      dealId: est.deal.id,
+      channel: est.deal.channel,
+      customerUserId: est.deal.customerUserId,
+      vehicleId: est.deal.vehicleId,
+      contact: est.deal.customer,
+      estimateTotal: est.total,
+      hasRepairOrder: est.deal.repairOrders.length > 0,
+      hasPartShipment: est.deal.partShipments.length > 0,
     });
   });
 
-  revalidatePath(`/admin/crm/deals/${est.dealId}`);
+  revalidatePath(`/admin/crm/deals/${est.deal.id}`);
   revalidatePath(`/admin/crm/estimates/${estimateId}`);
   return { error: null, estimateId };
 }
@@ -281,6 +325,12 @@ export async function unapproveEstimate(estimateId: string): Promise<EstimateMut
       where: { id: estimateId },
       data: { stage: "SENT", approvedAt: null },
     });
+    // Reservation invariant: PART-line holds stay LIVE across the whole
+    // DRAFT → SENT → APPROVED span and through this APPROVED → SENT rollback.
+    // They are released exactly once, by ONE of: decline/supersede/expire
+    // (releasePartLinesForEstimate) or CONSUMPTION at RO/shipment close (which
+    // decrements reserved). So unapprove must NOT release here — the estimate
+    // is going back to SENT, an active state that still holds its stock.
     // Roll deal back IN_PROGRESS → NEW. We don't touch WON/LOST: if the
     // deal already closed, manager should reopen via the deal stage UI
     // (setDealStage handles that path with its own audit trail).
@@ -342,7 +392,7 @@ export async function declineEstimate(
   estimateId: string,
   reason: string,
 ): Promise<EstimateMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const trimmedReason = reason.trim();
   if (!trimmedReason) return { error: "Укажите причину отказа" };
@@ -357,9 +407,13 @@ export async function declineEstimate(
   }
 
   const now = new Date();
-  await db.estimate.update({
-    where: { id: estimateId },
-    data: { stage: "DECLINED", declinedAt: now, declineReason: trimmedReason },
+  await db.$transaction(async (tx) => {
+    await tx.estimate.update({
+      where: { id: estimateId },
+      data: { stage: "DECLINED", declinedAt: now, declineReason: trimmedReason },
+    });
+    // DRAFT/SENT held reservations — release them now that the estimate is dead.
+    await releasePartLinesForEstimate(tx, estimateId, actorId(session));
   });
 
   revalidatePath(`/admin/crm/deals/${est.dealId}`);
@@ -481,6 +535,12 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
       where: { id: parent.id },
       data: { stage: "SUPERSEDED" },
     });
+    // Transfer holds: release the parent's (only if it still held them — SENT/
+    // EXPIRED; DECLINED already released) and reserve the new DRAFT child's.
+    if (parent.stage === "SENT" || parent.stage === "EXPIRED") {
+      await releasePartLinesForEstimate(tx, parent.id, actorId(session));
+    }
+    await reservePartLinesForEstimate(tx, created.id, actorId(session));
     return created;
   });
 

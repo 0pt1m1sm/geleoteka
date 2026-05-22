@@ -20,7 +20,10 @@ export default async function MyRentalsPage() {
 
   const bookings = await db.rentalBooking.findMany({
     where: { userId: session.id },
-    include: { vehicle: { select: { model: true, year: true } } },
+    include: {
+      vehicle: { select: { model: true, year: true } },
+      deal: { select: { total: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -46,7 +49,7 @@ export default async function MyRentalsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-[var(--color-accent)]">{formatPrice(b.totalCost as number)}</p>
+                    <p className="font-bold text-[var(--color-accent)]">{formatPrice((b.deal as { total: number }).total)}</p>
                     <span className="badge text-[10px] bg-[var(--color-info-bg)] text-[var(--color-info)]">
                       {STATUS_LABELS[b.status as string] ?? b.status}
                     </span>

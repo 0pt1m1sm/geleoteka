@@ -2,6 +2,8 @@
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { recordMovement } from "@/lib/wms/public";
+import { TENANT_KEY, actorId } from "@/lib/wms-host";
 
 interface OrderItemInput {
   type: "PART" | "CUSTOM" | "FEE" | "SERVICE";
@@ -80,7 +82,7 @@ export async function updateSupplierOrderStatus(
   orderId: string,
   newStatus: string
 ): Promise<void> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const updateData: Record<string, unknown> = {
     status: newStatus as
@@ -93,13 +95,45 @@ export async function updateSupplierOrderStatus(
       | "CANCELLED",
   };
 
+  // Only fire stock RECEIPTs when transitioning INTO RECEIVED from another
+  // status — re-saving RECEIVED is a no-op (also guarded by recordMovement's
+  // idempotency key, so a double-fire never double-counts).
+  const current = (await db.supplierOrder.findUnique({
+    where: { id: orderId },
+    select: {
+      status: true,
+      items: {
+        where: { type: "PART", partId: { not: null } },
+        select: { id: true, partId: true, quantity: true },
+      },
+    },
+  })) as {
+    status: string;
+    items: Array<{ id: string; partId: string | null; quantity: number }>;
+  } | null;
+  if (!current) return;
+
+  const enteringReceived = newStatus === "RECEIVED" && current.status !== "RECEIVED";
   if (newStatus === "RECEIVED") {
     updateData.receivedAt = new Date();
   }
 
-  await db.supplierOrder.update({
-    where: { id: orderId },
-    data: updateData,
+  await db.$transaction(async (tx) => {
+    await tx.supplierOrder.update({ where: { id: orderId }, data: updateData });
+
+    if (enteringReceived) {
+      for (const item of current.items) {
+        if (!item.partId) continue;
+        await recordMovement(tx, {
+          item: { itemId: item.partId },
+          reason: "RECEIPT",
+          qty: item.quantity,
+          source: { type: "SupplierOrder", id: `${orderId}:${item.id}` },
+          actorId: actorId(session),
+          tenantKey: TENANT_KEY,
+        });
+      }
+    }
   });
 }
 

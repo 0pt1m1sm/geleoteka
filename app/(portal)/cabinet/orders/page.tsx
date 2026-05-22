@@ -18,7 +18,7 @@ export default async function OrdersPage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const orders = await db.partOrder.findMany({
+  const orders = await db.partShipment.findMany({
     where: { userId: session.id },
     include: {
       items: {

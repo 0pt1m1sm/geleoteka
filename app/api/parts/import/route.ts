@@ -139,7 +139,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
           await tx.part.update({
             where: { article },
-            data: { name, description: description || null, price, quantity, isOEM, categoryId },
+            data: { name, description: description || null, price, isOEM, categoryId },
+          });
+          // CSV import is an authoritative stock load — set the StockItem on-hand directly.
+          await tx.stockItem.upsert({
+            where: { partId: existing.id },
+            update: { quantity },
+            create: { partId: existing.id, quantity, tenantKey: "geleoteka" },
           });
           await tx.partTrim.deleteMany({ where: { partId: existing.id } });
           if (trimIds.length > 0) {
@@ -151,19 +157,22 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
         updated++;
       } else {
-        await db.part.create({
+        const created_ = (await db.part.create({
           data: {
             slug,
             article,
             name,
             description: description || null,
             price,
-            quantity,
             isOEM,
             categoryId,
             photos: [],
             partTrims: { create: trimIds.map((trimId) => ({ trimId })) },
           },
+          select: { id: true },
+        })) as { id: string };
+        await db.stockItem.create({
+          data: { partId: created_.id, quantity, tenantKey: "geleoteka" },
         });
         created++;
       }

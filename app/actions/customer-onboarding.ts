@@ -59,7 +59,7 @@ export async function setPasswordForGuestUser(input: {
     storedToken = rb.claimToken;
     userIdOnOrder = rb.userId;
   } else {
-    const po = (await db.partOrder.findUnique({
+    const po = (await db.partShipment.findUnique({
       where: { id: input.orderId },
       select: { claimToken: true, userId: true },
     })) as { claimToken: string | null; userId: string | null } | null;
@@ -101,7 +101,7 @@ export async function setPasswordForGuestUser(input: {
           where: { id: input.orderId },
           data: { claimToken: null },
         })
-      : db.partOrder.update({
+      : db.partShipment.update({
           where: { id: input.orderId },
           data: { claimToken: null },
         });
@@ -164,7 +164,7 @@ export async function loginAndAttachOrder(input: {
     orderEmail = rb.contactEmail;
     orderUserId = rb.userId;
   } else {
-    const po = (await db.partOrder.findUnique({
+    const po = (await db.partShipment.findUnique({
       where: { id: input.orderId },
       select: { claimToken: true, userId: true, contactEmail: true },
     })) as
@@ -212,7 +212,7 @@ export async function loginAndAttachOrder(input: {
     if (orderUserId !== null && orderUserId !== user.id) {
       return { ok: false, error: "Заказ привязан к другому аккаунту." };
     }
-    await db.partOrder.update({
+    await db.partShipment.update({
       where: { id: input.orderId },
       data:
         orderUserId === null

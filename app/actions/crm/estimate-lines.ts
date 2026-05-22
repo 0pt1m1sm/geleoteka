@@ -3,8 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { recomputeEstimateTotals } from "@/lib/crm/internal/recompute-estimate-totals";
-import { signedLineTotal } from "@/lib/crm/internal/signed-line-total";
+import { recomputeEstimateTotals, signedLineTotal } from "@/lib/crm/public";
+import { reserveForLine, releaseForLine } from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 interface EstimateLineMutationResult {
   error: string | null;
@@ -37,7 +38,7 @@ export async function addEstimateLine(
   _prevState: EstimateLineMutationResult | null,
   formData: FormData,
 ): Promise<EstimateLineMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const estimateId = formData.get("estimateId") as string;
   if (!estimateId) return { error: "Не передан estimateId" };
@@ -63,17 +64,15 @@ export async function addEstimateLine(
   })) as { sortOrder: number } | null;
   const sortOrder = last ? last.sortOrder + 1 : 0;
 
-  await db.estimateLine.create({
-    data: {
-      estimateId,
-      sortOrder,
-      type: type as never,
-      description,
-      qty,
-      unitPrice,
-      total,
-      partId,
-    },
+  await db.$transaction(async (tx) => {
+    const line = (await tx.estimateLine.create({
+      data: { estimateId, sortOrder, type: type as never, description, qty, unitPrice, total, partId },
+      select: { id: true },
+    })) as { id: string };
+    // A catalog PART line holds reserved stock equal to its qty.
+    if (type === "PART" && partId) {
+      await reserveForLine(tx, { partId, qty: Math.round(qty), lineId: line.id, actorId: actorId(session) });
+    }
   });
 
   await recomputeEstimateTotals(estimateId);
@@ -85,15 +84,15 @@ export async function updateEstimateLine(
   _prevState: EstimateLineMutationResult | null,
   formData: FormData,
 ): Promise<EstimateLineMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const id = formData.get("estimateLineId") as string;
   if (!id) return { error: "Не передан estimateLineId" };
 
   const existing = (await db.estimateLine.findUnique({
     where: { id },
-    select: { estimateId: true },
-  })) as { estimateId: string } | null;
+    select: { estimateId: true, type: true, partId: true, qty: true },
+  })) as { estimateId: string; type: string; partId: string | null; qty: number } | null;
   if (!existing) return { error: "Строка не найдена" };
 
   const gate = await assertDraft(existing.estimateId);
@@ -107,15 +106,24 @@ export async function updateEstimateLine(
     Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
   const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
 
-  await db.estimateLine.update({
-    where: { id },
-    data: {
-      description,
-      type: type as never,
-      qty,
-      unitPrice,
-      total,
-    },
+  // partId is immutable on update; only type/qty may flip the reservation.
+  const wasReserved = existing.type === "PART" && !!existing.partId;
+  const nowReserved = type === "PART" && !!existing.partId;
+
+  await db.$transaction(async (tx) => {
+    await tx.estimateLine.update({
+      where: { id },
+      data: { description, type: type as never, qty, unitPrice, total },
+    });
+    // Versioned source ids: the base `${lineId}:reserve` / `:release` keys were
+    // consumed at add/delete, so a qty-edit issues fresh versioned holds.
+    const version = Date.now();
+    if (wasReserved && existing.partId) {
+      await releaseForLine(tx, { partId: existing.partId, qty: Math.round(existing.qty), lineId: id, version, actorId: actorId(session) });
+    }
+    if (nowReserved && existing.partId) {
+      await reserveForLine(tx, { partId: existing.partId, qty: Math.round(qty), lineId: id, version, actorId: actorId(session) });
+    }
   });
 
   await recomputeEstimateTotals(existing.estimateId);
@@ -126,18 +134,23 @@ export async function updateEstimateLine(
 export async function deleteEstimateLine(
   estimateLineId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const existing = (await db.estimateLine.findUnique({
     where: { id: estimateLineId },
-    select: { estimateId: true },
-  })) as { estimateId: string } | null;
+    select: { estimateId: true, type: true, partId: true, qty: true },
+  })) as { estimateId: string; type: string; partId: string | null; qty: number } | null;
   if (!existing) return { error: "Строка не найдена" };
 
   const gate = await assertDraft(existing.estimateId);
   if (!gate.ok) return { error: gate.error };
 
-  await db.estimateLine.delete({ where: { id: estimateLineId } });
+  await db.$transaction(async (tx) => {
+    if (existing.type === "PART" && existing.partId) {
+      await releaseForLine(tx, { partId: existing.partId, qty: Math.round(existing.qty), lineId: estimateLineId, actorId: actorId(session) });
+    }
+    await tx.estimateLine.delete({ where: { id: estimateLineId } });
+  });
   await recomputeEstimateTotals(existing.estimateId);
   revalidatePath(`/admin/crm/estimates/${existing.estimateId}`);
   return { error: null };

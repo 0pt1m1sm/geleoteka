@@ -13,7 +13,7 @@ export default async function AdminOrdersPage() {
     redirect("/login");
   }
 
-  const orders = await db.partOrder.findMany({
+  const orders = await db.partShipment.findMany({
     include: {
       items: {
         include: { part: { select: { name: true, article: true } } },

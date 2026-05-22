@@ -8,7 +8,9 @@ import {
   generateClaimToken,
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
-import { nextPartOrderNumber } from "@/lib/crm/internal/next-number";
+import { nextPartOrderNumber } from "@/lib/crm/public";
+import { recordMovement } from "@/lib/wms/public";
+import { TENANT_KEY, actorId } from "@/lib/wms-host";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -57,9 +59,12 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     }
     const claimToken = !session ? generateClaimToken() : null;
 
-    // Fetch parts to get prices and check stock
+    // Fetch parts to get prices and check available stock (on-hand − reserved).
     const partIds = items.map((i) => i.partId);
-    const parts = await db.part.findMany({ where: { id: { in: partIds } } });
+    const parts = await db.part.findMany({
+      where: { id: { in: partIds } },
+      include: { stockItem: { select: { quantity: true, reserved: true } } },
+    });
 
     const partMap = new Map(parts.map((p: Record<string, unknown>) => [p.id as string, p]));
 
@@ -71,7 +76,8 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       if (!part) return { success: false, error: `Запчасть не найдена` };
 
       const price = part.price as number;
-      const stock = part.quantity as number;
+      const si = part.stockItem as { quantity: number; reserved: number } | null;
+      const stock = si ? si.quantity - si.reserved : 0;
 
       if (stock < item.quantity) {
         return { success: false, error: `${part.name as string}: недостаточно на складе (${stock} шт.)` };
@@ -105,7 +111,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     // Create order + decrement stock in transaction
     const order = await db.$transaction(async (tx) => {
       const orderNumber = await nextPartOrderNumber(tx);
-      const created = await tx.partOrder.create({
+      const created = await tx.partShipment.create({
         data: {
           userId: guestResult.userId,
           dealId: deal.id,
@@ -120,11 +126,17 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
         },
       });
 
-      // Decrement stock
+      // Retail sale is point-of-sale consumption: stock leaves on-hand now,
+      // through the WMS ledger (not a direct Part write). Idempotency key is
+      // per (order, part) so a retry never double-consumes.
       for (const item of orderItems) {
-        await tx.part.update({
-          where: { id: item.partId },
-          data: { quantity: { decrement: item.quantity } },
+        await recordMovement(tx, {
+          item: { itemId: item.partId },
+          reason: "CONSUMPTION",
+          qty: item.quantity,
+          source: { type: "PartShipment", id: `${created.id}:${item.partId}` },
+          actorId: actorId(session),
+          tenantKey: TENANT_KEY,
         });
       }
 

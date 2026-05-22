@@ -37,7 +37,7 @@ interface DealDetail {
   vehicle: { id: string; make: string; model: string; year: number; vin: string | null } | null;
   owner: { id: string; name: string } | null;
   repairOrders: Array<{ id: string; roNumber: string | null; status: string; dateTime: Date }>;
-  partOrders: Array<{ id: string; status: string; total: number }>;
+  partShipments: Array<{ id: string; status: string; total: number }>;
   rentalBookings: Array<{ id: string; status: string; startDate: Date; endDate: Date }>;
   estimates: Array<{
     id: string;
@@ -107,7 +107,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
         select: { id: true, roNumber: true, status: true, dateTime: true },
         orderBy: { dateTime: "desc" },
       },
-      partOrders: {
+      partShipments: {
         select: { id: true, status: true, total: true },
         orderBy: { createdAt: "desc" },
       },
@@ -288,11 +288,11 @@ export default async function CrmDealDetailPage({ params }: Props) {
             </Card>
           ) : null}
 
-          {deal.partOrders.length > 0 ? (
+          {deal.partShipments.length > 0 ? (
             <Card>
               <h3 className="font-semibold mb-2">Заказ запчастей</h3>
               <ul className="text-sm space-y-1">
-                {deal.partOrders.map((po) => (
+                {deal.partShipments.map((po) => (
                   <li key={po.id}>
                     {po.status} · {formatPrice(po.total)}
                   </li>

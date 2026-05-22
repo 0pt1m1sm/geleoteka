@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
+import { recordMovement } from "@/lib/wms/public";
+import { TENANT_KEY, actorId } from "@/lib/wms-host";
 
 /**
  * Parses the hidden form field posted by `<PartTrimPicker name="trimIds" />`.
@@ -66,22 +68,32 @@ export async function createPart(
 
   const slug = slugify(`${article}-${name}`).slice(0, 80);
 
-  await db.part.create({
-    data: {
-      slug,
-      article,
-      name,
-      description,
-      price,
-      compareAtPrice,
-      quantity,
-      isOEM,
-      categoryId: categoryId || null,
-      photos: photoUrls,
-      partTrims: {
-        create: trimIds.map((trimId) => ({ trimId })),
+  // Part + its opening-balance StockItem are created atomically so a part can
+  // never exist without a stock row (which would silently lose the opening qty).
+  await db.$transaction(async (tx) => {
+    const created = (await tx.part.create({
+      data: {
+        slug,
+        article,
+        name,
+        description,
+        price,
+        compareAtPrice,
+        isOEM,
+        categoryId: categoryId || null,
+        photos: photoUrls,
+        partTrims: {
+          create: trimIds.map((trimId) => ({ trimId })),
+        },
       },
-    },
+      select: { id: true },
+    })) as { id: string };
+
+    // Opening balance: seed the StockItem counter directly (subsequent CHANGES
+    // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
+    await tx.stockItem.create({
+      data: { partId: created.id, quantity, tenantKey: TENANT_KEY },
+    });
   });
 
   redirect("/admin/parts");
@@ -92,7 +104,7 @@ export async function updatePart(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const name = (formData.get("name") as string)?.trim();
   const price = parseInt(formData.get("price") as string);
@@ -127,13 +139,33 @@ export async function updatePart(
         description,
         price,
         compareAtPrice,
-        quantity,
         isOEM,
         categoryId: categoryId || null,
         isActive,
         photos: photoUrls,
       },
     });
+
+    // On-hand is owned by the WMS ledger. A manual quantity edit reconciles via
+    // an ADJUSTMENT movement (delta = new − current) so the ledger keeps summing
+    // to the counter. No-op when unchanged.
+    const si = (await tx.stockItem.findUnique({
+      where: { partId },
+      select: { quantity: true },
+    })) as { quantity: number } | null;
+    const currentQty = si?.quantity ?? 0;
+    const delta = quantity - currentQty;
+    if (delta !== 0) {
+      await recordMovement(tx, {
+        item: { itemId: partId },
+        reason: "ADJUSTMENT",
+        qty: delta,
+        source: { type: "AdminEdit", id: null },
+        actorId: actorId(session),
+        note: "Manual stock edit",
+        tenantKey: TENANT_KEY,
+      });
+    }
     await tx.partTrim.deleteMany({ where: { partId } });
     if (trimIds.length > 0) {
       await tx.partTrim.createMany({

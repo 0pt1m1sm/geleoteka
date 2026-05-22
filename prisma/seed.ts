@@ -441,7 +441,6 @@ async function main(): Promise<void> {
         slug: sp.slug,
         name: sp.name,
         price: sp.price,
-        quantity: sp.quantity,
         isOEM: sp.isOEM,
         categoryId: sp.categoryId,
         photos: sp.photos,
@@ -452,7 +451,6 @@ async function main(): Promise<void> {
         article: sp.article,
         name: sp.name,
         price: sp.price,
-        quantity: sp.quantity,
         isOEM: sp.isOEM,
         categoryId: sp.categoryId,
         photos: sp.photos,
@@ -461,6 +459,13 @@ async function main(): Promise<void> {
       select: { id: true },
     });
     const p = part as { id: string };
+
+    // Stock lives on StockItem (WMS). Seed the opening balance directly.
+    await prisma.stockItem.upsert({
+      where: { partId: p.id },
+      update: { quantity: sp.quantity },
+      create: { partId: p.id, quantity: sp.quantity, tenantKey: "geleoteka" },
+    });
 
     // Sync PartTrim rows: clear and recreate to match the seed definition exactly.
     await prisma.partTrim.deleteMany({ where: { partId: p.id } });

@@ -17,6 +17,7 @@ export default async function RentalBookingsPage() {
   const bookings = await db.rentalBooking.findMany({
     include: {
       vehicle: { select: { model: true } },
+      deal: { select: { total: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -50,7 +51,7 @@ export default async function RentalBookingsPage() {
                   </div>
                   <div className="text-right flex flex-col items-end gap-2">
                     <p className="font-bold text-[var(--color-accent)]">
-                      {formatPrice(b.totalCost as number)}
+                      {formatPrice((b.deal as { total: number }).total)}
                     </p>
                     <RentalStatusChanger
                       bookingId={b.id as string}
@@ -61,7 +62,7 @@ export default async function RentalBookingsPage() {
                         id: b.id as string,
                         startDate: b.startDate as Date,
                         endDate: b.endDate as Date,
-                        totalCost: b.totalCost as number,
+                        dealTotal: (b.deal as { total: number }).total,
                         contactName: b.contactName as string,
                         contactPhone: b.contactPhone as string,
                         contactEmail: b.contactEmail as string,

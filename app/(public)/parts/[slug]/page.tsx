@@ -41,6 +41,7 @@ export default async function PartDetailPage({ params }: Props) {
     where: { slug },
     include: {
       category: { select: { name: true, slug: true } },
+      stockItem: { select: { quantity: true } },
       partTrims: {
         include: {
           trim: {
@@ -58,6 +59,7 @@ export default async function PartDetailPage({ params }: Props) {
   if (!part || !(part as Record<string, unknown>).isActive) notFound();
 
   const p = part as Record<string, unknown>;
+  const onHand = (p.stockItem as { quantity: number } | null)?.quantity ?? 0;
   const cat = p.category as Record<string, string> | null;
   const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
   const photos = p.photos as string[];
@@ -150,8 +152,8 @@ export default async function PartDetailPage({ params }: Props) {
               )}
               <div className="flex justify-between py-3">
                 <span className="text-sm text-[var(--foreground-muted)]">Наличие</span>
-                <span className={`text-sm font-medium ${(p.quantity as number) > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
-                  {(p.quantity as number) > 0 ? `В наличии — ${p.quantity} шт.` : "Под заказ"}
+                <span className={`text-sm font-medium ${onHand > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
+                  {onHand > 0 ? `В наличии — ${onHand} шт.` : "Под заказ"}
                 </span>
               </div>
             </div>
@@ -209,9 +211,9 @@ export default async function PartDetailPage({ params }: Props) {
             </div>
 
             {/* Availability */}
-            <div className={`flex items-center gap-2 mb-6 text-sm ${(p.quantity as number) > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
-              <span className={`w-2.5 h-2.5 rounded-full ${(p.quantity as number) > 0 ? "bg-[var(--color-success)]" : "bg-[var(--foreground-muted)]"}`} />
-              {(p.quantity as number) > 0 ? `В наличии — ${p.quantity} шт.` : "Под заказ (3-5 дней)"}
+            <div className={`flex items-center gap-2 mb-6 text-sm ${onHand > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${onHand > 0 ? "bg-[var(--color-success)]" : "bg-[var(--foreground-muted)]"}`} />
+              {onHand > 0 ? `В наличии — ${onHand} шт.` : "Под заказ (3-5 дней)"}
             </div>
 
             {/* Add to cart */}
@@ -222,7 +224,7 @@ export default async function PartDetailPage({ params }: Props) {
                 name: p.name as string,
                 article: p.article as string,
                 price: p.price as number,
-                quantity: p.quantity as number,
+                quantity: onHand,
               }}
             />
 

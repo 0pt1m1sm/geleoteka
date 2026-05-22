@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { PartEditForm } from "@/components/admin/PartEditForm";
+import { StockHistory } from "@/components/admin/StockHistory";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -19,6 +20,7 @@ export default async function EditPartPage({ params }: Props) {
       where: { id },
       include: {
         partTrims: { select: { trimId: true } },
+        stockItem: { select: { quantity: true } },
       },
     }),
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -36,7 +38,7 @@ export default async function EditPartPage({ params }: Props) {
     description: (p.description as string) ?? "",
     price: p.price as number,
     compareAtPrice: (p.compareAtPrice as number) ?? 0,
-    quantity: p.quantity as number,
+    quantity: (p.stockItem as { quantity: number } | null)?.quantity ?? 0,
     isOEM: p.isOEM as boolean,
     isActive: p.isActive as boolean,
     categoryId: (p.categoryId as string) ?? "",
@@ -53,6 +55,7 @@ export default async function EditPartPage({ params }: Props) {
     <div className="max-w-2xl">
       <h1 className="text-display text-2xl font-bold mb-6">Редактировать запчасть</h1>
       <PartEditForm part={serialized} categories={cats} models={models} />
+      <StockHistory partId={p.id as string} />
     </div>
   );
 }

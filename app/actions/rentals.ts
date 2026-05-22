@@ -7,7 +7,7 @@ import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
-import { nextRentalBookingNumber } from "@/lib/crm/internal/next-number";
+import { nextRentalBookingNumber } from "@/lib/crm/public";
 
 interface VehicleFormData {
   model: string;
@@ -142,7 +142,6 @@ export async function updateRentalBooking(
   const contactName = ((formData.get("contactName") as string | null) ?? "").trim();
   const contactPhoneRaw = ((formData.get("contactPhone") as string | null) ?? "").trim();
   const contactEmail = ((formData.get("contactEmail") as string | null) ?? "").trim().toLowerCase();
-  const totalCostRaw = ((formData.get("totalCost") as string | null) ?? "").trim();
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
 
   if (!contactName) return { error: "Имя обязательно" };
@@ -156,11 +155,8 @@ export async function updateRentalBooking(
     return { error: "Некорректные даты" };
   }
   if (endDate <= startDate) return { error: "Дата возврата должна быть позже даты выдачи" };
-  const totalCost = Number.parseInt(totalCostRaw, 10);
-  if (!Number.isFinite(totalCost) || totalCost < 0) {
-    return { error: "Некорректная сумма" };
-  }
 
+  // Price is not edited here — it lives on the deal's estimate (RENTAL_DAY line).
   await db.rentalBooking.update({
     where: { id: bookingId },
     data: {
@@ -169,7 +165,6 @@ export async function updateRentalBooking(
       contactName,
       contactPhone: normalizePhone(contactPhoneRaw),
       contactEmail,
-      totalCost,
       notes,
     },
   });
@@ -178,9 +173,9 @@ export async function updateRentalBooking(
 }
 
 /**
- * Hard-delete a RentalBooking. The parent Deal stays (dealId is SetNull
- * on cascade) — deals are independent commercial records that survive
- * fulfillment changes.
+ * Hard-delete a RentalBooking. The parent Deal stays — the dealId FK
+ * cascades only Deal→booking (deleting a deal removes its bookings), not the
+ * reverse, so deals survive fulfillment deletion as independent records.
  */
 export async function deleteRentalBooking(
   bookingId: string,
@@ -309,7 +304,6 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
         dealId: deal.id,
         startDate: start,
         endDate: end,
-        totalCost,
         contactName,
         contactPhone: normalizePhone(contactPhone),
         contactEmail: contactEmail.trim().toLowerCase(),
