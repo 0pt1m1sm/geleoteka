@@ -94,6 +94,93 @@ export async function findViewByCode(
   };
 }
 
+// ── Bin placement layer ─────────────────────────────────────────────────────
+
+/** Sum of all bin quantities for a StockItem (by StockItem.id). */
+export async function sumBins(client: DbClientPort, stockItemId: string, tenantKey: string): Promise<number> {
+  const agg = (await client.stockBin.aggregate({
+    where: { tenantKey, itemId: stockItemId },
+    _sum: { quantity: true },
+  })) as { _sum: { quantity: number | null } };
+  return agg._sum.quantity ?? 0;
+}
+
+/** All non-empty bins for a StockItem, as { location, quantity }. */
+export async function findBinsForItem(
+  client: DbClientPort,
+  stockItemId: string,
+  tenantKey: string,
+): Promise<Array<{ location: string; quantity: number }>> {
+  return (await client.stockBin.findMany({
+    where: { tenantKey, itemId: stockItemId, quantity: { gt: 0 } },
+    select: { location: true, quantity: true },
+    orderBy: { location: "asc" },
+  })) as Array<{ location: string; quantity: number }>;
+}
+
+/** Items (by external partId) stored in a location, with quantity. */
+export async function findItemsInLocation(
+  client: DbClientPort,
+  location: string,
+  tenantKey: string,
+): Promise<Array<{ itemId: string; quantity: number }>> {
+  const rows = (await client.stockBin.findMany({
+    where: { tenantKey, location, quantity: { gt: 0 } },
+    select: { quantity: true, item: { select: { partId: true } } },
+    orderBy: { quantity: "desc" },
+  })) as Array<{ quantity: number; item: { partId: string } }>;
+  return rows.map((r) => ({ itemId: r.item.partId, quantity: r.quantity }));
+}
+
+/** Create-or-increment a bin by a positive delta (putaway / transfer-in). */
+export async function incrementBin(
+  client: DbClientPort,
+  stockItemId: string,
+  location: string,
+  qty: number,
+  tenantKey: string,
+): Promise<void> {
+  await client.stockBin.upsert({
+    where: { tenantKey_itemId_location: { tenantKey, itemId: stockItemId, location } },
+    create: { itemId: stockItemId, location, quantity: qty, tenantKey },
+    update: { quantity: { increment: qty } },
+  });
+}
+
+/** Conditionally decrement a bin ONLY if it still holds ≥ qty. Returns true
+ *  when applied. No silent clamp — the caller throws when this returns false,
+ *  so the audit never records a delta that wasn't applied. */
+export async function decrementBinIfEnough(
+  client: DbClientPort,
+  stockItemId: string,
+  location: string,
+  qty: number,
+  tenantKey: string,
+): Promise<boolean> {
+  const res = (await client.stockBin.updateMany({
+    where: { tenantKey, itemId: stockItemId, location, quantity: { gte: qty } },
+    data: { quantity: { decrement: qty } },
+  })) as { count: number };
+  return res.count === 1;
+}
+
+/** Insert a bin-movement audit row (PLACE / TRANSFER / REMOVE). */
+export async function insertBinMovement(
+  client: DbClientPort,
+  row: {
+    itemId: string;
+    reason: "PLACE" | "TRANSFER" | "REMOVE";
+    fromLocation: string | null;
+    toLocation: string | null;
+    quantity: number;
+    actorUserId: string | null;
+    note: string | null;
+    tenantKey: string;
+  },
+): Promise<void> {
+  await client.stockBinMovement.create({ data: row });
+}
+
 /** Resolve a stock view by external itemId (= partId). */
 export async function findViewByItemId(
   client: DbClientPort,

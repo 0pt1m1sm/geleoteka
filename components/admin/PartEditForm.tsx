@@ -16,6 +16,8 @@ interface PartData {
   price: number;
   compareAtPrice: number;
   quantity: number;
+  barcode: string;
+  gtin: string;
   isOEM: boolean;
   isActive: boolean;
   categoryId: string;
@@ -75,6 +77,17 @@ export function PartEditForm({ part, categories, models }: Props) {
         <div>
           <label htmlFor="quantity" className="block text-sm font-medium mb-2">Кол-во</label>
           <input id="quantity" name="quantity" type="number" defaultValue={part.quantity} className="input" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label htmlFor="barcode" className="block text-sm font-medium mb-2">Штрихкод</label>
+          <input id="barcode" name="barcode" defaultValue={part.barcode} className="input font-mono" placeholder="—" />
+        </div>
+        <div>
+          <label htmlFor="gtin" className="block text-sm font-medium mb-2">GTIN</label>
+          <input id="gtin" name="gtin" defaultValue={part.gtin} className="input font-mono" placeholder="—" />
         </div>
       </div>
 

@@ -20,7 +20,7 @@ export default async function EditPartPage({ params }: Props) {
       where: { id },
       include: {
         partTrims: { select: { trimId: true } },
-        stockItem: { select: { quantity: true } },
+        stockItem: { select: { quantity: true, barcode: true, gtin: true } },
       },
     }),
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
@@ -39,6 +39,8 @@ export default async function EditPartPage({ params }: Props) {
     price: p.price as number,
     compareAtPrice: (p.compareAtPrice as number) ?? 0,
     quantity: (p.stockItem as { quantity: number } | null)?.quantity ?? 0,
+    barcode: (p.stockItem as { barcode: string | null } | null)?.barcode ?? "",
+    gtin: (p.stockItem as { gtin: string | null } | null)?.gtin ?? "",
     isOEM: p.isOEM as boolean,
     isActive: p.isActive as boolean,
     categoryId: (p.categoryId as string) ?? "",

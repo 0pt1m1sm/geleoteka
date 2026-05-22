@@ -58,6 +58,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Запчасти",
     items: [
       { href: "/admin/parts", label: "Каталог" },
+      { href: "/admin/warehouse", label: "Склад" },
       { href: "/admin/orders", label: "Заказы клиентов" },
       { href: "/admin/suppliers", label: "Поставщики" },
       { href: "/admin/suppliers/orders", label: "Заказы поставщикам" },

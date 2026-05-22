@@ -7,6 +7,7 @@ import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { recordMovement } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
+import { assignCodes, DuplicateCodeError } from "@/lib/warehouse/codes";
 
 /**
  * Parses the hidden form field posted by `<PartTrimPicker name="trimIds" />`.
@@ -114,6 +115,8 @@ export async function updatePart(
   const description = (formData.get("description") as string)?.trim() || null;
   const compareAtPrice = parseInt(formData.get("compareAtPrice") as string) || null;
   const isActive = formData.get("isActive") !== "off";
+  const barcode = (formData.get("barcode") as string)?.trim() || null;
+  const gtin = (formData.get("gtin") as string)?.trim() || null;
   const { ids: trimIds, error: trimErr } = await parseTrimIds(formData.get("trimIds"));
   if (trimErr) return { error: trimErr };
   const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
@@ -126,7 +129,8 @@ export async function updatePart(
   // Replace partTrims atomically: drop old links, recreate with new selection.
   // Persist new photos[] and delete UploadedImage rows for removed photo URLs
   // when no other Part/Vehicle still references them (ref-counted cleanup).
-  await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+  try {
+    await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
     const current = (await tx.part.findUnique({
       where: { id: partId },
       select: { photos: true },
@@ -166,6 +170,8 @@ export async function updatePart(
         tenantKey: TENANT_KEY,
       });
     }
+    // Assign/clear barcode + gtin on the StockItem (per-field uniqueness).
+    await assignCodes(tx, partId, barcode, gtin);
     await tx.partTrim.deleteMany({ where: { partId } });
     if (trimIds.length > 0) {
       await tx.partTrim.createMany({
@@ -176,7 +182,18 @@ export async function updatePart(
     if (removed.length > 0) {
       await deleteOrphanImages(removed, tx);
     }
-  });
+    });
+  } catch (e: unknown) {
+    if (e instanceof DuplicateCodeError) {
+      return {
+        error:
+          e.field === "barcode"
+            ? "Этот штрихкод уже назначен другой позиции"
+            : "Этот GTIN уже назначен другой позиции",
+      };
+    }
+    throw e;
+  }
 
   redirect("/admin/parts");
 }

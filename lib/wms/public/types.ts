@@ -55,3 +55,54 @@ export interface StockItemView {
   reserved: number;
   available: number;
 }
+
+// ── Multi-bin placement layer ──────────────────────────────────────────────
+// StockBin records WHERE an item's on-hand sits. The aggregate StockItem stays
+// authoritative; placement ops move stock between unplaced↔bin↔bin and never
+// change quantity/reserved. Invariant: Σ bins ≤ quantity.
+
+/** A single location holding some of an item's on-hand. */
+export interface BinPlacement {
+  location: string;
+  quantity: number;
+}
+
+/** An item's placement breakdown. `unplaced = max(0, quantity − placed)`.
+ *  `reconcileNeeded` is true when placed exceeds on-hand (Phase-1 drift: an
+ *  aggregate CONSUMPTION lowered on-hand without deducting bins). */
+export interface ItemPlacement {
+  itemId: string;
+  quantity: number;
+  placed: number;
+  unplaced: number;
+  reconcileNeeded: boolean;
+  bins: BinPlacement[];
+}
+
+/** Common audit fields for a placement op. */
+interface PlacementMeta {
+  itemId: string;
+  qty: number;
+  actorId?: string;
+  note?: string;
+  tenantKey?: string;
+}
+
+export interface PlaceStockInput extends PlacementMeta {
+  location: string;
+}
+
+export interface TransferStockInput extends PlacementMeta {
+  from: string;
+  to: string;
+}
+
+export interface RemoveFromBinInput extends PlacementMeta {
+  location: string;
+}
+
+/** What an item occupies a given location with (itemId is the external partId). */
+export interface ItemInLocation {
+  itemId: string;
+  quantity: number;
+}

@@ -8,7 +8,9 @@
 export { recordMovement } from "./record-movement";
 export { availableStock } from "./stock";
 export { lookupByCode, lookupByItemId } from "./lookup";
+export { placeStock, transferStock, removeFromBin, binsForItem, itemsInLocation } from "./placement";
 export { WmsError } from "./errors";
+export type { WmsErrorCode } from "./errors";
 export type {
   WmsItemRef,
   MovementReason,
@@ -16,5 +18,11 @@ export type {
   RecordMovementInput,
   MovementResult,
   StockItemView,
+  BinPlacement,
+  ItemPlacement,
+  ItemInLocation,
+  PlaceStockInput,
+  TransferStockInput,
+  RemoveFromBinInput,
 } from "./types";
 export type { DbClientPort } from "../internal/repository";

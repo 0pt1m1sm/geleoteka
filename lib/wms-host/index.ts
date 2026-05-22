@@ -8,6 +8,10 @@ import { db } from "@/lib/db";
  *  product. Host callers pass this to recordMovement / lookupByCode. */
 export const TENANT_KEY = "geleoteka";
 
+/** Host display policy: a part is "low stock" when available ≤ this threshold.
+ *  Used by the warehouse overview for highlighting (Phase 5 makes it per-item). */
+export const LOW_STOCK_THRESHOLD = 3;
+
 /** The host db singleton, surfaced as the WMS DB client port. Callers pass this
  *  (or a `$transaction` tx) into the core's recordMovement / lookup functions. */
 export const wmsDb = db;

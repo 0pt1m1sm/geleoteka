@@ -924,8 +924,10 @@ model StockItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  part      Part            @relation(fields: [partId], references: [id], onDelete: Cascade)
-  movements StockMovement[]
+  part         Part                @relation(fields: [partId], references: [id], onDelete: Cascade)
+  movements    StockMovement[]
+  bins         StockBin[]
+  binMovements StockBinMovement[]
 
   @@index([tenantKey, partId])
   @@index([barcode])
@@ -950,6 +952,50 @@ model StockMovement {
   // sourceId is nullable (manual ADJUSTMENT); NULLs are distinct in PG so the
   // recordMovement guard forbids null sourceId for all reasons except ADJUSTMENT.
   @@unique([tenantKey, sourceType, sourceId, reason])
+  @@index([tenantKey, itemId, createdAt])
+}
+
+// Multi-bin placement layer over the aggregate StockItem (Phase 1 of the
+// warehouse roadmap, docs/prd/2026-05-22-warehouse-wms-roadmap.md). StockBin
+// records WHERE on-hand sits; Σ StockBin.quantity ≤ StockItem.quantity and
+// unplaced = quantity − Σbins. Placement ops never change the aggregate.
+// StockBinMovement is the append-only audit for bin-to-bin/unplaced moves
+// (these have no aggregate delta, so they are NOT in StockMovement).
+enum StockBinMovementReason {
+  PLACE // unplaced → bin (putaway)
+  TRANSFER // bin → bin
+  REMOVE // bin → unplaced
+}
+
+model StockBin {
+  id        String   @id @default(cuid())
+  itemId    String
+  location  String
+  quantity  Int      @default(0)
+  tenantKey String   @default("geleoteka")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  item StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantKey, itemId, location])
+  @@index([tenantKey, location])
+}
+
+model StockBinMovement {
+  id           String                 @id @default(cuid())
+  itemId       String
+  reason       StockBinMovementReason
+  fromLocation String?
+  toLocation   String?
+  quantity     Int
+  actorUserId  String?
+  note         String?
+  tenantKey    String                 @default("geleoteka")
+  createdAt    DateTime               @default(now())
+
+  item StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
   @@index([tenantKey, itemId, createdAt])
 }
 
