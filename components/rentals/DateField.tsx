@@ -72,8 +72,8 @@ export function DateField({
           min={min}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-          style={{ colorScheme: "normal", WebkitAppearance: "none", appearance: "none" }}
+          className="date-overlay-input absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          style={{ WebkitAppearance: "none", appearance: "none" }}
         />
       </div>
     </div>

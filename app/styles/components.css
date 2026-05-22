@@ -310,6 +310,7 @@
   input[type="datetime-local"].input {
     color-scheme: dark;
     cursor: pointer;
+    position: relative;
     min-width: 0;
     -webkit-min-logical-width: 0;
     width: 100%;
@@ -352,14 +353,23 @@
     padding: 0 1px;
     min-width: 0;
   }
-  /* Indicator (the native calendar picker icon Chrome/Safari add) — fully
-     remove via display:none so it doesn't reserve any layout width. The
-     input is still tappable / focuses the picker on click. We render our
-     own gold calendar icon overlay instead. */
+  /* Indicator (the native calendar picker icon Chrome/Safari add). Instead of
+     display:none (which left a plain .input date field with NO way to open the
+     picker, and misaligned the click target), stretch a TRANSPARENT indicator
+     across the whole field so clicking ANYWHERE opens the native picker. The
+     popup itself is theme-matched via color-scheme above. We keep our own gold
+     calendar icon as a visual cue underneath. */
   input[type="date"].input::-webkit-calendar-picker-indicator,
   input[type="time"].input::-webkit-calendar-picker-indicator,
   input[type="datetime-local"].input::-webkit-calendar-picker-indicator {
-    display: none !important;
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
     -webkit-appearance: none;
     appearance: none;
   }
@@ -367,6 +377,20 @@
   html.light input[type="time"].input,
   html.light input[type="datetime-local"].input {
     color-scheme: light;
+  }
+  /* DateField overlay (components/rentals/DateField.tsx): a transparent native
+     <input type=date> sits over a styled div + gold icon. Stretch its picker
+     indicator full-bleed so a click ANYWHERE on the field opens the picker —
+     not just the native icon's old right-edge hit area. */
+  input[type="date"].date-overlay-input::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
   }
   /* Native picker indicator hidden globally above (display:none !important);
      the deprecated filter rules that used to recolor it are no longer needed. */

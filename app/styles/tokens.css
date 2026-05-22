@@ -3,6 +3,11 @@
    No prefers-color-scheme media query — theme-init.js syncs the OS preference into html.light on load. */
 
 :root {
+  /* Dark is the default — make native UI (date-picker popups, scrollbars, form
+     controls) render dark so the browser calendar matches the brand instead of
+     defaulting to a white OS calendar. html.light flips this to light below. */
+  color-scheme: dark;
+
   /* Primary — Matte Black */
   --color-primary: #1a1a1a;
   --color-primary-foreground: #d4af37;
@@ -95,6 +100,7 @@
 /* Light theme — applied by theme-init.js (beforeInteractive) or ThemeToggle.
    theme-init.js reads localStorage and OS preference, applies html.light pre-paint. */
 html.light {
+  color-scheme: light;
   --color-primary: #f5f4f0;
   --color-primary-foreground: #1a1a1a;
   --color-primary-hover: #eae9e4;

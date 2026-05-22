@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { RentalStatusChanger } from "@/components/admin/RentalStatusChanger";
 import { RentalBookingEditDialog } from "@/components/admin/RentalBookingEditDialog";
+import { NewRentalBookingDialog } from "@/components/admin/NewRentalBookingDialog";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function RentalBookingsPage() {
@@ -14,17 +15,30 @@ export default async function RentalBookingsPage() {
     redirect("/login");
   }
 
-  const bookings = await db.rentalBooking.findMany({
-    include: {
-      vehicle: { select: { model: true } },
-      deal: { select: { total: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const [bookings, cars] = await Promise.all([
+    db.rentalBooking.findMany({
+      include: {
+        vehicle: { select: { model: true } },
+        deal: { select: { total: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+    db.vehicle.findMany({
+      where: { ownershipType: "RENTAL", isArchived: false, dailyRate: { not: null } },
+      select: { id: true, make: true, model: true, year: true, dailyRate: true },
+      orderBy: { model: "asc" },
+    }) as unknown as Promise<
+      Array<{ id: string; make: string | null; model: string; year: number; dailyRate: number }>
+    >,
+  ]);
 
   return (
     <div>
-      <PageHeader eyebrow="Аренда" title="Бронирования аренды" />
+      <PageHeader
+        eyebrow="Аренда"
+        title="Бронирования аренды"
+        actions={<NewRentalBookingDialog cars={cars} />}
+      />
 
       {bookings.length === 0 ? (
         <Card className="text-center py-12">

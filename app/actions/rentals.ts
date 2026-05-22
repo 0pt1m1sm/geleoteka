@@ -198,6 +198,10 @@ interface RentalBookingInput {
   contactPhone: string;
   contactEmail: string;
   notes: string;
+  /** Admin-only: book on behalf of a pre-selected existing customer. Overrides
+      session-based resolution so the booking attaches to that client, not the
+      logged-in admin. Public flow omits this (resolves via session/contact). */
+  customerUserId?: string;
 }
 
 interface RentalBookingResult {
@@ -215,7 +219,7 @@ interface RentalBookingResult {
 }
 
 export async function createRentalBooking(input: RentalBookingInput): Promise<RentalBookingResult> {
-  const { carId, startDate, endDate, contactName, contactPhone, contactEmail, notes } = input;
+  const { carId, startDate, endDate, contactName, contactPhone, contactEmail, notes, customerUserId } = input;
 
   if (!carId || !startDate || !endDate || !contactName || !contactPhone || !contactEmail) {
     return { success: false, error: "Заполните все обязательные поля" };
@@ -266,7 +270,9 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
 
     const session = await getSession();
     const guestResult = await findOrCreateGuestCustomer({
-      sessionUserId: session?.id ?? null,
+      // Admin-selected client wins; else fall back to the caller's own session
+      // (public flow), else match/create by contact details.
+      sessionUserId: customerUserId ?? session?.id ?? null,
       name: contactName,
       email: contactEmail,
       phone: normalizePhone(contactPhone),
