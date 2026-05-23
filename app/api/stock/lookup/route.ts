@@ -32,7 +32,8 @@ export async function GET(request: Request): Promise<NextResponse> {
   // 2) Host fallback: article (catalog identity, not known to the core).
   if (!itemId) {
     const byArticle = (await db.part.findFirst({
-      where: { article: code, isActive: true },
+      // No isActive filter: warehouse lookups must find shop-inactive parts too.
+      where: { article: code },
       select: { id: true },
     })) as { id: string } | null;
     itemId = byArticle?.id ?? null;

@@ -18,6 +18,8 @@ export interface PartCard {
   barcode: string | null;
   quantity: number;
   available: number;
+  /** Catalog/shop state. false = deactivated in the shop but still in stock. */
+  isActive: boolean;
 }
 
 export interface LocationCard {
@@ -146,12 +148,14 @@ async function resolvePart(
       id: true,
       name: true,
       article: true,
+      isActive: true,
       stockItem: { select: { quantity: true, reserved: true, barcode: true } },
     },
   })) as {
     id: string;
     name: string;
     article: string;
+    isActive: boolean;
     stockItem: { quantity: number; reserved: number; barcode: string | null } | null;
   } | null;
   if (!part) return null;
@@ -165,6 +169,7 @@ async function resolvePart(
     barcode: si?.barcode ?? null,
     quantity: si?.quantity ?? 0,
     available: si ? availableStock(si) : 0,
+    isActive: part.isActive,
   };
 }
 

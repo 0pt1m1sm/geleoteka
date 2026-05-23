@@ -18,6 +18,7 @@ interface ResolvedItem {
   barcode: string | null;
   quantity: number;
   available: number;
+  isActive: boolean;
 }
 
 interface LocationCard {
@@ -259,7 +260,12 @@ export function WarehouseScanBox(): React.ReactElement {
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="font-medium">{item.name}</p>
+                <p className="font-medium">
+                  {item.name}
+                  {!item.isActive && (
+                    <span className="badge ml-2 align-middle">Снят с продажи</span>
+                  )}
+                </p>
                 <p className="text-xs font-mono text-[var(--foreground-muted)]">
                   {item.article}
                   {item.barcode ? ` · ${item.barcode}` : ""}

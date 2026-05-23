@@ -238,7 +238,8 @@ async function verifyScanRouter(): Promise<void> {
   })) as { id: string };
 
   const articleResolver = async (code: string): Promise<string | null> => {
-    const p = (await db.part.findFirst({ where: { article: code, isActive: true }, select: { id: true } })) as { id: string } | null;
+    // Mirrors the route: NO isActive filter (warehouse must find shop-inactive parts).
+    const p = (await db.part.findFirst({ where: { article: code }, select: { id: true } })) as { id: string } | null;
     return p?.id ?? null;
   };
   const ctx = { userId: null as string | null, action: "scan", articleResolver };
@@ -260,6 +261,27 @@ async function verifyScanRouter(): Promise<void> {
   const rawArticle = await resolveScan(db, parseScanCode(article), TENANT, ctx);
   assert(rawArticle.status === 200 && rawArticle.data.kind === "part" && rawArticle.data.itemId === part.id, "RAW article fallback resolves");
   console.log("  ✓ resolveScan RAW (legacy) resolves via host article fallback");
+
+  // catalog-INACTIVE part still resolves by article (shop-inactive ≠ absent from warehouse)
+  const inactArticle = `VERIFY-QR-SR-INACT-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+  const inactPart = (await db.part.create({
+    data: {
+      slug: `verify-qr-sr-inact-${Date.now()}`,
+      article: inactArticle,
+      name: "verify-qr inactive part",
+      price: 100,
+      isActive: false,
+      stockItem: { create: { quantity: 2, tenantKey: TENANT } },
+    },
+    select: { id: true },
+  })) as { id: string };
+  const rInact = await resolveScan(db, parseScanCode(formatScanCode("PART", inactArticle)), TENANT, ctx);
+  assert(
+    rInact.status === 200 && rInact.data.kind === "part" && rInact.data.itemId === inactPart.id && rInact.data.isActive === false,
+    `inactive part must resolve by article with isActive=false flag, got ${JSON.stringify(rInact)}`,
+  );
+  await db.part.deleteMany({ where: { id: inactPart.id } });
+  console.log("  ✓ resolveScan resolves a catalog-inactive part by article (warehouse ≠ shop), flagged isActive=false");
 
   // unknown code → UNKNOWN_CODE 404, exactly one REJECTED ScanEvent
   const missRaw = "WMS:PART:QRSR-NOPE";

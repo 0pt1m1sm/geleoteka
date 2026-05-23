@@ -43,8 +43,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     deviceId: typeof body.deviceId === "string" ? body.deviceId : null,
     sessionId: typeof body.sessionId === "string" ? body.sessionId : null,
     articleResolver: async (code) => {
+      // No isActive filter: a part deactivated in the shop still physically
+      // exists in the warehouse and must be scannable (putaway/move/count).
       const p = (await db.part.findFirst({
-        where: { article: code, isActive: true },
+        where: { article: code },
         select: { id: true },
       })) as { id: string } | null;
       return p?.id ?? null;
