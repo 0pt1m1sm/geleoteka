@@ -88,19 +88,19 @@ export async function WarehouseOverview({
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between gap-4 mb-4">
+    <div className="min-w-0">
+      <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold">Остатки</h2>
-        <form method="get" action="/admin/warehouse" className="flex gap-2">
+        <form method="get" action="/admin/warehouse" className="flex gap-2 w-full sm:w-auto">
           <input
             type="search"
             name="q"
             defaultValue={query}
             placeholder="Название, артикул или штрихкод"
             aria-label="Поиск по складу"
-            className="input w-64 max-w-full"
+            className="input flex-1 sm:w-64"
           />
-          <button type="submit" className="btn btn-secondary">Найти</button>
+          <button type="submit" className="btn btn-secondary shrink-0">Найти</button>
         </form>
       </div>
 
