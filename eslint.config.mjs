@@ -79,6 +79,31 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  // Programmatic navigation must go through useProgressRouter() so the global
+  // NavigationProgress bar fires. Ban raw router.push/replace everywhere; the
+  // provider (which owns the real router) is exempted below. router.refresh/
+  // back/forward/prefetch are unaffected.
+  {
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.object.name='router'][callee.property.name=/^(push|replace)$/]",
+          message:
+            "Use useProgressRouter() from @/components/shared/NavigationProgressProvider instead of router.push/replace, so the global NavigationProgress bar fires. (router.refresh/back/forward are fine.)",
+        },
+      ],
+    },
+  },
+  // The provider owns the real router and is the one place raw push/replace
+  // is allowed.
+  {
+    files: ["components/shared/NavigationProgressProvider.tsx"],
+    rules: {
+      "no-restricted-syntax": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

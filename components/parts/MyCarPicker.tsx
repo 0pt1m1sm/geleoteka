@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import {
   generationLabel,
   modelDisplayName,
@@ -29,7 +30,7 @@ interface Props {
  *     existing `?showAll=1` flag handled in `app/(public)/parts/page.tsx`
  */
 export function MyCarPicker({ models }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const searchParams = useSearchParams();
   const [model, setModel] = useState<string>("");
   const [generation, setGeneration] = useState<string>("");
@@ -57,7 +58,7 @@ export function MyCarPicker({ models }: Props): React.ReactElement {
     if (persistedTrim) newParams.set("trim", persistedTrim);
     else newParams.delete("trim");
     newParams.delete("showAll");
-    router.push(`/parts?${newParams.toString()}`);
+    nav.push(`/parts?${newParams.toString()}`);
   }
 
   function handleShowAll(): void {
@@ -67,7 +68,7 @@ export function MyCarPicker({ models }: Props): React.ReactElement {
     newParams.set("showAll", "1");
     newParams.delete("generation");
     newParams.delete("trim");
-    router.push(`/parts?${newParams.toString()}`);
+    nav.push(`/parts?${newParams.toString()}`);
   }
 
   return (

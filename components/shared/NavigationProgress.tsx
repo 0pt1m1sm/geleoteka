@@ -2,6 +2,7 @@
 
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useNavPending } from "@/components/shared/NavigationProgressProvider";
 
 /**
  * Global top-of-viewport progress bar shown during in-app navigation.
@@ -10,33 +11,37 @@ import { useEffect, useState } from "react";
  * wiring or extra dependencies.
  *
  * Mechanism:
- *   - Document-level click listener flips visible=true the moment an
- *     in-app anchor is clicked (skipped for external, _blank, download,
- *     modified-key, and same-route clicks).
- *   - usePathname + useSearchParams change triggers an effect that flips
- *     visible=false — App Router has no router.events, but a new render
- *     of the listener with a different (pathname, searchParams) tuple is
- *     reliable enough as a navigation-complete signal.
- *   - A safety timeout clears the bar after 8s in case a navigation is
- *     cancelled / errors out silently.
+ *   - Programmatic navigation via useProgressRouter wraps router.push/replace
+ *     in a transition; the bar shows while that transition's isPending is true.
+ *   - As a fallback for plain <a>/<Link> clicks (which don't go through the
+ *     wrapper), a document-level click listener flips anchorVisible=true the
+ *     moment an in-app anchor is clicked (skipped for external, _blank,
+ *     download, modified-key, and same-route clicks).
+ *   - usePathname + useSearchParams change triggers an effect that clears the
+ *     anchor fallback — App Router has no router.events, but a new render at a
+ *     different (pathname, searchParams) tuple is a reliable completion signal.
+ *   - A safety timeout clears the anchor fallback after 8s in case a
+ *     navigation is cancelled / errors out silently.
  *
  * Renders a 2px accent-colored bar with an indeterminate slide animation.
  */
 export function NavigationProgress(): React.ReactElement | null {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [visible, setVisible] = useState(false);
+  const navPending = useNavPending();
+  const [anchorVisible, setAnchorVisible] = useState(false);
+  const visible = navPending || anchorVisible;
 
-  // Hide on every navigation completion (pathname or query change).
-  // App Router has no router.events, so the only signal we have that
-  // navigation finished is a re-render at a different (pathname,
-  // searchParams) tuple. This is exactly the "synchronize external
-  // system with React" case the rule is meant to allow — the previous
-  // visible state was set in a DOM event handler, not in render, so
-  // the cascading-render concern doesn't apply.
+  // Clear the anchor-click fallback on every navigation completion (pathname
+  // or query change). App Router has no router.events, so the only signal we
+  // have that navigation finished is a re-render at a different (pathname,
+  // searchParams) tuple. The transition-driven path (navPending) clears
+  // itself when the transition resolves, so it needs no effect here. This is
+  // the "synchronize external system with React" case the rule allows — the
+  // previous state was set in a DOM event handler, not in render.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setVisible(false);
+    setAnchorVisible(false);
   }, [pathname, searchParams]);
 
   useEffect(() => {
@@ -55,32 +60,29 @@ export function NavigationProgress(): React.ReactElement | null {
       if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
         return;
       }
-      // Same-origin check + same-route ignore.
+      // Same-origin check + same-route ignore. A same-pathname target is a
+      // query-only update (filters) — never flash the bar for those.
       try {
         const url = new URL(anchor.href);
         if (url.origin !== window.location.origin) return;
-        if (
-          url.pathname === window.location.pathname &&
-          url.search === window.location.search
-        ) {
-          return;
-        }
+        if (url.pathname === window.location.pathname) return;
       } catch {
         return;
       }
-      setVisible(true);
+      setAnchorVisible(true);
     }
 
     document.addEventListener("click", handleClick, { capture: true });
     return () => document.removeEventListener("click", handleClick, { capture: true });
   }, []);
 
-  // Safety timeout — if a navigation hangs we don't want the bar stuck on.
+  // Safety timeout — if an anchor navigation hangs we don't want the bar stuck
+  // on. The transition-driven path clears itself, so only guard the fallback.
   useEffect(() => {
-    if (!visible) return;
-    const t = window.setTimeout(() => setVisible(false), 8000);
+    if (!anchorVisible) return;
+    const t = window.setTimeout(() => setAnchorVisible(false), 8000);
     return () => window.clearTimeout(t);
-  }, [visible]);
+  }, [anchorVisible]);
 
   if (!visible) return null;
   return (

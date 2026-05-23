@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { modelDisplayName, trimLabel, type VehicleModel } from "@/lib/vehicle-catalog-types";
 import { setMyCar } from "@/lib/my-car-store";
 
@@ -20,7 +21,7 @@ interface Props {
  *       picker reappears with fresh state, ready to pick a different vehicle.
  */
 export function MyCarStrip({ models }: Props): React.ReactElement | null {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const searchParams = useSearchParams();
   const model = searchParams.get("model");
   const generation = searchParams.get("generation");
@@ -51,7 +52,7 @@ export function MyCarStrip({ models }: Props): React.ReactElement | null {
 
   function handleClear(): void {
     setMyCar(null);
-    router.replace(urlWithoutCar(), { scroll: false });
+    nav.replace(urlWithoutCar(), { scroll: false });
     if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

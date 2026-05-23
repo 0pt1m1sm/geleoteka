@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { FileText, Plus, Trash2 } from "lucide-react";
 import { Alert, Button } from "@/components/ui";
 import {
@@ -49,14 +50,14 @@ export function EstimatesSection({
   estimates,
   canCreate,
 }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const [state, formAction, isPending] = useActionState(openOrCreateActiveEstimate, null);
 
   useEffect(() => {
     if (state?.estimateId && !state?.error && !isPending) {
-      router.push(`/admin/crm/estimates/${state.estimateId}`);
+      nav.push(`/admin/crm/estimates/${state.estimateId}`);
     }
-  }, [state, isPending, router]);
+  }, [state, isPending, nav]);
 
   const hasDraft = estimates.some((e) => e.stage === "DRAFT");
   const buttonLabel = hasDraft ? "Открыть активную смету" : "Новая смета";

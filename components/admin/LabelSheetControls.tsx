@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 
 /**
  * Print controls + bin-label generator for /admin/warehouse/labels. The print
@@ -10,7 +11,7 @@ import { useRouter, useSearchParams } from "next/navigation";
  * render. Hidden when printing.
  */
 export function LabelSheetControls(): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const params = useSearchParams();
   const [locInput, setLocInput] = useState("");
 
@@ -28,7 +29,7 @@ export function LabelSheetControls(): React.ReactElement {
     const merged = Array.from(new Set([...existing, ...added]));
     const next = new URLSearchParams(params.toString());
     next.set("loc", merged.join(","));
-    router.push(`/admin/warehouse/labels?${next.toString()}`);
+    nav.push(`/admin/warehouse/labels?${next.toString()}`);
     setLocInput("");
   }
 

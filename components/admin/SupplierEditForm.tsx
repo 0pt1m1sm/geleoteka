@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { updateSupplier, deleteSupplier } from "@/app/actions/suppliers";
 import { AdminFormShell } from "./AdminFormShell";
 import { EMAIL_PATTERN, EMAIL_TITLE, PHONE_PATTERN, PHONE_TITLE } from "@/lib/utils";
@@ -20,7 +20,7 @@ interface SupplierData {
 }
 
 export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const boundAction = updateSupplier.bind(null, supplier.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
@@ -30,7 +30,7 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
     startDelete(async () => {
       await deleteSupplier(supplier.id);
       toast.success("Поставщик деактивирован");
-      router.push("/admin/suppliers");
+      nav.push("/admin/suppliers");
     });
   }
 

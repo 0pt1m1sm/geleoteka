@@ -1,7 +1,8 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { MY_CAR_KEY } from "@/lib/my-car-store";
 
 /**
@@ -22,7 +23,7 @@ import { MY_CAR_KEY } from "@/lib/my-car-store";
 export function MyCarInit(): null {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
+  const nav = useProgressRouter();
 
   useLayoutEffect(() => {
     if (pathname !== "/parts") return;
@@ -63,8 +64,8 @@ export function MyCarInit(): null {
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set("model", car.model);
     newParams.set("generation", car.generation);
-    router.replace(`/parts?${newParams.toString()}`);
-  }, [pathname, searchParams, router]);
+    nav.replace(`/parts?${newParams.toString()}`);
+  }, [pathname, searchParams, nav]);
 
   return null;
 }

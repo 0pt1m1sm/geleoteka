@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import Link from "next/link";
 import { updateRentalCar, deleteRentalCar } from "@/app/actions/rentals";
 import { AdminFormShell } from "./AdminFormShell";
@@ -28,7 +28,7 @@ interface CarData {
 }
 
 export function RentalEditForm({ car }: { car: CarData }) {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const boundAction = updateRentalCar.bind(null, car.id);
   const [state, formAction, isPending] = useActionState(boundAction, null);
 
@@ -38,7 +38,7 @@ export function RentalEditForm({ car }: { car: CarData }) {
     startDelete(async () => {
       await deleteRentalCar(car.id);
       toast.success("Mercedes-Benz удалён из автопарка");
-      router.push("/admin/rentals");
+      nav.push("/admin/rentals");
     });
   }
 

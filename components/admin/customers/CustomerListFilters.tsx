@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { useEffect, useRef, useState } from "react";
 import {
   serializeCustomerListFilter,
@@ -23,7 +23,7 @@ interface Props {
 const DEBOUNCE_MS = 250;
 
 export function CustomerListFilters({ initial, availableTags }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const [q, setQ] = useState(initial.q);
   const [tagId, setTagId] = useState<string | null>(initial.tagId);
   const [blacklist, setBlacklist] = useState<BlacklistFilter>(initial.blacklist);
@@ -40,7 +40,7 @@ export function CustomerListFilters({ initial, availableTags }: Props): React.Re
   function navigate(next: CustomerListFilter): void {
     const qs = serializeCustomerListFilter(next).toString();
     const url = qs ? `/admin/customers?${qs}` : "/admin/customers";
-    router.replace(url);
+    nav.replace(url);
   }
 
   function commitDebounced(next: CustomerListFilter): void {

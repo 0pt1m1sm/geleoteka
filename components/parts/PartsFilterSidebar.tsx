@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 
 interface Category {
   name: string;
@@ -23,7 +24,7 @@ type FacetKey = "category" | "oem" | "inStock" | "minPrice" | "maxPrice";
  * while the drawer is open.
  */
 export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const searchParams = useSearchParams();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -62,7 +63,7 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
       if (v === null || v === "") next.delete(k);
       else next.set(k, v);
     }
-    router.push(`/parts?${next.toString()}`);
+    nav.push(`/parts?${next.toString()}`);
   }
 
   function resetAllFacets(): void {
@@ -71,7 +72,7 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
       const v = searchParams.get(k);
       if (v !== null) next.set(k, v);
     }
-    router.push(`/parts?${next.toString()}`);
+    nav.push(`/parts?${next.toString()}`);
   }
 
   const FacetBody = (
@@ -215,7 +216,7 @@ interface ChipProps {
  * Each chip's ✕ removes that single param from the URL.
  */
 export function PartsFilterChips({ categories }: ChipProps): React.ReactElement | null {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const searchParams = useSearchParams();
 
   const chips: { key: FacetKey; label: string }[] = [];
@@ -237,7 +238,7 @@ export function PartsFilterChips({ categories }: ChipProps): React.ReactElement 
   function removeChip(key: FacetKey): void {
     const next = new URLSearchParams(searchParams.toString());
     next.delete(key);
-    router.push(`/parts?${next.toString()}`);
+    nav.push(`/parts?${next.toString()}`);
   }
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import Link from "next/link";
 import { createSupplierOrder } from "@/app/actions/supplier-orders";
 import { Alert, Button, Card, Textarea } from "@/components/ui";
@@ -27,7 +27,7 @@ export function SupplierOrderForm({
   suppliers: SupplierOption[];
   parts: PartOption[];
 }): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,7 +121,7 @@ export function SupplierOrderForm({
     });
 
     if (result.success && result.orderId) {
-      router.push(`/admin/suppliers/orders/${result.orderId}`);
+      nav.push(`/admin/suppliers/orders/${result.orderId}`);
     } else {
       setError(result.error || "Ошибка при создании заказа");
       setSubmitting(false);

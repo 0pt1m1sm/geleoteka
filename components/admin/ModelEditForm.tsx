@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { confirm } from "@/lib/ui/confirm";
 import { toast } from "@/lib/ui/toast";
 import {
@@ -30,6 +31,7 @@ interface Props {
 
 export function ModelEditForm({ mode, initial, manufacturers }: Props): React.ReactElement {
   const router = useRouter();
+  const nav = useProgressRouter();
   const { pending, error, setError, runAction } = useFormAction();
   const [slug, setSlug] = useState(initial?.slug ?? "");
   const [name, setName] = useState(initial?.name ?? "");
@@ -63,7 +65,7 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
           manufacturerId,
           isActive,
         });
-        router.push(`/admin/models/${res.id}`);
+        nav.push(`/admin/models/${res.id}`);
       } else if (initial) {
         await updateModel(initial.id, {
           slug,
@@ -85,7 +87,7 @@ export function ModelEditForm({ mode, initial, manufacturers }: Props): React.Re
     runAction(async () => {
       await deleteModel(initial.id);
       toast.success("Модель удалена");
-      router.push("/admin/models");
+      nav.push("/admin/models");
     });
   }
 

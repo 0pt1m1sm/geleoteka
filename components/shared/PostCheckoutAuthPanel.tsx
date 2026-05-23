@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import {
   setPasswordForGuestUser,
   loginAndAttachOrder,
@@ -35,7 +35,7 @@ export function PostCheckoutAuthPanel({
   email,
   isReturning,
 }: PostCheckoutAuthPanelProps): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const [tab, setTab] = useState<"create" | "login">(
     isReturning ? "login" : "create",
   );
@@ -61,7 +61,7 @@ export function PostCheckoutAuthPanel({
           orderKind={kind}
           claimToken={claimToken}
           email={email}
-          router={router}
+          nav={nav}
         />
       ) : (
         <Tabs value={tab} onValueChange={(v) => setTab(v as "create" | "login")}>
@@ -75,7 +75,7 @@ export function PostCheckoutAuthPanel({
               orderKind={kind}
               claimToken={claimToken}
               email={email}
-              router={router}
+              nav={nav}
             />
           </TabsContent>
           <TabsContent value="login">
@@ -84,7 +84,7 @@ export function PostCheckoutAuthPanel({
               orderKind={kind}
               claimToken={claimToken}
               email={email}
-              router={router}
+              nav={nav}
             />
           </TabsContent>
         </Tabs>
@@ -104,10 +104,10 @@ interface TabProps {
   orderKind: "booking" | "cart" | "rental";
   claimToken: string;
   email: string;
-  router: ReturnType<typeof useRouter>;
+  nav: ReturnType<typeof useProgressRouter>;
 }
 
-function CreateTab({ orderId, orderKind, claimToken, email, router }: TabProps): React.ReactElement {
+function CreateTab({ orderId, orderKind, claimToken, email, nav }: TabProps): React.ReactElement {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,7 +130,7 @@ function CreateTab({ orderId, orderKind, claimToken, email, router }: TabProps):
         return;
       }
       setSuccess(true);
-      router.push(res.redirectTo);
+      nav.push(res.redirectTo);
     } catch (err) {
       console.error("setPasswordForGuestUser failed", err);
       setError(
@@ -173,7 +173,7 @@ function CreateTab({ orderId, orderKind, claimToken, email, router }: TabProps):
   );
 }
 
-function LoginTab({ orderId, orderKind, claimToken, email, router }: TabProps): React.ReactElement {
+function LoginTab({ orderId, orderKind, claimToken, email, nav }: TabProps): React.ReactElement {
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,7 +196,7 @@ function LoginTab({ orderId, orderKind, claimToken, email, router }: TabProps): 
         return;
       }
       setSuccess(true);
-      router.push(res.redirectTo);
+      nav.push(res.redirectTo);
     } catch (err) {
       console.error("loginAndAttachOrder failed", err);
       setError(

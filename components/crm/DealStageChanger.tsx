@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { Alert } from "@/components/ui";
 import { setDealStage, deleteDeal } from "@/app/actions/crm/deals";
 import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
@@ -18,6 +19,7 @@ export function DealStageChanger({
   currentStage: string;
 }): React.ReactElement {
   const router = useRouter();
+  const nav = useProgressRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -64,7 +66,7 @@ export function DealStageChanger({
         return;
       }
       toast.success("Сделка удалена");
-      router.push("/admin/crm/deals");
+      nav.push("/admin/crm/deals");
       router.refresh();
     });
   }

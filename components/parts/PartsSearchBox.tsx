@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 
 interface Props {
   currentQuery: string;
@@ -12,7 +13,7 @@ interface Props {
  * the catalog area (separate from the sidebar facets).
  */
 export function PartsSearchBox({ currentQuery }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(currentQuery);
 
@@ -21,7 +22,7 @@ export function PartsSearchBox({ currentQuery }: Props): React.ReactElement {
     const next = new URLSearchParams(searchParams.toString());
     if (query.trim()) next.set("q", query.trim());
     else next.delete("q");
-    router.push(`/parts?${next.toString()}`);
+    nav.push(`/parts?${next.toString()}`);
   }
 
   return (

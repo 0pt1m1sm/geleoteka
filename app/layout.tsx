@@ -8,6 +8,7 @@ import { MyCarInit } from "@/components/shared/MyCarInit";
 import { ConfirmHost } from "@/components/ui/ConfirmHost";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { NavigationProgress } from "@/components/shared/NavigationProgress";
+import { NavigationProgressProvider } from "@/components/shared/NavigationProgressProvider";
 
 // Sync theme bootstrap. Must run before first paint to eliminate the
 // dark-flash FOUC on light-theme reloads. `<Script strategy="beforeInteractive">`
@@ -71,19 +72,23 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col bg-[var(--background)]">
-        <ThemeInit />
-        {/* MyCarInit reads useSearchParams — must be wrapped in Suspense per Next.js. */}
-        <Suspense fallback={null}>
-          <MyCarInit />
-        </Suspense>
-        {/* Top-of-viewport progress bar — reads useSearchParams so it
-            must be wrapped in Suspense per Next.js App Router rules. */}
-        <Suspense fallback={null}>
-          <NavigationProgress />
-        </Suspense>
-        <Providers>{children}</Providers>
-        <ConfirmHost />
-        <ToastHost />
+        {/* Wraps the whole app so useProgressRouter() is available everywhere
+            and the bar below can read the navigation transition's isPending. */}
+        <NavigationProgressProvider>
+          <ThemeInit />
+          {/* MyCarInit reads useSearchParams — must be wrapped in Suspense per Next.js. */}
+          <Suspense fallback={null}>
+            <MyCarInit />
+          </Suspense>
+          {/* Top-of-viewport progress bar — reads useSearchParams so it
+              must be wrapped in Suspense per Next.js App Router rules. */}
+          <Suspense fallback={null}>
+            <NavigationProgress />
+          </Suspense>
+          <Providers>{children}</Providers>
+          <ConfirmHost />
+          <ToastHost />
+        </NavigationProgressProvider>
       </body>
     </html>
   );

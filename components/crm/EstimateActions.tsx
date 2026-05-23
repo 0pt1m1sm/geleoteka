@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { Alert, Button, Textarea } from "@/components/ui";
 import {
   approveEstimate,
@@ -32,6 +33,7 @@ export function EstimateActions({
   stage,
 }: Props): React.ReactElement | null {
   const router = useRouter();
+  const nav = useProgressRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [declineOpen, setDeclineOpen] = useState(false);
@@ -51,12 +53,12 @@ export function EstimateActions({
       }
       if (onSuccess?.toast) toast.success(onSuccess.toast);
       if (onSuccess?.redirect) {
-        router.push(onSuccess.redirect);
+        nav.push(onSuccess.redirect);
         return;
       }
       // Revision creates a child estimate; navigate there.
       if (res.estimateId && res.estimateId !== estimateId) {
-        router.push(`/admin/crm/estimates/${res.estimateId}`);
+        nav.push(`/admin/crm/estimates/${res.estimateId}`);
         return;
       }
       router.refresh();
@@ -95,12 +97,12 @@ export function EstimateActions({
       }
       toast.success("Смета удалена");
       if (res.dealId) {
-        router.push(`/admin/crm/deals/${res.dealId}`);
+        nav.push(`/admin/crm/deals/${res.dealId}`);
         router.refresh();
         return;
       }
       // Fallback (should never hit) — head to the deals list rather than 404.
-      router.push("/admin/crm/deals");
+      nav.push("/admin/crm/deals");
     });
   }
 

@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { Alert, Button } from "@/components/ui";
 import { CustomerSearchCombobox } from "./CustomerSearchCombobox";
 import { confirm } from "@/lib/ui/confirm";
@@ -26,7 +26,7 @@ export function InboxActions({
   fromEmail,
   fromName,
 }: Props): React.ReactElement {
-  const router = useRouter();
+  const nav = useProgressRouter();
   const [panel, setPanel] = useState<Panel>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -46,7 +46,7 @@ export function InboxActions({
         return;
       }
       toast.success("Письмо привязано к клиенту");
-      router.push(`/admin/customers/${customer.id}`);
+      nav.push(`/admin/customers/${customer.id}`);
     });
   }
 
@@ -60,7 +60,7 @@ export function InboxActions({
         return;
       }
       toast.success("Помечено как спам");
-      router.push("/admin/crm/inbox?status=SPAM");
+      nav.push("/admin/crm/inbox?status=SPAM");
     });
   }
 
@@ -73,7 +73,7 @@ export function InboxActions({
         return;
       }
       toast.success("Письмо в архиве");
-      router.push("/admin/crm/inbox?status=ARCHIVED");
+      nav.push("/admin/crm/inbox?status=ARCHIVED");
     });
   }
 
