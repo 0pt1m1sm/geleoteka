@@ -114,6 +114,15 @@ export const adminNav: AdminNavEntry[] = [
   },
 ];
 
+/** Scope the nav to a role. WAREHOUSE_WORKER only sees the warehouse section;
+ *  all other admin roles see the full nav. */
+export function filterNavForRole(nav: readonly AdminNavEntry[], role: string): AdminNavEntry[] {
+  if (role === "WAREHOUSE_WORKER") {
+    return [{ kind: "link", href: "/admin/warehouse", label: "Склад" }];
+  }
+  return [...nav];
+}
+
 interface HrefSearch {
   get(key: string): string | null;
 }

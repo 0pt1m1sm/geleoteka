@@ -35,6 +35,8 @@ export interface RecordMovementInput {
   source: MovementSource;
   actorId?: string;
   note?: string;
+  /** Client-supplied idempotency key (retry safety); independent of the source triple. */
+  idempotencyKey?: string;
   /** Tenant discriminator. Optional; the host adapter supplies it. */
   tenantKey?: string;
 }
@@ -85,6 +87,8 @@ interface PlacementMeta {
   qty: number;
   actorId?: string;
   note?: string;
+  /** Client-supplied idempotency key (retry safety). */
+  idempotencyKey?: string;
   tenantKey?: string;
 }
 

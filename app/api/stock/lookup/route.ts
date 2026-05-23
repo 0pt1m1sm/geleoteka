@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request): Promise<NextResponse> {
   try {
-    await requireRole(["ADMIN", "MANAGER"]);
+    await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   } catch {
     return NextResponse.json({ error: { code: "UNAUTHORIZED", message: "Unauthorized" } }, { status: 401 });
   }

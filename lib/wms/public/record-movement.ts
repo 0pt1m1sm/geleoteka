@@ -6,6 +6,7 @@ import {
   insertMovement,
   applyDeltas,
   isUniqueViolation,
+  findMovementByKey,
   type DbClientPort,
 } from "../internal/repository";
 
@@ -45,6 +46,35 @@ export async function recordMovement(
   // Never drive reserved below zero (e.g. consuming more than was held).
   if (reservedDelta < 0) reservedDelta = -Math.min(-reservedDelta, item.reserved);
 
+  const idempotencyKey = input.idempotencyKey ?? null;
+
+  const noop = (): MovementResult => ({
+    applied: false,
+    itemId: input.item.itemId,
+    quantity: item.quantity,
+    reserved: item.reserved,
+    available: item.quantity - item.reserved,
+  });
+
+  // Pre-check the idempotency key BEFORE inserting. A failed insert aborts the
+  // surrounding Postgres transaction, so the disambiguation SELECT must run
+  // first (not in the catch). The unique constraint remains only as a
+  // concurrency backstop (handled in the catch as a plain no-op).
+  if (idempotencyKey) {
+    const prior = await findMovementByKey(client, tenantKey, idempotencyKey);
+    if (prior) {
+      const samePayload =
+        prior.itemId === item.id &&
+        prior.reason === input.reason &&
+        prior.quantityDelta === quantityDelta &&
+        prior.reservedDelta === reservedDelta &&
+        prior.sourceType === input.source.type &&
+        prior.sourceId === input.source.id;
+      if (!samePayload) throw WmsError.idempotencyKeyReused();
+      return noop(); // identical payload already applied → idempotent no-op
+    }
+  }
+
   try {
     await insertMovement(client, {
       itemId: item.id,
@@ -55,19 +85,18 @@ export async function recordMovement(
       sourceId: input.source.id,
       actorUserId: input.actorId ?? null,
       note: input.note ?? null,
+      idempotencyKey,
       tenantKey,
     });
   } catch (e) {
-    if (isUniqueViolation(e)) {
-      // Already applied — idempotent no-op. Report current counters.
-      return {
-        applied: false,
-        itemId: input.item.itemId,
-        quantity: item.quantity,
-        reserved: item.reserved,
-        available: item.quantity - item.reserved,
-      };
-    }
+    // Source-triple collision, or a rare concurrent key insert that beat us →
+    // idempotent no-op. Do NOT query here (the tx may be aborted by the P2002).
+    // Accepted bound (same as placement): a CONCURRENT same-key/different-payload
+    // race reports applied:false instead of IDEMPOTENCY_KEY_REUSED — the
+    // sequential reuse case is caught by the pre-check above; the concurrent
+    // loser is a no-op (no wrong write applied). Unreachable from the UI, which
+    // generates a fresh key per operation.
+    if (isUniqueViolation(e)) return noop();
     throw e;
   }
 

@@ -9,6 +9,12 @@ export { recordMovement } from "./record-movement";
 export { availableStock } from "./stock";
 export { lookupByCode, lookupByItemId } from "./lookup";
 export { placeStock, transferStock, removeFromBin, binsForItem, itemsInLocation } from "./placement";
+export { parseScanCode, formatScanCode } from "./qr";
+export type { ScanObjectType, ParsedScanCode } from "./qr";
+export { assertLocationUsable, getLocation, listLocations, setLocationBlocked } from "./locations";
+export type { WmsLocation } from "./locations";
+export { recordScanEvent } from "./scan";
+export type { ScanEventInput, ScanResult } from "./scan";
 export { WmsError } from "./errors";
 export type { WmsErrorCode } from "./errors";
 export type {

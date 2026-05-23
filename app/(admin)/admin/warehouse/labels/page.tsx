@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { formatScanCode } from "@/lib/wms/public";
 import { LabelSheetControls } from "@/components/admin/LabelSheetControls";
 
 interface Props {
@@ -29,7 +30,12 @@ async function qr(payload: string): Promise<string> {
 
 export default async function WarehouseLabelsPage({ searchParams }: Props): Promise<React.ReactElement> {
   const session = await getSession();
-  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
+  if (
+    !session ||
+    (session.permissionRole !== "ADMIN" &&
+      session.permissionRole !== "MANAGER" &&
+      session.permissionRole !== "WAREHOUSE_WORKER")
+  ) {
     redirect("/login");
   }
 
@@ -48,14 +54,15 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
     for (const id of partIds) {
       const p = byId.get(id);
       if (!p) continue;
-      // QR encodes the re-scannable code: barcode if present, else the article.
-      const payload = p.stockItem?.barcode ?? p.article;
-      labels.push({ qr: await qr(payload), title: p.name, sub: payload });
+      // QR encodes the typed re-scannable code (barcode if present, else article);
+      // the caption stays the human-readable code.
+      const code = p.stockItem?.barcode ?? p.article;
+      labels.push({ qr: await qr(formatScanCode("PART", code)), title: p.name, sub: code });
     }
   }
 
   for (const location of locations) {
-    labels.push({ qr: await qr(location), title: location, sub: "Ячейка" });
+    labels.push({ qr: await qr(formatScanCode("LOC", location)), title: location, sub: "Ячейка" });
   }
 
   return (

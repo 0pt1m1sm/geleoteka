@@ -3,7 +3,10 @@ export type WmsErrorCode =
   | "INVALID_QTY"
   | "INSUFFICIENT_UNPLACED"
   | "INSUFFICIENT_BIN"
-  | "SAME_LOCATION";
+  | "SAME_LOCATION"
+  | "LOCATION_BLOCKED"
+  | "DUPLICATE_OPERATION"
+  | "IDEMPOTENCY_KEY_REUSED";
 
 /** Error taxonomy for the WMS core. */
 export class WmsError extends Error {
@@ -44,5 +47,23 @@ export class WmsError extends Error {
   /** Placement: transfer source and destination are the same location. */
   static sameLocation(): WmsError {
     return new WmsError("SAME_LOCATION", "Transfer source and destination must differ.");
+  }
+
+  /** Placement: destination location is inactive or blocked for putaway/transfer-in. */
+  static locationBlocked(): WmsError {
+    return new WmsError("LOCATION_BLOCKED", "The destination location is blocked or inactive.");
+  }
+
+  /** A write with this idempotency key already ran (same payload) — no-op duplicate. */
+  static duplicateOperation(): WmsError {
+    return new WmsError("DUPLICATE_OPERATION", "This operation was already applied (duplicate idempotency key).");
+  }
+
+  /** The idempotency key was reused for a DIFFERENT operation — reject, do not mask. */
+  static idempotencyKeyReused(): WmsError {
+    return new WmsError(
+      "IDEMPOTENCY_KEY_REUSED",
+      "This idempotency key was already used for a different operation.",
+    );
   }
 }

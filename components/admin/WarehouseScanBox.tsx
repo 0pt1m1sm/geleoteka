@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type FormEvent } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adjustStock,
@@ -9,6 +9,7 @@ import {
   transferBetweenBins,
 } from "@/app/actions/warehouse";
 import type { ItemPlacement } from "@/lib/wms/public";
+import { QrScanner } from "@/components/warehouse/QrScanner";
 
 interface ResolvedItem {
   itemId: string;
@@ -19,16 +20,29 @@ interface ResolvedItem {
   available: number;
 }
 
+interface LocationCard {
+  code: string;
+  isActive: boolean;
+  isBlocked: boolean;
+  items: Array<{ itemId: string; name: string; article: string; quantity: number }>;
+}
+
+type ScanData =
+  | ({ kind: "part" } & ResolvedItem)
+  | ({ kind: "location" } & LocationCard);
+
 /**
- * Barcode-HID scan box. The scanner acts as a keyboard wedge: it "types" the
- * code and presses Enter. On submit we resolve the code via /api/stock/lookup
- * and show the item with an inline on-hand adjust. The input auto-focuses and
- * re-focuses after every scan so an operator can scan continuously.
+ * Warehouse scan box. A scan (camera or manual entry) is parsed and resolved by
+ * POST /api/warehouse/scan, which logs a ScanEvent and returns a part or
+ * location card. Part results expose the inline on-hand adjust + bin placement;
+ * location results show the cell's state and contents. Write ops carry a
+ * client idempotency key (regenerated per operation, reused only on a network
+ * retry where the server outcome is unknown).
  */
 export function WarehouseScanBox(): React.ReactElement {
   const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
   const [item, setItem] = useState<ResolvedItem | null>(null);
+  const [locationCard, setLocationCard] = useState<LocationCard | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [adjustValue, setAdjustValue] = useState("");
@@ -43,48 +57,64 @@ export function WarehouseScanBox(): React.ReactElement {
   const [binError, setBinError] = useState<string | null>(null);
   const [isBinPending, startBinTransition] = useTransition();
 
-  const refocus = (): void => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
-  };
+  // Per-operation idempotency keys. Lifecycle: generated on submit; KEPT on a
+  // network error so the immediate retry reuses it (idempotent — server outcome
+  // unknown); CLEARED on a confirmed server outcome (success or rejection) and
+  // on any input change (a different value/location = a different intended
+  // operation, not a retry — so it must get a fresh key, never the prior one).
+  const adjustKeyRef = useRef<string | null>(null);
+  const placeKeyRef = useRef<string | null>(null);
+  const transferKeyRef = useRef<string | null>(null);
 
-  async function handleLookup(e: FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
-    const code = (inputRef.current?.value ?? "").trim();
+  async function handleScan(raw: string): Promise<void> {
     setAdjustError(null);
     setBinError(null);
-    if (!code) return;
     setNotFound(false);
     setLookupError(null);
     try {
-      const res = await fetch(`/api/stock/lookup?code=${encodeURIComponent(code)}`);
-      if (res.status === 404) {
+      const res = await fetch("/api/warehouse/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawCode: raw }),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { data: ScanData };
+        if (body.data.kind === "part") {
+          setLocationCard(null);
+          setItem(body.data);
+          setAdjustValue(String(body.data.quantity));
+          setPlaceLoc("");
+          setPlaceQty("");
+          setTransferFrom("");
+          setTransferTo("");
+          setTransferQty("");
+          adjustKeyRef.current = null;
+          placeKeyRef.current = null;
+          transferKeyRef.current = null;
+          const p = await getPlacement(body.data.itemId);
+          setPlacement(p.placement ?? null);
+        } else {
+          setItem(null);
+          setPlacement(null);
+          setLocationCard(body.data);
+        }
+      } else if (res.status === 404) {
         setItem(null);
         setPlacement(null);
+        setLocationCard(null);
         setNotFound(true);
-      } else if (res.ok) {
-        const body = (await res.json()) as { data: ResolvedItem };
-        setItem(body.data);
-        setAdjustValue(String(body.data.quantity));
-        setPlaceLoc("");
-        setPlaceQty("");
-        setTransferFrom("");
-        setTransferTo("");
-        setTransferQty("");
-        const p = await getPlacement(body.data.itemId);
-        setPlacement(p.placement ?? null);
       } else {
+        const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
         setItem(null);
         setPlacement(null);
-        setLookupError("Ошибка поиска");
+        setLocationCard(null);
+        setLookupError(body?.error?.message ?? "Ошибка поиска");
       }
     } catch {
       setItem(null);
       setPlacement(null);
+      setLocationCard(null);
       setLookupError("Ошибка сети");
-    } finally {
-      if (inputRef.current) inputRef.current.value = "";
-      refocus();
     }
   }
 
@@ -96,16 +126,23 @@ export function WarehouseScanBox(): React.ReactElement {
       return;
     }
     setAdjustError(null);
+    const key = adjustKeyRef.current ?? (adjustKeyRef.current = crypto.randomUUID());
     startTransition(async () => {
-      const result = await adjustStock(item.itemId, next);
-      if (result.error) {
-        setAdjustError(result.error);
-        return;
+      try {
+        const result = await adjustStock(item.itemId, next, undefined, key);
+        if (result.error) {
+          setAdjustError(result.error);
+          adjustKeyRef.current = null; // server rejected definitively → fresh key next time
+          return;
+        }
+        adjustKeyRef.current = null;
+        setItem({ ...item, quantity: result.quantity ?? next, available: result.available ?? item.available });
+        const p = await getPlacement(item.itemId);
+        setPlacement(p.placement ?? null);
+        router.refresh();
+      } catch {
+        setAdjustError("Ошибка сети — повторите"); // keep key: outcome unknown, retry is idempotent
       }
-      setItem({ ...item, quantity: result.quantity ?? next, available: result.available ?? item.available });
-      const p = await getPlacement(item.itemId);
-      setPlacement(p.placement ?? null);
-      router.refresh();
     });
   }
 
@@ -113,16 +150,23 @@ export function WarehouseScanBox(): React.ReactElement {
     if (!item) return;
     const qty = parseInt(placeQty, 10);
     setBinError(null);
+    const key = placeKeyRef.current ?? (placeKeyRef.current = crypto.randomUUID());
     startBinTransition(async () => {
-      const result = await placeIntoBin(item.itemId, placeLoc, qty);
-      if (result.error) {
-        setBinError(result.error);
-        return;
+      try {
+        const result = await placeIntoBin(item.itemId, placeLoc, qty, key);
+        if (result.error) {
+          setBinError(result.error);
+          placeKeyRef.current = null;
+          return;
+        }
+        placeKeyRef.current = null;
+        if (result.placement) setPlacement(result.placement);
+        setPlaceLoc("");
+        setPlaceQty("");
+        router.refresh();
+      } catch {
+        setBinError("Ошибка сети — повторите");
       }
-      if (result.placement) setPlacement(result.placement);
-      setPlaceLoc("");
-      setPlaceQty("");
-      router.refresh();
     });
   }
 
@@ -130,39 +174,65 @@ export function WarehouseScanBox(): React.ReactElement {
     if (!item) return;
     const qty = parseInt(transferQty, 10);
     setBinError(null);
+    const key = transferKeyRef.current ?? (transferKeyRef.current = crypto.randomUUID());
     startBinTransition(async () => {
-      const result = await transferBetweenBins(item.itemId, transferFrom, transferTo, qty);
-      if (result.error) {
-        setBinError(result.error);
-        return;
+      try {
+        const result = await transferBetweenBins(item.itemId, transferFrom, transferTo, qty, key);
+        if (result.error) {
+          setBinError(result.error);
+          transferKeyRef.current = null;
+          return;
+        }
+        transferKeyRef.current = null;
+        if (result.placement) setPlacement(result.placement);
+        setTransferFrom("");
+        setTransferTo("");
+        setTransferQty("");
+        router.refresh();
+      } catch {
+        setBinError("Ошибка сети — повторите");
       }
-      if (result.placement) setPlacement(result.placement);
-      setTransferFrom("");
-      setTransferTo("");
-      setTransferQty("");
-      router.refresh();
     });
   }
 
   return (
     <section aria-label="Сканирование" className="card">
       <h2 className="text-lg font-semibold mb-3">Сканирование</h2>
-      <form onSubmit={handleLookup} className="flex gap-2">
-        <input
-          ref={inputRef}
-          autoFocus
-          type="text"
-          inputMode="text"
-          aria-label="Штрихкод или артикул"
-          placeholder="Отсканируйте штрихкод или введите артикул"
-          className="input flex-1"
-        />
-        <button type="submit" className="btn btn-secondary">Найти</button>
-      </form>
+      <QrScanner onScan={handleScan} busy={isPending || isBinPending} />
 
       <div aria-live="polite" className="mt-4">
         {notFound && <p className="alert-error">Не найдено</p>}
         {lookupError && <p className="alert-error">{lookupError}</p>}
+
+        {locationCard && (
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="font-mono font-medium">{locationCard.code}</p>
+              {locationCard.isBlocked ? (
+                <span className="badge bg-[var(--color-error-bg)] text-[var(--color-error)]">Заблокирована</span>
+              ) : !locationCard.isActive ? (
+                <span className="badge">Неактивна</span>
+              ) : (
+                <span className="badge">Активна</span>
+              )}
+            </div>
+            {locationCard.items.length > 0 ? (
+              <ul className="mt-3 space-y-1 text-sm">
+                {locationCard.items.map((it) => (
+                  <li key={it.itemId} className="flex justify-between gap-2">
+                    <span>
+                      {it.name} <span className="font-mono text-xs text-[var(--foreground-muted)]">{it.article}</span>
+                    </span>
+                    <span className="font-medium">{it.quantity}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-[var(--foreground-muted)]">Ячейка пуста</p>
+            )}
+          </div>
+        )}
+
         {item && (
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
             <div className="flex items-start justify-between gap-4">
@@ -185,7 +255,10 @@ export function WarehouseScanBox(): React.ReactElement {
                   type="number"
                   min={0}
                   value={adjustValue}
-                  onChange={(e) => setAdjustValue(e.target.value)}
+                  onChange={(e) => {
+                    setAdjustValue(e.target.value);
+                    adjustKeyRef.current = null;
+                  }}
                   className="input"
                 />
               </label>
@@ -235,7 +308,10 @@ export function WarehouseScanBox(): React.ReactElement {
                         aria-label="Ячейка для размещения"
                         placeholder="Ячейка"
                         value={placeLoc}
-                        onChange={(e) => setPlaceLoc(e.target.value)}
+                        onChange={(e) => {
+                          setPlaceLoc(e.target.value);
+                          placeKeyRef.current = null;
+                        }}
                         className="input flex-1 font-mono"
                       />
                       <input
@@ -244,7 +320,10 @@ export function WarehouseScanBox(): React.ReactElement {
                         min={1}
                         placeholder="Кол-во"
                         value={placeQty}
-                        onChange={(e) => setPlaceQty(e.target.value)}
+                        onChange={(e) => {
+                          setPlaceQty(e.target.value);
+                          placeKeyRef.current = null;
+                        }}
                         className="input w-24"
                       />
                     </div>
@@ -265,14 +344,20 @@ export function WarehouseScanBox(): React.ReactElement {
                         aria-label="Из ячейки"
                         placeholder="Из"
                         value={transferFrom}
-                        onChange={(e) => setTransferFrom(e.target.value)}
+                        onChange={(e) => {
+                          setTransferFrom(e.target.value);
+                          transferKeyRef.current = null;
+                        }}
                         className="input flex-1 font-mono"
                       />
                       <input
                         aria-label="В ячейку"
                         placeholder="В"
                         value={transferTo}
-                        onChange={(e) => setTransferTo(e.target.value)}
+                        onChange={(e) => {
+                          setTransferTo(e.target.value);
+                          transferKeyRef.current = null;
+                        }}
                         className="input flex-1 font-mono"
                       />
                       <input
@@ -281,7 +366,10 @@ export function WarehouseScanBox(): React.ReactElement {
                         min={1}
                         placeholder="Кол-во"
                         value={transferQty}
-                        onChange={(e) => setTransferQty(e.target.value)}
+                        onChange={(e) => {
+                          setTransferQty(e.target.value);
+                          transferKeyRef.current = null;
+                        }}
                         className="input w-24"
                       />
                     </div>

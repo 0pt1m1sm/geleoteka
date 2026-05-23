@@ -39,7 +39,8 @@ export async function ensureStockItem(
   })) as StockItemRow;
 }
 
-/** Insert the audit movement. Throws P2002 on a duplicate idempotency triple. */
+/** Insert the audit movement. Throws P2002 on a duplicate source-triple OR a
+ *  duplicate (tenantKey, idempotencyKey) — the caller disambiguates which. */
 export async function insertMovement(
   client: DbClientPort,
   row: {
@@ -51,10 +52,45 @@ export async function insertMovement(
     sourceId: string | null;
     actorUserId: string | null;
     note: string | null;
+    idempotencyKey: string | null;
     tenantKey: string;
   },
 ): Promise<void> {
   await client.stockMovement.create({ data: row });
+}
+
+/** Identity of a prior movement claimed by an idempotency key (for collision
+ *  disambiguation: same payload → idempotent no-op; different → key reuse). */
+export async function findMovementByKey(
+  client: DbClientPort,
+  tenantKey: string,
+  idempotencyKey: string,
+): Promise<{
+  itemId: string;
+  reason: MovementReason;
+  quantityDelta: number;
+  reservedDelta: number;
+  sourceType: string;
+  sourceId: string | null;
+} | null> {
+  return (await client.stockMovement.findUnique({
+    where: { tenantKey_idempotencyKey: { tenantKey, idempotencyKey } },
+    select: {
+      itemId: true,
+      reason: true,
+      quantityDelta: true,
+      reservedDelta: true,
+      sourceType: true,
+      sourceId: true,
+    },
+  })) as {
+    itemId: string;
+    reason: MovementReason;
+    quantityDelta: number;
+    reservedDelta: number;
+    sourceType: string;
+    sourceId: string | null;
+  } | null;
 }
 
 /** Apply signed deltas to the StockItem counters; returns the new values. */
@@ -164,7 +200,8 @@ export async function decrementBinIfEnough(
   return res.count === 1;
 }
 
-/** Insert a bin-movement audit row (PLACE / TRANSFER / REMOVE). */
+/** Insert a bin-movement audit row (PLACE / TRANSFER / REMOVE). Throws P2002 on
+ *  a duplicate (tenantKey, idempotencyKey) when a key is supplied. */
 export async function insertBinMovement(
   client: DbClientPort,
   row: {
@@ -175,10 +212,122 @@ export async function insertBinMovement(
     quantity: number;
     actorUserId: string | null;
     note: string | null;
+    idempotencyKey: string | null;
     tenantKey: string;
   },
 ): Promise<void> {
   await client.stockBinMovement.create({ data: row });
+}
+
+/** Identity of a prior bin-movement claimed by an idempotency key. */
+export async function findBinMovementByKey(
+  client: DbClientPort,
+  tenantKey: string,
+  idempotencyKey: string,
+): Promise<{
+  itemId: string;
+  reason: "PLACE" | "TRANSFER" | "REMOVE";
+  fromLocation: string | null;
+  toLocation: string | null;
+  quantity: number;
+} | null> {
+  return (await client.stockBinMovement.findUnique({
+    where: { tenantKey_idempotencyKey: { tenantKey, idempotencyKey } },
+    select: { itemId: true, reason: true, fromLocation: true, toLocation: true, quantity: true },
+  })) as {
+    itemId: string;
+    reason: "PLACE" | "TRANSFER" | "REMOVE";
+    fromLocation: string | null;
+    toLocation: string | null;
+    quantity: number;
+  } | null;
+}
+
+/** Append a scan-audit row (every scan, including failures). */
+export async function insertScanEvent(
+  client: DbClientPort,
+  row: {
+    userId: string | null;
+    deviceId: string | null;
+    sessionId: string | null;
+    action: string;
+    rawCode: string;
+    parsedObjectType: string | null;
+    parsedObjectId: string | null;
+    result: "SUCCESS" | "REJECTED" | "ERROR";
+    errorCode: string | null;
+    tenantKey: string;
+  },
+): Promise<void> {
+  await client.scanEvent.create({ data: row });
+}
+
+// ── Location registry ───────────────────────────────────────────────────────
+
+export interface StockLocationRow {
+  code: string;
+  zone: string | null;
+  isActive: boolean;
+  isBlocked: boolean;
+}
+
+/** Find a location registry row by normalized code. */
+export async function findLocation(
+  client: DbClientPort,
+  code: string,
+  tenantKey: string,
+): Promise<StockLocationRow | null> {
+  return (await client.stockLocation.findUnique({
+    where: { tenantKey_code: { tenantKey, code } },
+    select: { code: true, zone: true, isActive: true, isBlocked: true },
+  })) as StockLocationRow | null;
+}
+
+/** Create-if-absent an active, unblocked location; returns its current row. */
+export async function ensureLocation(
+  client: DbClientPort,
+  code: string,
+  tenantKey: string,
+): Promise<StockLocationRow> {
+  return (await client.stockLocation.upsert({
+    where: { tenantKey_code: { tenantKey, code } },
+    create: { code, tenantKey, isActive: true, isBlocked: false },
+    update: {},
+    select: { code: true, zone: true, isActive: true, isBlocked: true },
+  })) as StockLocationRow;
+}
+
+/** All locations for a tenant, ordered by code. */
+export async function listLocationRows(
+  client: DbClientPort,
+  tenantKey: string,
+): Promise<StockLocationRow[]> {
+  return (await client.stockLocation.findMany({
+    where: { tenantKey },
+    select: { code: true, zone: true, isActive: true, isBlocked: true },
+    orderBy: { code: "asc" },
+  })) as StockLocationRow[];
+}
+
+/** Update a location's active/blocked flags (create-if-absent so the toggle is
+ *  usable for an auto-created location that has no explicit row yet). */
+export async function updateLocationFlags(
+  client: DbClientPort,
+  code: string,
+  tenantKey: string,
+  flags: { isActive?: boolean; isBlocked?: boolean },
+): Promise<StockLocationRow> {
+  return (await client.stockLocation.upsert({
+    where: { tenantKey_code: { tenantKey, code } },
+    create: {
+      code,
+      tenantKey,
+      isActive: flags.isActive ?? true,
+      isBlocked: flags.isBlocked ?? false,
+    },
+    update: flags,
+    select: { code: true, zone: true, isActive: true, isBlocked: true },
+  })) as StockLocationRow;
 }
 
 /** Resolve a stock view by external itemId (= partId). */

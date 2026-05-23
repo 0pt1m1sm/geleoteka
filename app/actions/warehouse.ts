@@ -12,7 +12,10 @@ import {
   removeFromBin,
   binsForItem,
   itemsInLocation,
+  listLocations,
+  setLocationBlocked,
   type ItemPlacement,
+  type WmsLocation,
 } from "@/lib/wms/public";
 
 interface PlacementResult {
@@ -29,8 +32,9 @@ export async function adjustStock(
   partId: string,
   newQuantity: number,
   note?: string,
+  idempotencyKey?: string,
 ): Promise<{ error: string | null; quantity?: number; available?: number }> {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
 
   if (!Number.isInteger(newQuantity) || newQuantity < 0) {
     return { error: "Количество должно быть целым неотрицательным числом" };
@@ -38,20 +42,22 @@ export async function adjustStock(
 
   try {
     const result = await db.$transaction((tx) =>
-      applyAdjustment(tx, partId, newQuantity, actorId(session), note),
+      applyAdjustment(tx, partId, newQuantity, actorId(session), note, idempotencyKey),
     );
     return { error: null, quantity: result.quantity, available: result.available };
   } catch (e) {
     if (e instanceof Error && e.message === "NEGATIVE_ON_HAND") {
       return { error: "Остаток нельзя сделать отрицательным" };
     }
+    const msg = wmsErrorMessage(e); // DUPLICATE_OPERATION / IDEMPOTENCY_KEY_REUSED
+    if (msg) return { error: msg };
     throw e; // unexpected (DB error etc.) — surface it, don't mask as a vague message
   }
 }
 
 /** Read a part's bin placement (bins + unplaced + reconcile flag). */
 export async function getPlacement(partId: string): Promise<PlacementResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const placement = await binsForItem(db, partId, TENANT_KEY);
   return { error: null, placement };
 }
@@ -63,9 +69,28 @@ interface LocationItem {
   quantity: number;
 }
 
+/** List all warehouse locations for the block/unblock admin surface.
+ *  Cell configuration is admin/manager only (PRD §7) — NOT warehouse_worker. */
+export async function listLocationsAction(): Promise<{ locations: WmsLocation[] }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const locations = await listLocations(db, TENANT_KEY);
+  return { locations };
+}
+
+/** Toggle a location's active/blocked flags (admin/manager only). */
+export async function setLocationBlockedAction(
+  code: string,
+  flags: { isActive?: boolean; isBlocked?: boolean },
+): Promise<{ error: string | null; location?: WmsLocation }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  if (!code.trim()) return { error: "Укажите ячейку" };
+  const location = await setLocationBlocked(db, code, TENANT_KEY, flags);
+  return { error: null, location };
+}
+
 /** List the items stored in a location (for the location-centric lookup). */
 export async function lookupLocation(location: string): Promise<{ items: LocationItem[] }> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { items: [] };
   const rows = await itemsInLocation(db, location, TENANT_KEY);
   if (rows.length === 0) return { items: [] };
@@ -85,13 +110,18 @@ export async function lookupLocation(location: string): Promise<{ items: Locatio
 }
 
 /** Putaway: place unplaced on-hand into a location. */
-export async function placeIntoBin(partId: string, location: string, qty: number): Promise<PlacementResult> {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+export async function placeIntoBin(
+  partId: string,
+  location: string,
+  qty: number,
+  idempotencyKey?: string,
+): Promise<PlacementResult> {
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
     await db.$transaction((tx) =>
-      placeStock(tx, { itemId: partId, location, qty, actorId: actorId(session), tenantKey: TENANT_KEY }),
+      placeStock(tx, { itemId: partId, location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);
@@ -107,13 +137,14 @@ export async function transferBetweenBins(
   from: string,
   to: string,
   qty: number,
+  idempotencyKey?: string,
 ): Promise<PlacementResult> {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!from.trim() || !to.trim()) return { error: "Укажите обе ячейки" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
     await db.$transaction((tx) =>
-      transferStock(tx, { itemId: partId, from, to, qty, actorId: actorId(session), tenantKey: TENANT_KEY }),
+      transferStock(tx, { itemId: partId, from, to, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);
@@ -124,13 +155,18 @@ export async function transferBetweenBins(
 }
 
 /** Return stock from a location back to unplaced. */
-export async function removeFromBinAction(partId: string, location: string, qty: number): Promise<PlacementResult> {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+export async function removeFromBinAction(
+  partId: string,
+  location: string,
+  qty: number,
+  idempotencyKey?: string,
+): Promise<PlacementResult> {
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
     await db.$transaction((tx) =>
-      removeFromBin(tx, { itemId: partId, location, qty, actorId: actorId(session), tenantKey: TENANT_KEY }),
+      removeFromBin(tx, { itemId: partId, location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);

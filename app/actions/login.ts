@@ -115,5 +115,9 @@ export async function loginAction(_prevState: { error: string | null } | null, f
     redirect("/admin");
   }
 
+  if (user.permissionRole === "WAREHOUSE_WORKER") {
+    redirect("/admin/warehouse");
+  }
+
   redirect("/cabinet");
 }

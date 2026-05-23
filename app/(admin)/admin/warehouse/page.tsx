@@ -6,13 +6,15 @@ import { WarehouseOverview } from "@/components/admin/WarehouseOverview";
 import { WarehouseScanBox } from "@/components/admin/WarehouseScanBox";
 import { WarehouseMovementsFeed } from "@/components/admin/WarehouseMovementsFeed";
 import { WarehouseLocationLookup } from "@/components/admin/WarehouseLocationLookup";
+import { WarehouseLocationsAdmin } from "@/components/admin/WarehouseLocationsAdmin";
 
 interface Props {
   searchParams: Promise<{ q?: string; page?: string; loc?: string }>;
 }
 
 export default async function WarehousePage({ searchParams }: Props) {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  const canManageLocations = session.permissionRole === "ADMIN" || session.permissionRole === "MANAGER";
   const sp = await searchParams;
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
@@ -27,6 +29,9 @@ export default async function WarehousePage({ searchParams }: Props) {
 
       {/* Location lookup — Task 10 */}
       <WarehouseLocationLookup />
+
+      {/* Location block/unblock admin — Phase 2.5 (admin/manager only) */}
+      {canManageLocations && <WarehouseLocationsAdmin />}
 
       {/* Stock overview — Task 2 */}
       <WarehouseOverview q={q} page={page} loc={loc} />

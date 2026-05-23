@@ -23,13 +23,16 @@
     "verify-crm-task-unique": "tsx scripts/verify-crm-task-unique.ts",
     "verify-auto-task": "tsx scripts/verify-auto-task.ts",
     "verify-warehouse": "tsx scripts/verify-warehouse.ts",
-    "verify-landed-cost": "tsx scripts/verify-landed-cost.ts"
+    "verify-landed-cost": "tsx scripts/verify-landed-cost.ts",
+    "verify-qr-scanning": "tsx scripts/verify-qr-scanning.ts",
+    "backfill-stock-locations": "tsx scripts/backfill-stock-locations.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
     "@radix-ui/react-dialog": "^1.1.15",
     "@react-pdf/renderer": "^4.5.1",
     "@tanstack/react-query": "^5.97.0",
+    "@zxing/browser": "^0.2.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
     "jsonwebtoken": "^9.0.3",

@@ -18,6 +18,7 @@ enum UserPermissionRole {
   MASTER // Technician portal only (/master) — assigned RepairOrders queue
   MANAGER // Admin panel, day-to-day operations
   ADMIN // Full admin access including settings
+  WAREHOUSE_WORKER // Warehouse operations only (scan, putaway, move, adjust) — no other admin sections
 }
 
 enum VehicleOwnershipType {
@@ -950,6 +951,10 @@ model StockMovement {
   sourceId      String?
   actorUserId   String?
   note          String?
+  // Client-supplied idempotency key (phone retry safety). Nullable: NULLs are
+  // distinct in PG so only keyed writes dedupe. Independent of the source-triple
+  // below — recordMovement disambiguates which unique fired on P2002.
+  idempotencyKey String?
   tenantKey     String              @default("geleoteka")
   createdAt     DateTime            @default(now())
 
@@ -959,6 +964,7 @@ model StockMovement {
   // sourceId is nullable (manual ADJUSTMENT); NULLs are distinct in PG so the
   // recordMovement guard forbids null sourceId for all reasons except ADJUSTMENT.
   @@unique([tenantKey, sourceType, sourceId, reason])
+  @@unique([tenantKey, idempotencyKey])
   @@index([tenantKey, itemId, createdAt])
 }
 
@@ -998,12 +1004,61 @@ model StockBinMovement {
   quantity     Int
   actorUserId  String?
   note         String?
+  // Client-supplied idempotency key (phone retry safety). Nullable; NULLs are
+  // distinct in PG so only keyed placement writes dedupe.
+  idempotencyKey String?
   tenantKey    String                 @default("geleoteka")
   createdAt    DateTime               @default(now())
 
   item StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
+  @@unique([tenantKey, idempotencyKey])
   @@index([tenantKey, itemId, createdAt])
+}
+
+// Registry of physical warehouse locations (cells/bins addresses), WMS-owned and
+// tenant-scoped. Distinct from StockBin (which is per-item placement keyed by
+// location string): a StockLocation is the location itself, blocked/inactive for
+// ALL items. `code` is normalized upper/trimmed by callers. LOCATION_BLOCKED
+// (putaway/transfer-in rejection) checks isActive/isBlocked here.
+model StockLocation {
+  id        String   @id @default(cuid())
+  code      String
+  zone      String?
+  isActive  Boolean  @default(true)
+  isBlocked Boolean  @default(false)
+  tenantKey String   @default("geleoteka")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantKey, code])
+  @@index([tenantKey])
+}
+
+// Append-only audit of every scan, including failures. WMS-owned, tenant-scoped.
+// userId is opaque (host user id; no FK to User, mirrors StockMovement.actorUserId).
+enum ScanResult {
+  SUCCESS
+  REJECTED
+  ERROR
+}
+
+model ScanEvent {
+  id               String     @id @default(cuid())
+  userId           String?
+  deviceId         String?
+  sessionId        String?
+  action           String
+  rawCode          String
+  parsedObjectType String?
+  parsedObjectId   String?
+  result           ScanResult
+  errorCode        String?
+  tenantKey        String     @default("geleoteka")
+  createdAt        DateTime   @default(now())
+
+  @@index([tenantKey, createdAt])
+  @@index([tenantKey, userId, createdAt])
 }
 
 // Parts fulfillment / shipment for a Deal (channel PARTS_*). Renamed from

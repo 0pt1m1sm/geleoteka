@@ -6,6 +6,7 @@ import type {
   RemoveFromBinInput,
 } from "./types";
 import { WmsError } from "./errors";
+import { assertLocationUsable } from "./locations";
 import {
   ensureStockItem,
   sumBins,
@@ -14,6 +15,8 @@ import {
   incrementBin,
   decrementBinIfEnough,
   insertBinMovement,
+  findBinMovementByKey,
+  isUniqueViolation,
   type DbClientPort,
 } from "../internal/repository";
 
@@ -28,6 +31,66 @@ function assertPositive(qty: number): void {
   if (!Number.isInteger(qty) || qty <= 0) throw WmsError.invalidQty("PLACE");
 }
 
+/** A client able to open an interactive transaction (the base PrismaClient, not
+ *  a tx client). The base client's $transaction is overloaded; we only use the
+ *  interactive-callback form, so narrow to that single signature for the call. */
+type TxCapable = { $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>) => Promise<T> };
+function txCapable(client: DbClientPort): boolean {
+  return typeof (client as { $transaction?: unknown }).$transaction === "function";
+}
+
+interface BinAuditRow {
+  itemId: string;
+  reason: "PLACE" | "TRANSFER" | "REMOVE";
+  fromLocation: string | null;
+  toLocation: string | null;
+  quantity: number;
+  actorUserId: string | null;
+  note: string | null;
+  idempotencyKey: string | null;
+  tenantKey: string;
+}
+
+/**
+ * Insert the bin-movement audit (the idempotency claim when keyed). A P2002 on
+ * a keyed insert means the key was already used: identical payload → an
+ * already-applied DUPLICATE_OPERATION; different payload → IDEMPOTENCY_KEY_REUSED
+ * (reject, never mask a different op as a silent success).
+ */
+async function auditBinMovement(client: DbClientPort, row: BinAuditRow): Promise<void> {
+  if (!row.idempotencyKey) {
+    await insertBinMovement(client, row);
+    return;
+  }
+  // Pre-check the key BEFORE inserting — a P2002 aborts the surrounding tx, so
+  // the disambiguation SELECT cannot run in the catch.
+  const prior = await findBinMovementByKey(client, row.tenantKey, row.idempotencyKey);
+  if (prior) {
+    const samePayload =
+      prior.itemId === row.itemId &&
+      prior.reason === row.reason &&
+      prior.fromLocation === row.fromLocation &&
+      prior.toLocation === row.toLocation &&
+      prior.quantity === row.quantity;
+    throw samePayload ? WmsError.duplicateOperation() : WmsError.idempotencyKeyReused();
+  }
+  try {
+    await insertBinMovement(client, row);
+  } catch (e) {
+    // The pre-check above handles the realistic case (sequential retry with the
+    // same key). A P2002 here means a CONCURRENT insert with the same key won
+    // the race between our pre-check and our insert. We report DUPLICATE_OPERATION
+    // rather than disambiguating payload, because the P2002 has aborted this
+    // transaction so a follow-up SELECT cannot run on it. Accepted bound: a
+    // concurrent same-key/DIFFERENT-payload race reports DUPLICATE_OPERATION
+    // instead of IDEMPOTENCY_KEY_REUSED. This is unreachable from the UI (a fresh
+    // key is generated per operation) and never applies a wrong write — the loser
+    // is a rolled-back no-op, not a silent success.
+    if (isUniqueViolation(e)) throw WmsError.duplicateOperation();
+    throw e;
+  }
+}
+
 /**
  * Putaway: move `qty` of an item's UNPLACED on-hand into `location`. Rejects
  * when `qty` exceeds `unplaced = quantity − Σbins`. Never changes the aggregate.
@@ -37,14 +100,34 @@ export async function placeStock(client: DbClientPort, input: PlaceStockInput): 
   assertPositive(input.qty);
   const tenantKey = input.tenantKey ?? DEFAULT_TENANT;
   const location = normalizeLocation(input.location);
+  const key = input.idempotencyKey ?? null;
+  // Self-wrap: when keyed and handed the base client, run the claim + bin
+  // mutation in one transaction so a later throw rolls the claim back (the key
+  // is never burned without the stock delta). When already inside a caller's
+  // tx (no $transaction on the client), compose with it.
+  if (key && txCapable(client)) {
+    return (client as unknown as TxCapable).$transaction((tx) =>
+      placeStockImpl(tx, input, tenantKey, location, key),
+    );
+  }
+  return placeStockImpl(client, input, tenantKey, location, key);
+}
+
+async function placeStockImpl(
+  client: DbClientPort,
+  input: PlaceStockInput,
+  tenantKey: string,
+  location: string,
+  key: string | null,
+): Promise<void> {
+  await assertLocationUsable(client, location, tenantKey);
   const item = await ensureStockItem(client, input.itemId, tenantKey);
 
   const placed = await sumBins(client, item.id, tenantKey);
   const unplaced = item.quantity - placed;
   if (input.qty > unplaced) throw WmsError.insufficientUnplaced();
 
-  await incrementBin(client, item.id, location, input.qty, tenantKey);
-  await insertBinMovement(client, {
+  const row: BinAuditRow = {
     itemId: item.id,
     reason: "PLACE",
     fromLocation: null,
@@ -52,8 +135,17 @@ export async function placeStock(client: DbClientPort, input: PlaceStockInput): 
     quantity: input.qty,
     actorUserId: input.actorId ?? null,
     note: input.note ?? null,
+    idempotencyKey: key,
     tenantKey,
-  });
+  };
+  if (key) {
+    // Audit-first: claim the key before mutating the bin (atomic via self-wrap).
+    await auditBinMovement(client, row);
+    await incrementBin(client, item.id, location, input.qty, tenantKey);
+  } else {
+    await incrementBin(client, item.id, location, input.qty, tenantKey);
+    await insertBinMovement(client, row);
+  }
 }
 
 /**
@@ -66,12 +158,28 @@ export async function transferStock(client: DbClientPort, input: TransferStockIn
   const from = normalizeLocation(input.from);
   const to = normalizeLocation(input.to);
   if (from === to) throw WmsError.sameLocation();
+  const key = input.idempotencyKey ?? null;
+  if (key && txCapable(client)) {
+    return (client as unknown as TxCapable).$transaction((tx) =>
+      transferStockImpl(tx, input, tenantKey, from, to, key),
+    );
+  }
+  return transferStockImpl(client, input, tenantKey, from, to, key);
+}
+
+async function transferStockImpl(
+  client: DbClientPort,
+  input: TransferStockInput,
+  tenantKey: string,
+  from: string,
+  to: string,
+  key: string | null,
+): Promise<void> {
+  // Destination only — a blocked SOURCE must still be evacuable.
+  await assertLocationUsable(client, to, tenantKey);
   const item = await ensureStockItem(client, input.itemId, tenantKey);
 
-  const ok = await decrementBinIfEnough(client, item.id, from, input.qty, tenantKey);
-  if (!ok) throw WmsError.insufficientBin();
-  await incrementBin(client, item.id, to, input.qty, tenantKey);
-  await insertBinMovement(client, {
+  const row: BinAuditRow = {
     itemId: item.id,
     reason: "TRANSFER",
     fromLocation: from,
@@ -79,8 +187,20 @@ export async function transferStock(client: DbClientPort, input: TransferStockIn
     quantity: input.qty,
     actorUserId: input.actorId ?? null,
     note: input.note ?? null,
+    idempotencyKey: key,
     tenantKey,
-  });
+  };
+  if (key) {
+    await auditBinMovement(client, row); // claim first
+    const ok = await decrementBinIfEnough(client, item.id, from, input.qty, tenantKey);
+    if (!ok) throw WmsError.insufficientBin();
+    await incrementBin(client, item.id, to, input.qty, tenantKey);
+  } else {
+    const ok = await decrementBinIfEnough(client, item.id, from, input.qty, tenantKey);
+    if (!ok) throw WmsError.insufficientBin();
+    await incrementBin(client, item.id, to, input.qty, tenantKey);
+    await insertBinMovement(client, row);
+  }
 }
 
 /**
@@ -91,11 +211,25 @@ export async function removeFromBin(client: DbClientPort, input: RemoveFromBinIn
   assertPositive(input.qty);
   const tenantKey = input.tenantKey ?? DEFAULT_TENANT;
   const location = normalizeLocation(input.location);
+  const key = input.idempotencyKey ?? null;
+  if (key && txCapable(client)) {
+    return (client as unknown as TxCapable).$transaction((tx) =>
+      removeFromBinImpl(tx, input, tenantKey, location, key),
+    );
+  }
+  return removeFromBinImpl(client, input, tenantKey, location, key);
+}
+
+async function removeFromBinImpl(
+  client: DbClientPort,
+  input: RemoveFromBinInput,
+  tenantKey: string,
+  location: string,
+  key: string | null,
+): Promise<void> {
   const item = await ensureStockItem(client, input.itemId, tenantKey);
 
-  const ok = await decrementBinIfEnough(client, item.id, location, input.qty, tenantKey);
-  if (!ok) throw WmsError.insufficientBin();
-  await insertBinMovement(client, {
+  const row: BinAuditRow = {
     itemId: item.id,
     reason: "REMOVE",
     fromLocation: location,
@@ -103,8 +237,18 @@ export async function removeFromBin(client: DbClientPort, input: RemoveFromBinIn
     quantity: input.qty,
     actorUserId: input.actorId ?? null,
     note: input.note ?? null,
+    idempotencyKey: key,
     tenantKey,
-  });
+  };
+  if (key) {
+    await auditBinMovement(client, row); // claim first
+    const ok = await decrementBinIfEnough(client, item.id, location, input.qty, tenantKey);
+    if (!ok) throw WmsError.insufficientBin();
+  } else {
+    const ok = await decrementBinIfEnough(client, item.id, location, input.qty, tenantKey);
+    if (!ok) throw WmsError.insufficientBin();
+    await insertBinMovement(client, row);
+  }
 }
 
 /** Read an item's placement breakdown (bins + placed/unplaced + reconcile flag). */

@@ -1,6 +1,11 @@
 import { WmsError } from "@/lib/wms/public";
 
-/** Map a WmsError to a Russian message; returns null for non-WmsErrors. */
+/**
+ * Map a user-actionable WmsError to a Russian message. Returns null for
+ * non-WmsErrors AND for WmsError codes that indicate a programming error
+ * (e.g. NULL_SOURCE) — callers re-throw on null so those surface for
+ * observability instead of being masked as a generic "failed" message.
+ */
 export function wmsErrorMessage(e: unknown): string | null {
   if (!(e instanceof WmsError)) return null;
   switch (e.code) {
@@ -12,7 +17,14 @@ export function wmsErrorMessage(e: unknown): string | null {
       return "Ячейки отправления и назначения совпадают";
     case "INVALID_QTY":
       return "Количество должно быть положительным";
+    case "LOCATION_BLOCKED":
+      return "Ячейка заблокирована или неактивна";
+    case "DUPLICATE_OPERATION":
+      return "Операция уже была выполнена (повторный запрос)";
+    case "IDEMPOTENCY_KEY_REUSED":
+      return "Ключ операции уже использован для другого действия";
     default:
-      return "Не удалось выполнить операцию";
+      // Unmapped code (e.g. NULL_SOURCE) = programming error → re-throw upstream.
+      return null;
   }
 }

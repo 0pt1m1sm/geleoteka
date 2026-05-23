@@ -23,6 +23,7 @@ export async function applyAdjustment(
   newQuantity: number,
   actorUserId: string | undefined,
   note?: string,
+  idempotencyKey?: string,
 ): Promise<AdjustResult> {
   const si = (await client.stockItem.findUnique({
     where: { partId },
@@ -44,6 +45,7 @@ export async function applyAdjustment(
     source: { type: "WarehouseAdjust", id: null },
     actorId: actorUserId,
     note: note ?? "Warehouse adjust",
+    idempotencyKey,
     tenantKey: TENANT_KEY,
   });
 
