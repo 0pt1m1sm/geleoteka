@@ -23,6 +23,8 @@ interface EstimateFull {
   subtotalParts: number;
   subtotalRental: number;
   discount: number;
+  tax: number;
+  taxRate: number;
   total: number;
   estimateLines: Array<{
     id: string;
@@ -63,6 +65,8 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
       subtotalParts: true,
       subtotalRental: true,
       discount: true,
+      tax: true,
+      taxRate: true,
       total: true,
       estimateLines: {
         orderBy: { sortOrder: "asc" },

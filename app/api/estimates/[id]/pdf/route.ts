@@ -35,6 +35,7 @@ interface EstimateRow {
   subtotalRental: number;
   discount: number;
   tax: number;
+  taxRate: number;
   total: number;
   deal: {
     customerUserId: string;
@@ -82,6 +83,7 @@ export async function GET(req: Request, { params }: RouteParams) {
       subtotalRental: true,
       discount: true,
       tax: true,
+      taxRate: true,
       total: true,
       deal: {
         select: {
@@ -146,6 +148,7 @@ export async function GET(req: Request, { params }: RouteParams) {
     subtotalRental: estimate.subtotalRental,
     discount: estimate.discount,
     tax: estimate.tax,
+    taxRate: estimate.taxRate,
     total: estimate.total,
     customer: estimate.deal.customer,
     vehicle: estimate.deal.vehicle,

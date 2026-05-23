@@ -12,7 +12,7 @@
 
 import "dotenv/config";
 import { db } from "../lib/db";
-import { createDeal } from "../lib/crm/public";
+import { createDeal, recomputeEstimateTotals, computeEstimateMoney } from "../lib/crm/public";
 
 // reviseEstimate the action wraps in requireRole (needs request cookies),
 // which a tsx script can't provide. Inline its core write logic to exercise
@@ -28,6 +28,7 @@ async function reviseEstimateForVerify(estimateId: string): Promise<{ estimateId
       subtotalRental: true,
       discount: true,
       tax: true,
+      taxRate: true,
       total: true,
       notes: true,
       estimateLines: {
@@ -51,6 +52,7 @@ async function reviseEstimateForVerify(estimateId: string): Promise<{ estimateId
     subtotalRental: number;
     discount: number;
     tax: number;
+    taxRate: number;
     total: number;
     notes: string | null;
     estimateLines: Array<{
@@ -75,6 +77,7 @@ async function reviseEstimateForVerify(estimateId: string): Promise<{ estimateId
         subtotalRental: parent.subtotalRental,
         discount: parent.discount,
         tax: parent.tax,
+        taxRate: parent.taxRate,
         total: parent.total,
         estimateLines: {
           create: parent.estimateLines.map((l) => ({
@@ -147,15 +150,42 @@ async function main(): Promise<void> {
   assert(est.estimateLines.length === 2, `expected 2 EstimateLines, got ${est.estimateLines.length}`);
   console.log("  ✓ createDeal populated initial DRAFT estimate");
 
-  // 2. Deal totals reflect estimate (recomputed in createDeal).
+  // 2. Deal + estimate totals reflect the estimate (recomputed in createDeal).
+  //    New estimates default to taxRate 20%, so tax = round(8000 * 0.2) = 1600,
+  //    total = 8000 + 1600 = 9600. createDeal now routes through the estimate
+  //    recompute, so BOTH estimate and deal carry tax.
   const dealRow = (await db.deal.findUnique({
     where: { id: deal.id },
-    select: { total: true, subtotalLabor: true, subtotalParts: true },
-  })) as { total: number; subtotalLabor: number; subtotalParts: number };
-  assert(dealRow.total === 8000, `deal.total=${dealRow.total}, expected 8000 (2*1500 + 1*5000)`);
+    select: { total: true, subtotalLabor: true, subtotalParts: true, tax: true },
+  })) as { total: number; subtotalLabor: number; subtotalParts: number; tax: number };
   assert(dealRow.subtotalLabor === 3000, `subtotalLabor=${dealRow.subtotalLabor}, expected 3000`);
   assert(dealRow.subtotalParts === 5000, `subtotalParts=${dealRow.subtotalParts}, expected 5000`);
-  console.log("  ✓ Deal totals match active estimate after createDeal");
+  assert(dealRow.tax === 1600, `deal.tax=${dealRow.tax}, expected 1600 (8000 * 20%)`);
+  assert(dealRow.total === 9600, `deal.total=${dealRow.total}, expected 9600 (8000 + 1600 tax)`);
+  const estRow0 = (await db.estimate.findUnique({
+    where: { id: est.id },
+    select: { tax: true, total: true, taxRate: true },
+  })) as { tax: number; total: number; taxRate: number };
+  assert(estRow0.taxRate === 20 && estRow0.tax === 1600 && estRow0.total === 9600, `estimate carries 20% tax (rate=${estRow0.taxRate}, tax=${estRow0.tax}, total=${estRow0.total})`);
+  console.log("  ✓ createDeal: estimate & deal carry default 20% tax; totals consistent");
+
+  // 2b. Change the rate to 10% and recompute → tax 800, total 8800 on both.
+  await db.estimate.update({ where: { id: est.id }, data: { taxRate: 10 } });
+  await recomputeEstimateTotals(est.id);
+  const estRow1 = (await db.estimate.findUnique({ where: { id: est.id }, select: { tax: true, total: true } })) as { tax: number; total: number };
+  const dealRow1 = (await db.deal.findUnique({ where: { id: deal.id }, select: { tax: true, total: true } })) as { tax: number; total: number };
+  assert(estRow1.tax === 800 && estRow1.total === 8800, `rate 10% → estimate tax 800/total 8800, got ${estRow1.tax}/${estRow1.total}`);
+  assert(dealRow1.tax === 800 && dealRow1.total === 8800, `rate 10% cascades to deal (tax ${dealRow1.tax}/total ${dealRow1.total})`);
+  console.log("  ✓ setting taxRate recomputes tax on estimate AND deal (cascade)");
+
+  // 2c. computeEstimateMoney pure-helper edge cases.
+  const clamp = computeEstimateMoney([{ type: "LABOR", total: 1000 }, { type: "DISCOUNT", total: -2000 }], 20);
+  assert(clamp.tax === 0 && clamp.total === -1000, `discount ≥ subtotal clamps base to 0 (tax ${clamp.tax}/total ${clamp.total})`);
+  const zero = computeEstimateMoney([{ type: "PART", total: 5000 }], 0);
+  assert(zero.tax === 0 && zero.total === 5000, `rate 0 → no tax (tax ${zero.tax}/total ${zero.total})`);
+  const fee = computeEstimateMoney([{ type: "PART", total: 1000 }, { type: "FEE", total: 500 }], 10);
+  assert(fee.tax === 100 && fee.total === 1600, `FEE excluded from base, included in total (tax ${fee.tax}/total ${fee.total})`);
+  console.log("  ✓ computeEstimateMoney: clamp, zero-rate, FEE-excluded-from-base");
 
   // 3. Send the estimate then revise it — child clones parent lines.
   await db.estimate.update({ where: { id: est.id }, data: { stage: "SENT" } });
@@ -168,19 +198,21 @@ async function main(): Promise<void> {
       select: {
         stage: true,
         parentEstimateId: true,
+        taxRate: true,
         estimateLines: { select: { description: true } },
       },
     }),
   ])) as [
     { stage: string } | null,
-    | { stage: string; parentEstimateId: string | null; estimateLines: Array<{ description: string }> }
+    | { stage: string; parentEstimateId: string | null; taxRate: number; estimateLines: Array<{ description: string }> }
     | null,
   ];
   assert(parent?.stage === "SUPERSEDED", `parent stage=${parent?.stage}, expected SUPERSEDED`);
   assert(child?.stage === "DRAFT", `child stage=${child?.stage}, expected DRAFT`);
   assert(child?.parentEstimateId === est.id, "child.parentEstimateId mismatch");
   assert(child?.estimateLines.length === 2, "child should clone 2 lines from parent");
-  console.log("  ✓ reviseEstimate clones lines + supersedes parent");
+  assert(child?.taxRate === 10, `revision must keep parent taxRate 10, got ${child?.taxRate}`);
+  console.log("  ✓ reviseEstimate clones lines + taxRate + supersedes parent");
 
   // Cleanup.
   await db.deal.delete({ where: { id: deal.id } });

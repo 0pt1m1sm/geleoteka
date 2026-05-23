@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { nextEstimateNumber, dispatchFulfillment } from "@/lib/crm/public";
+import { nextEstimateNumber, dispatchFulfillment, recomputeEstimateTotals } from "@/lib/crm/public";
 import {
   releasePartLinesForEstimate,
   reservePartLinesForEstimate,
@@ -436,6 +436,31 @@ export async function declineEstimate(
  * Cloning source is the parent estimate's `estimateLines` (post-refactor
  * 2026-05-18) — DealLine no longer exists as a separate table.
  */
+/**
+ * Set the tax rate (percent of post-discount subtotal) on a DRAFT estimate and
+ * recompute its totals (cascades to the deal). Editable only while DRAFT —
+ * matches the line editor's mutability rule.
+ */
+export async function setEstimateTaxRate(
+  estimateId: string,
+  rate: number,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  if (!Number.isInteger(rate) || rate < 0 || rate > 100) {
+    return { error: "Ставка налога должна быть целым числом от 0 до 100%" };
+  }
+  const est = (await db.estimate.findUnique({
+    where: { id: estimateId },
+    select: { stage: true },
+  })) as { stage: string } | null;
+  if (!est) return { error: "Смета не найдена" };
+  if (est.stage !== "DRAFT") return { error: "Налог можно менять только в черновике" };
+
+  await db.estimate.update({ where: { id: estimateId }, data: { taxRate: rate } });
+  await recomputeEstimateTotals(estimateId);
+  return { error: null };
+}
+
 export async function reviseEstimate(estimateId: string): Promise<EstimateMutationResult> {
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
@@ -450,6 +475,7 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
       subtotalRental: true,
       discount: true,
       tax: true,
+      taxRate: true,
       total: true,
       notes: true,
       estimateLines: {
@@ -475,6 +501,7 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
         subtotalRental: number;
         discount: number;
         tax: number;
+        taxRate: number;
         total: number;
         notes: string | null;
         estimateLines: Array<{
@@ -514,6 +541,7 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
         subtotalRental: parent.subtotalRental,
         discount: parent.discount,
         tax: parent.tax,
+        taxRate: parent.taxRate,
         total: parent.total,
         number,
         estimateLines: {

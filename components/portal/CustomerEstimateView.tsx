@@ -36,6 +36,8 @@ interface EstimateView {
   subtotalParts: number;
   subtotalRental: number;
   discount: number;
+  tax: number;
+  taxRate: number;
   total: number;
   estimateLines: EstimateLine[];
   vehicle: { make: string; model: string; year: number } | null;
@@ -193,6 +195,12 @@ export function CustomerEstimateView({
             <div className="flex justify-between text-[var(--foreground-muted)]">
               <span>Скидки</span>
               <span className="tabular-nums">{formatPrice(estimate.discount)}</span>
+            </div>
+          ) : null}
+          {estimate.tax ? (
+            <div className="flex justify-between text-[var(--foreground-muted)]">
+              <span>Налог ({estimate.taxRate}%)</span>
+              <span className="tabular-nums">{formatPrice(estimate.tax)}</span>
             </div>
           ) : null}
           <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">

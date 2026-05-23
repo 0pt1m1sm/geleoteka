@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { Alert, Button, Input } from "@/components/ui";
@@ -9,6 +9,7 @@ import {
   deleteEstimateLine,
   updateEstimateLine,
 } from "@/app/actions/crm/estimate-lines";
+import { setEstimateTaxRate } from "@/app/actions/crm/estimates";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
 import { formatPrice } from "@/lib/utils";
 import { confirm } from "@/lib/ui/confirm";
@@ -29,6 +30,17 @@ interface Props {
   estimateId: string;
   initialLines: EstimateLineView[];
   editable: boolean;
+  taxRate: number;
+}
+
+/** Tax = round(max(0, labor + parts + rental + discount) × rate%). Mirrors the
+ *  server `computeEstimateMoney` so the live strip matches the persisted value. */
+function liveTax(
+  subtotals: { labor: number; parts: number; rental: number; discount: number },
+  rate: number,
+): number {
+  const base = Math.max(0, subtotals.labor + subtotals.parts + subtotals.rental + subtotals.discount);
+  return Math.round((base * (rate || 0)) / 100);
 }
 
 const LINE_TYPES = ["LABOR", "PART", "RENTAL_DAY", "DISCOUNT", "FEE"];
@@ -78,7 +90,65 @@ export function EstimateLineEditor({
   estimateId,
   initialLines,
   editable,
+  taxRate,
 }: Props): React.ReactElement {
+  const router = useRouter();
+  const [rate, setRate] = useState(taxRate);
+  const [ratePending, setRatePending] = useState(false);
+  // Refs avoid stale-closure reads: serverRateRef tracks the last committed
+  // server value (synced from the prop), pendingRateRef the latest desired value.
+  const serverRateRef = useRef(taxRate);
+  const pendingRateRef = useRef<number | null>(null);
+  const savingRef = useRef(false);
+  const rateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    serverRateRef.current = taxRate;
+  }, [taxRate]);
+
+  // Serialized tax-rate autosave: at most ONE save in flight; if the user
+  // changes the rate again mid-save, the loop saves the newest value next — so
+  // the last input always wins and the DB never receives out-of-order rate
+  // writes (a fire-and-forget debounce could commit an older rate after a newer
+  // one under slow-network/retry timing). router.refresh() runs once after the
+  // queue drains, in the success path only.
+  const flushRate = useCallback(async (): Promise<void> => {
+    if (savingRef.current) return;
+    savingRef.current = true;
+    setRatePending(true);
+    try {
+      while (pendingRateRef.current !== null && pendingRateRef.current !== serverRateRef.current) {
+        const target = pendingRateRef.current;
+        const res = await setEstimateTaxRate(estimateId, target);
+        if (res.error) {
+          toast.error(res.error);
+          pendingRateRef.current = null;
+          setRate(serverRateRef.current); // revert to committed value on rejection
+          break;
+        }
+        serverRateRef.current = target;
+        if (pendingRateRef.current === target) pendingRateRef.current = null;
+      }
+    } finally {
+      savingRef.current = false;
+      setRatePending(false);
+      router.refresh();
+    }
+  }, [estimateId, router]);
+
+  const onRateChange = useCallback(
+    (next: number): void => {
+      setRate(next);
+      if (!editable) return;
+      if (rateTimerRef.current) clearTimeout(rateTimerRef.current);
+      rateTimerRef.current = setTimeout(() => {
+        pendingRateRef.current = next;
+        void flushRate();
+      }, SAVE_DEBOUNCE_MS);
+    },
+    [editable, flushRate],
+  );
+
   const [rowStatuses, setRowStatuses] = useState<Map<string, SaveStatus>>(
     new Map(),
   );
@@ -164,24 +234,49 @@ export function EstimateLineEditor({
 
       {editable ? (
         <>
-          <LiveTotalsStrip subtotals={liveSubtotals} pending={rowStatuses.size > 0} />
+          <LiveTotalsStrip
+            subtotals={liveSubtotals}
+            taxRate={rate}
+            pending={rowStatuses.size > 0 || ratePending}
+            rateControl={
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-[var(--foreground-muted)]">Налог, %</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={rate}
+                  onChange={(e) => onRateChange(Math.max(0, Math.min(100, parseInt(e.target.value, 10) || 0)))}
+                  aria-label="Ставка налога, %"
+                  className="input w-20 text-sm tabular-nums"
+                />
+              </label>
+            }
+          />
           <div className="flex flex-wrap items-start gap-2">
             <AddLineButton estimateId={estimateId} />
             <EstimatePartPicker estimateId={estimateId} />
           </div>
         </>
-      ) : null}
+      ) : (
+        <LiveTotalsStrip subtotals={liveSubtotals} taxRate={taxRate} pending={false} />
+      )}
     </div>
   );
 }
 
 function LiveTotalsStrip({
   subtotals,
+  taxRate,
   pending,
+  rateControl,
 }: {
   subtotals: { labor: number; parts: number; rental: number; discount: number; total: number };
+  taxRate: number;
   pending: boolean;
+  rateControl?: React.ReactNode;
 }): React.ReactElement {
+  const taxAmount = liveTax(subtotals, taxRate);
   return (
     <div
       className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--background-secondary)] px-4 py-3 space-y-1 text-sm"
@@ -207,6 +302,17 @@ function LiveTotalsStrip({
           <span className="tabular-nums">{formatPrice(subtotals.discount)}</span>
         </div>
       ) : null}
+      {rateControl ? (
+        <div className="flex justify-between items-center pt-1">
+          {rateControl}
+          <span className="tabular-nums">{formatPrice(taxAmount)}</span>
+        </div>
+      ) : taxAmount ? (
+        <div className="flex justify-between text-[var(--foreground-muted)]">
+          <span>Налог ({taxRate}%)</span>
+          <span className="tabular-nums">{formatPrice(taxAmount)}</span>
+        </div>
+      ) : null}
       <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">
         <span className="font-medium flex items-center gap-2">
           Итого
@@ -217,7 +323,7 @@ function LiveTotalsStrip({
           ) : null}
         </span>
         <span className="text-lg font-bold text-[var(--color-accent)] tabular-nums">
-          {formatPrice(subtotals.total)}
+          {formatPrice(subtotals.total + taxAmount)}
         </span>
       </div>
     </div>

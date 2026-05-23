@@ -33,6 +33,7 @@ interface EstimateDetail {
   subtotalRental: number;
   discount: number;
   tax: number;
+  taxRate: number;
   total: number;
   deal: {
     id: string;
@@ -83,6 +84,7 @@ export default async function EstimateDetailPage({ params }: Props) {
       subtotalRental: true,
       discount: true,
       tax: true,
+      taxRate: true,
       total: true,
       deal: {
         select: {
@@ -189,6 +191,7 @@ export default async function EstimateDetailPage({ params }: Props) {
                 estimateId={estimate.id}
                 initialLines={estimate.estimateLines.map((l, i) => ({ ...l, sortOrder: i }))}
                 editable
+                taxRate={estimate.taxRate}
               />
             ) : estimate.estimateLines.length === 0 ? (
               <p className="text-sm text-[var(--foreground-muted)]">
@@ -247,6 +250,12 @@ export default async function EstimateDetailPage({ params }: Props) {
                   <div className="flex justify-between text-[var(--foreground-muted)]">
                     <span>Скидки</span>
                     <span className="tabular-nums">{formatPrice(estimate.discount)}</span>
+                  </div>
+                ) : null}
+                {estimate.tax ? (
+                  <div className="flex justify-between text-[var(--foreground-muted)]">
+                    <span>Налог ({estimate.taxRate}%)</span>
+                    <span className="tabular-nums">{formatPrice(estimate.tax)}</span>
                   </div>
                 ) : null}
                 <div className="flex justify-between items-baseline pt-2 border-t border-[var(--border)]">

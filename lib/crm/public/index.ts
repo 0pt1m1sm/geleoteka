@@ -21,6 +21,8 @@ export {
 } from "../internal/next-number";
 export { recomputeEstimateTotals } from "../internal/recompute-estimate-totals";
 export { recomputeDealTotals } from "../internal/recompute-deal-totals";
+export { computeEstimateMoney } from "../internal/compute-estimate-money";
+export type { EstimateMoney } from "../internal/compute-estimate-money";
 export { signedLineTotal } from "../internal/signed-line-total";
 export { dispatchFulfillment } from "../internal/dispatch-fulfillment";
 export type {

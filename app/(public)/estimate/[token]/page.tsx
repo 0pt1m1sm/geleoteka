@@ -28,6 +28,8 @@ interface DealMin {
     subtotalParts: number;
     subtotalRental: number;
     discount: number;
+    tax: number;
+    taxRate: number;
     total: number;
     createdAt: Date;
     estimateLines: Array<{
@@ -81,6 +83,8 @@ export default async function GuestEstimatePage({ params, searchParams }: Props)
           subtotalParts: true,
           subtotalRental: true,
           discount: true,
+          tax: true,
+          taxRate: true,
           total: true,
           createdAt: true,
           estimateLines: {

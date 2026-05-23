@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { recomputeDealTotals } from "@/lib/crm/internal/recompute-deal-totals";
+import { recomputeEstimateTotals } from "@/lib/crm/internal/recompute-estimate-totals";
 import { nextDealNumber, nextEstimateNumber } from "@/lib/crm/internal/next-number";
 import type { CreateDealInput, DealSummary } from "./types";
 
@@ -17,7 +17,7 @@ import type { CreateDealInput, DealSummary } from "./types";
  * `dealId` to the returned deal id.
  */
 export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
-  const dealId = await db.$transaction(async (tx) => {
+  const { dealId, estimateId } = await db.$transaction(async (tx) => {
     const [dealNumber, estimateNumber] = await Promise.all([
       nextDealNumber(tx),
       nextEstimateNumber(tx),
@@ -65,12 +65,14 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
       });
     }
 
-    return deal.id;
+    return { dealId: deal.id, estimateId: estimate.id };
   });
 
-  // Recompute outside the transaction — single follow-up roundtrip is
-  // simpler than threading the tx into recomputeDealTotals.
-  await recomputeDealTotals(dealId);
+  // Recompute outside the transaction — single follow-up roundtrip is simpler
+  // than threading the tx in. Going through the ESTIMATE recompute writes the
+  // estimate's denormalized totals + tax AND cascades to the deal, so both
+  // rows are consistent (the deal-only path would leave estimate.tax/total 0).
+  await recomputeEstimateTotals(estimateId);
 
   const full = (await db.deal.findUnique({
     where: { id: dealId },

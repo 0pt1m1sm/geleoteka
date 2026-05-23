@@ -46,6 +46,7 @@ export interface EstimatePdfData {
   subtotalRental: number;
   discount: number;
   tax: number;
+  taxRate: number;
   total: number;
   customer: { name: string; phone: string; email: string };
   vehicle: {
@@ -775,8 +776,10 @@ export function EstimatePdfDocument({
             </View>
           ) : null}
           <View style={styles.totalsRow}>
-            <Text>НДС</Text>
-            <Text style={styles.totalsValue}>не облагается</Text>
+            <Text>{estimate.tax ? `Налог (${estimate.taxRate}%)` : "НДС"}</Text>
+            <Text style={styles.totalsValue}>
+              {estimate.tax ? formatPricePdf(estimate.tax) : "не облагается"}
+            </Text>
           </View>
           <View style={styles.grandRow}>
             <Text style={styles.grandLabel}>Итого к оплате</Text>

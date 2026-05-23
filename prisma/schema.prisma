@@ -1355,6 +1355,7 @@ model Estimate {
   subtotalRental Int @default(0)
   discount       Int @default(0)
   tax            Int @default(0)
+  taxRate        Int @default(20) // percent of (subtotal − discount); new estimates default 20%, pre-existing backfilled to 0
   total          Int @default(0)
 
   createdAt DateTime @default(now())
