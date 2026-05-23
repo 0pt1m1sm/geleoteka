@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavPending } from "@/components/shared/NavigationProgressProvider";
 
 /**
@@ -22,15 +22,44 @@ import { useNavPending } from "@/components/shared/NavigationProgressProvider";
  *     different (pathname, searchParams) tuple is a reliable completion signal.
  *   - A safety timeout clears the anchor fallback after 8s in case a
  *     navigation is cancelled / errors out silently.
+ *   - A minimum on-screen time (MIN_VISIBLE_MS) keeps the bar shown long
+ *     enough to complete a visible sweep even when the navigation resolves
+ *     almost instantly (prefetched / cached routes). Without it a fast nav
+ *     mounts and unmounts the bar within a frame or two, so the slide never
+ *     becomes visible — the bar "appears but doesn't run".
  *
  * Renders a 2px accent-colored bar with an indeterminate slide animation.
  */
+const MIN_VISIBLE_MS = 600;
+
 export function NavigationProgress(): React.ReactElement | null {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const navPending = useNavPending();
   const [anchorVisible, setAnchorVisible] = useState(false);
-  const visible = navPending || anchorVisible;
+  const active = navPending || anchorVisible;
+
+  // Hold the bar on screen for at least MIN_VISIBLE_MS once a navigation
+  // starts, so even an instant route change shows a perceptible sweep.
+  const [shown, setShown] = useState(false);
+  const shownSinceRef = useRef(0);
+  useEffect(() => {
+    if (active) {
+      if (shownSinceRef.current === 0) shownSinceRef.current = Date.now();
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setShown(true);
+      return;
+    }
+    if (shownSinceRef.current === 0) return;
+    const remaining = Math.max(0, MIN_VISIBLE_MS - (Date.now() - shownSinceRef.current));
+    const t = window.setTimeout(() => {
+      shownSinceRef.current = 0;
+      setShown(false);
+    }, remaining);
+    return () => window.clearTimeout(t);
+  }, [active]);
+
+  const visible = shown;
 
   // Clear the anchor-click fallback on every navigation completion (pathname
   // or query change). App Router has no router.events, so the only signal we
