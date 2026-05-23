@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { recomputeEstimateTotals } from "@/lib/crm/internal/recompute-estimate-totals";
+import { signedLineTotal } from "@/lib/crm/internal/signed-line-total";
 import { nextDealNumber, nextEstimateNumber } from "@/lib/crm/internal/next-number";
 import type { CreateDealInput, DealSummary } from "./types";
 
@@ -52,16 +53,19 @@ export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
 
     if (input.lines && input.lines.length > 0) {
       await tx.estimateLine.createMany({
-        data: input.lines.map((line, i) => ({
-          estimateId: estimate.id,
-          sortOrder: line.sortOrder ?? i,
-          type: line.type,
-          description: line.description,
-          qty: line.qty,
-          unitPrice: line.unitPrice,
-          total: Math.round(line.qty * line.unitPrice),
-          partId: line.partId ?? null,
-        })),
+        data: input.lines.map((line, i) => {
+          const { unitPrice, total } = signedLineTotal(line.type, line.qty, line.unitPrice);
+          return {
+            estimateId: estimate.id,
+            sortOrder: line.sortOrder ?? i,
+            type: line.type,
+            description: line.description,
+            qty: line.qty,
+            unitPrice,
+            total,
+            partId: line.partId ?? null,
+          };
+        }),
       });
     }
 

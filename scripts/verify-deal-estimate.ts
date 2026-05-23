@@ -187,6 +187,45 @@ async function main(): Promise<void> {
   assert(fee.tax === 100 && fee.total === 1600, `FEE excluded from base, included in total (tax ${fee.tax}/total ${fee.total})`);
   console.log("  ✓ computeEstimateMoney: clamp, zero-rate, FEE-excluded-from-base");
 
+  // 2d. createDeal must sign DISCOUNT lines negative (regression: it stored
+  //     raw qty*unitPrice, so the discount INCREASED the total instead of
+  //     reducing it). PART 5000 + DISCOUNT 1000 @ 20% →
+  //     base = 5000 - 1000 = 4000, tax = 800, total = 4800.
+  const discountDeal = await createDeal({
+    customerUserId: customer.id,
+    channel: "SERVICE",
+    source: "verify-deal-estimate-discount",
+    initialStage: "NEW",
+    lines: [
+      { type: "PART", description: "verify-test part", qty: 1, unitPrice: 5000 },
+      { type: "DISCOUNT", description: "verify-test discount", qty: 1, unitPrice: 1000 },
+    ],
+  });
+  const discRows = (await db.estimate.findMany({
+    where: { dealId: discountDeal.id },
+    select: {
+      discount: true,
+      total: true,
+      tax: true,
+      estimateLines: { where: { type: "DISCOUNT" }, select: { unitPrice: true, total: true } },
+    },
+  })) as Array<{
+    discount: number;
+    total: number;
+    tax: number;
+    estimateLines: Array<{ unitPrice: number; total: number }>;
+  }>;
+  const discEst = discRows[0];
+  assert(discEst.estimateLines[0].unitPrice === -1000, `DISCOUNT line unitPrice should be -1000, got ${discEst.estimateLines[0].unitPrice}`);
+  assert(discEst.estimateLines[0].total === -1000, `DISCOUNT line total should be -1000, got ${discEst.estimateLines[0].total}`);
+  assert(discEst.discount === -1000, `estimate.discount should be -1000, got ${discEst.discount}`);
+  assert(discEst.tax === 800, `tax on post-discount base 4000 @ 20% should be 800, got ${discEst.tax}`);
+  assert(discEst.total === 4800, `total should be 4800 (5000 - 1000 + 800 tax), got ${discEst.total}`);
+  const discDealRow = (await db.deal.findUnique({ where: { id: discountDeal.id }, select: { total: true } })) as { total: number };
+  assert(discDealRow.total === 4800, `deal.total should be 4800, got ${discDealRow.total}`);
+  await db.deal.delete({ where: { id: discountDeal.id } });
+  console.log("  ✓ createDeal signs DISCOUNT lines negative (discount reduces total)");
+
   // 3. Send the estimate then revise it — child clones parent lines.
   await db.estimate.update({ where: { id: est.id }, data: { stage: "SENT" } });
   const revised = await reviseEstimateForVerify(est.id);
