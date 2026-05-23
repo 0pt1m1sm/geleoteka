@@ -80,6 +80,23 @@ export function OrderLineItems({
                     <option key={p.id} value={p.id}>{p.name} — {p.article}</option>
                   ))}
                 </select>
+              ) : item.type === "NEW_PART" ? (
+                <div className="flex-1 flex gap-2">
+                  <input
+                    value={item.article ?? ""}
+                    onChange={(e) => updateItem(i, { article: e.target.value })}
+                    className="input w-40 text-sm font-mono"
+                    aria-label="Артикул нового товара"
+                    placeholder="Артикул"
+                  />
+                  <input
+                    value={item.description}
+                    onChange={(e) => updateItem(i, { description: e.target.value })}
+                    className="input flex-1 text-sm"
+                    aria-label="Название нового товара"
+                    placeholder="Название нового товара"
+                  />
+                </div>
               ) : (
                 <input
                   value={item.description}

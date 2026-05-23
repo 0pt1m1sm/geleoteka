@@ -61,6 +61,12 @@ export function SupplierOrderForm({
       return;
     }
 
+    if (items.some((i) => i.type === "NEW_PART" && !i.article?.trim())) {
+      setError("Укажите артикул для нового товара");
+      setSubmitting(false);
+      return;
+    }
+
     const result = await createSupplierOrder({
       supplierId,
       orderNumber: orderNumber || undefined,
@@ -69,6 +75,7 @@ export function SupplierOrderForm({
         type: i.type,
         partId: i.type === "PART" ? i.partId : null,
         description: i.description,
+        article: i.type === "NEW_PART" ? i.article?.trim() : undefined,
         quantity: i.quantity,
         unitCost: i.unitCost,
       })),

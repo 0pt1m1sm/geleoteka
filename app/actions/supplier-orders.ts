@@ -2,15 +2,24 @@
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { slugify } from "@/lib/slug";
 import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
 import { applyReceive, isReceivingStatus, type ReceiveResult } from "@/lib/warehouse/receive";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 
+/** A validation failure with a user-facing message, thrown inside the order tx. */
+class OrderValidationError extends Error {}
+
+type DbItemType = "PART" | "CUSTOM" | "FEE" | "SERVICE";
+
 interface OrderItemInput {
-  type: "PART" | "CUSTOM" | "FEE" | "SERVICE";
+  // NEW_PART is UI-only: the action creates a draft Part and stores the line as PART.
+  type: DbItemType | "NEW_PART";
   partId?: string | null;
   description: string;
+  /** For NEW_PART: the new product's catalog article. */
+  article?: string;
   quantity: number;
   unitCost: number;
 }
@@ -41,40 +50,81 @@ export async function createSupplierOrder(input: CreateOrderInput): Promise<Orde
     return { success: false, error: "Поставщик, дата и позиции обязательны" };
   }
 
+  // Validate NEW_PART lines up front (clear messages before touching the DB).
+  for (const i of input.items) {
+    if (i.type === "NEW_PART" && (!i.article?.trim() || !i.description?.trim())) {
+      return { success: false, error: "Новый товар: укажите артикул и название" };
+    }
+  }
+
   try {
     const itemsCost = input.items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
     const totalCost = itemsCost + (input.shippingCost || 0) + (input.customsCost || 0);
     const estimatedProfit = (input.sellingPrice || 0) - totalCost;
 
-    const order = await db.supplierOrder.create({
-      data: {
-        userId: input.supplierId,
-        orderNumber: input.orderNumber || null,
-        orderDate: new Date(input.orderDate),
-        itemsCost,
-        shippingCost: input.shippingCost || 0,
-        customsCost: input.customsCost || 0,
-        totalCost,
-        sellingPrice: input.sellingPrice || 0,
-        estimatedProfit,
-        trackingNumber: input.trackingNumber || null,
-        estimatedArrival: input.estimatedArrival ? new Date(input.estimatedArrival) : null,
-        notes: input.notes || null,
-        items: {
-          create: input.items.map((i) => ({
-            type: i.type,
-            partId: i.partId || null,
-            description: i.description,
-            quantity: i.quantity,
-            unitCost: i.unitCost,
-            totalCost: i.unitCost * i.quantity,
-          })),
+    const orderId = await db.$transaction(async (tx) => {
+      // Resolve each line; a NEW_PART line creates a DRAFT catalog Part (hidden in
+      // the shop: isActive=false, price=0) + its StockItem, then stores as a PART
+      // line linked to the new partId so it can be received like any other part.
+      const lines = [];
+      for (const i of input.items) {
+        let type: DbItemType = i.type === "NEW_PART" ? "PART" : i.type;
+        let partId = i.partId || null;
+        let description = i.description;
+
+        if (i.type === "NEW_PART") {
+          const article = i.article!.trim();
+          const name = i.description.trim();
+          const existing = (await tx.part.findUnique({ where: { article }, select: { id: true } })) as { id: string } | null;
+          if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
+          const slug = slugify(`${article}-${name}`).slice(0, 80);
+          const part = (await tx.part.create({
+            data: { slug, article, name, price: 0, isActive: false },
+            select: { id: true },
+          })) as { id: string };
+          await tx.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY } });
+          type = "PART";
+          partId = part.id;
+          description = name;
+        }
+
+        lines.push({
+          type,
+          partId,
+          description,
+          quantity: i.quantity,
+          unitCost: i.unitCost,
+          totalCost: i.unitCost * i.quantity,
+        });
+      }
+
+      const order = (await tx.supplierOrder.create({
+        data: {
+          userId: input.supplierId,
+          orderNumber: input.orderNumber || null,
+          orderDate: new Date(input.orderDate),
+          itemsCost,
+          shippingCost: input.shippingCost || 0,
+          customsCost: input.customsCost || 0,
+          totalCost,
+          sellingPrice: input.sellingPrice || 0,
+          estimatedProfit,
+          trackingNumber: input.trackingNumber || null,
+          estimatedArrival: input.estimatedArrival ? new Date(input.estimatedArrival) : null,
+          notes: input.notes || null,
+          items: { create: lines },
         },
-      },
+        select: { id: true },
+      })) as { id: string };
+      return order.id;
     });
 
-    return { success: true, orderId: order.id };
+    return { success: true, orderId };
   } catch (err) {
+    if (err instanceof OrderValidationError) return { success: false, error: err.message };
+    if (err && typeof err === "object" && (err as { code?: string }).code === "P2002") {
+      return { success: false, error: "Товар с таким артикулом или slug уже существует" };
+    }
     console.error("Supplier order error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };
   }
