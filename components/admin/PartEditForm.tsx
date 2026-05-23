@@ -15,6 +15,7 @@ interface PartData {
   description: string;
   price: number;
   compareAtPrice: number;
+  weightGrams: number | null;
   quantity: number;
   barcode: string;
   gtin: string;
@@ -65,7 +66,7 @@ export function PartEditForm({ part, categories, models }: Props) {
         <textarea id="description" name="description" defaultValue={part.description} className="input min-h-[80px] resize-y" />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>
           <label htmlFor="price" className="block text-sm font-medium mb-2">Цена (₽) *</label>
           <input id="price" name="price" type="number" required defaultValue={part.price} className="input" />
@@ -77,6 +78,10 @@ export function PartEditForm({ part, categories, models }: Props) {
         <div>
           <label htmlFor="quantity" className="block text-sm font-medium mb-2">Кол-во</label>
           <input id="quantity" name="quantity" type="number" defaultValue={part.quantity} className="input" />
+        </div>
+        <div>
+          <label htmlFor="weightKg" className="block text-sm font-medium mb-2">Вес (кг)</label>
+          <input id="weightKg" name="weightKg" type="number" min={0} step="0.001" defaultValue={part.weightGrams ? part.weightGrams / 1000 : ""} className="input" placeholder="2.5" />
         </div>
       </div>
 

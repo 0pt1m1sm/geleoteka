@@ -8,6 +8,7 @@ export interface PartOption {
   name: string;
   article: string;
   price: number;
+  weightGrams: number | null;
 }
 
 export interface ItemRow {

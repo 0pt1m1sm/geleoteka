@@ -69,6 +69,11 @@ enum SupplierOrderItemType {
   SERVICE
 }
 
+enum CustomsMode {
+  PERCENT_CIF // customs = % of CIF (itemsCost + shipping)
+  CARGO_PER_KG // customs = weight × cargo $/kg × USD rate
+}
+
 enum LoyaltyTransactionType {
   EARN
   REDEEM
@@ -877,6 +882,7 @@ model Part {
   description    String?
   price          Int
   compareAtPrice Int?
+  weightGrams    Int? // unit weight in grams; drives supplier-order shipping calc
   isOEM          Boolean  @default(true)
   photos         String[]
   categoryId     String?
@@ -1130,6 +1136,16 @@ model SupplierOrder {
   totalCost        Int                 @default(0)
   sellingPrice     Int                 @default(0)
   estimatedProfit  Int                 @default(0)
+
+  // Landed-cost inputs (nullable — old orders have none). Money results stay in
+  // the Int-ruble columns above; fractional inputs are scaled ints.
+  shippingWeightGrams      Int? // effective weight used (server-computed: override ?? auto-from-catalog)
+  manualWeightOverrideGrams Int? // manager override; null = auto from Part.weightGrams
+  shippingRateUsdCents     Int? // shipping $/kg ×100
+  usdRateKopecks           Int? // USD→RUB rate ×100
+  customsMode              CustomsMode @default(PERCENT_CIF)
+  customsPercentBps        Int? // customs % in basis points (2600 = 26%)
+  cargoRateUsdCents        Int? // cargo $/kg ×100 (CARGO_PER_KG mode)
   trackingNumber   String?
   estimatedArrival DateTime?
   receivedAt       DateTime?

@@ -8,6 +8,7 @@ import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { recordMovement } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
 import { assignCodes, DuplicateCodeError } from "@/lib/warehouse/codes";
+import { MAX_WEIGHT_GRAMS } from "@/lib/suppliers/landed-cost";
 
 /**
  * Parses the hidden form field posted by `<PartTrimPicker name="trimIds" />`.
@@ -39,6 +40,13 @@ async function parseTrimIds(raw: unknown): Promise<{ ids: string[]; error: strin
   return { ids, error: null };
 }
 
+/** Parse the «Вес (кг)» field to grams (Int), capped at MAX_WEIGHT_GRAMS, or null when blank/invalid. */
+function parseWeightGrams(raw: unknown): number | null {
+  const kg = parseFloat(raw as string);
+  if (!Number.isFinite(kg) || kg <= 0) return null;
+  return Math.min(Math.round(kg * 1000), MAX_WEIGHT_GRAMS);
+}
+
 export async function createPart(
   _prevState: { error: string | null } | null,
   formData: FormData,
@@ -53,6 +61,7 @@ export async function createPart(
   const categoryId = (formData.get("categoryId") as string) || null;
   const description = (formData.get("description") as string)?.trim() || null;
   const compareAtPrice = parseInt(formData.get("compareAtPrice") as string) || null;
+  const weightGrams = parseWeightGrams(formData.get("weightKg"));
   const { ids: trimIds, error: trimErr } = await parseTrimIds(formData.get("trimIds"));
   if (trimErr) return { error: trimErr };
   const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
@@ -80,6 +89,7 @@ export async function createPart(
         description,
         price,
         compareAtPrice,
+        weightGrams,
         isOEM,
         categoryId: categoryId || null,
         photos: photoUrls,
@@ -114,6 +124,7 @@ export async function updatePart(
   const categoryId = (formData.get("categoryId") as string) || null;
   const description = (formData.get("description") as string)?.trim() || null;
   const compareAtPrice = parseInt(formData.get("compareAtPrice") as string) || null;
+  const weightGrams = parseWeightGrams(formData.get("weightKg"));
   const isActive = formData.get("isActive") !== "off";
   const barcode = (formData.get("barcode") as string)?.trim() || null;
   const gtin = (formData.get("gtin") as string)?.trim() || null;
@@ -143,6 +154,7 @@ export async function updatePart(
         description,
         price,
         compareAtPrice,
+        weightGrams,
         isOEM,
         categoryId: categoryId || null,
         isActive,

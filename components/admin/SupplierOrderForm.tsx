@@ -7,7 +7,13 @@ import { createSupplierOrder } from "@/app/actions/supplier-orders";
 import { Alert, Button, Card, Textarea } from "@/components/ui";
 import { SupplierPicker } from "./supplier-order-form/SupplierPicker";
 import { OrderLineItems } from "./supplier-order-form/OrderLineItems";
-import { OrderTotals } from "./supplier-order-form/OrderTotals";
+import { OrderTotals, type LandedCostState } from "./supplier-order-form/OrderTotals";
+import {
+  orderWeightGrams,
+  computeShippingRub,
+  computeCustomsRub,
+  DEFAULT_CUSTOMS_PERCENT_BPS,
+} from "@/lib/suppliers/landed-cost";
 import type {
   ItemRow,
   PartOption,
@@ -33,13 +39,39 @@ export function SupplierOrderForm({
   const [items, setItems] = useState<ItemRow[]>([
     { type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 },
   ]);
-  const [shippingCost, setShippingCost] = useState(0);
-  const [customsCost, setCustomsCost] = useState(0);
+  const [landedCost, setLandedCost] = useState<LandedCostState>({
+    shippingRateUsdCents: 0,
+    usdRateKopecks: 0,
+    customsMode: "PERCENT_CIF",
+    customsPercentBps: DEFAULT_CUSTOMS_PERCENT_BPS,
+    cargoRateUsdCents: 0,
+    manualWeightOverrideGrams: null,
+  });
   const [trackingNumber, setTrackingNumber] = useState("");
   const [estimatedArrival, setEstimatedArrival] = useState("");
   const [notes, setNotes] = useState("");
 
   const itemsCost = items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
+
+  // Auto weight from catalog: a PART line carries its part's weight; other line
+  // types (CUSTOM/FEE/SERVICE, and not-yet-created NEW_PART) contribute 0.
+  const partWeightById = new Map(parts.map((p) => [p.id, p.weightGrams]));
+  const autoWeightGrams = orderWeightGrams(
+    items.map((i) => ({
+      weightGrams: i.type === "PART" && i.partId ? (partWeightById.get(i.partId) ?? null) : null,
+      quantity: i.quantity,
+    })),
+  );
+  const effectiveWeightGrams = landedCost.manualWeightOverrideGrams ?? autoWeightGrams;
+  const shippingCost = computeShippingRub({
+    weightGrams: effectiveWeightGrams,
+    shippingRateUsdCents: landedCost.shippingRateUsdCents,
+    usdRateKopecks: landedCost.usdRateKopecks,
+  });
+  const customsCost =
+    landedCost.customsMode === "PERCENT_CIF"
+      ? computeCustomsRub({ mode: "PERCENT_CIF", itemsCostRub: itemsCost, shippingRub: shippingCost, customsPercentBps: landedCost.customsPercentBps })
+      : computeCustomsRub({ mode: "CARGO_PER_KG", weightGrams: effectiveWeightGrams, cargoRateUsdCents: landedCost.cargoRateUsdCents, usdRateKopecks: landedCost.usdRateKopecks });
   const totalCost = itemsCost + shippingCost + customsCost;
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
@@ -77,8 +109,12 @@ export function SupplierOrderForm({
         quantity: i.quantity,
         unitCost: i.unitCost,
       })),
-      shippingCost,
-      customsCost,
+      manualWeightOverrideGrams: landedCost.manualWeightOverrideGrams,
+      shippingRateUsdCents: landedCost.shippingRateUsdCents,
+      usdRateKopecks: landedCost.usdRateKopecks,
+      customsMode: landedCost.customsMode,
+      customsPercentBps: landedCost.customsPercentBps,
+      cargoRateUsdCents: landedCost.cargoRateUsdCents,
       trackingNumber: trackingNumber || undefined,
       estimatedArrival: estimatedArrival || undefined,
       notes: notes || undefined,
@@ -113,12 +149,9 @@ export function SupplierOrderForm({
       <OrderLineItems items={items} setItems={setItems} parts={parts} />
 
       <OrderTotals
-        shippingCost={shippingCost}
-        setShippingCost={setShippingCost}
-        customsCost={customsCost}
-        setCustomsCost={setCustomsCost}
-        itemsCost={itemsCost}
-        totalCost={totalCost}
+        state={landedCost}
+        onChange={(patch) => setLandedCost((prev) => ({ ...prev, ...patch }))}
+        preview={{ itemsCost, autoWeightGrams, effectiveWeightGrams, shippingCost, customsCost, totalCost }}
       />
 
       <Card>

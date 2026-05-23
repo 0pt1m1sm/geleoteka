@@ -38,6 +38,7 @@ export default async function EditPartPage({ params }: Props) {
     description: (p.description as string) ?? "",
     price: p.price as number,
     compareAtPrice: (p.compareAtPrice as number) ?? 0,
+    weightGrams: (p.weightGrams as number | null) ?? null,
     quantity: (p.stockItem as { quantity: number } | null)?.quantity ?? 0,
     barcode: (p.stockItem as { barcode: string | null } | null)?.barcode ?? "",
     gtin: (p.stockItem as { gtin: string | null } | null)?.gtin ?? "",

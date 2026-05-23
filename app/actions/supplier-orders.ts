@@ -7,6 +7,10 @@ import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
 import { applyReceive, isReceivingStatus, type ReceiveResult } from "@/lib/warehouse/receive";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
+import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
+import { resolveLandedCost } from "@/lib/suppliers/resolve-landed-cost";
+
+const CUSTOMS_MODES: readonly CustomsMode[] = ["PERCENT_CIF", "CARGO_PER_KG"];
 
 /** A validation failure with a user-facing message, thrown inside the order tx. */
 class OrderValidationError extends Error {}
@@ -29,8 +33,15 @@ interface CreateOrderInput {
   orderNumber?: string;
   orderDate: string;
   items: OrderItemInput[];
-  shippingCost: number;
-  customsCost: number;
+  // Landed-cost inputs (structured). The client sends NO ₽ totals and NO auto
+  // weight — shipping/customs/total are recomputed server-side, with the auto
+  // weight derived from DB Part.weightGrams (see resolveLandedCost).
+  manualWeightOverrideGrams?: number | null;
+  shippingRateUsdCents?: number | null;
+  usdRateKopecks?: number | null;
+  customsMode?: CustomsMode;
+  customsPercentBps?: number | null;
+  cargoRateUsdCents?: number | null;
   /** Deprecated — expected-revenue tracking was removed from the form; kept optional, defaults 0. */
   sellingPrice?: number;
   trackingNumber?: string;
@@ -58,10 +69,30 @@ export async function createSupplierOrder(input: CreateOrderInput): Promise<Orde
     }
   }
 
+  // Server-authoritative line validation — a direct action call (bypassing the
+  // form) must not persist a negative quantity / out-of-range amount.
+  const lineError = validateOrderLines(input.items);
+  if (lineError) return { success: false, error: lineError };
+
+  // Landed-cost input validation — reject negatives / out-of-range before any write.
+  const customsMode: CustomsMode = input.customsMode ?? "PERCENT_CIF";
+  if (!CUSTOMS_MODES.includes(customsMode)) {
+    return { success: false, error: "Некорректный режим таможни" };
+  }
+  if (
+    !isWithinLandedCostBounds({
+      manualWeightOverrideGrams: input.manualWeightOverrideGrams,
+      shippingRateUsdCents: input.shippingRateUsdCents,
+      usdRateKopecks: input.usdRateKopecks,
+      customsPercentBps: input.customsPercentBps,
+      cargoRateUsdCents: input.cargoRateUsdCents,
+    })
+  ) {
+    return { success: false, error: "Некорректные параметры доставки/таможни" };
+  }
+
   try {
     const itemsCost = input.items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
-    const totalCost = itemsCost + (input.shippingCost || 0) + (input.customsCost || 0);
-    const estimatedProfit = (input.sellingPrice || 0) - totalCost;
 
     const orderId = await db.$transaction(async (tx) => {
       // Resolve each line; a NEW_PART line creates a DRAFT catalog Part (hidden in
@@ -99,17 +130,47 @@ export async function createSupplierOrder(input: CreateOrderInput): Promise<Orde
         });
       }
 
+      // Server-authoritative cost: auto weight is derived from DB Part.weightGrams
+      // for the resolved PART lines (NOT from the client). Override is applied if set.
+      const partLines = lines
+        .filter((l) => l.type === "PART" && l.partId)
+        .map((l) => ({ partId: l.partId as string, quantity: l.quantity }));
+      const cost = await resolveLandedCost(tx, {
+        partLines,
+        itemsCostRub: itemsCost,
+        manualWeightOverrideGrams: input.manualWeightOverrideGrams ?? null,
+        shippingRateUsdCents: input.shippingRateUsdCents ?? null,
+        usdRateKopecks: input.usdRateKopecks ?? null,
+        customsMode,
+        customsPercentBps: input.customsPercentBps ?? null,
+        cargoRateUsdCents: input.cargoRateUsdCents ?? null,
+      });
+      // Guard the DB-derived weight + computed ₽ totals against the Int4 / weight
+      // ceilings (a large catalog weight × quantity can exceed limits even after
+      // the per-input bounds check passed).
+      if (!costResultWithinBounds(cost)) {
+        throw new OrderValidationError("Итоговая стоимость или вес вне допустимых пределов");
+      }
+      const estimatedProfit = (input.sellingPrice || 0) - cost.totalCost;
+
       const order = (await tx.supplierOrder.create({
         data: {
           userId: input.supplierId,
           orderNumber: input.orderNumber || null,
           orderDate: new Date(input.orderDate),
           itemsCost,
-          shippingCost: input.shippingCost || 0,
-          customsCost: input.customsCost || 0,
-          totalCost,
+          shippingCost: cost.shippingCost,
+          customsCost: cost.customsCost,
+          totalCost: cost.totalCost,
           sellingPrice: input.sellingPrice || 0,
           estimatedProfit,
+          shippingWeightGrams: cost.shippingWeightGrams,
+          manualWeightOverrideGrams: input.manualWeightOverrideGrams ?? null,
+          shippingRateUsdCents: input.shippingRateUsdCents ?? null,
+          usdRateKopecks: input.usdRateKopecks ?? null,
+          customsMode,
+          customsPercentBps: input.customsPercentBps ?? null,
+          cargoRateUsdCents: input.cargoRateUsdCents ?? null,
           trackingNumber: input.trackingNumber || null,
           estimatedArrival: input.estimatedArrival ? new Date(input.estimatedArrival) : null,
           notes: input.notes || null,

@@ -21,7 +21,7 @@ export default async function NewSupplierOrderPage() {
     db.part.findMany({
       where: { isActive: true },
       orderBy: { name: "asc" },
-      select: { id: true, name: true, article: true, price: true },
+      select: { id: true, name: true, article: true, price: true, weightGrams: true },
     }),
   ]);
 
@@ -35,6 +35,7 @@ export default async function NewSupplierOrderPage() {
     name: p.name as string,
     article: p.article as string,
     price: p.price as number,
+    weightGrams: (p.weightGrams as number | null) ?? null,
   }));
 
   if (supplierOptions.length === 0) {

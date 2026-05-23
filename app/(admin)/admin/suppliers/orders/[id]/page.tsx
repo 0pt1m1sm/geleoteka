@@ -102,13 +102,28 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
                 <span className="text-[var(--foreground-muted)]">Стоимость позиций</span>
                 <span>{formatPrice(order.itemsCost)}</span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--foreground-muted)]">Доставка</span>
-                <span>{formatPrice(order.shippingCost)}</span>
+              <div className="text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--foreground-muted)]">Доставка</span>
+                  <span>{formatPrice(order.shippingCost)}</span>
+                </div>
+                {order.shippingWeightGrams != null && order.shippingWeightGrams > 0 && order.shippingRateUsdCents != null && order.usdRateKopecks != null ? (
+                  <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                    {(order.shippingWeightGrams / 1000).toLocaleString("ru-RU")} кг
+                    {order.manualWeightOverrideGrams != null ? " (вручную)" : ""} × ${order.shippingRateUsdCents / 100}/кг × {order.usdRateKopecks / 100} ₽/$
+                  </p>
+                ) : null}
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-[var(--foreground-muted)]">Таможня</span>
-                <span>{formatPrice(order.customsCost)}</span>
+              <div className="text-sm">
+                <div className="flex justify-between">
+                  <span className="text-[var(--foreground-muted)]">Таможня</span>
+                  <span>{formatPrice(order.customsCost)}</span>
+                </div>
+                {order.customsMode === "PERCENT_CIF" && order.customsPercentBps != null ? (
+                  <p className="text-xs text-[var(--foreground-muted)] mt-0.5">{order.customsPercentBps / 100}% от CIF</p>
+                ) : order.customsMode === "CARGO_PER_KG" && order.cargoRateUsdCents != null ? (
+                  <p className="text-xs text-[var(--foreground-muted)] mt-0.5">Карго ${order.cargoRateUsdCents / 100}/кг</p>
+                ) : null}
               </div>
               <div className="flex justify-between pt-2 border-t border-[var(--border)] font-semibold">
                 <span>Итого</span>
