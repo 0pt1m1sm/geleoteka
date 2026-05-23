@@ -35,14 +35,12 @@ export function SupplierOrderForm({
   ]);
   const [shippingCost, setShippingCost] = useState(0);
   const [customsCost, setCustomsCost] = useState(0);
-  const [sellingPrice, setSellingPrice] = useState(0);
   const [trackingNumber, setTrackingNumber] = useState("");
   const [estimatedArrival, setEstimatedArrival] = useState("");
   const [notes, setNotes] = useState("");
 
   const itemsCost = items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
   const totalCost = itemsCost + shippingCost + customsCost;
-  const estimatedProfit = sellingPrice - totalCost;
 
   async function handleSubmit(e: React.FormEvent): Promise<void> {
     e.preventDefault();
@@ -81,7 +79,6 @@ export function SupplierOrderForm({
       })),
       shippingCost,
       customsCost,
-      sellingPrice,
       trackingNumber: trackingNumber || undefined,
       estimatedArrival: estimatedArrival || undefined,
       notes: notes || undefined,
@@ -120,11 +117,8 @@ export function SupplierOrderForm({
         setShippingCost={setShippingCost}
         customsCost={customsCost}
         setCustomsCost={setCustomsCost}
-        sellingPrice={sellingPrice}
-        setSellingPrice={setSellingPrice}
         itemsCost={itemsCost}
         totalCost={totalCost}
-        estimatedProfit={estimatedProfit}
       />
 
       <Card>

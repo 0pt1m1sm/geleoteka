@@ -114,20 +114,6 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
                 <span>Итого</span>
                 <span className="text-[var(--color-accent)] text-lg">{formatPrice(order.totalCost)}</span>
               </div>
-              {order.sellingPrice > 0 && (
-                <>
-                  <div className="flex justify-between text-sm pt-2 border-t border-[var(--border)]">
-                    <span className="text-[var(--foreground-muted)]">Ожидаемая выручка</span>
-                    <span>{formatPrice(order.sellingPrice)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--foreground-muted)]">Прибыль</span>
-                    <span className={order.estimatedProfit >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}>
-                      {formatPrice(order.estimatedProfit)}
-                    </span>
-                  </div>
-                </>
-              )}
             </div>
           </div>
 

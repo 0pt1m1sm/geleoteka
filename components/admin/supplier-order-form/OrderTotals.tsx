@@ -8,11 +8,8 @@ interface OrderTotalsProps {
   setShippingCost: (v: number) => void;
   customsCost: number;
   setCustomsCost: (v: number) => void;
-  sellingPrice: number;
-  setSellingPrice: (v: number) => void;
   itemsCost: number;
   totalCost: number;
-  estimatedProfit: number;
 }
 
 export function OrderTotals({
@@ -20,17 +17,14 @@ export function OrderTotals({
   setShippingCost,
   customsCost,
   setCustomsCost,
-  sellingPrice,
-  setSellingPrice,
   itemsCost,
   totalCost,
-  estimatedProfit,
 }: OrderTotalsProps): React.ReactElement {
   return (
     <Card className="space-y-4">
       <CardTitle>Финансы</CardTitle>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Доставка (₽)"
           type="number"
@@ -44,13 +38,6 @@ export function OrderTotals({
           min={0}
           value={customsCost || ""}
           onChange={(e) => setCustomsCost(parseInt(e.target.value) || 0)}
-        />
-        <Input
-          label="Ожидаемая выручка (₽)"
-          type="number"
-          min={0}
-          value={sellingPrice || ""}
-          onChange={(e) => setSellingPrice(parseInt(e.target.value) || 0)}
         />
       </div>
 
@@ -71,14 +58,6 @@ export function OrderTotals({
           <span className="font-semibold">Итого (к разделу между учредителями):</span>
           <span className="font-bold text-[var(--color-accent)] text-base">{formatPrice(totalCost)}</span>
         </div>
-        {sellingPrice > 0 && (
-          <div className="flex justify-between pt-2 border-t border-[var(--border)]">
-            <span className="text-[var(--foreground-muted)]">Ожидаемая прибыль:</span>
-            <span className={`font-bold ${estimatedProfit >= 0 ? "text-[var(--color-success)]" : "text-[var(--color-error)]"}`}>
-              {formatPrice(estimatedProfit)}
-            </span>
-          </div>
-        )}
       </div>
     </Card>
   );

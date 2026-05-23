@@ -31,7 +31,8 @@ interface CreateOrderInput {
   items: OrderItemInput[];
   shippingCost: number;
   customsCost: number;
-  sellingPrice: number;
+  /** Deprecated — expected-revenue tracking was removed from the form; kept optional, defaults 0. */
+  sellingPrice?: number;
   trackingNumber?: string;
   estimatedArrival?: string;
   notes?: string;
