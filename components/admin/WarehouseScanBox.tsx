@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   adjustStock,
@@ -57,6 +57,26 @@ export function WarehouseScanBox(): React.ReactElement {
   const [binError, setBinError] = useState<string | null>(null);
   const [isBinPending, startBinTransition] = useTransition();
 
+  // Scan-result feedback: scroll the result into view + flash + haptic so a
+  // resolved scan is obvious on mobile (the card otherwise just appears below).
+  // The flash is a DOM animation (not React state) — restarted each scan.
+  const resultRef = useRef<HTMLDivElement>(null);
+  const [scanNonce, setScanNonce] = useState(0);
+
+  useEffect(() => {
+    if (scanNonce === 0) return;
+    const el = resultRef.current;
+    if (!el) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    navigator.vibrate?.(60);
+    if (!reduce) {
+      el.classList.remove("scan-flash");
+      void el.offsetWidth; // force reflow so the animation restarts on repeat scans
+      el.classList.add("scan-flash");
+    }
+  }, [scanNonce]);
+
   // Per-operation idempotency keys. Lifecycle: generated on submit; KEPT on a
   // network error so the immediate retry reuses it (idempotent — server outcome
   // unknown); CLEARED on a confirmed server outcome (success or rejection) and
@@ -110,11 +130,13 @@ export function WarehouseScanBox(): React.ReactElement {
         setLocationCard(null);
         setLookupError(body?.error?.message ?? "Ошибка поиска");
       }
+      setScanNonce((n) => n + 1); // signal "result ready" → scroll + flash + haptic
     } catch {
       setItem(null);
       setPlacement(null);
       setLocationCard(null);
       setLookupError("Ошибка сети");
+      setScanNonce((n) => n + 1);
     }
   }
 
@@ -200,7 +222,7 @@ export function WarehouseScanBox(): React.ReactElement {
       <h2 className="text-lg font-semibold mb-3">Сканирование</h2>
       <QrScanner onScan={handleScan} busy={isPending || isBinPending} />
 
-      <div aria-live="polite" className="mt-4">
+      <div ref={resultRef} aria-live="polite" className="mt-4 scroll-mt-4 rounded-[var(--radius-md)]">
         {notFound && <p className="alert-error">Не найдено</p>}
         {lookupError && <p className="alert-error">{lookupError}</p>}
 

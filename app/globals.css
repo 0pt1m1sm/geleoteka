@@ -201,3 +201,13 @@
   [data-side="left"][data-state],
   [data-side="bottom"][data-state] { animation: none !important; }
 }
+
+/* Brief highlight pulse when a scan result appears (WarehouseScanBox). */
+@keyframes scan-flash {
+  0% { box-shadow: 0 0 0 3px var(--color-accent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.scan-flash { animation: scan-flash 0.9s ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .scan-flash { animation: none !important; }
+}
