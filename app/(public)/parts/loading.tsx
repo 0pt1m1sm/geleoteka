@@ -1,10 +1,13 @@
 import { Skeleton } from "@/components/ui";
+import { TopProgressBar } from "@/components/shared/TopProgressBar";
 
 const SKELETON_CARDS = Array.from({ length: 9 });
 
 export default function PartsLoading(): React.ReactElement {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <>
+      <TopProgressBar />
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="text-center mb-8">
         <Skeleton className="mx-auto h-10 w-48 mb-3" />
         <Skeleton className="mx-auto h-4 w-80" />
@@ -40,6 +43,7 @@ export default function PartsLoading(): React.ReactElement {
           </div>
         </main>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

@@ -1,8 +1,11 @@
 import { Skeleton } from "@/components/ui";
+import { TopProgressBar } from "@/components/shared/TopProgressBar";
 
 export default function CabinetLoading(): React.ReactElement {
   return (
-    <div>
+    <>
+      <TopProgressBar />
+      <div>
       <div className="mb-8">
         <Skeleton className="h-3 w-12 mb-2" />
         <Skeleton className="h-9 w-56" />
@@ -35,6 +38,7 @@ export default function CabinetLoading(): React.ReactElement {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

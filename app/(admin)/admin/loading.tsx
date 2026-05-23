@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui";
+import { TopProgressBar } from "@/components/shared/TopProgressBar";
 
 const ROWS = Array.from({ length: 6 });
 
@@ -10,7 +11,9 @@ const ROWS = Array.from({ length: 6 });
  */
 export default function AdminLoading(): React.ReactElement {
   return (
-    <div>
+    <>
+      <TopProgressBar />
+      <div>
       <div className="mb-8 flex items-end justify-between gap-4">
         <div>
           <Skeleton className="h-3 w-12 mb-2" />
@@ -32,6 +35,7 @@ export default function AdminLoading(): React.ReactElement {
           </div>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   );
 }

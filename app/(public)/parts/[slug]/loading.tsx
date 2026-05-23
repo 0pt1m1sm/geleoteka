@@ -1,8 +1,11 @@
 import { Skeleton } from "@/components/ui";
+import { TopProgressBar } from "@/components/shared/TopProgressBar";
 
 export default function PartDetailLoading(): React.ReactElement {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+    <>
+      <TopProgressBar />
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <Skeleton className="h-4 w-32 mb-6" />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -36,6 +39,7 @@ export default function PartDetailLoading(): React.ReactElement {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

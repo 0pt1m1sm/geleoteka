@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui";
+import { TopProgressBar } from "@/components/shared/TopProgressBar";
 
 /**
  * Estimate detail loading skeleton. Fires immediately when the row is tapped
@@ -10,7 +11,9 @@ import { Skeleton } from "@/components/ui";
  */
 export default function EstimateLoading(): React.ReactElement {
   return (
-    <div>
+    <>
+      <TopProgressBar />
+      <div>
       <div className="mb-6 flex items-end justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-3 w-20" />
@@ -46,6 +49,7 @@ export default function EstimateLoading(): React.ReactElement {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
