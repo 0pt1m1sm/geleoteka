@@ -2,8 +2,10 @@
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { recordMovement } from "@/lib/wms/public";
+import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
+import { applyReceive, isReceivingStatus, type ReceiveResult } from "@/lib/warehouse/receive";
+import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 
 interface OrderItemInput {
   type: "PART" | "CUSTOM" | "FEE" | "SERVICE";
@@ -82,58 +84,93 @@ export async function updateSupplierOrderStatus(
   orderId: string,
   newStatus: string
 ): Promise<void> {
-  const session = await requireRole(["ADMIN", "MANAGER"]);
+  await requireRole(["ADMIN", "MANAGER"]);
 
-  const updateData: Record<string, unknown> = {
-    status: newStatus as
-      | "DRAFT"
-      | "ORDERED"
-      | "IN_TRANSIT"
-      | "CUSTOMS"
-      | "RECEIVED"
-      | "COMPLETED"
-      | "CANCELLED",
-  };
+  // RECEIVED / PARTIALLY_RECEIVED are owned exclusively by receiving (receiveLine):
+  // they are set automatically as lines are received and must NOT be settable by
+  // hand — scan-receive is the only path that raises stock.
+  if (isReceivingStatus(newStatus)) return;
 
-  // Only fire stock RECEIPTs when transitioning INTO RECEIVED from another
-  // status — re-saving RECEIVED is a no-op (also guarded by recordMovement's
-  // idempotency key, so a double-fire never double-counts).
-  const current = (await db.supplierOrder.findUnique({
+  await db.supplierOrder.update({
     where: { id: orderId },
-    select: {
-      status: true,
-      items: {
-        where: { type: "PART", partId: { not: null } },
-        select: { id: true, partId: true, quantity: true },
-      },
+    data: {
+      status: newStatus as
+        | "DRAFT"
+        | "ORDERED"
+        | "IN_TRANSIT"
+        | "CUSTOMS"
+        | "COMPLETED"
+        | "CANCELLED",
     },
-  })) as {
-    status: string;
-    items: Array<{ id: string; partId: string | null; quantity: number }>;
-  } | null;
-  if (!current) return;
-
-  const enteringReceived = newStatus === "RECEIVED" && current.status !== "RECEIVED";
-  if (newStatus === "RECEIVED") {
-    updateData.receivedAt = new Date();
-  }
-
-  await db.$transaction(async (tx) => {
-    await tx.supplierOrder.update({ where: { id: orderId }, data: updateData });
-
-    if (enteringReceived) {
-      for (const item of current.items) {
-        if (!item.partId) continue;
-        await recordMovement(tx, {
-          item: { itemId: item.partId },
-          reason: "RECEIPT",
-          qty: item.quantity,
-          source: { type: "SupplierOrder", id: `${orderId}:${item.id}` },
-          actorId: actorId(session),
-          tenantKey: TENANT_KEY,
-        });
-      }
-    }
   });
+}
+
+/**
+ * Receive `qty` of a PART line incrementally. `expectedReceived` is the
+ * `receivedQuantity` the caller last saw — the optimistic-concurrency token that
+ * makes a stale/replayed/concurrent submit fail closed (`{ stale: true }`). With
+ * a non-blank `location` the received delta is also put away into that bin,
+ * atomically with the RECEIPT. Admin/manager only.
+ */
+export async function receiveLine(
+  orderId: string,
+  lineId: string,
+  qty: number,
+  expectedReceived: number,
+  location?: string
+): Promise<ReceiveResult> {
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
+  if (!Number.isInteger(expectedReceived) || expectedReceived < 0) {
+    return { error: "Некорректное состояние позиции" };
+  }
+  try {
+    return await db.$transaction((tx) =>
+      applyReceive(tx, { orderId, lineId, qty, expectedReceived, location, actorId: actorId(session) })
+    );
+  } catch (e) {
+    const msg = wmsErrorMessage(e);
+    if (msg) return { error: msg };
+    throw e; // genuine DB error — surface it, don't mask
+  }
+}
+
+/**
+ * Resolve a scanned code (barcode/gtin via the WMS core, else article via the
+ * host catalog) to a PART line on this order, then receive `qty` of it. Passes
+ * the line's current `receivedQuantity` as `expectedReceived`.
+ */
+export async function scanReceiveLine(
+  orderId: string,
+  code: string,
+  qty: number = 1,
+  location?: string
+): Promise<ReceiveResult & { matchedLineId?: string }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const trimmed = (code ?? "").trim();
+  if (!trimmed) return { error: "Пустой код" };
+  if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
+
+  // Resolve code → itemId, mirroring app/api/stock/lookup/route.ts.
+  const view = await lookupByCode(db, trimmed, TENANT_KEY);
+  let itemId = view?.itemId ?? null;
+  if (!itemId) {
+    const byArticle = (await db.part.findFirst({
+      where: { article: trimmed, isActive: true },
+      select: { id: true },
+    })) as { id: string } | null;
+    itemId = byArticle?.id ?? null;
+  }
+  if (!itemId) return { error: "Код не найден" };
+
+  const lines = (await db.supplierOrderItem.findMany({
+    where: { orderId, type: "PART", partId: itemId },
+    select: { id: true, quantity: true, receivedQuantity: true },
+  })) as Array<{ id: string; quantity: number; receivedQuantity: number }>;
+  if (lines.length === 0) return { error: "Эта позиция не в заказе" };
+
+  const target = lines.find((l) => l.receivedQuantity < l.quantity) ?? lines[0];
+  const res = await receiveLine(orderId, target.id, qty, target.receivedQuantity, location);
+  return { ...res, matchedLineId: target.id };
 }
 

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
 import { LOW_STOCK_THRESHOLD, TENANT_KEY } from "@/lib/wms-host";
@@ -119,6 +120,7 @@ export async function WarehouseOverview({
                 <th className="p-3 font-medium text-right">Резерв</th>
                 <th className="p-3 font-medium text-right">Доступно</th>
                 <th className="p-3 font-medium text-right">Размещение</th>
+                <th className="p-3 font-medium text-right">Этикетка</th>
               </tr>
             </thead>
             <tbody>
@@ -151,6 +153,14 @@ export async function WarehouseOverview({
                       {reconcile && (
                         <span className="ml-2 badge bg-[var(--color-error-bg)] text-[var(--color-error)]">сверка</span>
                       )}
+                    </td>
+                    <td className="p-3 text-right text-xs">
+                      <Link
+                        href={`/admin/warehouse/labels?part=${p.id}`}
+                        className="text-[var(--color-accent)] hover:underline"
+                      >
+                        этикетка
+                      </Link>
                     </td>
                   </tr>
                 );

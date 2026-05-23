@@ -56,6 +56,7 @@ enum SupplierOrderStatus {
   ORDERED
   IN_TRANSIT
   CUSTOMS
+  PARTIALLY_RECEIVED
   RECEIVED
   COMPLETED
   CANCELLED
@@ -1147,12 +1148,13 @@ model SupplierOrder {
 model SupplierOrderItem {
   id          String                @id @default(cuid())
   orderId     String
-  type        SupplierOrderItemType @default(PART)
-  partId      String?
-  description String
-  quantity    Int                   @default(1)
-  unitCost    Int
-  totalCost   Int
+  type             SupplierOrderItemType @default(PART)
+  partId           String?
+  description      String
+  quantity         Int                   @default(1)
+  receivedQuantity Int                   @default(0) // cumulative received via scan-receive (Phase 2)
+  unitCost         Int
+  totalCost        Int
 
   order SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part?         @relation(fields: [partId], references: [id], onDelete: SetNull)

@@ -21,6 +21,7 @@ import {
 } from "../lib/wms/public";
 import { applyAdjustment } from "../lib/warehouse/adjust";
 import { assignCodes, DuplicateCodeError } from "../lib/warehouse/codes";
+import { applyReceive, computeReceivingStatus, isReceivingStatus } from "../lib/warehouse/receive";
 
 const TENANT = "geleoteka";
 
@@ -224,6 +225,157 @@ async function main(): Promise<void> {
   assert(placement.reconcileNeeded === true, "Σbins > on-hand must flag reconcileNeeded");
   assert(placement.unplaced === 0, "unplaced clamps at 0 when over-placed");
   console.log("  ✓ reconcileNeeded flags when Σbins exceeds on-hand (drift), unplaced clamps at 0");
+
+  // --- Receiving (приёмка) core: applyReceive + computeReceivingStatus (Phase 2) ---
+
+  // computeReceivingStatus is pure: partial vs full vs terminal-no-downgrade.
+  assert(
+    computeReceivingStatus([{ quantity: 5, receivedQuantity: 0 }], "ORDERED") === "ORDERED",
+    "no receipts yet → status unchanged",
+  );
+  assert(
+    computeReceivingStatus([{ quantity: 5, receivedQuantity: 2 }], "ORDERED") === "PARTIALLY_RECEIVED",
+    "some received, not all full → PARTIALLY_RECEIVED",
+  );
+  assert(
+    computeReceivingStatus(
+      [{ quantity: 5, receivedQuantity: 5 }, { quantity: 2, receivedQuantity: 3 }],
+      "PARTIALLY_RECEIVED",
+    ) === "RECEIVED",
+    "all PART lines received-in-full → RECEIVED",
+  );
+  assert(
+    computeReceivingStatus([{ quantity: 5, receivedQuantity: 1 }], "COMPLETED") === "COMPLETED",
+    "terminal COMPLETED is never auto-downgraded",
+  );
+  assert(
+    computeReceivingStatus([{ quantity: 5, receivedQuantity: 5 }], "CANCELLED") === "CANCELLED",
+    "terminal CANCELLED is never auto-touched",
+  );
+  console.log("  ✓ computeReceivingStatus: partial/full/terminal transitions");
+
+  // Throwaway parts + a supplier order with PART lines.
+  const rPart = (await db.part.create({
+    data: {
+      slug: "verify-wh-recv-1",
+      article: "VERIFY-WH-RECV-1",
+      name: "verify-warehouse receive part",
+      price: 100,
+      stockItem: { create: { quantity: 0, tenantKey: TENANT } },
+    },
+    select: { id: true },
+  })) as { id: string };
+  const rPart2 = (await db.part.create({
+    data: {
+      slug: "verify-wh-recv-2",
+      article: "VERIFY-WH-RECV-2",
+      name: "verify-warehouse receive part 2",
+      price: 100,
+      stockItem: { create: { quantity: 0, tenantKey: TENANT } },
+    },
+    select: { id: true },
+  })) as { id: string };
+
+  const order = (await db.supplierOrder.create({
+    data: {
+      userId: admin.id,
+      orderNumber: "VERIFY-WH-ORDER-1",
+      orderDate: new Date(),
+      status: "ORDERED",
+      items: {
+        create: [
+          { type: "PART", partId: rPart.id, description: "recv line 1", quantity: 5, unitCost: 100, totalCost: 500 },
+          { type: "PART", partId: rPart2.id, description: "recv line 2", quantity: 2, unitCost: 100, totalCost: 200 },
+          { type: "CUSTOM", description: "non-part fee", quantity: 1, unitCost: 50, totalCost: 50 },
+        ],
+      },
+    },
+    select: { id: true },
+  })) as { id: string };
+  const oLines = (await db.supplierOrderItem.findMany({
+    where: { orderId: order.id },
+    select: { id: true, type: true, partId: true },
+    orderBy: { totalCost: "desc" },
+  })) as Array<{ id: string; type: string; partId: string | null }>;
+  const line1 = oLines.find((l) => l.partId === rPart.id)!;
+  const line2 = oLines.find((l) => l.partId === rPart2.id)!;
+  const customLine = oLines.find((l) => l.type === "CUSTOM")!;
+
+  // 1) incremental receive: qty 3 against expected 0 → RECEIPT +3, on-hand 3, PARTIALLY_RECEIVED.
+  const rec1 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: line1.id, qty: 3, expectedReceived: 0, actorId: admin.id }),
+  );
+  assert(rec1.error === null && rec1.received === 3 && rec1.overReceived === false, "receive 3 → received 3, not over");
+  assert(rec1.status === "PARTIALLY_RECEIVED", `expected PARTIALLY_RECEIVED, got ${rec1.status}`);
+  const onHand1 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  assert(onHand1.quantity === 3, `expected on-hand 3, got ${onHand1.quantity}`);
+  const receiptCount1 = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
+  assert(receiptCount1 === 1, `expected 1 RECEIPT, got ${receiptCount1}`);
+  console.log("  ✓ applyReceive: incremental RECEIPT raises on-hand, status → PARTIALLY_RECEIVED");
+
+  // 2) replay/stale: same expected 0 again → fail closed, no second RECEIPT, no change.
+  const rec2 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: line1.id, qty: 3, expectedReceived: 0, actorId: admin.id }),
+  );
+  assert(rec2.stale === true && rec2.error !== null, "replayed submit (stale expectedReceived) fails closed");
+  const onHand2 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  const receiptCount2 = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
+  assert(onHand2.quantity === 3 && receiptCount2 === 1, "stale replay writes no RECEIPT and leaves on-hand unchanged");
+  console.log("  ✓ applyReceive: stale/replayed submit fails closed (no double-count)");
+
+  // 3) non-PART line (order still non-terminal) → structured error, nothing written.
+  const customReceiptsBefore = await db.stockMovement.count({ where: { reason: "RECEIPT", sourceId: { startsWith: `${order.id}:${customLine.id}` } } });
+  const rec3 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: customLine.id, qty: 1, expectedReceived: 0, actorId: admin.id }),
+  );
+  assert(rec3.error !== null && rec3.stale !== true, "non-PART line receive returns a structured error");
+  const customReceiptsAfter = await db.stockMovement.count({ where: { reason: "RECEIPT", sourceId: { startsWith: `${order.id}:${customLine.id}` } } });
+  assert(customReceiptsAfter === customReceiptsBefore, "non-PART rejection writes no RECEIPT");
+  console.log("  ✓ applyReceive: non-PART line returns structured error, writes nothing");
+
+  // 4) over-receipt WHILE NON-TERMINAL: line1 qty 4 (expected 3) → received 7 (> ordered 5),
+  //    overReceived true, on-hand 7; order stays PARTIALLY_RECEIVED (line2 still open).
+  const rec4 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: line1.id, qty: 4, expectedReceived: 3, actorId: admin.id }),
+  );
+  assert(rec4.received === 7 && rec4.overReceived === true, "over-receipt accepted and flagged (received 7 > ordered 5)");
+  assert(rec4.status === "PARTIALLY_RECEIVED", `over-receipt with line2 open → PARTIALLY_RECEIVED, got ${rec4.status}`);
+  const onHand7 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  assert(onHand7.quantity === 7, `over-receipt raises on-hand to 7, got ${onHand7.quantity}`);
+  console.log("  ✓ applyReceive: over-receipt allowed while non-terminal (received > ordered)");
+
+  // 5) complete the order WITH putaway: line2 qty 2 + location → line2 full, ALL lines full →
+  //    RECEIVED + receivedAt, and the received delta is placed into bin R-1-1.
+  const rec5 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: line2.id, qty: 2, expectedReceived: 0, location: "r-1-1", actorId: admin.id }),
+  );
+  assert(rec5.error === null && rec5.status === "RECEIVED", `final line full → RECEIVED, got ${rec5.status}`);
+  const ord = (await db.supplierOrder.findUnique({ where: { id: order.id }, select: { status: true, receivedAt: true } })) as { status: string; receivedAt: Date | null };
+  assert(ord.status === "RECEIVED" && ord.receivedAt !== null, "order auto-RECEIVED with receivedAt stamped");
+  const place = await binsForItem(db, rPart2.id, TENANT);
+  assert(place.bins.some((b) => b.location === "R-1-1" && b.quantity === 2), "received qty placed into bin R-1-1 (putaway)");
+  console.log("  ✓ applyReceive: completing receive with location → RECEIVED + putaway into bin");
+
+  // 6) TERMINAL GUARD: the order is now RECEIVED — a further receive (e.g. stale UI or direct
+  //    action call) must be rejected server-side, writing no RECEIPT and leaving on-hand unchanged.
+  const termReceiptsBefore = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
+  const rec6 = await db.$transaction((tx) =>
+    applyReceive(tx, { orderId: order.id, lineId: line1.id, qty: 1, expectedReceived: 7, actorId: admin.id }),
+  );
+  assert(rec6.error !== null && rec6.stale !== true, "receiving on a terminal (RECEIVED) order is rejected");
+  const termReceiptsAfter = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
+  const onHandTerm = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  assert(termReceiptsAfter === termReceiptsBefore && onHandTerm.quantity === 7, "terminal-order receive writes no RECEIPT and leaves on-hand unchanged");
+  console.log("  ✓ applyReceive: terminal order is closed for receiving (no stock raised)");
+
+  // 7) Manual-status guard (regression for bulk-flip removal): the receiving statuses are
+  //    auto-only, so updateSupplierOrderStatus rejects them and never fires a RECEIPT.
+  assert(isReceivingStatus("RECEIVED") && isReceivingStatus("PARTIALLY_RECEIVED"), "auto-only statuses are receiving statuses");
+  assert(!isReceivingStatus("IN_TRANSIT") && !isReceivingStatus("COMPLETED") && !isReceivingStatus("CANCELLED"), "manual statuses are not receiving statuses");
+  console.log("  ✓ isReceivingStatus: RECEIVED/PARTIALLY_RECEIVED are auto-only (manual flip rejected, no RECEIPT)");
+
+  // Receiving cleanup (order + its items).
+  await db.supplierOrder.deleteMany({ where: { orderNumber: { startsWith: "VERIFY-WH-ORDER-" } } });
 
   // Cleanup (cascade removes StockItem + movements + bins).
   await db.part.deleteMany({ where: { article: { startsWith: "VERIFY-WH-" } } });

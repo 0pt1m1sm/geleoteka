@@ -16,6 +16,7 @@ const STATUS_LABELS: Record<string, string> = {
   ORDERED: "Заказ размещён",
   IN_TRANSIT: "В пути",
   CUSTOMS: "Таможня",
+  PARTIALLY_RECEIVED: "Частично получен",
   RECEIVED: "Получен",
   COMPLETED: "Завершён",
   CANCELLED: "Отменён",

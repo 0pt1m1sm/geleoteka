@@ -6,17 +6,11 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierOrderStatusChanger } from "@/components/admin/SupplierOrderStatusChanger";
+import { SupplierOrderReceiving, type ReceivingLine } from "@/components/admin/SupplierOrderReceiving";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
-
-const TYPE_LABELS: Record<string, string> = {
-  PART: "Запчасть",
-  CUSTOM: "Другое",
-  FEE: "Комиссия",
-  SERVICE: "Услуга",
-};
 
 export default async function SupplierOrderDetailPage({ params }: Props) {
   const session = await getSession();
@@ -29,11 +23,48 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
     where: { id },
     include: {
       supplier: true,
-      items: true,
+      items: {
+        select: {
+          id: true,
+          type: true,
+          partId: true,
+          description: true,
+          quantity: true,
+          receivedQuantity: true,
+          unitCost: true,
+          totalCost: true,
+          part: { select: { article: true, stockItem: { select: { barcode: true } } } },
+        },
+      },
     },
   });
 
   if (!order) notFound();
+
+  const receivingLines: ReceivingLine[] = order.items.map(
+    (it: {
+      id: string;
+      type: string;
+      partId: string | null;
+      description: string;
+      quantity: number;
+      receivedQuantity: number;
+      unitCost: number;
+      totalCost: number;
+      part: { article: string | null; stockItem: { barcode: string | null } | null } | null;
+    }) => ({
+      lineId: it.id,
+      type: it.type,
+      partId: it.partId,
+      description: it.description,
+      article: it.part?.article ?? null,
+      barcode: it.part?.stockItem?.barcode ?? null,
+      ordered: it.quantity,
+      received: it.receivedQuantity,
+      unitCost: it.unitCost,
+      totalCost: it.totalCost,
+    })
+  );
 
   return (
     <div>
@@ -60,33 +91,8 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
 
       <div className="max-w-3xl">
         <div className="space-y-6">
-          {/* Items */}
-          <div>
-            <h2 className="text-lg font-semibold mb-3">Позиции ({order.items.length})</h2>
-            <div className="card">
-              <div className="space-y-3">
-                {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between gap-3 pb-3 border-b border-[var(--border)] last:border-0 last:pb-0"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] uppercase text-[var(--foreground-muted)] bg-[var(--background-secondary)] px-1.5 py-0.5 rounded">
-                          {TYPE_LABELS[item.type] ?? item.type}
-                        </span>
-                        <p className="text-sm font-medium truncate">{item.description}</p>
-                      </div>
-                      <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
-                        {item.quantity} × {formatPrice(item.unitCost)}
-                      </p>
-                    </div>
-                    <p className="font-medium shrink-0">{formatPrice(item.totalCost)}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          {/* Items + receiving */}
+          <SupplierOrderReceiving orderId={order.id} status={order.status} lines={receivingLines} />
 
           {/* Financial summary */}
           <div>

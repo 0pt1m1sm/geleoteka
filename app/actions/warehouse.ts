@@ -5,36 +5,19 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { actorId, TENANT_KEY } from "@/lib/wms-host";
 import { applyAdjustment } from "@/lib/warehouse/adjust";
+import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import {
   placeStock,
   transferStock,
   removeFromBin,
   binsForItem,
   itemsInLocation,
-  WmsError,
   type ItemPlacement,
 } from "@/lib/wms/public";
 
 interface PlacementResult {
   error: string | null;
   placement?: ItemPlacement;
-}
-
-/** Map a WmsError to a Russian message; returns null for non-WmsErrors. */
-function wmsErrorMessage(e: unknown): string | null {
-  if (!(e instanceof WmsError)) return null;
-  switch (e.code) {
-    case "INSUFFICIENT_UNPLACED":
-      return "Недостаточно нераспределённого остатка";
-    case "INSUFFICIENT_BIN":
-      return "В ячейке недостаточно остатка";
-    case "SAME_LOCATION":
-      return "Ячейки отправления и назначения совпадают";
-    case "INVALID_QTY":
-      return "Количество должно быть положительным";
-    default:
-      return "Не удалось выполнить операцию";
-  }
 }
 
 /**
