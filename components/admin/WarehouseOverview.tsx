@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
+import { incomingByPartIds } from "@/lib/warehouse/incoming";
 import { LOW_STOCK_THRESHOLD, TENANT_KEY } from "@/lib/wms-host";
 import { Pagination } from "@/components/ui";
 
@@ -78,6 +79,10 @@ export async function WarehouseOverview({
       : [];
   const placedByItem = new Map(placedRows.map((r) => [r.itemId, r._sum.quantity ?? 0]));
 
+  // Incoming (ожидается): units still owed on this page's parts across open
+  // supplier orders. Single batch groupBy keyed by partId — no N+1.
+  const incomingByPart = await incomingByPartIds(db, parts.map((p) => p.id));
+
   const buildHref = (p: number): string => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
@@ -119,6 +124,7 @@ export async function WarehouseOverview({
                 <th className="p-3 font-medium text-right">На складе</th>
                 <th className="p-3 font-medium text-right">Резерв</th>
                 <th className="p-3 font-medium text-right">Доступно</th>
+                <th className="p-3 font-medium text-right">Ожидается</th>
                 <th className="p-3 font-medium text-right">Размещение</th>
                 <th className="p-3 font-medium text-right">Этикетка</th>
               </tr>
@@ -133,6 +139,7 @@ export async function WarehouseOverview({
                 const placed = si ? (placedByItem.get(si.id) ?? 0) : 0;
                 const unplaced = Math.max(0, onHand - placed);
                 const reconcile = placed > onHand;
+                const incoming = incomingByPart.get(p.id) ?? 0;
                 return (
                   <tr
                     key={p.id}
@@ -147,6 +154,13 @@ export async function WarehouseOverview({
                     <td className="p-3 text-right">{reserved}</td>
                     <td className={`p-3 text-right font-medium ${low ? "text-[var(--color-error)]" : ""}`}>
                       {available}
+                    </td>
+                    <td className="p-3 text-right">
+                      {incoming > 0 ? (
+                        <span className="text-[var(--color-info)]">+{incoming}</span>
+                      ) : (
+                        <span className="text-[var(--foreground-muted)]">—</span>
+                      )}
                     </td>
                     <td className="p-3 text-right text-xs">
                       <span className="text-[var(--foreground-muted)]">{placed} / {unplaced}</span>

@@ -22,6 +22,7 @@ import {
 import { applyAdjustment } from "../lib/warehouse/adjust";
 import { assignCodes, DuplicateCodeError } from "../lib/warehouse/codes";
 import { applyReceive, computeReceivingStatus, isReceivingStatus } from "../lib/warehouse/receive";
+import { incomingByPartIds } from "../lib/warehouse/incoming";
 
 const TENANT = "geleoteka";
 
@@ -373,6 +374,39 @@ async function main(): Promise<void> {
   assert(isReceivingStatus("RECEIVED") && isReceivingStatus("PARTIALLY_RECEIVED"), "auto-only statuses are receiving statuses");
   assert(!isReceivingStatus("IN_TRANSIT") && !isReceivingStatus("COMPLETED") && !isReceivingStatus("CANCELLED"), "manual statuses are not receiving statuses");
   console.log("  ✓ isReceivingStatus: RECEIVED/PARTIALLY_RECEIVED are auto-only (manual flip rejected, no RECEIPT)");
+
+  // 8) incomingByPartIds: Σ(quantity − receivedQuantity) over PART lines of OPEN
+  //    orders only. rPart/rPart2's order is now RECEIVED (closed) → contributes
+  //    0. Build a fresh OPEN order to exercise open-status + remaining math.
+  const incPartA = (await db.part.create({
+    data: { slug: "verify-wh-inc-a", article: "VERIFY-WH-INC-A", name: "inc A", price: 100, stockItem: { create: { quantity: 0, tenantKey: TENANT } } },
+    select: { id: true },
+  })) as { id: string };
+  const incPartB = (await db.part.create({
+    data: { slug: "verify-wh-inc-b", article: "VERIFY-WH-INC-B", name: "inc B", price: 100, stockItem: { create: { quantity: 0, tenantKey: TENANT } } },
+    select: { id: true },
+  })) as { id: string };
+  await db.supplierOrder.create({
+    data: {
+      userId: admin.id,
+      orderNumber: "VERIFY-WH-ORDER-INC",
+      orderDate: new Date(),
+      status: "IN_TRANSIT",
+      items: {
+        create: [
+          { type: "PART", partId: incPartA.id, description: "inc A1", quantity: 10, receivedQuantity: 4, unitCost: 100, totalCost: 1000 },
+          { type: "PART", partId: incPartA.id, description: "inc A2", quantity: 3, receivedQuantity: 0, unitCost: 100, totalCost: 300 },
+          { type: "PART", partId: incPartB.id, description: "inc B", quantity: 5, receivedQuantity: 5, unitCost: 100, totalCost: 500 },
+          { type: "CUSTOM", description: "inc fee", quantity: 7, unitCost: 10, totalCost: 70 },
+        ],
+      },
+    },
+  });
+  const incMap = await incomingByPartIds(db, [incPartA.id, incPartB.id, rPart.id, rPart2.id]);
+  assert(incMap.get(incPartA.id) === 9, `partA incoming should be 9 ((10-4)+(3-0)), got ${incMap.get(incPartA.id)}`);
+  assert(!incMap.has(incPartB.id), `partB fully received on open order → no incoming, got ${incMap.get(incPartB.id)}`);
+  assert(!incMap.has(rPart.id) && !incMap.has(rPart2.id), "closed (RECEIVED) order contributes no incoming");
+  console.log("  ✓ incomingByPartIds: sums remaining over open-order PART lines, excludes closed/full/non-PART");
 
   // Receiving cleanup (order + its items).
   await db.supplierOrder.deleteMany({ where: { orderNumber: { startsWith: "VERIFY-WH-ORDER-" } } });
