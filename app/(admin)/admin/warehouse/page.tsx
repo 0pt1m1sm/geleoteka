@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { WarehouseOverview } from "@/components/admin/WarehouseOverview";
@@ -23,6 +24,10 @@ export default async function WarehousePage({ searchParams }: Props) {
   return (
     <div className="space-y-8">
       <PageHeader eyebrow="Запчасти" title="Склад" description="Остатки, сканирование и движения" />
+
+      <Link href="/admin/warehouse/stocktake" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
+        Инвентаризация →
+      </Link>
 
       {/* Scan box — Task 4 */}
       <WarehouseScanBox />

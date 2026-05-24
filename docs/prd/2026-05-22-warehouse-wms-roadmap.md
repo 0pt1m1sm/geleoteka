@@ -81,9 +81,11 @@ then Phase 3 (инвентаризация), then Phase 4/4b (pick/pack/ship). E
 - Scan-receive against a `SupplierOrder` (PO): RECEIPT raises the aggregate, then guided putaway places the received qty into bins. Closes the "received but unplaced" loop from Phase 1.
 - Label printing for items **and** bins (the `qrcode` dep is already present).
 
-### Phase 3 — Stocktake / инвентаризация
-- Structured count sessions: generate a count sheet (optionally per location/zone), scan each item/bin, capture counted-vs-system, post variances as bulk ADJUSTMENT movements with a session audit. Cycle counts. Supersedes the Phase-1 one-off adjust as the disciplined recount path.
-- **Folded-in PRD §10.7:** scan-a-bin then scan-its-items via the Phase-2.5 camera scanner; report `found`/`missing`/`unexpected`/`unknown`; **no auto write-off** — variances are saved for review. `cycle-count` endpoint with `idempotency_key`.
+### Phase 3 — Stocktake / инвентаризация ← SHIPPED
+`docs/plans/2026-05-24-warehouse-stocktake.md` (VERIFIED)
+
+- Structured count sessions: generate a count sheet (per location/zone/full/part), scan each cell + its items (informed — system qty shown), capture counted-vs-system, post variances as bulk per-part ADJUSTMENT movements with a session audit. Supersedes the Phase-1 one-off adjust as the disciplined recount path.
+- **Folded-in PRD §10.7:** scan-a-bin then scan-its-items; classify `found`/`missing`/`unexpected`/`unknown`; **no auto write-off** — variances reviewed and posted by a manager (ADMIN/MANAGER gate; workers count). Posting is **bins-are-truth** (per part Σ(counted−system) ADJUSTMENT + each counted bin reconciled), **blocks on drift** (any in-scope cell changed/removed/newly-created since generation), and refuses to post on top of pre-existing reconcile drift. `StockCountSession`/`StockCountLine` tables; `lib/wms/public/stocktake.ts`; `app/actions/stocktake.ts`; `/admin/warehouse/stocktake`.
 
 ### Phase 4 — Bin-aware picking / отбор (closes the Phase-1 drift)
 - Outbound consumption deducts from a chosen bin, so `Σbins` tracks the aggregate exactly (eliminates the Phase-1 over-placement drift). Scan-to-pick for repair/customer orders; ties into the existing fulfillment `CONSUMPTION` path. (Scan-into-estimate, deferred earlier, fits here.)

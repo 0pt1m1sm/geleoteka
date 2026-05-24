@@ -23,6 +23,10 @@ export function wmsErrorMessage(e: unknown): string | null {
       return "Операция уже была выполнена (повторный запрос)";
     case "IDEMPOTENCY_KEY_REUSED":
       return "Ключ операции уже использован для другого действия";
+    case "COUNT_DRIFT":
+      return "Остаток в ячейках изменился с момента создания пересчёта — обновите подсчёт";
+    case "RECONCILE_BLOCKED":
+      return "Остаток позиции рассогласован — устраните расхождение перед проводкой";
     default:
       // Unmapped code (e.g. NULL_SOURCE) = programming error → re-throw upstream.
       return null;

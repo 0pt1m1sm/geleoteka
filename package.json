@@ -25,6 +25,7 @@
     "verify-warehouse": "tsx scripts/verify-warehouse.ts",
     "verify-landed-cost": "tsx scripts/verify-landed-cost.ts",
     "verify-qr-scanning": "tsx scripts/verify-qr-scanning.ts",
+    "verify-stocktake": "tsx scripts/verify-stocktake.ts",
     "backfill-stock-locations": "tsx scripts/backfill-stock-locations.ts"
   },
   "dependencies": {

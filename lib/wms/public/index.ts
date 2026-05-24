@@ -15,6 +15,28 @@ export { assertLocationUsable, getLocation, listLocations, setLocationBlocked } 
 export type { WmsLocation } from "./locations";
 export { recordScanEvent } from "./scan";
 export type { ScanEventInput, ScanResult } from "./scan";
+export {
+  createCountSession,
+  recordCount,
+  recordUnknownScan,
+  finalizeSession,
+  postCountSession,
+  reopenSession,
+  cancelSession,
+  getCountSession,
+  listCountSessions,
+  sessionVariance,
+} from "./stocktake";
+export type {
+  StockCountScope,
+  StockCountStatus,
+  StockCountClassification,
+  CountLine,
+  CountSession,
+  CreateCountSessionInput,
+  PostResult,
+  PartVariance,
+} from "./stocktake";
 export { WmsError } from "./errors";
 export type { WmsErrorCode } from "./errors";
 export type {

@@ -1061,6 +1061,76 @@ model ScanEvent {
   @@index([tenantKey, userId, createdAt])
 }
 
+// Stocktake / инвентаризация (Phase 3 of the warehouse roadmap). A count session
+// snapshots the in-scope StockBins as count lines, the worker records counted
+// quantities (informed: system qty shown), and a manager reviews + posts the
+// found/missing/unexpected/unknown variances. Posting is bins-are-truth: per
+// part a single ADJUSTMENT (Σ counted−system over counted cells) + each counted
+// bin reconciled to its counted qty. Nothing is written until the manager posts.
+// WMS-owned, tenant-scoped. itemId is a host partId (no FK, mirrors StockBin).
+enum StockCountStatus {
+  OPEN // counting in progress
+  REVIEW // counting finished, variances awaiting manager post
+  POSTED // variances applied to stock
+  CANCELLED // abandoned, nothing applied
+}
+
+enum StockCountScope {
+  ZONE // all locations in a StockLocation.zone
+  LOCATION // one or more specific cells
+  FULL // every placed location in the tenant
+  PART // specific parts wherever they sit
+}
+
+enum StockCountClassification {
+  FOUND // expected in this cell and counted (qty may still vary)
+  MISSING // expected in this cell, not counted (countedQty 0)
+  UNEXPECTED // counted in this cell, system had none here
+  UNKNOWN // scanned code resolved to no part (posts nothing)
+}
+
+model StockCountSession {
+  id             String           @id @default(cuid())
+  status         StockCountStatus @default(OPEN)
+  scope          StockCountScope
+  scopeValue     String? // display label (zone name / comma codes / category ref)
+  // Resolved scope, persisted so the post-time drift query can enumerate the
+  // FULL live scoped bin map (a new bin with no count line still counts as drift).
+  // FULL scope = both arrays empty + scope=FULL meaning "all tenant bins".
+  scopeLocations String[]
+  scopePartIds   String[]
+  note           String?
+  createdByUserId String?
+  postedByUserId String?
+  postedAt       DateTime?
+  tenantKey      String           @default("geleoteka")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  lines StockCountLine[]
+
+  @@index([tenantKey, status, createdAt])
+}
+
+model StockCountLine {
+  id             String                    @id @default(cuid())
+  sessionId      String
+  itemId         String? // host partId; null for UNKNOWN lines
+  rawCode        String? // scanned payload for an UNKNOWN line
+  location       String
+  systemQty      Int // snapshot of the bin qty at session generation
+  countedQty     Int? // null until counted
+  classification StockCountClassification?
+  postedDelta    Int? // the on-hand delta actually posted for this line
+  tenantKey      String                    @default("geleoteka")
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  session StockCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantKey, sessionId])
+}
+
 // Parts fulfillment / shipment for a Deal (channel PARTS_*). Renamed from
 // PartOrder (the Deal is now the "order"); @@map keeps the DB table "PartOrder"
 // so no data moves. The PO-NNNN number + PartOrder_number_seq are unchanged.
