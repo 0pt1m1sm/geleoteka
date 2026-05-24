@@ -105,6 +105,22 @@ export interface RemoveFromBinInput extends PlacementMeta {
   location: string;
 }
 
+/** Bin-aware outbound consumption. Records a CONSUMPTION movement (aggregate)
+ *  then deducts bins so Σbins tracks on-hand. `fromLocation` picks from one
+ *  explicit bin (scan-to-pick); omitting it auto-drains unplaced-first then
+ *  oldest bins (server-side fulfillment). */
+export interface ConsumeStockInput {
+  item: WmsItemRef;
+  qty: number;
+  source: MovementSource;
+  actorId?: string;
+  note?: string;
+  idempotencyKey?: string;
+  tenantKey?: string;
+  /** When set, consume from this exact bin (rejects INSUFFICIENT_BIN if short). */
+  fromLocation?: string;
+}
+
 /** What an item occupies a given location with (itemId is the external partId). */
 export interface ItemInLocation {
   itemId: string;

@@ -978,6 +978,7 @@ enum StockBinMovementReason {
   PLACE // unplaced → bin (putaway)
   TRANSFER // bin → bin
   REMOVE // bin → unplaced
+  PICK // bin → consumed/outbound (bin-aware CONSUMPTION; aggregate already dropped)
 }
 
 model StockBin {

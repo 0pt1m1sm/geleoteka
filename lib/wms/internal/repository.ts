@@ -93,6 +93,24 @@ export async function findMovementByKey(
   } | null;
 }
 
+/** True when a movement already exists for this (tenant, source, reason) triple.
+ *  Lets a higher-level op short-circuit BEFORE the insert that would otherwise
+ *  raise P2002 — a caught P2002 aborts a composed caller transaction, which would
+ *  break a multi-line loop (e.g. an RO close over already-picked lines). */
+export async function movementExistsForSource(
+  client: DbClientPort,
+  tenantKey: string,
+  sourceType: string,
+  sourceId: string,
+  reason: MovementReason,
+): Promise<boolean> {
+  const row = (await client.stockMovement.findFirst({
+    where: { tenantKey, sourceType, sourceId, reason },
+    select: { id: true },
+  })) as { id: string } | null;
+  return row !== null;
+}
+
 /** Apply signed deltas to the StockItem counters; returns the new values. */
 export async function applyDeltas(
   client: DbClientPort,
@@ -200,13 +218,13 @@ export async function decrementBinIfEnough(
   return res.count === 1;
 }
 
-/** Insert a bin-movement audit row (PLACE / TRANSFER / REMOVE). Throws P2002 on
- *  a duplicate (tenantKey, idempotencyKey) when a key is supplied. */
+/** Insert a bin-movement audit row (PLACE / TRANSFER / REMOVE / PICK). Throws
+ *  P2002 on a duplicate (tenantKey, idempotencyKey) when a key is supplied. */
 export async function insertBinMovement(
   client: DbClientPort,
   row: {
     itemId: string;
-    reason: "PLACE" | "TRANSFER" | "REMOVE";
+    reason: "PLACE" | "TRANSFER" | "REMOVE" | "PICK";
     fromLocation: string | null;
     toLocation: string | null;
     quantity: number;
@@ -217,6 +235,21 @@ export async function insertBinMovement(
   },
 ): Promise<void> {
   await client.stockBinMovement.create({ data: row });
+}
+
+/** Non-empty bins for a StockItem, ordered OLDEST-first (createdAt asc) — the
+ *  FIFO order bin-aware consumption drains. Distinct from findBinsForItem (which
+ *  orders by location for display). */
+export async function findBinsOldestFirst(
+  client: DbClientPort,
+  stockItemId: string,
+  tenantKey: string,
+): Promise<Array<{ location: string; quantity: number }>> {
+  return (await client.stockBin.findMany({
+    where: { tenantKey, itemId: stockItemId, quantity: { gt: 0 } },
+    select: { location: true, quantity: true },
+    orderBy: { createdAt: "asc" },
+  })) as Array<{ location: string; quantity: number }>;
 }
 
 /** Identity of a prior bin-movement claimed by an idempotency key. */

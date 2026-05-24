@@ -6,6 +6,7 @@
  * lib/wms/README.md (extraction checklist).
  */
 export { recordMovement } from "./record-movement";
+export { consumeStock } from "./consumption";
 export { availableStock } from "./stock";
 export { lookupByCode, lookupByItemId } from "./lookup";
 export { placeStock, transferStock, removeFromBin, binsForItem, itemsInLocation } from "./placement";
@@ -52,5 +53,6 @@ export type {
   PlaceStockInput,
   TransferStockInput,
   RemoveFromBinInput,
+  ConsumeStockInput,
 } from "./types";
 export type { DbClientPort } from "../internal/repository";

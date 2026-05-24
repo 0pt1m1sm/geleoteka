@@ -19,6 +19,7 @@ import {
   isUniqueViolation,
   type DbClientPort,
 } from "../internal/repository";
+import { txCapable, type TxCapable } from "../internal/tx";
 
 const DEFAULT_TENANT = "default";
 
@@ -29,14 +30,6 @@ function normalizeLocation(location: string): string {
 
 function assertPositive(qty: number): void {
   if (!Number.isInteger(qty) || qty <= 0) throw WmsError.invalidQty("PLACE");
-}
-
-/** A client able to open an interactive transaction (the base PrismaClient, not
- *  a tx client). The base client's $transaction is overloaded; we only use the
- *  interactive-callback form, so narrow to that single signature for the call. */
-type TxCapable = { $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>) => Promise<T> };
-function txCapable(client: DbClientPort): boolean {
-  return typeof (client as { $transaction?: unknown }).$transaction === "function";
 }
 
 interface BinAuditRow {

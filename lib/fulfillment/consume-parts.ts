@@ -1,7 +1,7 @@
 // Host orchestration: translate a fulfillment close into stock CONSUMPTION
 // movements. Bridges CRM (the deal's APPROVED estimate PART lines) and the WMS
 // core (recordMovement). NOT part of lib/wms — it knows about Estimate/Deal.
-import { recordMovement, type DbClientPort } from "@/lib/wms/public";
+import { consumeStock, type DbClientPort } from "@/lib/wms/public";
 import { TENANT_KEY } from "@/lib/wms-host";
 
 interface ConsumeInput {
@@ -43,9 +43,10 @@ export async function consumeApprovedEstimateParts(
     if (!line.partId) continue;
     const qty = Math.round(line.qty);
     if (qty <= 0) continue;
-    await recordMovement(client, {
+    // consumeStock = CONSUMPTION movement + bin deduction (unplaced-first, then
+    // oldest bins) so Σbins tracks on-hand. Runs in the caller's tx (composed).
+    await consumeStock(client, {
       item: { itemId: line.partId },
-      reason: "CONSUMPTION",
       qty,
       source: { type: input.sourceType, id: `${input.sourceId}:${line.id}` },
       actorId: input.actorId,

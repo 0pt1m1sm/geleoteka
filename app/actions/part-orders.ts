@@ -9,7 +9,7 @@ import {
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
 import { nextPartOrderNumber } from "@/lib/crm/public";
-import { recordMovement } from "@/lib/wms/public";
+import { consumeStock } from "@/lib/wms/public";
 import { TENANT_KEY, actorId } from "@/lib/wms-host";
 
 interface OrderInput {
@@ -130,9 +130,10 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       // through the WMS ledger (not a direct Part write). Idempotency key is
       // per (order, part) so a retry never double-consumes.
       for (const item of orderItems) {
-        await recordMovement(tx, {
+        // consumeStock = CONSUMPTION + bin deduction (unplaced-first → oldest
+        // bins) so a point-of-sale sale keeps Σbins consistent with on-hand.
+        await consumeStock(tx, {
           item: { itemId: item.partId },
-          reason: "CONSUMPTION",
           qty: item.quantity,
           source: { type: "PartShipment", id: `${created.id}:${item.partId}` },
           actorId: actorId(session),

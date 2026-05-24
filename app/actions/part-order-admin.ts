@@ -22,10 +22,15 @@ export async function updatePartOrderStatus(
   const enteringDispatched =
     DISPATCHED.has(newStatus) && prior !== null && !DISPATCHED.has(prior.status);
 
-  // Guard against double-consumption: a retail sale (createPartOrder) already
-  // consumed its parts at order-create time with a PartShipment source. If any
-  // CONSUMPTION movement already exists for this shipment, the parts left stock
-  // at sale — do not consume again on dispatch, regardless of estimate state.
+  // Fast-path guard against double-consumption: a retail sale (createPartOrder)
+  // already consumed its parts at order-create time with a PartShipment source.
+  // If any CONSUMPTION movement already exists for this shipment, the parts left
+  // stock at sale — skip re-consuming on dispatch, regardless of estimate state.
+  // NOTE: this count is read OUTSIDE the tx, so it is a TOCTOU optimization, not
+  // the correctness backstop. Stock correctness is guaranteed by consumeStock →
+  // recordMovement's (tenant, source, reason) unique index (a duplicate is an
+  // idempotent no-op that deducts nothing). Do NOT remove that idempotency
+  // believing this guard suffices.
   const alreadyConsumed =
     enteringDispatched &&
     (await db.stockMovement.count({
