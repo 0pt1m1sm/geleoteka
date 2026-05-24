@@ -12,6 +12,11 @@ export const TENANT_KEY = "geleoteka";
  *  Used by the warehouse overview for highlighting (Phase 5 makes it per-item). */
 export const LOW_STOCK_THRESHOLD = 3;
 
+/** Default staging cell for scanner receiving: received goods land here, then a
+ *  putaway scan moves them to a real shelf. System-critical — kept active and
+ *  unblocked by the stock-locations backfill so default receiving never breaks. */
+export const STAGING_LOCATION = "ПРИЁМКА";
+
 /** The host db singleton, surfaced as the WMS DB client port. Callers pass this
  *  (or a `$transaction` tx) into the core's recordMovement / lookup functions. */
 export const wmsDb = db;

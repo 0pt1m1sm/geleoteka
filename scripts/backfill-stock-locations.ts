@@ -8,7 +8,7 @@
  */
 import "dotenv/config";
 import { db } from "../lib/db";
-import { TENANT_KEY } from "../lib/wms-host";
+import { TENANT_KEY, STAGING_LOCATION } from "../lib/wms-host";
 
 function normalizeLocation(location: string): string {
   return location.trim().toUpperCase();
@@ -16,6 +16,17 @@ function normalizeLocation(location: string): string {
 
 async function main(): Promise<void> {
   console.log("[backfill-stock-locations] starting");
+
+  // System-critical staging cell: assert it exists AND is usable on every run.
+  // Unlike the create-only loop below, this resets isActive/isBlocked so a stale
+  // or manually-blocked ПРИЁМКА row can never silently break default receiving.
+  const staging = normalizeLocation(STAGING_LOCATION);
+  await db.stockLocation.upsert({
+    where: { tenantKey_code: { tenantKey: TENANT_KEY, code: staging } },
+    update: { isActive: true, isBlocked: false },
+    create: { code: staging, tenantKey: TENANT_KEY, isActive: true, isBlocked: false },
+  });
+  console.log(`  staging location ${staging} asserted active + unblocked`);
 
   const bins = (await db.stockBin.findMany({
     where: { tenantKey: TENANT_KEY },

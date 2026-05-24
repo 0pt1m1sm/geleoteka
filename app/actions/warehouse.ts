@@ -3,9 +3,16 @@
 // Warehouse stock actions: manual on-hand adjustment + multi-bin placement.
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { actorId, TENANT_KEY } from "@/lib/wms-host";
+import { actorId, TENANT_KEY, STAGING_LOCATION } from "@/lib/wms-host";
 import { applyAdjustment } from "@/lib/warehouse/adjust";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
+import type { ReceiveResult } from "@/lib/warehouse/receive";
+import {
+  applyScanReceiveOrderLine,
+  applyBlindReceive,
+  openOrderLinesForPart,
+  type OpenOrderLine,
+} from "@/lib/warehouse/scan-receive";
 import {
   placeStock,
   transferStock,
@@ -152,6 +159,64 @@ export async function transferBetweenBins(
     throw e;
   }
   return { error: null, placement: await binsForItem(db, partId, TENANT_KEY) };
+}
+
+/** Scanner receiving — open, not-fully-received supplier-order PART lines for a
+ *  part (the candidates the worker can receive against). */
+export async function openOrderLinesForPartAction(
+  partId: string,
+): Promise<{ lines: OpenOrderLine[] }> {
+  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  return { lines: await openOrderLinesForPart(db, partId) };
+}
+
+/** Scanner receipt against an open supplier-order line. Raises on-hand, places
+ *  into `location` (default ПРИЁМКА), advances the order. Worker-allowed. */
+export async function scanReceiveOrderLine(
+  orderId: string,
+  lineId: string,
+  qty: number,
+  expectedReceived: number,
+  location: string = STAGING_LOCATION,
+): Promise<ReceiveResult> {
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
+  if (!Number.isInteger(expectedReceived) || expectedReceived < 0) {
+    return { error: "Некорректное состояние позиции" };
+  }
+  try {
+    return await db.$transaction((tx) =>
+      applyScanReceiveOrderLine(tx, { orderId, lineId, qty, expectedReceived, location, actorId: actorId(session) }),
+    );
+  } catch (e) {
+    const msg = wmsErrorMessage(e);
+    if (msg) return { error: msg };
+    throw e;
+  }
+}
+
+/** Scanner blind receipt for goods with no supplier order (gray import). Raises
+ *  on-hand into `location` (default ПРИЁМКА). `idempotencyKey` is required so a
+ *  retry never double-counts. Worker-allowed. */
+export async function blindReceive(
+  partId: string,
+  qty: number,
+  idempotencyKey: string,
+  location: string = STAGING_LOCATION,
+): Promise<{ error: string | null; quantity?: number }> {
+  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
+  if (!idempotencyKey) return { error: "Отсутствует ключ операции" };
+  try {
+    const r = await db.$transaction((tx) =>
+      applyBlindReceive(tx, { partId, qty, location, idempotencyKey, actorId: actorId(session) }),
+    );
+    return { error: null, quantity: r.quantity };
+  } catch (e) {
+    const msg = wmsErrorMessage(e);
+    if (msg) return { error: msg };
+    throw e;
+  }
 }
 
 /** Return stock from a location back to unplaced. */
