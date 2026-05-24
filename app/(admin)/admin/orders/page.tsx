@@ -1,9 +1,11 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { packProgress } from "@/lib/warehouse/pack";
 import { OrderStatusChanger } from "@/components/admin/OrderStatusChanger";
 import { Card, PageHeader } from "@/components/ui";
 
@@ -28,6 +30,19 @@ export default async function AdminOrdersPage() {
   const pending = orders.filter(
     (o: Record<string, unknown>) => o.status === "PROCESSING"
   ).length;
+
+  // Packing progress for the warehouse cross-link — computed ONLY for PROCESSING
+  // orders (the active queue is small; shipped/cancelled orders need no progress).
+  const progressById = new Map(
+    await Promise.all(
+      orders
+        .filter((o: Record<string, unknown>) => o.status === "PROCESSING")
+        .map(
+          async (o: Record<string, unknown>) =>
+            [o.id as string, await packProgress(db, o.id as string)] as const
+        )
+    )
+  );
 
   return (
     <div>
@@ -82,6 +97,20 @@ export default async function AdminOrdersPage() {
                       orderId={order.id as string}
                       currentStatus={order.status as string}
                     />
+                    {order.status === "PROCESSING" && (
+                      <div className="mt-2 flex flex-col items-end gap-1">
+                        <span className="text-xs text-[var(--foreground-muted)]">
+                          упаковано {progressById.get(order.id as string)?.packed ?? 0}/
+                          {progressById.get(order.id as string)?.required ?? 0}
+                        </span>
+                        <Link
+                          href={`/admin/warehouse/packing/${order.id as string}`}
+                          className="text-xs font-medium hover:text-[var(--color-accent)]"
+                        >
+                          Упаковка →
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 </div>
 

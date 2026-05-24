@@ -7,6 +7,7 @@ import {
   recordScanEvent,
   type ParsedScanCode,
 } from "@/lib/wms/public";
+import { packProgress } from "@/lib/warehouse/pack";
 
 type DbClient = typeof db;
 
@@ -30,7 +31,21 @@ export interface LocationCard {
   items: Array<{ itemId: string; name: string; article: string; quantity: number }>;
 }
 
-export type ScanCard = PartCard | LocationCard;
+export interface OrderCard {
+  kind: "order";
+  orderId: string;
+  orderNumber: string | null;
+  status: string;
+  requiredCount: number;
+  packedCount: number;
+}
+
+export interface BoxCard {
+  kind: "box";
+  code: string;
+}
+
+export type ScanCard = PartCard | LocationCard | OrderCard | BoxCard;
 
 export type ScanOutcome =
   | { status: 200; data: ScanCard }
@@ -103,14 +118,20 @@ export async function resolveScan(
         }
         return { status: 200, data: card };
       }
-      case "ORDER":
+      case "ORDER": {
+        const card = await resolveOrder(client, parsed.id);
+        if (!card) {
+          await log("REJECTED", "UNKNOWN_CODE");
+          return { status: 404, errorCode: "UNKNOWN_CODE", message: "Заказ не найден" };
+        }
+        await log("SUCCESS", null);
+        return { status: 200, data: card };
+      }
       case "BOX": {
-        await log("REJECTED", "WRONG_OBJECT_TYPE");
-        return {
-          status: 422,
-          errorCode: "WRONG_OBJECT_TYPE",
-          message: "Этот тип кода пока не поддерживается",
-        };
+        // Boxes are not registered entities — echo the code so the pack flow can
+        // group by it; the scan is audited as a successful parcel scan.
+        await log("SUCCESS", null);
+        return { status: 200, data: { kind: "box", code: parsed.id } };
       }
       default: {
         await log("REJECTED", "UNKNOWN_CODE");
@@ -170,6 +191,26 @@ async function resolvePart(
     quantity: si?.quantity ?? 0,
     available: si ? availableStock(si) : 0,
     isActive: part.isActive,
+  };
+}
+
+async function resolveOrder(client: DbClient, code: string): Promise<OrderCard | null> {
+  // A scanned ORDER payload carries the human-readable order number (printed on
+  // the label); fall back to the cuid id for robustness.
+  const order = (await client.partShipment.findFirst({
+    where: { OR: [{ orderNumber: code }, { id: code }] },
+    select: { id: true, orderNumber: true, status: true },
+  })) as { id: string; orderNumber: string | null; status: string } | null;
+  if (!order) return null;
+
+  const prog = await packProgress(client, order.id);
+  return {
+    kind: "order",
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: order.status,
+    requiredCount: prog.required,
+    packedCount: prog.packed,
   };
 }
 

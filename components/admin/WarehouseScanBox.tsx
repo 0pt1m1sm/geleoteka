@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   adjustStock,
@@ -47,9 +48,23 @@ interface LocationCard {
   items: Array<{ itemId: string; name: string; article: string; quantity: number }>;
 }
 
+interface OrderCard {
+  orderId: string;
+  orderNumber: string | null;
+  status: string;
+  requiredCount: number;
+  packedCount: number;
+}
+
+interface BoxCard {
+  code: string;
+}
+
 type ScanData =
   | ({ kind: "part" } & ResolvedItem)
-  | ({ kind: "location" } & LocationCard);
+  | ({ kind: "location" } & LocationCard)
+  | ({ kind: "order" } & OrderCard)
+  | ({ kind: "box" } & BoxCard);
 
 /**
  * Warehouse scan box. A scan (camera or manual entry) is parsed and resolved by
@@ -63,6 +78,8 @@ export function WarehouseScanBox(): React.ReactElement {
   const router = useRouter();
   const [item, setItem] = useState<ResolvedItem | null>(null);
   const [locationCard, setLocationCard] = useState<LocationCard | null>(null);
+  const [orderCard, setOrderCard] = useState<OrderCard | null>(null);
+  const [boxCard, setBoxCard] = useState<BoxCard | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [adjustValue, setAdjustValue] = useState("");
@@ -134,6 +151,8 @@ export function WarehouseScanBox(): React.ReactElement {
         const body = (await res.json()) as { data: ScanData };
         if (body.data.kind === "part") {
           setLocationCard(null);
+          setOrderCard(null);
+          setBoxCard(null);
           setItem(body.data);
           setAdjustValue(String(body.data.quantity));
           setPlaceLoc("");
@@ -155,21 +174,39 @@ export function WarehouseScanBox(): React.ReactElement {
           const ol = await openOrderLinesForPartAction(body.data.itemId);
           setOpenLines(ol.lines);
           setLineQty(Object.fromEntries(ol.lines.map((l) => [l.lineId, String(l.remaining)])));
+        } else if (body.data.kind === "location") {
+          setItem(null);
+          setPlacement(null);
+          setOrderCard(null);
+          setBoxCard(null);
+          setLocationCard(body.data);
+        } else if (body.data.kind === "order") {
+          setItem(null);
+          setPlacement(null);
+          setLocationCard(null);
+          setBoxCard(null);
+          setOrderCard(body.data);
         } else {
           setItem(null);
           setPlacement(null);
-          setLocationCard(body.data);
+          setLocationCard(null);
+          setOrderCard(null);
+          setBoxCard(body.data);
         }
       } else if (res.status === 404) {
         setItem(null);
         setPlacement(null);
         setLocationCard(null);
+        setOrderCard(null);
+        setBoxCard(null);
         setNotFound(true);
       } else {
         const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
         setItem(null);
         setPlacement(null);
         setLocationCard(null);
+        setOrderCard(null);
+        setBoxCard(null);
         setLookupError(body?.error?.message ?? "Ошибка поиска");
       }
       setScanNonce((n) => n + 1); // signal "result ready" → scroll + flash + haptic
@@ -177,6 +214,8 @@ export function WarehouseScanBox(): React.ReactElement {
       setItem(null);
       setPlacement(null);
       setLocationCard(null);
+      setOrderCard(null);
+      setBoxCard(null);
       setLookupError("Ошибка сети");
       setScanNonce((n) => n + 1);
     }
@@ -370,6 +409,31 @@ export function WarehouseScanBox(): React.ReactElement {
       <div ref={resultRef} aria-live="polite" className="mt-4 scroll-mt-4 rounded-[var(--radius-md)]">
         {notFound && <p className="alert-error">Не найдено</p>}
         {lookupError && <p className="alert-error">{lookupError}</p>}
+
+        {orderCard && (
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="font-medium">Заказ {orderCard.orderNumber ?? orderCard.orderId.slice(0, 8)}</p>
+              <span className="badge">{orderCard.status}</span>
+            </div>
+            <p className="mt-2 text-sm text-[var(--foreground-muted)]">
+              упаковано {orderCard.packedCount}/{orderCard.requiredCount}
+            </p>
+            <Link
+              href={`/admin/warehouse/packing/${orderCard.orderId}`}
+              className="btn btn-secondary btn-sm mt-3 inline-block"
+            >
+              Упаковка →
+            </Link>
+          </div>
+        )}
+
+        {boxCard && (
+          <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">
+            <p className="text-sm text-[var(--foreground-muted)]">Короб</p>
+            <p className="font-mono font-medium">{boxCard.code}</p>
+          </div>
+        )}
 
         {locationCard && (
           <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-4">

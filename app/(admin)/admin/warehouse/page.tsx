@@ -32,6 +32,9 @@ export default async function WarehousePage({ searchParams }: Props) {
         <Link href="/admin/warehouse/picking" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Отбор →
         </Link>
+        <Link href="/admin/warehouse/packing" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
+          Упаковка →
+        </Link>
       </div>
 
       {/* Scan box — Task 4 */}

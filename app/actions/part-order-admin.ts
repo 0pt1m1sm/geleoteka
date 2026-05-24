@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { consumeApprovedEstimateParts } from "@/lib/fulfillment/consume-parts";
+import { isFullyPacked } from "@/lib/warehouse/pack";
 import { actorId } from "@/lib/wms-host";
 
 const DISPATCHED = new Set(["SHIPPED", "COMPLETED"]);
@@ -19,23 +20,26 @@ export async function updatePartOrderStatus(
     where: { id: orderId },
     select: { status: true, dealId: true },
   })) as { status: string; dealId: string } | null;
+  // CANCELLED is excluded as a source status: a cancelled order that is later
+  // re-marked SHIPPED must NOT auto-consume stock (it was intentionally voided).
+  // Consumption belongs to the normal PROCESSING → dispatched flow only.
   const enteringDispatched =
-    DISPATCHED.has(newStatus) && prior !== null && !DISPATCHED.has(prior.status);
+    DISPATCHED.has(newStatus) &&
+    prior !== null &&
+    !DISPATCHED.has(prior.status) &&
+    prior.status !== "CANCELLED";
 
-  // Fast-path guard against double-consumption: a retail sale (createPartOrder)
-  // already consumed its parts at order-create time with a PartShipment source.
-  // If any CONSUMPTION movement already exists for this shipment, the parts left
-  // stock at sale — skip re-consuming on dispatch, regardless of estimate state.
-  // NOTE: this count is read OUTSIDE the tx, so it is a TOCTOU optimization, not
-  // the correctness backstop. Stock correctness is guaranteed by consumeStock →
-  // recordMovement's (tenant, source, reason) unique index (a duplicate is an
-  // idempotent no-op that deducts nothing). Do NOT remove that idempotency
-  // believing this guard suffices.
-  const alreadyConsumed =
-    enteringDispatched &&
-    (await db.stockMovement.count({
-      where: { sourceType: "PartShipment", sourceId: { startsWith: `${orderId}:` }, reason: "CONSUMPTION" },
-    })) > 0;
+  // Skip re-consuming on dispatch ONLY when the order is FULLY fulfilled already
+  // — retail sales consume at create time (source orderId:partId), and Phase 4b
+  // packing consumes each picked CRM line (source orderId:estimateLineId). A
+  // coarse "any CONSUMPTION movement exists" guard would wrongly skip the dispatch
+  // top-up for a PARTIALLY-packed CRM order, leaving its remaining lines
+  // un-consumed while marking it shipped. isFullyPacked is line-precise (unified:
+  // retail by partId, CRM by estimate-line id), so a partially-packed order still
+  // tops up its remaining APPROVED-estimate lines here. Each already-consumed line
+  // is an idempotent per-line no-op (consumeStock → recordMovement's
+  // (tenant, source, reason) unique index), which is the real correctness backstop.
+  const fullyConsumed = enteringDispatched && (await isFullyPacked(db, orderId));
 
   await db.$transaction(async (tx) => {
     await tx.partShipment.update({
@@ -44,7 +48,7 @@ export async function updatePartOrderStatus(
         status: newStatus as "PROCESSING" | "SHIPPED" | "COMPLETED" | "CANCELLED",
       },
     });
-    if (enteringDispatched && !alreadyConsumed && prior) {
+    if (enteringDispatched && !fullyConsumed && prior) {
       await consumeApprovedEstimateParts(tx, {
         dealId: prior.dealId,
         sourceType: "PartShipment",
