@@ -27,6 +27,7 @@ import {
   sessionVariance,
 } from "../lib/wms/public/stocktake";
 import { TENANT_KEY } from "../lib/wms-host";
+const WH = "wh_main_geleoteka";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -48,7 +49,7 @@ async function assertThrowsCode(fn: () => Promise<unknown>, code: string, msg: s
 }
 
 async function onHand(partId: string): Promise<number> {
-  const si = (await db.stockItem.findUnique({ where: { partId }, select: { quantity: true } })) as
+  const si = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId, warehouseId: WH } }, select: { quantity: true } })) as
     | { quantity: number }
     | null;
   return si?.quantity ?? 0;
@@ -87,7 +88,7 @@ async function makePart(qty: number): Promise<string> {
       article: `VERIFY-ST-${suffix}`,
       name: `verify stocktake ${suffix}`,
       price: 100,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -106,8 +107,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-AA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const session = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-a",
       locations: [CELL_A],
@@ -132,11 +134,12 @@ async function main(): Promise<void> {
     const p1 = await makePart(10);
     const p2 = await makePart(5);
     const p3 = await makePart(2);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p1, location: CELL_B, qty: 3, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p2, location: CELL_A, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_B, qty: 3, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p2, warehouseId: WH, location: CELL_A, qty: 5, tenantKey: TENANT_KEY });
 
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-b",
       locations: [CELL_A, CELL_B],
@@ -168,10 +171,11 @@ async function main(): Promise<void> {
     const CELL_B = "VERIFY-ST-CB";
     const p1 = await makePart(10);
     const p2 = await makePart(0); // unexpected part (no bins, no on-hand)
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p1, location: CELL_B, qty: 3, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_B, qty: 3, tenantKey: TENANT_KEY });
 
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-c",
       locations: [CELL_A, CELL_B],
@@ -204,8 +208,9 @@ async function main(): Promise<void> {
     const CELL_B = "VERIFY-ST-DB";
     // Variant A: a counted line's live bin changed.
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const sA = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-dA",
       locations: [CELL_A],
@@ -230,9 +235,10 @@ async function main(): Promise<void> {
 
     // Variant B: a NEW bin (different part) appears in an in-scope cell.
     const p2 = await makePart(8);
-    await placeStock(db, { itemId: p2, location: CELL_B, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p2, warehouseId: WH, location: CELL_B, qty: 4, tenantKey: TENANT_KEY });
     const p3 = await makePart(3); // will be placed into B AFTER snapshot
     const sB = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-dB",
       locations: [CELL_B],
@@ -240,7 +246,7 @@ async function main(): Promise<void> {
     });
     await recordCount(db, { sessionId: sB.id, itemId: p2, location: CELL_B, countedQty: 4, tenantKey: TENANT_KEY });
     await finalizeSession(db, sB.id);
-    await placeStock(db, { itemId: p3, location: CELL_B, qty: 3, tenantKey: TENANT_KEY }); // new bin, no line
+    await placeStock(db, { itemId: p3, warehouseId: WH, location: CELL_B, qty: 3, tenantKey: TENANT_KEY }); // new bin, no line
     await assertThrowsCode(
       () => postCountSession(db, { sessionId: sB.id, tenantKey: TENANT_KEY }),
       "COUNT_DRIFT",
@@ -254,8 +260,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-EA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-e",
       locations: [CELL_A],
@@ -280,8 +287,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-FA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-f",
       locations: [CELL_A],
@@ -305,10 +313,11 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-GA";
     const p1 = await makePart(8);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 8, tenantKey: TENANT_KEY }); // Σbins=8=qty
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 8, tenantKey: TENANT_KEY }); // Σbins=8=qty
     // Simulate consumption that did not deduct the bin: drop on-hand to 5.
-    await db.stockItem.update({ where: { partId: p1 }, data: { quantity: 5 } }); // now Σbins 8 > qty 5
+    await db.stockItem.update({ where: { partId_warehouseId: { partId: p1, warehouseId: WH } }, data: { quantity: 5 } }); // now Σbins 8 > qty 5
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-g",
       locations: [CELL_A],
@@ -330,9 +339,10 @@ async function main(): Promise<void> {
     const CELL_A = "VERIFY-ST-HA";
     const CELL_BLOCK = "VERIFY-ST-HBLK";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
-    await setLocationBlocked(db, CELL_BLOCK, TENANT_KEY, { isBlocked: true }); // block the target
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await setLocationBlocked(db, CELL_BLOCK, WH, TENANT_KEY, { isBlocked: true }); // block the target
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-h",
       locations: [CELL_A],
@@ -359,8 +369,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-IA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-i",
       locations: [CELL_A],
@@ -382,8 +393,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-JA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 7, tenantKey: TENANT_KEY }); // placed 7, unplaced 3
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 7, tenantKey: TENANT_KEY }); // placed 7, unplaced 3
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-j",
       locations: [CELL_A],
@@ -404,8 +416,9 @@ async function main(): Promise<void> {
   {
     const CELL_A = "VERIFY-ST-KA";
     const p1 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL_A, qty: 4, tenantKey: TENANT_KEY });
     const s = await createCountSession(db, {
+      warehouseId: WH,
       scope: "LOCATION",
       scopeValue: "VERIFY-ST-k",
       locations: [CELL_A],

@@ -13,6 +13,7 @@ import "dotenv/config";
 import { db } from "../lib/db";
 import { placeStock, consumeStock } from "../lib/wms/public";
 import { TENANT_KEY } from "../lib/wms-host";
+const WH = "wh_main_geleoteka";
 import { nextPartOrderNumber } from "../lib/crm/public";
 
 async function clean(): Promise<void> {
@@ -28,7 +29,7 @@ async function makePart(article: string, qty: number): Promise<string> {
       article,
       name: `E2E pack ${article}`,
       price: 1000,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -45,9 +46,9 @@ async function main(): Promise<void> {
 
   // CRM order parts: placed in bins so they can be packed bin-aware.
   const pa = await makePart("E2E-PACK-A", 5);
-  await placeStock(db, { itemId: pa, location: "E2E-PA1", qty: 5, tenantKey: TENANT_KEY });
+  await placeStock(db, { itemId: pa, warehouseId: WH, location: "E2E-PA1", qty: 5, tenantKey: TENANT_KEY });
   const pb = await makePart("E2E-PACK-B", 5);
-  await placeStock(db, { itemId: pb, location: "E2E-PB1", qty: 5, tenantKey: TENANT_KEY });
+  await placeStock(db, { itemId: pb, warehouseId: WH, location: "E2E-PB1", qty: 5, tenantKey: TENANT_KEY });
   // Off-order part → WRONG_ITEM when scanned on a CRM line.
   await makePart("E2E-PACK-OFF", 5);
 
@@ -90,7 +91,7 @@ async function main(): Promise<void> {
 
   // ── Retail PartShipment (items, consumed at sale) ──
   const pr = await makePart("E2E-PACK-R", 10);
-  await placeStock(db, { itemId: pr, location: "E2E-PR1", qty: 10, tenantKey: TENANT_KEY });
+  await placeStock(db, { itemId: pr, warehouseId: WH, location: "E2E-PR1", qty: 10, tenantKey: TENANT_KEY });
   const retUser = (await db.user.create({
     data: { email: "e2e-pack-retail@test.local", phone: "+79003334455", name: "E2E Pack Retail" },
     select: { id: true },
@@ -117,7 +118,7 @@ async function main(): Promise<void> {
   // Point-of-sale consumption (source orderId:partId), so the retail order reads
   // as already fulfilled → shippable with nothing to pack.
   await consumeStock(db, {
-    item: { itemId: pr },
+    item: { itemId: pr, warehouseId: WH },
     qty: 1,
     source: { type: "PartShipment", id: `${retOrder.id}:${pr}` },
     tenantKey: TENANT_KEY,

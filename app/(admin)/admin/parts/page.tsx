@@ -13,12 +13,12 @@ export default async function AdminPartsPage() {
   const parts = await db.part.findMany({
     include: {
       category: { select: { name: true } },
-      stockItem: { select: { quantity: true } },
+      stockItems: { select: { quantity: true } },
     },
     orderBy: { createdAt: "desc" },
   });
   const onHandOf = (p: Record<string, unknown>): number =>
-    (p.stockItem as { quantity: number } | null)?.quantity ?? 0;
+    (p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0;
 
   return (
     <div>

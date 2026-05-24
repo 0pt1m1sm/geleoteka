@@ -69,12 +69,12 @@ interface PartWithStock {
   id: string;
   name: string;
   article: string;
-  stockItem: {
+  stockItems: Array<{
     quantity: number;
     reserved: number;
     reorderPoint: number | null;
     reorderUpTo: number | null;
-  } | null;
+  }>;
 }
 
 /**
@@ -87,18 +87,22 @@ interface PartWithStock {
 export async function buildReorderReport(
   db: ReplenishmentDb,
   tenantKey: string,
+  warehouseId: string,
   defaultPoint: number,
 ): Promise<ReorderReportRow[]> {
   const findMany = db.part.findMany as PartFindManyFn;
   const parts = (await findMany({
-    // tenantKey lives on StockItem (Part has none); scope via the relation, which
-    // also requires the stockItem to exist (replaces the prior isNot:null filter).
-    where: { isActive: true, stockItem: { is: { tenantKey } } },
+    // tenantKey/warehouseId live on StockItem (Part has none); scope via the
+    // relation, which also requires a stock row to exist in this warehouse.
+    where: { isActive: true, stockItems: { some: { tenantKey, warehouseId } } },
     select: {
       id: true,
       name: true,
       article: true,
-      stockItem: { select: { quantity: true, reserved: true, reorderPoint: true, reorderUpTo: true } },
+      stockItems: {
+        where: { warehouseId },
+        select: { quantity: true, reserved: true, reorderPoint: true, reorderUpTo: true },
+      },
     },
     orderBy: { name: "asc" },
   })) as PartWithStock[];
@@ -108,7 +112,7 @@ export async function buildReorderReport(
 
   const rows: ReorderReportRow[] = [];
   for (const p of parts) {
-    const si = p.stockItem;
+    const si = p.stockItems[0];
     if (!si) continue;
     const available = availableStock(si);
     const incoming = incomingMap.get(p.id) ?? 0;

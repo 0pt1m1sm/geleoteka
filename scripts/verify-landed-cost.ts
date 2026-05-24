@@ -99,11 +99,11 @@ async function main(): Promise<void> {
   // --- DB resolver: server-derived weight, tamper-resistance, override, null path ---
   await db.part.deleteMany({ where: { article: { startsWith: "VERIFY-LC-" } } });
   const partA = (await db.part.create({
-    data: { slug: "verify-lc-a", article: "VERIFY-LC-A", name: "lc A", price: 100, weightGrams: 2500, stockItem: { create: {} } },
+    data: { slug: "verify-lc-a", article: "VERIFY-LC-A", name: "lc A", price: 100, weightGrams: 2500, stockItems: { create: { warehouseId: "wh_main_geleoteka" } } },
     select: { id: true },
   })) as { id: string };
   const partB = (await db.part.create({
-    data: { slug: "verify-lc-b", article: "VERIFY-LC-B", name: "lc B", price: 100, weightGrams: 1000, stockItem: { create: {} } },
+    data: { slug: "verify-lc-b", article: "VERIFY-LC-B", name: "lc B", price: 100, weightGrams: 1000, stockItems: { create: { warehouseId: "wh_main_geleoteka" } } },
     select: { id: true },
   })) as { id: string };
 

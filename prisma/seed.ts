@@ -462,9 +462,9 @@ async function main(): Promise<void> {
 
     // Stock lives on StockItem (WMS). Seed the opening balance directly.
     await prisma.stockItem.upsert({
-      where: { partId: p.id },
+      where: { partId_warehouseId: { partId: p.id, warehouseId: "wh_main_geleoteka" } },
       update: { quantity: sp.quantity },
-      create: { partId: p.id, quantity: sp.quantity, tenantKey: "geleoteka" },
+      create: { partId: p.id, quantity: sp.quantity, tenantKey: "geleoteka", warehouseId: "wh_main_geleoteka" },
     });
 
     // Sync PartTrim rows: clear and recreate to match the seed definition exactly.

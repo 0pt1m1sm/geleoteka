@@ -30,6 +30,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 const PREFIX = "VERIFY-REPL-";
+const WH = "wh_main_geleoteka";
 
 async function makePart(
   tag: string,
@@ -43,7 +44,7 @@ async function makePart(
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({
-    data: { partId: part.id, tenantKey: TENANT_KEY, quantity, reserved: 0, reorderPoint, reorderUpTo },
+    data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId: WH, quantity, reserved: 0, reorderPoint, reorderUpTo },
   });
   return part.id;
 }
@@ -108,7 +109,7 @@ async function main(): Promise<void> {
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({
-    data: { partId: partF.id, tenantKey: "other-tenant", quantity: 0, reserved: 0, reorderPoint: null, reorderUpTo: null },
+    data: { partId: partF.id, tenantKey: "other-tenant", warehouseId: WH, quantity: 0, reserved: 0, reorderPoint: null, reorderUpTo: null },
   });
 
   // ORDERED supplier order owing 20 units of part C → incoming covers the gap.
@@ -122,7 +123,7 @@ async function main(): Promise<void> {
     },
   });
 
-  const rows = await buildReorderReport(db, TENANT_KEY, LOW_STOCK_THRESHOLD);
+  const rows = await buildReorderReport(db, TENANT_KEY, WH, LOW_STOCK_THRESHOLD);
   const byId = new Map(rows.map((r) => [r.partId, r]));
 
   const a = byId.get(idA);

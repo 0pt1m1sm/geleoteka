@@ -2,7 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
 import { incomingByPartIds } from "@/lib/warehouse/incoming";
-import { LOW_STOCK_THRESHOLD, TENANT_KEY } from "@/lib/wms-host";
+import { LOW_STOCK_THRESHOLD, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { effectiveReorderPoint } from "@/lib/warehouse/replenishment";
 import { Pagination } from "@/components/ui";
 import { ReorderPolicyCell } from "@/components/admin/ReorderPolicyCell";
@@ -13,14 +13,14 @@ interface PartRow {
   id: string;
   name: string;
   article: string;
-  stockItem: {
+  stockItems: Array<{
     id: string;
     quantity: number;
     reserved: number;
     barcode: string | null;
     reorderPoint: number | null;
     reorderUpTo: number | null;
-  } | null;
+  }>;
 }
 
 /** Cross-part stock overview: name/article/barcode + on-hand/reserved/available,
@@ -30,13 +30,17 @@ export async function WarehouseOverview({
   q,
   page,
   loc,
+  warehouseId: warehouseIdProp,
 }: {
   q?: string;
   page: number;
   loc?: string;
+  /** Active warehouse to scope to; falls back to the default warehouse. */
+  warehouseId?: string;
 }): Promise<React.ReactElement> {
   const query = (q ?? "").trim();
   const location = (loc ?? "").trim().toUpperCase();
+  const warehouseId = warehouseIdProp ?? (await defaultWarehouseId(db));
   const where = {
     isActive: true,
     ...(query
@@ -44,12 +48,12 @@ export async function WarehouseOverview({
           OR: [
             { name: { contains: query, mode: "insensitive" as const } },
             { article: { contains: query, mode: "insensitive" as const } },
-            { stockItem: { is: { barcode: { contains: query, mode: "insensitive" as const } } } },
+            { stockItems: { some: { warehouseId, barcode: { contains: query, mode: "insensitive" as const } } } },
           ],
         }
       : {}),
     ...(location
-      ? { stockItem: { is: { bins: { some: { location, tenantKey: TENANT_KEY, quantity: { gt: 0 } } } } } }
+      ? { stockItems: { some: { warehouseId, bins: { some: { location, tenantKey: TENANT_KEY, quantity: { gt: 0 } } } } } }
       : {}),
   };
 
@@ -63,7 +67,7 @@ export async function WarehouseOverview({
       id: true,
       name: true,
       article: true,
-      stockItem: { select: { id: true, quantity: true, reserved: true, barcode: true, reorderPoint: true, reorderUpTo: true } },
+      stockItems: { where: { warehouseId }, select: { id: true, quantity: true, reserved: true, barcode: true, reorderPoint: true, reorderUpTo: true } },
     },
     orderBy: { name: "asc" },
     skip: (current - 1) * PAGE_SIZE,
@@ -74,7 +78,7 @@ export async function WarehouseOverview({
   // groupBy is cast through a loose function type — the generated (@ts-nocheck)
   // client's strict GroupByArgs overload leaks its result type into the arg
   // constraint, so the inline call otherwise fails to type-check.
-  const stockItemIds = parts.map((p) => p.stockItem?.id).filter((x): x is string => !!x);
+  const stockItemIds = parts.map((p) => p.stockItems[0]?.id).filter((x): x is string => !!x);
   const groupBins = db.stockBin.groupBy as unknown as (
     args: unknown,
   ) => Promise<Array<{ itemId: string; _sum: { quantity: number | null } }>>;
@@ -97,6 +101,7 @@ export async function WarehouseOverview({
     if (query) params.set("q", query);
     if (location) params.set("loc", location);
     if (p > 1) params.set("page", String(p));
+    if (warehouseIdProp) params.set("wh", warehouseIdProp); // keep active warehouse on paging/search
     const qs = params.toString();
     return qs ? `/admin/warehouse?${qs}` : "/admin/warehouse";
   };
@@ -106,6 +111,7 @@ export async function WarehouseOverview({
       <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-semibold">Остатки</h2>
         <form method="get" action="/admin/warehouse" className="flex gap-2 w-full sm:w-auto">
+          {warehouseIdProp ? <input type="hidden" name="wh" value={warehouseIdProp} /> : null}
           <input
             type="search"
             name="q"
@@ -141,7 +147,7 @@ export async function WarehouseOverview({
             </thead>
             <tbody>
               {parts.map((p) => {
-                const si = p.stockItem;
+                const si = p.stockItems[0] ?? null;
                 const onHand = si?.quantity ?? 0;
                 const reserved = si?.reserved ?? 0;
                 const available = si ? availableStock(si) : 0;

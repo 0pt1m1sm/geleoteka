@@ -113,8 +113,8 @@ async function placeStockImpl(
   location: string,
   key: string | null,
 ): Promise<void> {
-  await assertLocationUsable(client, location, tenantKey);
-  const item = await ensureStockItem(client, input.itemId, tenantKey);
+  await assertLocationUsable(client, location, input.warehouseId, tenantKey);
+  const item = await ensureStockItem(client, input.itemId, tenantKey, input.warehouseId);
 
   const placed = await sumBins(client, item.id, tenantKey);
   const unplaced = item.quantity - placed;
@@ -134,9 +134,9 @@ async function placeStockImpl(
   if (key) {
     // Audit-first: claim the key before mutating the bin (atomic via self-wrap).
     await auditBinMovement(client, row);
-    await incrementBin(client, item.id, location, input.qty, tenantKey);
+    await incrementBin(client, item.id, location, input.qty, tenantKey, input.warehouseId);
   } else {
-    await incrementBin(client, item.id, location, input.qty, tenantKey);
+    await incrementBin(client, item.id, location, input.qty, tenantKey, input.warehouseId);
     await insertBinMovement(client, row);
   }
 }
@@ -169,8 +169,8 @@ async function transferStockImpl(
   key: string | null,
 ): Promise<void> {
   // Destination only — a blocked SOURCE must still be evacuable.
-  await assertLocationUsable(client, to, tenantKey);
-  const item = await ensureStockItem(client, input.itemId, tenantKey);
+  await assertLocationUsable(client, to, input.warehouseId, tenantKey);
+  const item = await ensureStockItem(client, input.itemId, tenantKey, input.warehouseId);
 
   const row: BinAuditRow = {
     itemId: item.id,
@@ -187,11 +187,11 @@ async function transferStockImpl(
     await auditBinMovement(client, row); // claim first
     const ok = await decrementBinIfEnough(client, item.id, from, input.qty, tenantKey);
     if (!ok) throw WmsError.insufficientBin();
-    await incrementBin(client, item.id, to, input.qty, tenantKey);
+    await incrementBin(client, item.id, to, input.qty, tenantKey, input.warehouseId);
   } else {
     const ok = await decrementBinIfEnough(client, item.id, from, input.qty, tenantKey);
     if (!ok) throw WmsError.insufficientBin();
-    await incrementBin(client, item.id, to, input.qty, tenantKey);
+    await incrementBin(client, item.id, to, input.qty, tenantKey, input.warehouseId);
     await insertBinMovement(client, row);
   }
 }
@@ -220,7 +220,7 @@ async function removeFromBinImpl(
   location: string,
   key: string | null,
 ): Promise<void> {
-  const item = await ensureStockItem(client, input.itemId, tenantKey);
+  const item = await ensureStockItem(client, input.itemId, tenantKey, input.warehouseId);
 
   const row: BinAuditRow = {
     itemId: item.id,
@@ -248,11 +248,12 @@ async function removeFromBinImpl(
 export async function binsForItem(
   client: DbClientPort,
   itemId: string,
+  warehouseId: string,
   tenantKey?: string,
 ): Promise<ItemPlacement> {
   const tenant = tenantKey ?? DEFAULT_TENANT;
   const si = (await (client as DbClientPort).stockItem.findUnique({
-    where: { partId: itemId },
+    where: { partId_warehouseId: { partId: itemId, warehouseId } },
     select: { id: true, quantity: true },
   })) as { id: string; quantity: number } | null;
 
@@ -275,7 +276,8 @@ export async function binsForItem(
 export async function itemsInLocation(
   client: DbClientPort,
   location: string,
+  warehouseId: string,
   tenantKey?: string,
 ): Promise<ItemInLocation[]> {
-  return findItemsInLocation(client, normalizeLocation(location), tenantKey ?? DEFAULT_TENANT);
+  return findItemsInLocation(client, normalizeLocation(location), tenantKey ?? DEFAULT_TENANT, warehouseId);
 }

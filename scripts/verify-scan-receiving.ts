@@ -15,6 +15,7 @@ import "dotenv/config";
 import { db } from "../lib/db";
 import { WmsError, setLocationBlocked } from "../lib/wms/public";
 import { STAGING_LOCATION, TENANT_KEY } from "../lib/wms-host";
+const WH = "wh_main_geleoteka";
 import {
   applyScanReceiveOrderLine,
   applyBlindReceive,
@@ -30,7 +31,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 
 async function onHand(partId: string): Promise<number> {
   const si = (await db.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId: WH } },
     select: { quantity: true },
   })) as { quantity: number } | null;
   return si?.quantity ?? 0;
@@ -56,7 +57,7 @@ async function makePart(suffix: string): Promise<string> {
       article: `VERIFY-SR-${suffix}`,
       name: `verify scan-receive ${suffix}`,
       price: 100,
-      stockItem: { create: { quantity: 0, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -151,7 +152,7 @@ async function main(): Promise<void> {
   console.log("  ✓ blind receive raises on-hand into ПРИЁМКА; replay with same key is a no-op");
 
   // --- blocked-location guard ---
-  await setLocationBlocked(db, "VERIFY-SR-BLK", TENANT_KEY, { isActive: true, isBlocked: true });
+  await setLocationBlocked(db, "VERIFY-SR-BLK", WH, TENANT_KEY, { isActive: true, isBlocked: true });
   const p4 = await makePart("0004");
   let blocked = false;
   try {

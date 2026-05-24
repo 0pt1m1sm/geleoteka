@@ -25,6 +25,7 @@ import { applyReceive, computeReceivingStatus, isReceivingStatus } from "../lib/
 import { incomingByPartIds } from "../lib/warehouse/incoming";
 
 const TENANT = "geleoteka";
+const WH = "wh_main_geleoteka";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -54,7 +55,7 @@ async function main(): Promise<void> {
       article: "VERIFY-WH-0001",
       name: "verify-warehouse part",
       price: 100,
-      stockItem: { create: { quantity: 10, tenantKey: TENANT } },
+      stockItems: { create: { warehouseId: WH, quantity: 10, tenantKey: TENANT } },
     },
     select: { id: true },
   })) as { id: string };
@@ -91,7 +92,7 @@ async function main(): Promise<void> {
   // --- negative-result guard rolls back ---
   // Raise reserved to 20, then attempt to drop on-hand to 10 (< reserved) → must roll back.
   await recordMovement(db, {
-    item: { itemId: partId },
+    item: { itemId: partId, warehouseId: WH },
     reason: "RESERVATION",
     qty: 20,
     source: { type: "VerifyWh", id: "reserve-1" },
@@ -106,7 +107,7 @@ async function main(): Promise<void> {
   }
   const guardAfter = await movementCount(partId);
   const si = (await db.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId: WH } },
     select: { quantity: true },
   })) as { quantity: number };
   assert(threw, "adjust below reserved must throw");
@@ -120,7 +121,7 @@ async function main(): Promise<void> {
       article: "VERIFY-WH-0002",
       name: "verify-warehouse part 2",
       price: 100,
-      stockItem: { create: { quantity: 0, tenantKey: TENANT, barcode: "VERIFY-BC-1" } },
+      stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT, barcode: "VERIFY-BC-1" } },
     },
   });
 
@@ -141,7 +142,7 @@ async function main(): Promise<void> {
     dupeThrew = e instanceof DuplicateCodeError && e.field === "barcode";
   }
   const stillOwn = (await db.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId: WH } },
     select: { barcode: true },
   })) as { barcode: string | null };
   assert(dupeThrew, "duplicate barcode must throw DuplicateCodeError(barcode)");
@@ -150,8 +151,8 @@ async function main(): Promise<void> {
 
   // --- StockBin placement layer (Task 8) ---
   // partId currently: on-hand 30, reserved 20, 0 placed → unplaced 30.
-  await placeStock(db, { itemId: partId, location: "a-1-1", qty: 5, tenantKey: TENANT });
-  let placement = await binsForItem(db, partId, TENANT);
+  await placeStock(db, { itemId: partId, warehouseId: WH, location: "a-1-1", qty: 5, tenantKey: TENANT });
+  let placement = await binsForItem(db, partId, WH, TENANT);
   assert(placement.placed === 5 && placement.unplaced === 25, `after place: placed 5/unplaced 25, got ${placement.placed}/${placement.unplaced}`);
   const placeMv = await db.stockBinMovement.count({ where: { item: { partId }, reason: "PLACE" } });
   assert(placeMv === 1, "place writes one PLACE audit row");
@@ -162,7 +163,7 @@ async function main(): Promise<void> {
   // place beyond unplaced is rejected.
   let overThrew = false;
   try {
-    await placeStock(db, { itemId: partId, location: "C-9", qty: 1000, tenantKey: TENANT });
+    await placeStock(db, { itemId: partId, warehouseId: WH, location: "C-9", qty: 1000, tenantKey: TENANT });
   } catch (e) {
     overThrew = e instanceof WmsError && e.code === "INSUFFICIENT_UNPLACED";
   }
@@ -170,20 +171,20 @@ async function main(): Promise<void> {
   console.log("  ✓ placeStock rejects qty > unplaced");
 
   // transfer between bins.
-  await transferStock(db, { itemId: partId, from: "A-1-1", to: "B-2", qty: 2, tenantKey: TENANT });
-  placement = await binsForItem(db, partId, TENANT);
+  await transferStock(db, { itemId: partId, warehouseId: WH, from: "A-1-1", to: "B-2", qty: 2, tenantKey: TENANT });
+  placement = await binsForItem(db, partId, WH, TENANT);
   const a11 = placement.bins.find((b) => b.location === "A-1-1");
   const b2 = placement.bins.find((b) => b.location === "B-2");
   assert(a11?.quantity === 3 && b2?.quantity === 2, `after transfer: A-1-1=3,B-2=2 got ${a11?.quantity}/${b2?.quantity}`);
   assert(placement.placed === 5, "transfer does not change total placed");
-  const si2 = (await db.stockItem.findUnique({ where: { partId }, select: { quantity: true } })) as { quantity: number };
+  const si2 = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId, warehouseId: WH } }, select: { quantity: true } })) as { quantity: number };
   assert(si2.quantity === 30, "transfer does not change aggregate on-hand");
   console.log("  ✓ transferStock moves qty between bins, aggregate unchanged, audited TRANSFER");
 
   // transfer to same location rejected.
   let sameThrew = false;
   try {
-    await transferStock(db, { itemId: partId, from: "A-1-1", to: "a-1-1", qty: 1, tenantKey: TENANT });
+    await transferStock(db, { itemId: partId, warehouseId: WH, from: "A-1-1", to: "a-1-1", qty: 1, tenantKey: TENANT });
   } catch (e) {
     sameThrew = e instanceof WmsError && e.code === "SAME_LOCATION";
   }
@@ -194,7 +195,7 @@ async function main(): Promise<void> {
   const remBefore = await db.stockBinMovement.count({ where: { item: { partId }, reason: "REMOVE" } });
   let remOverThrew = false;
   try {
-    await removeFromBin(db, { itemId: partId, location: "B-2", qty: 100, tenantKey: TENANT });
+    await removeFromBin(db, { itemId: partId, warehouseId: WH, location: "B-2", qty: 100, tenantKey: TENANT });
   } catch (e) {
     remOverThrew = e instanceof WmsError && e.code === "INSUFFICIENT_BIN";
   }
@@ -204,25 +205,25 @@ async function main(): Promise<void> {
   console.log("  ✓ removeFromBin rejects qty > bin and writes no audit on rejection");
 
   // remove back to unplaced.
-  await removeFromBin(db, { itemId: partId, location: "B-2", qty: 2, tenantKey: TENANT });
-  placement = await binsForItem(db, partId, TENANT);
+  await removeFromBin(db, { itemId: partId, warehouseId: WH, location: "B-2", qty: 2, tenantKey: TENANT });
+  placement = await binsForItem(db, partId, WH, TENANT);
   assert(placement.placed === 3, `after remove placed 3, got ${placement.placed}`);
   console.log("  ✓ removeFromBin returns qty to unplaced, audited REMOVE");
 
   // itemsInLocation lists what's stored in a location.
-  const inA = await itemsInLocation(db, "A-1-1", TENANT);
+  const inA = await itemsInLocation(db, "A-1-1", WH, TENANT);
   assert(inA.some((r) => r.itemId === partId && r.quantity === 3), "itemsInLocation lists the part in A-1-1 with qty 3");
   console.log("  ✓ itemsInLocation lists items stored in a location");
 
   // reconcileNeeded when Σbins > on-hand (Phase-1 drift via aggregate CONSUMPTION).
   await recordMovement(db, {
-    item: { itemId: partId },
+    item: { itemId: partId, warehouseId: WH },
     reason: "CONSUMPTION",
     qty: 28,
     source: { type: "VerifyWh", id: "consume-1" },
     tenantKey: TENANT,
   });
-  placement = await binsForItem(db, partId, TENANT);
+  placement = await binsForItem(db, partId, WH, TENANT);
   assert(placement.reconcileNeeded === true, "Σbins > on-hand must flag reconcileNeeded");
   assert(placement.unplaced === 0, "unplaced clamps at 0 when over-placed");
   console.log("  ✓ reconcileNeeded flags when Σbins exceeds on-hand (drift), unplaced clamps at 0");
@@ -262,7 +263,7 @@ async function main(): Promise<void> {
       article: "VERIFY-WH-RECV-1",
       name: "verify-warehouse receive part",
       price: 100,
-      stockItem: { create: { quantity: 0, tenantKey: TENANT } },
+      stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } },
     },
     select: { id: true },
   })) as { id: string };
@@ -272,7 +273,7 @@ async function main(): Promise<void> {
       article: "VERIFY-WH-RECV-2",
       name: "verify-warehouse receive part 2",
       price: 100,
-      stockItem: { create: { quantity: 0, tenantKey: TENANT } },
+      stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } },
     },
     select: { id: true },
   })) as { id: string };
@@ -308,7 +309,7 @@ async function main(): Promise<void> {
   );
   assert(rec1.error === null && rec1.received === 3 && rec1.overReceived === false, "receive 3 → received 3, not over");
   assert(rec1.status === "PARTIALLY_RECEIVED", `expected PARTIALLY_RECEIVED, got ${rec1.status}`);
-  const onHand1 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  const onHand1 = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId: rPart.id, warehouseId: WH } }, select: { quantity: true } })) as { quantity: number };
   assert(onHand1.quantity === 3, `expected on-hand 3, got ${onHand1.quantity}`);
   const receiptCount1 = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
   assert(receiptCount1 === 1, `expected 1 RECEIPT, got ${receiptCount1}`);
@@ -319,7 +320,7 @@ async function main(): Promise<void> {
     applyReceive(tx, { orderId: order.id, lineId: line1.id, qty: 3, expectedReceived: 0, actorId: admin.id }),
   );
   assert(rec2.stale === true && rec2.error !== null, "replayed submit (stale expectedReceived) fails closed");
-  const onHand2 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  const onHand2 = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId: rPart.id, warehouseId: WH } }, select: { quantity: true } })) as { quantity: number };
   const receiptCount2 = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
   assert(onHand2.quantity === 3 && receiptCount2 === 1, "stale replay writes no RECEIPT and leaves on-hand unchanged");
   console.log("  ✓ applyReceive: stale/replayed submit fails closed (no double-count)");
@@ -341,7 +342,7 @@ async function main(): Promise<void> {
   );
   assert(rec4.received === 7 && rec4.overReceived === true, "over-receipt accepted and flagged (received 7 > ordered 5)");
   assert(rec4.status === "PARTIALLY_RECEIVED", `over-receipt with line2 open → PARTIALLY_RECEIVED, got ${rec4.status}`);
-  const onHand7 = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  const onHand7 = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId: rPart.id, warehouseId: WH } }, select: { quantity: true } })) as { quantity: number };
   assert(onHand7.quantity === 7, `over-receipt raises on-hand to 7, got ${onHand7.quantity}`);
   console.log("  ✓ applyReceive: over-receipt allowed while non-terminal (received > ordered)");
 
@@ -353,7 +354,7 @@ async function main(): Promise<void> {
   assert(rec5.error === null && rec5.status === "RECEIVED", `final line full → RECEIVED, got ${rec5.status}`);
   const ord = (await db.supplierOrder.findUnique({ where: { id: order.id }, select: { status: true, receivedAt: true } })) as { status: string; receivedAt: Date | null };
   assert(ord.status === "RECEIVED" && ord.receivedAt !== null, "order auto-RECEIVED with receivedAt stamped");
-  const place = await binsForItem(db, rPart2.id, TENANT);
+  const place = await binsForItem(db, rPart2.id, WH, TENANT);
   assert(place.bins.some((b) => b.location === "R-1-1" && b.quantity === 2), "received qty placed into bin R-1-1 (putaway)");
   console.log("  ✓ applyReceive: completing receive with location → RECEIVED + putaway into bin");
 
@@ -365,7 +366,7 @@ async function main(): Promise<void> {
   );
   assert(rec6.error !== null && rec6.stale !== true, "receiving on a terminal (RECEIVED) order is rejected");
   const termReceiptsAfter = await db.stockMovement.count({ where: { item: { partId: rPart.id }, reason: "RECEIPT" } });
-  const onHandTerm = (await db.stockItem.findUnique({ where: { partId: rPart.id }, select: { quantity: true } })) as { quantity: number };
+  const onHandTerm = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId: rPart.id, warehouseId: WH } }, select: { quantity: true } })) as { quantity: number };
   assert(termReceiptsAfter === termReceiptsBefore && onHandTerm.quantity === 7, "terminal-order receive writes no RECEIPT and leaves on-hand unchanged");
   console.log("  ✓ applyReceive: terminal order is closed for receiving (no stock raised)");
 
@@ -379,11 +380,11 @@ async function main(): Promise<void> {
   //    orders only. rPart/rPart2's order is now RECEIVED (closed) → contributes
   //    0. Build a fresh OPEN order to exercise open-status + remaining math.
   const incPartA = (await db.part.create({
-    data: { slug: "verify-wh-inc-a", article: "VERIFY-WH-INC-A", name: "inc A", price: 100, stockItem: { create: { quantity: 0, tenantKey: TENANT } } },
+    data: { slug: "verify-wh-inc-a", article: "VERIFY-WH-INC-A", name: "inc A", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
     select: { id: true },
   })) as { id: string };
   const incPartB = (await db.part.create({
-    data: { slug: "verify-wh-inc-b", article: "VERIFY-WH-INC-B", name: "inc B", price: 100, stockItem: { create: { quantity: 0, tenantKey: TENANT } } },
+    data: { slug: "verify-wh-inc-b", article: "VERIFY-WH-INC-B", name: "inc B", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
     select: { id: true },
   })) as { id: string };
   await db.supplierOrder.create({

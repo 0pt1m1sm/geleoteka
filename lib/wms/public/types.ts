@@ -7,9 +7,12 @@
  */
 
 /** The only shape the core knows about a stockable item. `itemId` is opaque:
- *  it is StockItem.partId in the auto-service host today, a SKU id elsewhere. */
+ *  it is StockItem.partId in the auto-service host today, a SKU id elsewhere.
+ *  `warehouseId` (Phase 6) is the opaque physical-site key the host injects; a
+ *  stock row is identified by (itemId, warehouseId). */
 export interface WmsItemRef {
   itemId: string;
+  warehouseId: string;
 }
 
 export type MovementReason =
@@ -84,6 +87,8 @@ export interface ItemPlacement {
 /** Common audit fields for a placement op. */
 interface PlacementMeta {
   itemId: string;
+  /** Physical-site key (Phase 6); host injects the default warehouse. */
+  warehouseId: string;
   qty: number;
   actorId?: string;
   note?: string;

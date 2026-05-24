@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
+import { defaultWarehouseId } from "@/lib/wms-host";
 
 /**
  * Resolves a CSV "compatible models" cell to a set of trim ids. Each token can
@@ -143,9 +144,9 @@ export async function POST(request: Request): Promise<NextResponse> {
           });
           // CSV import is an authoritative stock load — set the StockItem on-hand directly.
           await tx.stockItem.upsert({
-            where: { partId: existing.id },
+            where: { partId_warehouseId: { partId: existing.id, warehouseId: await defaultWarehouseId(tx) } },
             update: { quantity },
-            create: { partId: existing.id, quantity, tenantKey: "geleoteka" },
+            create: { partId: existing.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(tx) },
           });
           await tx.partTrim.deleteMany({ where: { partId: existing.id } });
           if (trimIds.length > 0) {
@@ -172,7 +173,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           select: { id: true },
         })) as { id: string };
         await db.stockItem.create({
-          data: { partId: created_.id, quantity, tenantKey: "geleoteka" },
+          data: { partId: created_.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(db) },
         });
         created++;
       }

@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { defaultWarehouseId } from "@/lib/wms-host";
 import {
   lookupByCode,
   availableStock,
@@ -159,7 +160,8 @@ async function resolvePart(
   articleResolver: (code: string) => Promise<string | null>,
 ): Promise<PartCard | null> {
   // 1) core: barcode / gtin. 2) host fallback: article (catalog identity).
-  const view = await lookupByCode(client, code, tenantKey);
+  const warehouseId = await defaultWarehouseId(client);
+  const view = await lookupByCode(client, code, warehouseId, tenantKey);
   const itemId = view?.itemId ?? (await articleResolver(code));
   if (!itemId) return null;
 
@@ -170,18 +172,18 @@ async function resolvePart(
       name: true,
       article: true,
       isActive: true,
-      stockItem: { select: { quantity: true, reserved: true, barcode: true } },
+      stockItems: { where: { warehouseId }, select: { quantity: true, reserved: true, barcode: true } },
     },
   })) as {
     id: string;
     name: string;
     article: string;
     isActive: boolean;
-    stockItem: { quantity: number; reserved: number; barcode: string | null } | null;
+    stockItems: Array<{ quantity: number; reserved: number; barcode: string | null }>;
   } | null;
   if (!part) return null;
 
-  const si = part.stockItem;
+  const si = part.stockItems[0] ?? null;
   return {
     kind: "part",
     itemId: part.id,
@@ -215,8 +217,9 @@ async function resolveOrder(client: DbClient, code: string): Promise<OrderCard |
 }
 
 async function resolveLocation(client: DbClient, code: string, tenantKey: string): Promise<LocationCard> {
-  const loc = await getLocation(client, code, tenantKey);
-  const rows = await itemsInLocation(client, code, tenantKey);
+  const warehouseId = await defaultWarehouseId(client);
+  const loc = await getLocation(client, code, warehouseId, tenantKey);
+  const rows = await itemsInLocation(client, code, warehouseId, tenantKey);
   const parts = (await client.part.findMany({
     where: { id: { in: rows.map((r) => r.itemId) } },
     select: { id: true, name: true, article: true },

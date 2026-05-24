@@ -4,7 +4,7 @@
 // scanned bin (bin-aware via consumeStock). Knows about RepairOrder/Estimate
 // (host knowledge), so it lives OUTSIDE lib/wms (the host-agnostic core).
 import { binsForItem, consumeStock, type DbClientPort, type BinPlacement } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export interface OpenPickLine {
   lineId: string;
@@ -97,9 +97,10 @@ export async function openPickLinesForOrder(
   })) as Array<{ id: string; name: string; article: string }>;
   const byId = new Map(parts.map((p) => [p.id, p]));
 
+  const warehouseId = await defaultWarehouseId(client);
   const result: OpenPickLine[] = [];
   for (const l of open) {
-    const placement = await binsForItem(client, l.partId, TENANT_KEY);
+    const placement = await binsForItem(client, l.partId, warehouseId, TENANT_KEY);
     result.push({
       lineId: l.lineId,
       partId: l.partId,
@@ -141,7 +142,7 @@ export async function applyPickLine(
     throw new PickError("WRONG_ITEM", "Запчасть не из этого заказа");
   }
   await consumeStock(client, {
-    item: { itemId: input.partId },
+    item: { itemId: input.partId, warehouseId: await defaultWarehouseId(client) },
     qty: line.requiredQty,
     source: { type: "RepairOrder", id: `${input.repairOrderId}:${input.lineId}` },
     fromLocation: input.location,

@@ -65,9 +65,10 @@ async function consumeStockImpl(
       input.source.type,
       input.source.id,
       "CONSUMPTION",
+      input.item.warehouseId,
     );
     if (already) {
-      const si = await ensureStockItem(client, input.item.itemId, tenantKey);
+      const si = await ensureStockItem(client, input.item.itemId, tenantKey, input.item.warehouseId);
       return {
         applied: false,
         itemId: input.item.itemId,
@@ -92,7 +93,7 @@ async function consumeStockImpl(
   // so the bins must not move either.
   if (!mv.applied) return mv;
 
-  const item = await ensureStockItem(client, input.item.itemId, tenantKey);
+  const item = await ensureStockItem(client, input.item.itemId, tenantKey, input.item.warehouseId);
   const actorUserId = input.actorId ?? null;
   const note = input.note ?? null;
 

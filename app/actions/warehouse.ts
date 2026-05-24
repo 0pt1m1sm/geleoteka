@@ -3,7 +3,7 @@
 // Warehouse stock actions: manual on-hand adjustment + multi-bin placement.
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { actorId, TENANT_KEY, STAGING_LOCATION } from "@/lib/wms-host";
+import { actorId, TENANT_KEY, STAGING_LOCATION, defaultWarehouseId } from "@/lib/wms-host";
 import { applyAdjustment } from "@/lib/warehouse/adjust";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import type { ReceiveResult } from "@/lib/warehouse/receive";
@@ -65,7 +65,7 @@ export async function adjustStock(
 /** Read a part's bin placement (bins + unplaced + reconcile flag). */
 export async function getPlacement(partId: string): Promise<PlacementResult> {
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
-  const placement = await binsForItem(db, partId, TENANT_KEY);
+  const placement = await binsForItem(db, partId, await defaultWarehouseId(db), TENANT_KEY);
   return { error: null, placement };
 }
 
@@ -80,7 +80,7 @@ interface LocationItem {
  *  Cell configuration is admin/manager only (PRD §7) — NOT warehouse_worker. */
 export async function listLocationsAction(): Promise<{ locations: WmsLocation[] }> {
   await requireRole(["ADMIN", "MANAGER"]);
-  const locations = await listLocations(db, TENANT_KEY);
+  const locations = await listLocations(db, await defaultWarehouseId(db), TENANT_KEY);
   return { locations };
 }
 
@@ -91,7 +91,7 @@ export async function setLocationBlockedAction(
 ): Promise<{ error: string | null; location?: WmsLocation }> {
   await requireRole(["ADMIN", "MANAGER"]);
   if (!code.trim()) return { error: "Укажите ячейку" };
-  const location = await setLocationBlocked(db, code, TENANT_KEY, flags);
+  const location = await setLocationBlocked(db, code, await defaultWarehouseId(db), TENANT_KEY, flags);
   return { error: null, location };
 }
 
@@ -99,7 +99,7 @@ export async function setLocationBlockedAction(
 export async function lookupLocation(location: string): Promise<{ items: LocationItem[] }> {
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { items: [] };
-  const rows = await itemsInLocation(db, location, TENANT_KEY);
+  const rows = await itemsInLocation(db, location, await defaultWarehouseId(db), TENANT_KEY);
   if (rows.length === 0) return { items: [] };
   const parts = (await db.part.findMany({
     where: { id: { in: rows.map((r) => r.itemId) } },
@@ -127,15 +127,15 @@ export async function placeIntoBin(
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
-    await db.$transaction((tx) =>
-      placeStock(tx, { itemId: partId, location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
+    await db.$transaction(async (tx) =>
+      placeStock(tx, { itemId: partId, warehouseId: await defaultWarehouseId(tx), location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);
     if (msg) return { error: msg };
     throw e;
   }
-  return { error: null, placement: await binsForItem(db, partId, TENANT_KEY) };
+  return { error: null, placement: await binsForItem(db, partId, await defaultWarehouseId(db), TENANT_KEY) };
 }
 
 /** Move stock between two locations. */
@@ -150,15 +150,15 @@ export async function transferBetweenBins(
   if (!from.trim() || !to.trim()) return { error: "Укажите обе ячейки" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
-    await db.$transaction((tx) =>
-      transferStock(tx, { itemId: partId, from, to, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
+    await db.$transaction(async (tx) =>
+      transferStock(tx, { itemId: partId, warehouseId: await defaultWarehouseId(tx), from, to, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);
     if (msg) return { error: msg };
     throw e;
   }
-  return { error: null, placement: await binsForItem(db, partId, TENANT_KEY) };
+  return { error: null, placement: await binsForItem(db, partId, await defaultWarehouseId(db), TENANT_KEY) };
 }
 
 /** Scanner receiving — open, not-fully-received supplier-order PART lines for a
@@ -230,13 +230,13 @@ export async function removeFromBinAction(
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   try {
-    await db.$transaction((tx) =>
-      removeFromBin(tx, { itemId: partId, location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
+    await db.$transaction(async (tx) =>
+      removeFromBin(tx, { itemId: partId, warehouseId: await defaultWarehouseId(tx), location, qty, actorId: actorId(session), idempotencyKey, tenantKey: TENANT_KEY }),
     );
   } catch (e) {
     const msg = wmsErrorMessage(e);
     if (msg) return { error: msg };
     throw e;
   }
-  return { error: null, placement: await binsForItem(db, partId, TENANT_KEY) };
+  return { error: null, placement: await binsForItem(db, partId, await defaultWarehouseId(db), TENANT_KEY) };
 }

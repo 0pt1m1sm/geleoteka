@@ -21,20 +21,22 @@ export function isUniqueViolation(e: unknown): boolean {
   return typeof e === "object" && e !== null && (e as { code?: string }).code === "P2002";
 }
 
-/** Find the StockItem for an external itemId (= partId today), creating one if absent. */
+/** Find the StockItem for an external itemId (= partId today) in a warehouse,
+ *  creating one if absent. A stock row is keyed by (partId, warehouseId). */
 export async function ensureStockItem(
   client: DbClientPort,
   partId: string,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<StockItemRow> {
   const existing = (await client.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId } },
     select: { id: true, quantity: true, reserved: true },
   })) as StockItemRow | null;
   if (existing) return existing;
 
   return (await client.stockItem.create({
-    data: { partId, tenantKey },
+    data: { partId, tenantKey, warehouseId },
     select: { id: true, quantity: true, reserved: true },
   })) as StockItemRow;
 }
@@ -53,6 +55,7 @@ export async function insertMovement(
     actorUserId: string | null;
     note: string | null;
     idempotencyKey: string | null;
+    warehouseId: string;
     tenantKey: string;
   },
 ): Promise<void> {
@@ -103,9 +106,10 @@ export async function movementExistsForSource(
   sourceType: string,
   sourceId: string,
   reason: MovementReason,
+  warehouseId: string,
 ): Promise<boolean> {
   const row = (await client.stockMovement.findFirst({
-    where: { tenantKey, sourceType, sourceId, reason },
+    where: { tenantKey, sourceType, sourceId, reason, warehouseId },
     select: { id: true },
   })) as { id: string } | null;
   return row !== null;
@@ -133,9 +137,10 @@ export async function findViewByCode(
   client: DbClientPort,
   code: string,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<StockItemView | null> {
   const row = (await client.stockItem.findFirst({
-    where: { tenantKey, OR: [{ barcode: code }, { gtin: code }] },
+    where: { tenantKey, warehouseId, OR: [{ barcode: code }, { gtin: code }] },
     select: { partId: true, barcode: true, quantity: true, reserved: true },
   })) as { partId: string; barcode: string | null; quantity: number; reserved: number } | null;
   if (!row) return null;
@@ -177,9 +182,10 @@ export async function findItemsInLocation(
   client: DbClientPort,
   location: string,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<Array<{ itemId: string; quantity: number }>> {
   const rows = (await client.stockBin.findMany({
-    where: { tenantKey, location, quantity: { gt: 0 } },
+    where: { tenantKey, warehouseId, location, quantity: { gt: 0 } },
     select: { quantity: true, item: { select: { partId: true } } },
     orderBy: { quantity: "desc" },
   })) as Array<{ quantity: number; item: { partId: string } }>;
@@ -193,10 +199,11 @@ export async function incrementBin(
   location: string,
   qty: number,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<void> {
   await client.stockBin.upsert({
     where: { tenantKey_itemId_location: { tenantKey, itemId: stockItemId, location } },
-    create: { itemId: stockItemId, location, quantity: qty, tenantKey },
+    create: { itemId: stockItemId, location, quantity: qty, tenantKey, warehouseId },
     update: { quantity: { increment: qty } },
   });
 }
@@ -304,39 +311,42 @@ export interface StockLocationRow {
   isBlocked: boolean;
 }
 
-/** Find a location registry row by normalized code. */
+/** Find a location registry row by normalized code within a warehouse. */
 export async function findLocation(
   client: DbClientPort,
   code: string,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<StockLocationRow | null> {
   return (await client.stockLocation.findUnique({
-    where: { tenantKey_code: { tenantKey, code } },
+    where: { tenantKey_warehouseId_code: { tenantKey, warehouseId, code } },
     select: { code: true, zone: true, isActive: true, isBlocked: true },
   })) as StockLocationRow | null;
 }
 
-/** Create-if-absent an active, unblocked location; returns its current row. */
+/** Create-if-absent an active, unblocked location in a warehouse; returns its row. */
 export async function ensureLocation(
   client: DbClientPort,
   code: string,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<StockLocationRow> {
   return (await client.stockLocation.upsert({
-    where: { tenantKey_code: { tenantKey, code } },
-    create: { code, tenantKey, isActive: true, isBlocked: false },
+    where: { tenantKey_warehouseId_code: { tenantKey, warehouseId, code } },
+    create: { code, tenantKey, warehouseId, isActive: true, isBlocked: false },
     update: {},
     select: { code: true, zone: true, isActive: true, isBlocked: true },
   })) as StockLocationRow;
 }
 
-/** All locations for a tenant, ordered by code. */
+/** All locations for a tenant + warehouse, ordered by code. */
 export async function listLocationRows(
   client: DbClientPort,
   tenantKey: string,
+  warehouseId: string,
 ): Promise<StockLocationRow[]> {
   return (await client.stockLocation.findMany({
-    where: { tenantKey },
+    where: { tenantKey, warehouseId },
     select: { code: true, zone: true, isActive: true, isBlocked: true },
     orderBy: { code: "asc" },
   })) as StockLocationRow[];
@@ -348,13 +358,15 @@ export async function updateLocationFlags(
   client: DbClientPort,
   code: string,
   tenantKey: string,
+  warehouseId: string,
   flags: { isActive?: boolean; isBlocked?: boolean },
 ): Promise<StockLocationRow> {
   return (await client.stockLocation.upsert({
-    where: { tenantKey_code: { tenantKey, code } },
+    where: { tenantKey_warehouseId_code: { tenantKey, warehouseId, code } },
     create: {
       code,
       tenantKey,
+      warehouseId,
       isActive: flags.isActive ?? true,
       isBlocked: flags.isBlocked ?? false,
     },
@@ -367,9 +379,10 @@ export async function updateLocationFlags(
 export async function findViewByItemId(
   client: DbClientPort,
   itemId: string,
+  warehouseId: string,
 ): Promise<StockItemView | null> {
   const row = (await client.stockItem.findUnique({
-    where: { partId: itemId },
+    where: { partId_warehouseId: { partId: itemId, warehouseId } },
     select: { partId: true, barcode: true, quantity: true, reserved: true },
   })) as { partId: string; barcode: string | null; quantity: number; reserved: number } | null;
   if (!row) return null;

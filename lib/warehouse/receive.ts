@@ -1,5 +1,5 @@
 import { recordMovement, placeStock, type DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export type SupplierOrderStatus =
   | "DRAFT"
@@ -108,9 +108,10 @@ export async function applyReceive(client: DbClientPort, input: ApplyReceiveInpu
   }
 
   const newReceived = expectedReceived + qty;
+  const warehouseId = await defaultWarehouseId(client);
 
   await recordMovement(client, {
-    item: { itemId: line.partId },
+    item: { itemId: line.partId, warehouseId },
     reason: "RECEIPT",
     qty,
     source: { type: "SupplierOrder", id: `${orderId}:${lineId}:${newReceived}` },
@@ -119,7 +120,7 @@ export async function applyReceive(client: DbClientPort, input: ApplyReceiveInpu
   });
 
   if (location && location.trim()) {
-    await placeStock(client, { itemId: line.partId, location, qty, actorId, tenantKey: TENANT_KEY });
+    await placeStock(client, { itemId: line.partId, warehouseId, location, qty, actorId, tenantKey: TENANT_KEY });
   }
 
   const lines = (await client.supplierOrderItem.findMany({

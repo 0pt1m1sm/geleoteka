@@ -38,7 +38,7 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
       name: true,
       article: true,
       price: true,
-      stockItem: { select: { quantity: true, reserved: true } },
+      stockItems: { select: { quantity: true, reserved: true } },
     },
     orderBy: { name: "asc" },
     take: 20,
@@ -47,7 +47,7 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
     name: string;
     article: string;
     price: number;
-    stockItem: { quantity: number; reserved: number } | null;
+    stockItems: Array<{ quantity: number; reserved: number }>;
   }>;
 
   return parts.map((p) => ({
@@ -55,6 +55,6 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
     name: p.name,
     article: p.article,
     price: p.price,
-    available: p.stockItem ? availableStock(p.stockItem) : 0,
+    available: p.stockItems[0] ? availableStock(p.stockItems[0]) : 0,
   }));
 }

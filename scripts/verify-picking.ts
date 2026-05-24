@@ -22,6 +22,7 @@ import { WmsError, placeStock, consumeStock, binsForItem } from "../lib/wms/publ
 import { TENANT_KEY } from "../lib/wms-host";
 import { consumeApprovedEstimateParts } from "../lib/fulfillment/consume-parts";
 import { openPickLinesForOrder, applyPickLine, PickError } from "../lib/warehouse/pick";
+const WH = "wh_main_geleoteka";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -44,7 +45,7 @@ async function assertThrowsCode(fn: () => Promise<unknown>, code: string, msg: s
 }
 
 async function onHand(partId: string): Promise<number> {
-  const si = (await db.stockItem.findUnique({ where: { partId }, select: { quantity: true } })) as
+  const si = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId, warehouseId: WH } }, select: { quantity: true } })) as
     | { quantity: number }
     | null;
   return si?.quantity ?? 0;
@@ -142,7 +143,7 @@ async function makePart(qty: number): Promise<string> {
       article: `VERIFY-PICK-${suffix}`,
       name: `verify pick ${suffix}`,
       price: 100,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -157,9 +158,9 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-AA";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 4, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 4, tenantKey: TENANT_KEY });
     await consumeStock(db, {
-      item: { itemId: p },
+      item: { itemId: p, warehouseId: WH },
       qty: 3,
       source: { type: "VerifyPick", id: `a:${p}` },
       tenantKey: TENANT_KEY,
@@ -174,17 +175,17 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-BB";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 8, tenantKey: TENANT_KEY }); // unplaced 2
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 8, tenantKey: TENANT_KEY }); // unplaced 2
     const src = { type: "VerifyPick", id: `b:${p}` };
-    await consumeStock(db, { item: { itemId: p }, qty: 5, source: src, tenantKey: TENANT_KEY });
+    await consumeStock(db, { item: { itemId: p, warehouseId: WH }, qty: 5, source: src, tenantKey: TENANT_KEY });
     assert((await onHand(p)) === 5, "(b) on-hand 10−5=5");
     // needed = Σbins(8) − quantity(5) = 3 pulled from the bin
     assert((await binQty(p, CELL)) === 5, "(b) bin 8−3=5");
     assert((await sumBins(p)) === 5, "(b) Σbins 5 = quantity 5");
-    const place = await binsForItem(db, p, TENANT_KEY);
+    const place = await binsForItem(db, p, WH, TENANT_KEY);
     assert(place.reconcileNeeded === false, "(b) no reconcile drift");
     // replay same source triple → no-op, no extra bin pull
-    await consumeStock(db, { item: { itemId: p }, qty: 5, source: src, tenantKey: TENANT_KEY });
+    await consumeStock(db, { item: { itemId: p, warehouseId: WH }, qty: 5, source: src, tenantKey: TENANT_KEY });
     assert((await onHand(p)) === 5, "(b) replay: on-hand unchanged");
     assert((await sumBins(p)) === 5, "(b) replay: Σbins unchanged (no extra PICK)");
     console.log("(b) PASS — consume beyond unplaced pulls bins; replay is a no-op");
@@ -195,10 +196,10 @@ async function main(): Promise<void> {
     const CELL1 = "VERIFY-PICK-C1"; // created first (oldest)
     const CELL2 = "VERIFY-PICK-C2";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL1, qty: 3, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p, location: CELL2, qty: 4, tenantKey: TENANT_KEY }); // Σbins 7, unplaced 3
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL1, qty: 3, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL2, qty: 4, tenantKey: TENANT_KEY }); // Σbins 7, unplaced 3
     await consumeStock(db, {
-      item: { itemId: p },
+      item: { itemId: p, warehouseId: WH },
       qty: 8,
       source: { type: "VerifyPick", id: `c:${p}` },
       tenantKey: TENANT_KEY,
@@ -215,14 +216,14 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-DD";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 10, tenantKey: TENANT_KEY }); // Σbins 10 = qty 10
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY }); // Σbins 10 = qty 10
     // Simulate a legacy Phase-1 aggregate consumption that lowered on-hand WITHOUT
     // touching the bin (the drift this phase heals): quantity 10 → 7, bin still 10.
-    await db.stockItem.update({ where: { partId: p }, data: { quantity: 7 } });
-    let place = await binsForItem(db, p, TENANT_KEY);
+    await db.stockItem.update({ where: { partId_warehouseId: { partId: p, warehouseId: WH } }, data: { quantity: 7 } });
+    let place = await binsForItem(db, p, WH, TENANT_KEY);
     assert(place.reconcileNeeded === true, "(d) precondition: drift present (Σbins 10 > qty 7)");
     await consumeStock(db, {
-      item: { itemId: p },
+      item: { itemId: p, warehouseId: WH },
       qty: 3,
       source: { type: "VerifyPick", id: `d:${p}` },
       tenantKey: TENANT_KEY,
@@ -230,7 +231,7 @@ async function main(): Promise<void> {
     // quantity 7−3=4; needed = Σbins(10) − 4 = 6 pulled → bin 4
     assert((await onHand(p)) === 4, "(d) on-hand 7−3=4");
     assert((await sumBins(p)) === 4, "(d) Σbins healed to 4 = quantity");
-    place = await binsForItem(db, p, TENANT_KEY);
+    place = await binsForItem(db, p, WH, TENANT_KEY);
     assert(place.reconcileNeeded === false, "(d) drift cleared");
     console.log("(d) PASS — pre-existing drift heals toward Σbins=quantity");
   }
@@ -239,9 +240,9 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-EE";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 6, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 6, tenantKey: TENANT_KEY });
     await consumeStock(db, {
-      item: { itemId: p },
+      item: { itemId: p, warehouseId: WH },
       qty: 4,
       source: { type: "VerifyPick", id: `e:${p}` },
       fromLocation: CELL,
@@ -256,11 +257,11 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-FF";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 2, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 2, tenantKey: TENANT_KEY });
     await assertThrowsCode(
       () =>
         consumeStock(db, {
-          item: { itemId: p },
+          item: { itemId: p, warehouseId: WH },
           qty: 5,
           source: { type: "VerifyPick", id: `f:${p}` },
           fromLocation: CELL,
@@ -282,7 +283,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-CP1";
     const p = await makePart(5);
-    await placeStock(db, { itemId: p, location: CELL, qty: 5, tenantKey: TENANT_KEY }); // fully placed, unplaced 0
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY }); // fully placed, unplaced 0
     const { dealId } = await makeApprovedPartDeal([{ partId: p, qty: 2 }]);
     const src = `VERIFY-PICK-ro-${dealId}`;
     await db.$transaction((tx) =>
@@ -290,7 +291,7 @@ async function main(): Promise<void> {
     );
     assert((await onHand(p)) === 3, "(cp1) on-hand 5−2=3");
     assert((await sumBins(p)) === 3, "(cp1) bin deducted 5−2=3 (would be 5/drift before Task 2)");
-    const place = await binsForItem(db, p, TENANT_KEY);
+    const place = await binsForItem(db, p, WH, TENANT_KEY);
     assert(place.reconcileNeeded === false, "(cp1) no drift after close");
     // Idempotent re-close: same source triple → no double consume, no tx poison.
     await db.$transaction((tx) =>
@@ -306,8 +307,8 @@ async function main(): Promise<void> {
     const CELL = "VERIFY-PICK-GG";
     const partA = await makePart(5);
     const partB = await makePart(5); // NOT on the order
-    await placeStock(db, { itemId: partA, location: CELL, qty: 5, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: partB, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: partA, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: partB, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { dealId, userId, lineIds } = await makeApprovedPartDeal([{ partId: partA, qty: 2 }]);
     const roId = await makeRepairOrder(userId, dealId);
     const err = (await (async () => {
@@ -329,7 +330,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-HH";
     const partA = await makePart(5);
-    await placeStock(db, { itemId: partA, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: partA, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { dealId, userId, lineIds } = await makeApprovedPartDeal([{ partId: partA, qty: 2 }]);
     const roId = await makeRepairOrder(userId, dealId);
     let open = await openPickLinesForOrder(db, roId);
@@ -348,7 +349,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-II";
     const partA = await makePart(5);
-    await placeStock(db, { itemId: partA, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: partA, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { dealId, userId, lineIds } = await makeApprovedPartDeal([{ partId: partA, qty: 2 }]);
     const roId = await makeRepairOrder(userId, dealId);
     await db.$transaction((tx) =>
@@ -371,7 +372,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PICK-JJ";
     const partA = await makePart(5);
-    await placeStock(db, { itemId: partA, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: partA, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { dealId, userId, lineIds } = await makeApprovedPartDeal([{ partId: partA, qty: 2 }]);
     const roId = await makeRepairOrder(userId, dealId, "CANCELLED");
     const open = await openPickLinesForOrder(db, roId);

@@ -93,7 +93,7 @@ export default async function PartsPage({ searchParams }: Props) {
   // In-stock = on-hand > 0 (StockItem.quantity). Available (− reserved) needs a
   // column-to-column compare Prisma can't express in a where, so the storefront
   // filter uses on-hand; reservations are an internal concept.
-  if (inStockOnly) where.stockItem = { is: { quantity: { gt: 0 } } };
+  if (inStockOnly) where.stockItems = { some: { quantity: { gt: 0 } } };
 
   if (minPrice !== null || maxPrice !== null) {
     const priceFilter: Record<string, number> = {};
@@ -111,7 +111,7 @@ export default async function PartsPage({ searchParams }: Props) {
     where,
     include: {
       category: { select: { name: true, slug: true } },
-      stockItem: { select: { quantity: true } },
+      stockItems: { select: { quantity: true } },
     },
     orderBy: { name: "asc" },
     take: PAGE_SIZE,
@@ -258,12 +258,12 @@ export default async function PartsPage({ searchParams }: Props) {
                       </div>
                       <span
                         className={`text-xs ${
-                          (((part.stockItem as { quantity: number } | null)?.quantity ?? 0) > 0)
+                          (((part.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0) > 0)
                             ? "text-[var(--color-success)]"
                             : "text-[var(--foreground-muted)]"
                         }`}
                       >
-                        {(((part.stockItem as { quantity: number } | null)?.quantity ?? 0) > 0) ? "В наличии" : "Под заказ"}
+                        {(((part.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0) > 0) ? "В наличии" : "Под заказ"}
                       </span>
                     </div>
                   </Link>

@@ -25,6 +25,7 @@ import "dotenv/config";
 import { db } from "../lib/db";
 import { WmsError, placeStock, consumeStock } from "../lib/wms/public";
 import { TENANT_KEY } from "../lib/wms-host";
+const WH = "wh_main_geleoteka";
 import { consumeApprovedEstimateParts } from "../lib/fulfillment/consume-parts";
 import {
   openPackLinesForOrder,
@@ -42,7 +43,7 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 async function onHand(partId: string): Promise<number> {
-  const si = (await db.stockItem.findUnique({ where: { partId }, select: { quantity: true } })) as
+  const si = (await db.stockItem.findUnique({ where: { partId_warehouseId: { partId, warehouseId: WH } }, select: { quantity: true } })) as
     | { quantity: number }
     | null;
   return si?.quantity ?? 0;
@@ -98,7 +99,7 @@ async function makePart(qty: number): Promise<string> {
       article: `VERIFY-PACK-${suffix}`,
       name: `verify pack ${suffix}`,
       price: 100,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -184,7 +185,7 @@ async function makeRetailShipment(
   // Mimic createPartOrder's point-of-sale consumption (source orderId:partId).
   for (const i of items) {
     await consumeStock(db, {
-      item: { itemId: i.partId },
+      item: { itemId: i.partId, warehouseId: WH },
       qty: i.qty,
       source: { type: "PartShipment", id: `${order.id}:${i.partId}` },
       tenantKey: TENANT_KEY,
@@ -201,7 +202,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-AA";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 6, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 6, tenantKey: TENANT_KEY });
     const { orderId } = await makeRetailShipment([{ partId: p, qty: 2 }]);
     const open = await openPackLinesForOrder(db, orderId);
     assert(open.length === 0, "(a) retail order has no open pack lines (consumed at sale)");
@@ -231,7 +232,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-CC";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: p, qty: 4 }]);
     await db.$transaction((tx) =>
       applyPackLine(tx, { orderId, lineKey: lineIds[0], partId: p, location: CELL }),
@@ -250,8 +251,8 @@ async function main(): Promise<void> {
     const CELL = "VERIFY-PACK-DD";
     const pA = await makePart(5);
     const pB = await makePart(5); // not on the order
-    await placeStock(db, { itemId: pA, location: CELL, qty: 5, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: pB, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: pA, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: pB, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: pA, qty: 2 }]);
     let err: unknown = null;
     try {
@@ -271,7 +272,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-EE";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 2, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 2, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: p, qty: 5 }]);
     let err: unknown = null;
     try {
@@ -295,7 +296,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-FF";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: p, qty: 3 }]);
     await db.$transaction((tx) =>
       applyPackLine(tx, { orderId, lineKey: lineIds[0], partId: p, location: CELL }),
@@ -322,8 +323,8 @@ async function main(): Promise<void> {
     const CELL = "VERIFY-PACK-GG";
     const p1 = await makePart(10);
     const p2 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL, qty: 10, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p2, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p2, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([
       { partId: p1, qty: 1 },
       { partId: p2, qty: 1 },
@@ -346,7 +347,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-HH";
     const p = await makePart(10);
-    await placeStock(db, { itemId: p, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: p, qty: 2 }]);
     const order = (await db.partShipment.findUnique({
       where: { id: orderId },
@@ -369,7 +370,7 @@ async function main(): Promise<void> {
   {
     const CELL = "VERIFY-PACK-II";
     const p = await makePart(5);
-    await placeStock(db, { itemId: p, location: CELL, qty: 5, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p, warehouseId: WH, location: CELL, qty: 5, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([{ partId: p, qty: 2 }], "CANCELLED");
     const open = await openPackLinesForOrder(db, orderId);
     assert(open.length === 0, "(i) CANCELLED order exposes no open pack lines");
@@ -391,8 +392,8 @@ async function main(): Promise<void> {
     const CELL = "VERIFY-PACK-JJ";
     const p1 = await makePart(10);
     const p2 = await makePart(10);
-    await placeStock(db, { itemId: p1, location: CELL, qty: 10, tenantKey: TENANT_KEY });
-    await placeStock(db, { itemId: p2, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p1, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
+    await placeStock(db, { itemId: p2, warehouseId: WH, location: CELL, qty: 10, tenantKey: TENANT_KEY });
     const { orderId, lineIds } = await makeCrmShipment([
       { partId: p1, qty: 2 },
       { partId: p2, qty: 3 },

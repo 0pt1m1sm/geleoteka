@@ -8,6 +8,7 @@ import "dotenv/config";
 import { db } from "../lib/db";
 import { placeStock } from "../lib/wms/public";
 import { TENANT_KEY } from "../lib/wms-host";
+const WH = "wh_main_geleoteka";
 
 async function clean(): Promise<void> {
   await db.vehicle.deleteMany({ where: { vin: { startsWith: "E2E-PICK-" } } });
@@ -23,7 +24,7 @@ async function makePart(article: string, qty: number): Promise<string> {
       article,
       name: `E2E pick ${article}`,
       price: 1000,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT_KEY } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },
     },
     select: { id: true },
   })) as { id: string };
@@ -40,10 +41,10 @@ async function main(): Promise<void> {
 
   // PA: on the order (line 1, qty 2), 5 placed in E2E-A1 → TS-001 happy pick.
   const pa = await makePart("E2E-PICK-A", 5);
-  await placeStock(db, { itemId: pa, location: "E2E-A1", qty: 5, tenantKey: TENANT_KEY });
+  await placeStock(db, { itemId: pa, warehouseId: WH, location: "E2E-A1", qty: 5, tenantKey: TENANT_KEY });
   // PC: on the order (line 2, qty 5) but only 2 placed in E2E-C1 → TS-003 short bin.
   const pc = await makePart("E2E-PICK-C", 2);
-  await placeStock(db, { itemId: pc, location: "E2E-C1", qty: 2, tenantKey: TENANT_KEY });
+  await placeStock(db, { itemId: pc, warehouseId: WH, location: "E2E-C1", qty: 2, tenantKey: TENANT_KEY });
   // PB: NOT on the order → TS-002 WRONG_ITEM when scanned against a line.
   await makePart("E2E-PICK-B", 5);
 

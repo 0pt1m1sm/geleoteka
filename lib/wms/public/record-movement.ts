@@ -39,7 +39,7 @@ export async function recordMovement(
     if (!input.source.id) throw WmsError.nullSource(input.reason);
   }
 
-  const item = await ensureStockItem(client, input.item.itemId, tenantKey);
+  const item = await ensureStockItem(client, input.item.itemId, tenantKey, input.item.warehouseId);
 
   const { quantityDelta } = deltasForReason(input.reason, input.qty);
   let { reservedDelta } = deltasForReason(input.reason, input.qty);
@@ -86,6 +86,7 @@ export async function recordMovement(
       actorUserId: input.actorId ?? null,
       note: input.note ?? null,
       idempotencyKey,
+      warehouseId: input.item.warehouseId,
       tenantKey,
     });
   } catch (e) {

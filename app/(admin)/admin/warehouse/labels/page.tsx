@@ -49,15 +49,15 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
   if (partIds.length > 0) {
     const parts = (await db.part.findMany({
       where: { id: { in: partIds } },
-      select: { id: true, name: true, article: true, stockItem: { select: { barcode: true } } },
-    })) as Array<{ id: string; name: string; article: string; stockItem: { barcode: string | null } | null }>;
+      select: { id: true, name: true, article: true, stockItems: { select: { barcode: true } } },
+    })) as Array<{ id: string; name: string; article: string; stockItems: Array<{ barcode: string | null }> }>;
     const byId = new Map(parts.map((p) => [p.id, p]));
     for (const id of partIds) {
       const p = byId.get(id);
       if (!p) continue;
       // QR encodes the typed re-scannable code (barcode if present, else article);
       // the caption stays the human-readable code.
-      const code = p.stockItem?.barcode ?? p.article;
+      const code = p.stockItems[0]?.barcode ?? p.article;
       labels.push({ qr: await qr(formatScanCode("PART", code)), title: p.name, sub: code });
     }
   }

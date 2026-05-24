@@ -1,5 +1,5 @@
 import type { DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 /** Thrown when a barcode/gtin is already held by another StockItem. */
 export class DuplicateCodeError extends Error {
@@ -35,5 +35,6 @@ export async function assignCodes(
     });
     if (dupe) throw new DuplicateCodeError("gtin");
   }
-  await client.stockItem.update({ where: { partId }, data: { barcode, gtin } });
+  const warehouseId = await defaultWarehouseId(client);
+  await client.stockItem.update({ where: { partId_warehouseId: { partId, warehouseId } }, data: { barcode, gtin } });
 }

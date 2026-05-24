@@ -5,7 +5,7 @@
 // Reservation events are user-driven (no status-machine re-fire), so each gets
 // a unique source id; the lineId is encoded for audit traceability.
 import { recordMovement, type DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 // Source id is deterministic per (line, kind) so the WMS idempotency key
 // (tenantKey, sourceType, sourceId, reason) makes a repeated add-reserve or
@@ -22,7 +22,7 @@ export async function reserveForLine(
 ): Promise<void> {
   if (input.qty <= 0) return;
   await recordMovement(client, {
-    item: { itemId: input.partId },
+    item: { itemId: input.partId, warehouseId: await defaultWarehouseId(client) },
     reason: "RESERVATION",
     qty: input.qty,
     source: { type: "EstimateLine", id: sourceId(input.lineId, "reserve", input.version) },
@@ -38,7 +38,7 @@ export async function releaseForLine(
 ): Promise<void> {
   if (input.qty <= 0) return;
   await recordMovement(client, {
-    item: { itemId: input.partId },
+    item: { itemId: input.partId, warehouseId: await defaultWarehouseId(client) },
     reason: "RELEASE",
     qty: input.qty,
     source: { type: "EstimateLine", id: sourceId(input.lineId, "release", input.version) },

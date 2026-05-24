@@ -1,5 +1,5 @@
 import { recordMovement, placeStock, assertLocationUsable, type DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY, STAGING_LOCATION } from "@/lib/wms-host";
+import { TENANT_KEY, STAGING_LOCATION, defaultWarehouseId } from "@/lib/wms-host";
 import { applyReceive, type ReceiveResult } from "./receive";
 import { OPEN_SUPPLIER_ORDER_STATUSES } from "./incoming";
 
@@ -50,7 +50,7 @@ export async function applyScanReceiveOrderLine(
   const location = (input.location ?? "").trim() || STAGING_LOCATION;
   // Reject a blocked/inactive target before any stock change (applyReceive →
   // placeStock does not validate the location itself).
-  await assertLocationUsable(client, location, TENANT_KEY);
+  await assertLocationUsable(client, location, await defaultWarehouseId(client), TENANT_KEY);
   return applyReceive(client, {
     orderId: input.orderId,
     lineId: input.lineId,
@@ -91,9 +91,10 @@ export async function applyBlindReceive(
   // Coerce a blank/whitespace cell to the staging default — never place into a
   // normalized empty-string bin.
   const location = (input.location ?? "").trim() || STAGING_LOCATION;
-  await assertLocationUsable(client, location, TENANT_KEY);
+  const warehouseId = await defaultWarehouseId(client);
+  await assertLocationUsable(client, location, warehouseId, TENANT_KEY);
   const mv = await recordMovement(client, {
-    item: { itemId: partId },
+    item: { itemId: partId, warehouseId },
     reason: "RECEIPT",
     qty,
     source: { type: "ManualReceipt", id: idempotencyKey },
@@ -104,6 +105,7 @@ export async function applyBlindReceive(
   if (mv.applied) {
     await placeStock(client, {
       itemId: partId,
+      warehouseId,
       location,
       qty,
       actorId,

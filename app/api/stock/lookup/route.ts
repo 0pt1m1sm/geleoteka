@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { lookupByCode, availableStock } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   }
 
   // 1) Core: barcode / gtin.
-  const view = await lookupByCode(db, code, TENANT_KEY);
+  const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   let itemId = view?.itemId ?? null;
 
   // 2) Host fallback: article (catalog identity, not known to the core).
@@ -49,19 +49,19 @@ export async function GET(request: Request): Promise<NextResponse> {
       id: true,
       name: true,
       article: true,
-      stockItem: { select: { quantity: true, reserved: true, barcode: true } },
+      stockItems: { select: { quantity: true, reserved: true, barcode: true } },
     },
   })) as {
     id: string;
     name: string;
     article: string;
-    stockItem: { quantity: number; reserved: number; barcode: string | null } | null;
+    stockItems: Array<{ quantity: number; reserved: number; barcode: string | null }>;
   } | null;
   if (!part) {
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Не найдено" } }, { status: 404 });
   }
 
-  const si = part.stockItem;
+  const si = part.stockItems[0] ?? null;
   return NextResponse.json({
     data: {
       itemId: part.id,

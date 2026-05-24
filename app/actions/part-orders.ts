@@ -10,7 +10,7 @@ import {
 import { createDeal } from "@/lib/crm/public";
 import { nextPartOrderNumber } from "@/lib/crm/public";
 import { consumeStock } from "@/lib/wms/public";
-import { TENANT_KEY, actorId } from "@/lib/wms-host";
+import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -63,7 +63,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     const partIds = items.map((i) => i.partId);
     const parts = await db.part.findMany({
       where: { id: { in: partIds } },
-      include: { stockItem: { select: { quantity: true, reserved: true } } },
+      include: { stockItems: { select: { quantity: true, reserved: true } } },
     });
 
     const partMap = new Map(parts.map((p: Record<string, unknown>) => [p.id as string, p]));
@@ -76,7 +76,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       if (!part) return { success: false, error: `Запчасть не найдена` };
 
       const price = part.price as number;
-      const si = part.stockItem as { quantity: number; reserved: number } | null;
+      const si = (part.stockItems as Array<{ quantity: number; reserved: number }>)[0] ?? null;
       const stock = si ? si.quantity - si.reserved : 0;
 
       if (stock < item.quantity) {
@@ -129,11 +129,12 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       // Retail sale is point-of-sale consumption: stock leaves on-hand now,
       // through the WMS ledger (not a direct Part write). Idempotency key is
       // per (order, part) so a retry never double-consumes.
+      const warehouseId = await defaultWarehouseId(tx);
       for (const item of orderItems) {
         // consumeStock = CONSUMPTION + bin deduction (unplaced-first → oldest
         // bins) so a point-of-sale sale keeps Σbins consistent with on-hand.
         await consumeStock(tx, {
-          item: { itemId: item.partId },
+          item: { itemId: item.partId, warehouseId },
           qty: item.quantity,
           source: { type: "PartShipment", id: `${created.id}:${item.partId}` },
           actorId: actorId(session),

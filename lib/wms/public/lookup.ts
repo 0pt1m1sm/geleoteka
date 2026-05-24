@@ -11,15 +11,17 @@ const DEFAULT_TENANT = "default";
 export async function lookupByCode(
   client: DbClientPort,
   code: string,
+  warehouseId: string,
   tenantKey?: string,
 ): Promise<StockItemView | null> {
-  return findViewByCode(client, code, tenantKey ?? DEFAULT_TENANT);
+  return findViewByCode(client, code, tenantKey ?? DEFAULT_TENANT, warehouseId);
 }
 
-/** Resolve a stock view by external itemId (= partId today). */
+/** Resolve a stock view by external itemId (= partId today) in a warehouse. */
 export async function lookupByItemId(
   client: DbClientPort,
   itemId: string,
+  warehouseId: string,
 ): Promise<StockItemView | null> {
-  return findViewByItemId(client, itemId);
+  return findViewByItemId(client, itemId, warehouseId);
 }

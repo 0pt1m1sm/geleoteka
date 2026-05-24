@@ -55,6 +55,8 @@ async function assertSessionOpen(client: DbClientPort, sessionId: string): Promi
 
 export interface CreateCountSessionInput {
   scope: StockCountScope;
+  /** Physical-site key (Phase 6); the session and all its bins are scoped to it. */
+  warehouseId: string;
   scopeValue?: string | null;
   /** Normalized-or-not cell codes (LOCATION scope). */
   locations?: string[];
@@ -87,6 +89,7 @@ export interface CountSession {
   createdByUserId: string | null;
   postedByUserId: string | null;
   postedAt: Date | null;
+  warehouseId: string;
   tenantKey: string;
   createdAt: Date;
 }
@@ -122,11 +125,12 @@ async function liveBinsForScope(
   scopeLocations: string[],
   scopePartIds: string[],
   tenantKey: string,
+  warehouseId: string,
 ): Promise<BinRow[]> {
   const findMany = (client as DbClientPort).stockBin.findMany as unknown as (
     args: unknown,
   ) => Promise<BinRow[]>;
-  const where: Record<string, unknown> = { tenantKey };
+  const where: Record<string, unknown> = { tenantKey, warehouseId };
   if (scope === "LOCATION" || scope === "ZONE") {
     where.location = { in: scopeLocations };
   } else if (scope === "PART") {
@@ -143,6 +147,7 @@ export async function createCountSession(
 ): Promise<CountSession> {
   const tenantKey = input.tenantKey ?? DEFAULT_TENANT;
   const scope = input.scope;
+  const warehouseId = input.warehouseId;
 
   let scopeLocations: string[] = [];
   const scopePartIds: string[] = scope === "PART" ? [...new Set(input.partIds ?? [])] : [];
@@ -154,7 +159,7 @@ export async function createCountSession(
     const locFind = (client as DbClientPort).stockLocation.findMany as unknown as (
       args: unknown,
     ) => Promise<Array<{ code: string }>>;
-    const locs = await locFind({ where: { tenantKey, zone }, select: { code: true } });
+    const locs = await locFind({ where: { tenantKey, warehouseId, zone }, select: { code: true } });
     scopeLocations = [...new Set(locs.map((l) => normalizeLocation(l.code)))];
   }
 
@@ -167,11 +172,12 @@ export async function createCountSession(
         scopePartIds,
         status: "OPEN",
         createdByUserId: input.actorId ?? null,
+        warehouseId,
         tenantKey,
       },
     })) as unknown as CountSession;
 
-    const bins = await liveBinsForScope(tx, scope, scopeLocations, scopePartIds, tenantKey);
+    const bins = await liveBinsForScope(tx, scope, scopeLocations, scopePartIds, tenantKey, warehouseId);
     if (bins.length > 0) {
       const createMany = (tx as DbClientPort).stockCountLine.createMany as unknown as (
         args: unknown,
@@ -328,6 +334,7 @@ export async function postCountSession(
       session.scopeLocations,
       session.scopePartIds,
       tenantKey,
+      session.warehouseId,
     );
     const liveMap = new Map<string, number>();
     const keyMeta = new Map<string, { location: string; itemId: string }>();
@@ -372,9 +379,9 @@ export async function postCountSession(
       const net = plines.reduce((s, l) => s + (l.countedQty - l.systemQty), 0);
       partNet.set(partId, net);
 
-      const placement = await binsForItem(tx, partId, tenantKey);
+      const placement = await binsForItem(tx, partId, session.warehouseId, tenantKey);
       const si = (await (tx as DbClientPort).stockItem.findUnique({
-        where: { partId },
+        where: { partId_warehouseId: { partId, warehouseId: session.warehouseId } },
         select: { reserved: true },
       })) as { reserved: number } | null;
       const reserved = si?.reserved ?? 0;
@@ -388,7 +395,7 @@ export async function postCountSession(
       for (const l of plines) {
         if (l.countedQty - l.systemQty > 0) {
           try {
-            await assertLocationUsable(tx, l.location, tenantKey);
+            await assertLocationUsable(tx, l.location, session.warehouseId, tenantKey);
           } catch (e) {
             if (e instanceof WmsError && e.code === "LOCATION_BLOCKED") {
               throw new WmsError(e.code, e.message, { location: l.location });
@@ -404,13 +411,13 @@ export async function postCountSession(
       for (const l of plines) {
         const delta = l.countedQty - l.systemQty;
         if (delta < 0) {
-          await removeFromBin(tx, { itemId: partId, location: l.location, qty: -delta, actorId, tenantKey });
+          await removeFromBin(tx, { itemId: partId, warehouseId: session.warehouseId, location: l.location, qty: -delta, actorId, tenantKey });
         }
       }
       const net = partNet.get(partId) ?? 0;
       if (net !== 0) {
         await recordMovement(tx, {
-          item: { itemId: partId },
+          item: { itemId: partId, warehouseId: session.warehouseId },
           reason: "ADJUSTMENT",
           qty: net,
           source: { type: "StockCount", id: `${sessionId}:${partId}` },
@@ -421,7 +428,7 @@ export async function postCountSession(
       for (const l of plines) {
         const delta = l.countedQty - l.systemQty;
         if (delta > 0) {
-          await placeStock(tx, { itemId: partId, location: l.location, qty: delta, actorId, tenantKey });
+          await placeStock(tx, { itemId: partId, warehouseId: session.warehouseId, location: l.location, qty: delta, actorId, tenantKey });
         }
       }
       // Record per-line posted delta.
@@ -468,6 +475,7 @@ export async function reopenSession(client: DbClientPort, sessionId: string): Pr
       session.scopeLocations,
       session.scopePartIds,
       tenantKey,
+      session.warehouseId,
     );
     const liveMap = new Map<string, number>();
     const liveMeta = new Map<string, { location: string; itemId: string }>();
@@ -571,6 +579,12 @@ export async function sessionVariance(
   tenantKey?: string,
 ): Promise<PartVariance[]> {
   const tenant = tenantKey ?? DEFAULT_TENANT;
+  const sessionRow = (await (client as DbClientPort).stockCountSession.findUnique({
+    where: { id: sessionId },
+    select: { warehouseId: true },
+  })) as { warehouseId: string } | null;
+  if (!sessionRow) throw new Error("SESSION_NOT_FOUND");
+  const warehouseId = sessionRow.warehouseId;
   const lineFind = (client as DbClientPort).stockCountLine.findMany as unknown as (
     args: unknown,
   ) => Promise<CountLine[]>;
@@ -583,7 +597,7 @@ export async function sessionVariance(
 
   const out: PartVariance[] = [];
   for (const [itemId, net] of netByPart) {
-    const placement = await binsForItem(client, itemId, tenant);
+    const placement = await binsForItem(client, itemId, warehouseId, tenant);
     const onHandAfter = placement.quantity + net;
     // Posting reconciles each counted bin to its counted qty, so Σbins changes by
     // the SAME net delta as on-hand: placedAfter = placed + net. (For a consistent

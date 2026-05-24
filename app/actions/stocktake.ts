@@ -5,7 +5,7 @@
 // counting is WAREHOUSE_WORKER-allowed, posting is ADMIN/MANAGER only.
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { actorId, TENANT_KEY } from "@/lib/wms-host";
+import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
 import {
@@ -34,7 +34,7 @@ async function resolveItemCode(raw: string): Promise<string | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
-  const view = await lookupByCode(db, code, TENANT_KEY);
+  const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   if (view?.itemId) return view.itemId;
   const byArticle = (await db.part.findFirst({
     where: { article: code },
@@ -90,6 +90,7 @@ export async function createCountSessionAction(
   }
   const created = await createCountSession(db, {
     scope,
+    warehouseId: await defaultWarehouseId(db),
     scopeValue: value || null,
     locations,
     partIds,

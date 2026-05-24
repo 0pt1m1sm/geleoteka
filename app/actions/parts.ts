@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { recordMovement } from "@/lib/wms/public";
-import { TENANT_KEY, actorId } from "@/lib/wms-host";
+import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { assignCodes, DuplicateCodeError } from "@/lib/warehouse/codes";
 import { MAX_WEIGHT_GRAMS } from "@/lib/suppliers/landed-cost";
 
@@ -103,7 +103,7 @@ export async function createPart(
     // Opening balance: seed the StockItem counter directly (subsequent CHANGES
     // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
     await tx.stockItem.create({
-      data: { partId: created.id, quantity, tenantKey: TENANT_KEY },
+      data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
     });
   });
 
@@ -165,15 +165,16 @@ export async function updatePart(
     // On-hand is owned by the WMS ledger. A manual quantity edit reconciles via
     // an ADJUSTMENT movement (delta = new − current) so the ledger keeps summing
     // to the counter. No-op when unchanged.
+    const warehouseId = await defaultWarehouseId(tx);
     const si = (await tx.stockItem.findUnique({
-      where: { partId },
+      where: { partId_warehouseId: { partId, warehouseId } },
       select: { quantity: true },
     })) as { quantity: number } | null;
     const currentQty = si?.quantity ?? 0;
     const delta = quantity - currentQty;
     if (delta !== 0) {
       await recordMovement(tx, {
-        item: { itemId: partId },
+        item: { itemId: partId, warehouseId },
         reason: "ADJUSTMENT",
         qty: delta,
         source: { type: "AdminEdit", id: null },

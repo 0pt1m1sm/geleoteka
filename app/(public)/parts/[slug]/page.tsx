@@ -41,7 +41,7 @@ export default async function PartDetailPage({ params }: Props) {
     where: { slug },
     include: {
       category: { select: { name: true, slug: true } },
-      stockItem: { select: { quantity: true } },
+      stockItems: { select: { quantity: true } },
       partTrims: {
         include: {
           trim: {
@@ -59,7 +59,7 @@ export default async function PartDetailPage({ params }: Props) {
   if (!part || !(part as Record<string, unknown>).isActive) notFound();
 
   const p = part as Record<string, unknown>;
-  const onHand = (p.stockItem as { quantity: number } | null)?.quantity ?? 0;
+  const onHand = (p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0;
   const cat = p.category as Record<string, string> | null;
   const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
   const photos = p.photos as string[];

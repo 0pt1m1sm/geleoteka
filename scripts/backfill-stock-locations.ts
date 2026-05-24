@@ -22,9 +22,9 @@ async function main(): Promise<void> {
   // or manually-blocked ПРИЁМКА row can never silently break default receiving.
   const staging = normalizeLocation(STAGING_LOCATION);
   await db.stockLocation.upsert({
-    where: { tenantKey_code: { tenantKey: TENANT_KEY, code: staging } },
+    where: { tenantKey_warehouseId_code: { tenantKey: TENANT_KEY, warehouseId: "wh_main_geleoteka", code: staging } },
     update: { isActive: true, isBlocked: false },
-    create: { code: staging, tenantKey: TENANT_KEY, isActive: true, isBlocked: false },
+    create: { code: staging, tenantKey: TENANT_KEY, warehouseId: "wh_main_geleoteka", isActive: true, isBlocked: false },
   });
   console.log(`  staging location ${staging} asserted active + unblocked`);
 
@@ -40,12 +40,12 @@ async function main(): Promise<void> {
   let created = 0;
   for (const code of codes) {
     const existing = await db.stockLocation.findUnique({
-      where: { tenantKey_code: { tenantKey: TENANT_KEY, code } },
+      where: { tenantKey_warehouseId_code: { tenantKey: TENANT_KEY, warehouseId: "wh_main_geleoteka", code } },
       select: { id: true },
     });
     if (existing) continue; // never reset isActive/isBlocked of an existing location
     await db.stockLocation.create({
-      data: { code, tenantKey: TENANT_KEY, isActive: true, isBlocked: false },
+      data: { code, tenantKey: TENANT_KEY, warehouseId: "wh_main_geleoteka", isActive: true, isBlocked: false },
     });
     created += 1;
   }

@@ -24,6 +24,7 @@ import {
 } from "../lib/wms/public";
 
 const TENANT = "geleoteka";
+const WH = "wh_main_geleoteka";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -39,7 +40,7 @@ async function makeThrowawayPart(qty: number): Promise<string> {
       article: `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       name: "verify-qr part",
       price: 100,
-      stockItem: { create: { quantity: qty, tenantKey: TENANT } },
+      stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT } },
     },
     select: { id: true },
   })) as { id: string };
@@ -52,38 +53,38 @@ async function verifyLocations(): Promise<void> {
 
   // place into a pre-blocked location → LOCATION_BLOCKED, no bin written.
   await db.stockLocation.create({
-    data: { code: "QRLOC-BLOCKED", tenantKey: TENANT, isActive: true, isBlocked: true },
+    data: { code: "QRLOC-BLOCKED", tenantKey: TENANT, warehouseId: WH, isActive: true, isBlocked: true },
   });
   let blockedThrew = false;
   try {
-    await placeStock(db, { itemId: partId, location: "QRLOC-BLOCKED", qty: 5, tenantKey: TENANT });
+    await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRLOC-BLOCKED", qty: 5, tenantKey: TENANT });
   } catch (e) {
     blockedThrew = e instanceof WmsError && e.code === "LOCATION_BLOCKED";
   }
-  const afterBlocked = await binsForItem(db, partId, TENANT);
+  const afterBlocked = await binsForItem(db, partId, WH, TENANT);
   assert(blockedThrew, "place into blocked location must throw LOCATION_BLOCKED");
   assert(afterBlocked.placed === 0, "rejected place into blocked writes no bin");
   console.log("  ✓ placeStock into a blocked location is rejected (LOCATION_BLOCKED), no bin written");
 
   // place into a never-seen location → auto-creates active StockLocation + succeeds.
-  await placeStock(db, { itemId: partId, location: "qrloc-fresh", qty: 5, tenantKey: TENANT });
-  const fresh = await getLocation(db, "QRLOC-FRESH", TENANT);
-  const afterFresh = await binsForItem(db, partId, TENANT);
+  await placeStock(db, { itemId: partId, warehouseId: WH, location: "qrloc-fresh", qty: 5, tenantKey: TENANT });
+  const fresh = await getLocation(db, "QRLOC-FRESH", WH, TENANT);
+  const afterFresh = await binsForItem(db, partId, WH, TENANT);
   assert(fresh && fresh.isActive && !fresh.isBlocked, "fresh location auto-created active+unblocked");
   assert(afterFresh.bins.some((b) => b.location === "QRLOC-FRESH" && b.quantity === 5), "fresh place succeeded");
   console.log("  ✓ placeStock into a never-seen location auto-creates an active StockLocation and succeeds");
 
   // transfer OUT of a now-blocked location is allowed (evacuate); INTO a blocked one is not.
-  await placeStock(db, { itemId: partId, location: "QRLOC-EVAC", qty: 10, tenantKey: TENANT });
-  await setLocationBlocked(db, "QRLOC-EVAC", TENANT, { isBlocked: true });
-  await transferStock(db, { itemId: partId, from: "QRLOC-EVAC", to: "QRLOC-DEST", qty: 3, tenantKey: TENANT });
-  const afterEvac = await binsForItem(db, partId, TENANT);
+  await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRLOC-EVAC", qty: 10, tenantKey: TENANT });
+  await setLocationBlocked(db, "QRLOC-EVAC", WH, TENANT, { isBlocked: true });
+  await transferStock(db, { itemId: partId, warehouseId: WH, from: "QRLOC-EVAC", to: "QRLOC-DEST", qty: 3, tenantKey: TENANT });
+  const afterEvac = await binsForItem(db, partId, WH, TENANT);
   assert(afterEvac.bins.some((b) => b.location === "QRLOC-DEST" && b.quantity === 3), "transfer out of blocked source allowed");
   console.log("  ✓ transferStock OUT of a blocked source is allowed (evacuation)");
 
   let toBlockedThrew = false;
   try {
-    await transferStock(db, { itemId: partId, from: "QRLOC-FRESH", to: "QRLOC-BLOCKED", qty: 1, tenantKey: TENANT });
+    await transferStock(db, { itemId: partId, warehouseId: WH, from: "QRLOC-FRESH", to: "QRLOC-BLOCKED", qty: 1, tenantKey: TENANT });
   } catch (e) {
     toBlockedThrew = e instanceof WmsError && e.code === "LOCATION_BLOCKED";
   }
@@ -121,24 +122,24 @@ async function verifyScanEventAndIdempotency(): Promise<void> {
   // --- placement idempotency: same key applies once ---
   const partId = await makeThrowawayPart(100);
   const K1 = `QRIDEM-K1-${Date.now()}`;
-  await placeStock(db, { itemId: partId, location: "QRIDEM-A", qty: 5, idempotencyKey: K1, tenantKey: TENANT });
+  await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRIDEM-A", qty: 5, idempotencyKey: K1, tenantKey: TENANT });
   let dupThrew = false;
   try {
-    await placeStock(db, { itemId: partId, location: "QRIDEM-A", qty: 5, idempotencyKey: K1, tenantKey: TENANT });
+    await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRIDEM-A", qty: 5, idempotencyKey: K1, tenantKey: TENANT });
   } catch (e) {
     dupThrew = e instanceof WmsError && e.code === "DUPLICATE_OPERATION";
   }
-  const afterDup = await binsForItem(db, partId, TENANT);
+  const afterDup = await binsForItem(db, partId, WH, TENANT);
   assert(dupThrew, "second keyed placeStock must throw DUPLICATE_OPERATION");
   assert(afterDup.bins.find((b) => b.location === "QRIDEM-A")?.quantity === 5, "duplicate key must not double-apply (still 5)");
   console.log("  ✓ keyed placeStock applies once; repeat with same key → DUPLICATE_OPERATION, bin unchanged");
 
   // --- rollback proof: rejection does not burn the key ---
-  await db.stockLocation.create({ data: { code: "QRIDEM-BLK", tenantKey: TENANT, isActive: true, isBlocked: true } });
+  await db.stockLocation.create({ data: { code: "QRIDEM-BLK", tenantKey: TENANT, warehouseId: WH, isActive: true, isBlocked: true } });
   const K2 = `QRIDEM-K2-${Date.now()}`;
   let blkThrew = false;
   try {
-    await placeStock(db, { itemId: partId, location: "QRIDEM-BLK", qty: 3, idempotencyKey: K2, tenantKey: TENANT });
+    await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRIDEM-BLK", qty: 3, idempotencyKey: K2, tenantKey: TENANT });
   } catch (e) {
     blkThrew = e instanceof WmsError && e.code === "LOCATION_BLOCKED";
   }
@@ -146,20 +147,20 @@ async function verifyScanEventAndIdempotency(): Promise<void> {
   assert(blkThrew, "keyed place into blocked location throws LOCATION_BLOCKED");
   assert(burnedRows === 0, "a rejected keyed place must leave ZERO bin-movement rows with that key (claim rolled back / not inserted)");
   // retry the SAME key into a usable location → succeeds (key was not burned).
-  await placeStock(db, { itemId: partId, location: "QRIDEM-OK", qty: 3, idempotencyKey: K2, tenantKey: TENANT });
-  const afterRetry = await binsForItem(db, partId, TENANT);
+  await placeStock(db, { itemId: partId, warehouseId: WH, location: "QRIDEM-OK", qty: 3, idempotencyKey: K2, tenantKey: TENANT });
+  const afterRetry = await binsForItem(db, partId, WH, TENANT);
   assert(afterRetry.bins.find((b) => b.location === "QRIDEM-OK")?.quantity === 3, "retry with same key succeeds after rejection");
   console.log("  ✓ a rejected keyed write does not burn the key — retry with the same key succeeds");
 
   // --- recordMovement idempotency: same payload no-op; reused key different payload → reuse error ---
   const K3 = `QRIDEM-K3-${Date.now()}`;
   const r1 = await recordMovement(db, {
-    item: { itemId: partId }, reason: "RESERVATION", qty: 4,
+    item: { itemId: partId, warehouseId: WH }, reason: "RESERVATION", qty: 4,
     source: { type: "VerifyQr", id: `res-${K3}` }, idempotencyKey: K3, tenantKey: TENANT,
   });
   assert(r1.applied === true, "first keyed recordMovement applies");
   const r2 = await recordMovement(db, {
-    item: { itemId: partId }, reason: "RESERVATION", qty: 4,
+    item: { itemId: partId, warehouseId: WH }, reason: "RESERVATION", qty: 4,
     source: { type: "VerifyQr", id: `res-${K3}` }, idempotencyKey: K3, tenantKey: TENANT,
   });
   assert(r2.applied === false, "repeat keyed recordMovement with identical payload → applied:false");
@@ -167,7 +168,7 @@ async function verifyScanEventAndIdempotency(): Promise<void> {
   let reuseThrew = false;
   try {
     await recordMovement(db, {
-      item: { itemId: partId }, reason: "RELEASE", qty: 2,
+      item: { itemId: partId, warehouseId: WH }, reason: "RELEASE", qty: 2,
       source: { type: "VerifyQr", id: `different-${K3}` }, idempotencyKey: K3, tenantKey: TENANT,
     });
   } catch (e) {
@@ -232,7 +233,7 @@ async function verifyScanRouter(): Promise<void> {
       article,
       name: "verify-qr scan-router part",
       price: 100,
-      stockItem: { create: { quantity: 7, tenantKey: TENANT, barcode } },
+      stockItems: { create: { warehouseId: WH, quantity: 7, tenantKey: TENANT, barcode } },
     },
     select: { id: true },
   })) as { id: string };
@@ -271,7 +272,7 @@ async function verifyScanRouter(): Promise<void> {
       name: "verify-qr inactive part",
       price: 100,
       isActive: false,
-      stockItem: { create: { quantity: 2, tenantKey: TENANT } },
+      stockItems: { create: { warehouseId: WH, quantity: 2, tenantKey: TENANT } },
     },
     select: { id: true },
   })) as { id: string };
@@ -292,7 +293,7 @@ async function verifyScanRouter(): Promise<void> {
   console.log("  ✓ resolveScan unresolved PART → UNKNOWN_CODE (404) + one REJECTED ScanEvent");
 
   // LOC card — active location → SUCCESS
-  await db.stockLocation.create({ data: { code: "QRSR-OK", tenantKey: TENANT, isActive: true, isBlocked: false } });
+  await db.stockLocation.create({ data: { code: "QRSR-OK", tenantKey: TENANT, warehouseId: WH, isActive: true, isBlocked: false } });
   const okRaw = formatScanCode("LOC", "qrsr-ok");
   const rOk = await resolveScan(db, parseScanCode(okRaw), TENANT, ctx);
   const evOk = (await db.scanEvent.findFirst({ where: { rawCode: okRaw }, orderBy: { createdAt: "desc" } })) as { result: string } | null;
@@ -301,7 +302,7 @@ async function verifyScanRouter(): Promise<void> {
   console.log("  ✓ resolveScan LOC (active) → location card + SUCCESS ScanEvent");
 
   // LOC card — BLOCKED location → 200 card with blocked flag, but audited REJECTED/LOCATION_BLOCKED (Truth 1)
-  await db.stockLocation.create({ data: { code: "QRSR-L1", tenantKey: TENANT, isActive: true, isBlocked: true } });
+  await db.stockLocation.create({ data: { code: "QRSR-L1", tenantKey: TENANT, warehouseId: WH, isActive: true, isBlocked: true } });
   const locRaw = formatScanCode("LOC", "qrsr-l1");
   const rLoc = await resolveScan(db, parseScanCode(locRaw), TENANT, ctx);
   const evLoc = (await db.scanEvent.findFirst({ where: { rawCode: locRaw }, orderBy: { createdAt: "desc" } })) as { result: string; errorCode: string | null } | null;
@@ -309,10 +310,10 @@ async function verifyScanRouter(): Promise<void> {
   assert(evLoc?.result === "REJECTED" && evLoc?.errorCode === "LOCATION_BLOCKED", `blocked LOC scan must audit REJECTED/LOCATION_BLOCKED, got ${JSON.stringify(evLoc)}`);
   console.log("  ✓ resolveScan LOC (blocked) → card with blocked flag + REJECTED/LOCATION_BLOCKED ScanEvent (Truth 1)");
 
-  // ORDER/BOX recognized-but-unsupported → WRONG_OBJECT_TYPE 422
+  // ORDER is resolved since Phase 4b; an UNKNOWN order number → 404 UNKNOWN_CODE.
   const rOrder = await resolveScan(db, parseScanCode("WMS:ORDER:QRSR-SO1"), TENANT, ctx);
-  assert(rOrder.status === 422 && rOrder.errorCode === "WRONG_OBJECT_TYPE", `ORDER → WRONG_OBJECT_TYPE, got ${JSON.stringify(rOrder)}`);
-  console.log("  ✓ resolveScan ORDER/BOX → WRONG_OBJECT_TYPE (422), logged");
+  assert(rOrder.status === 404 && rOrder.errorCode === "UNKNOWN_CODE", `unknown ORDER → 404 UNKNOWN_CODE, got ${JSON.stringify(rOrder)}`);
+  console.log("  ✓ resolveScan unknown ORDER → 404 UNKNOWN_CODE, logged");
 
   // malformed → UNKNOWN_CODE 400
   const rUnknown = await resolveScan(db, parseScanCode("WMS:WAT:x"), TENANT, ctx);

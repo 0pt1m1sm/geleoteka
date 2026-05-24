@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
+import { defaultWarehouseId } from "@/lib/wms-host";
 import { formatDate } from "@/lib/utils";
 
 const REASON_LABELS: Record<string, string> = {
@@ -29,7 +30,7 @@ function signed(n: number): string {
 /** Per-part stock ledger: current counters + the StockMovement history. */
 export async function StockHistory({ partId }: { partId: string }): Promise<React.ReactElement> {
   const si = (await db.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId: await defaultWarehouseId(db) } },
     select: { quantity: true, reserved: true },
   })) as { quantity: number; reserved: number } | null;
 

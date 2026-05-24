@@ -8,9 +8,12 @@ import { WarehouseScanBox } from "@/components/admin/WarehouseScanBox";
 import { WarehouseMovementsFeed } from "@/components/admin/WarehouseMovementsFeed";
 import { WarehouseLocationLookup } from "@/components/admin/WarehouseLocationLookup";
 import { WarehouseLocationsAdmin } from "@/components/admin/WarehouseLocationsAdmin";
+import { WarehouseSwitcher } from "@/components/admin/WarehouseSwitcher";
+import { WarehouseAdmin } from "@/components/admin/WarehouseAdmin";
+import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 
 interface Props {
-  searchParams: Promise<{ q?: string; page?: string; loc?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; loc?: string; wh?: string }>;
 }
 
 export default async function WarehousePage({ searchParams }: Props) {
@@ -20,10 +23,17 @@ export default async function WarehousePage({ searchParams }: Props) {
   const q = (sp.q ?? "").trim();
   const page = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
   const loc = (sp.loc ?? "").trim();
+  const warehouses = await listWarehouses();
+  const warehouseId = await resolveWarehouseId(sp.wh, warehouses);
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Склад" description="Остатки, сканирование и движения" />
+      <PageHeader
+        eyebrow="Запчасти"
+        title="Склад"
+        description="Остатки, сканирование и движения"
+        actions={<WarehouseSwitcher warehouses={warehouses} current={warehouseId} />}
+      />
 
       <div className="flex flex-wrap gap-2">
         <Link href="/admin/warehouse/stocktake" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
@@ -38,6 +48,9 @@ export default async function WarehousePage({ searchParams }: Props) {
         <Link href="/admin/warehouse/replenishment" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Дозаказ →
         </Link>
+        <Link href="/admin/warehouse/reports/valuation" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
+          Отчёты →
+        </Link>
       </div>
 
       {/* Scan box — Task 4 */}
@@ -46,11 +59,14 @@ export default async function WarehousePage({ searchParams }: Props) {
       {/* Location lookup — Task 10 */}
       <WarehouseLocationLookup />
 
+      {/* Warehouse admin — Phase 6 (admin/manager only) */}
+      {canManageLocations && <WarehouseAdmin warehouses={warehouses} />}
+
       {/* Location block/unblock admin — Phase 2.5 (admin/manager only) */}
       {canManageLocations && <WarehouseLocationsAdmin />}
 
-      {/* Stock overview — Task 2 */}
-      <WarehouseOverview q={q} page={page} loc={loc} />
+      {/* Stock overview — Task 2 (scoped to the active warehouse) */}
+      <WarehouseOverview q={q} page={page} loc={loc} warehouseId={warehouseId} />
 
       {/* Movements feed — Task 5 */}
       <WarehouseMovementsFeed />

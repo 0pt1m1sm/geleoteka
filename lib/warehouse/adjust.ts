@@ -1,5 +1,5 @@
 import { recordMovement, type DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export interface AdjustResult {
   quantity: number;
@@ -25,8 +25,9 @@ export async function applyAdjustment(
   note?: string,
   idempotencyKey?: string,
 ): Promise<AdjustResult> {
+  const warehouseId = await defaultWarehouseId(client);
   const si = (await client.stockItem.findUnique({
-    where: { partId },
+    where: { partId_warehouseId: { partId, warehouseId } },
     select: { quantity: true, reserved: true },
   })) as { quantity: number; reserved: number } | null;
 
@@ -39,7 +40,7 @@ export async function applyAdjustment(
   }
 
   const result = await recordMovement(client, {
-    item: { itemId: partId },
+    item: { itemId: partId, warehouseId },
     reason: "ADJUSTMENT",
     qty: delta,
     source: { type: "WarehouseAdjust", id: null },

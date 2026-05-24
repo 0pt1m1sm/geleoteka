@@ -26,13 +26,14 @@ export type WmsLocation = StockLocationRow;
 export async function assertLocationUsable(
   client: DbClientPort,
   code: string,
+  warehouseId: string,
   tenantKey?: string,
 ): Promise<void> {
   const tenant = tenantKey ?? DEFAULT_TENANT;
   const loc = normalizeLocation(code);
-  const existing = await findLocation(client, loc, tenant);
+  const existing = await findLocation(client, loc, tenant, warehouseId);
   if (!existing) {
-    await ensureLocation(client, loc, tenant);
+    await ensureLocation(client, loc, tenant, warehouseId);
     return;
   }
   if (!existing.isActive || existing.isBlocked) throw WmsError.locationBlocked();
@@ -42,22 +43,28 @@ export async function assertLocationUsable(
 export async function getLocation(
   client: DbClientPort,
   code: string,
+  warehouseId: string,
   tenantKey?: string,
 ): Promise<WmsLocation | null> {
-  return findLocation(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT);
+  return findLocation(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT, warehouseId);
 }
 
-/** List all known locations for the tenant. */
-export async function listLocations(client: DbClientPort, tenantKey?: string): Promise<WmsLocation[]> {
-  return listLocationRows(client, tenantKey ?? DEFAULT_TENANT);
+/** List all known locations for the tenant + warehouse. */
+export async function listLocations(
+  client: DbClientPort,
+  warehouseId: string,
+  tenantKey?: string,
+): Promise<WmsLocation[]> {
+  return listLocationRows(client, tenantKey ?? DEFAULT_TENANT, warehouseId);
 }
 
 /** Set a location's active/blocked flags (create-if-absent). */
 export async function setLocationBlocked(
   client: DbClientPort,
   code: string,
+  warehouseId: string,
   tenantKey: string | undefined,
   flags: { isActive?: boolean; isBlocked?: boolean },
 ): Promise<WmsLocation> {
-  return updateLocationFlags(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT, flags);
+  return updateLocationFlags(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT, warehouseId, flags);
 }

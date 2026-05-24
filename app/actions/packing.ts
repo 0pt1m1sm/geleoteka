@@ -5,7 +5,7 @@
 // Every pack/box/ship scan writes exactly one ScanEvent for the audit.
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { actorId, TENANT_KEY } from "@/lib/wms-host";
+import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { revalidatePath } from "next/cache";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
@@ -26,7 +26,7 @@ async function resolveItemCode(raw: string): Promise<string | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
-  const view = await lookupByCode(db, code, TENANT_KEY);
+  const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   if (view?.itemId) return view.itemId;
   const byArticle = (await db.part.findFirst({
     where: { article: code },

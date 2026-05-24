@@ -2,7 +2,7 @@
 // movements. Bridges CRM (the deal's APPROVED estimate PART lines) and the WMS
 // core (recordMovement). NOT part of lib/wms — it knows about Estimate/Deal.
 import { consumeStock, type DbClientPort } from "@/lib/wms/public";
-import { TENANT_KEY } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 interface ConsumeInput {
   /** The deal whose APPROVED estimate names the consumed parts. */
@@ -39,6 +39,7 @@ export async function consumeApprovedEstimateParts(
   })) as { estimateLines: Array<{ id: string; partId: string | null; qty: number }> } | null;
   if (!estimate) return;
 
+  const warehouseId = await defaultWarehouseId(client);
   for (const line of estimate.estimateLines) {
     if (!line.partId) continue;
     const qty = Math.round(line.qty);
@@ -46,7 +47,7 @@ export async function consumeApprovedEstimateParts(
     // consumeStock = CONSUMPTION movement + bin deduction (unplaced-first, then
     // oldest bins) so Σbins tracks on-hand. Runs in the caller's tx (composed).
     await consumeStock(client, {
-      item: { itemId: line.partId },
+      item: { itemId: line.partId, warehouseId },
       qty,
       source: { type: input.sourceType, id: `${input.sourceId}:${line.id}` },
       actorId: input.actorId,

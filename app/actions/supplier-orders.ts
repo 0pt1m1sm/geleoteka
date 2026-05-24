@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { lookupByCode } from "@/lib/wms/public";
-import { TENANT_KEY, actorId } from "@/lib/wms-host";
+import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { applyReceive, isReceivingStatus, type ReceiveResult } from "@/lib/warehouse/receive";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
@@ -114,7 +114,7 @@ export async function createSupplierOrder(input: CreateOrderInput): Promise<Orde
             data: { slug, article, name, price: 0, isActive: false },
             select: { id: true },
           })) as { id: string };
-          await tx.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY } });
+          await tx.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) } });
           type = "PART";
           partId = part.id;
           description = name;
@@ -264,7 +264,7 @@ export async function scanReceiveLine(
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
 
   // Resolve code → itemId, mirroring app/api/stock/lookup/route.ts.
-  const view = await lookupByCode(db, trimmed, TENANT_KEY);
+  const view = await lookupByCode(db, trimmed, await defaultWarehouseId(db), TENANT_KEY);
   let itemId = view?.itemId ?? null;
   if (!itemId) {
     const byArticle = (await db.part.findFirst({

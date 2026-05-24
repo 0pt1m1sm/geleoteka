@@ -33,7 +33,7 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
           receivedQuantity: true,
           unitCost: true,
           totalCost: true,
-          part: { select: { article: true, stockItem: { select: { barcode: true } } } },
+          part: { select: { article: true, stockItems: { select: { barcode: true } } } },
         },
       },
     },
@@ -51,14 +51,14 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
       receivedQuantity: number;
       unitCost: number;
       totalCost: number;
-      part: { article: string | null; stockItem: { barcode: string | null } | null } | null;
+      part: { article: string | null; stockItems: Array<{ barcode: string | null }> } | null;
     }) => ({
       lineId: it.id,
       type: it.type,
       partId: it.partId,
       description: it.description,
       article: it.part?.article ?? null,
-      barcode: it.part?.stockItem?.barcode ?? null,
+      barcode: it.part?.stockItems?.[0]?.barcode ?? null,
       ordered: it.quantity,
       received: it.receivedQuantity,
       unitCost: it.unitCost,
