@@ -12,6 +12,7 @@ import {
   openOrderLinesForPartAction,
 } from "@/app/actions/warehouse";
 import type { ItemPlacement } from "@/lib/wms/public";
+import { formatScanCode } from "@/lib/wms/public/qr";
 import { QrScanner } from "@/components/warehouse/QrScanner";
 
 /** Default staging cell shown in the receive form. Mirrors STAGING_LOCATION in
@@ -351,7 +352,10 @@ export function WarehouseScanBox(): React.ReactElement {
         setPutawayTarget((m) => ({ ...m, [itemId]: "" }));
         setPutawayQty((m) => ({ ...m, [itemId]: "" }));
         // Re-scan the source cell to refresh the location card's quantities.
-        await handleScan(from);
+        // Use the typed LOC payload: the scanner resolves locations only via the
+        // WMS:LOC: form (what printed cell labels encode); a bare code is treated
+        // as a barcode/article and 404s, which would flash a misleading "Не найдено".
+        await handleScan(formatScanCode("LOC", from));
       } catch {
         setBinError("Ошибка сети — повторите");
       }
