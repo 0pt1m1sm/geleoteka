@@ -29,6 +29,8 @@ export default async function PickingOrderPage({ params }: Props) {
         eyebrow="Отбор"
         title={`Заказ-наряд ${ro.roNumber ?? ""}`}
         description={ro.user?.name ?? ""}
+        backHref="/admin/warehouse/picking"
+        backLabel="Отбор"
       />
       <PickBox repairOrderId={id} lines={lines} />
     </div>

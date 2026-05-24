@@ -11,7 +11,7 @@ export default async function PackingPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Упаковка" description="Упаковка и отгрузка заказов запчастей" />
+      <PageHeader eyebrow="Запчасти" title="Упаковка" description="Упаковка и отгрузка заказов запчастей" backHref="/admin/warehouse" backLabel="Склад" />
       <PackingOrderList orders={orders} />
     </div>
   );

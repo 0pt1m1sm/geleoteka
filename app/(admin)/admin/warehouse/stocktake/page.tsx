@@ -14,7 +14,7 @@ export default async function StocktakePage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Инвентаризация" description="Пересчёт остатков по ячейкам" />
+      <PageHeader eyebrow="Запчасти" title="Инвентаризация" description="Пересчёт остатков по ячейкам" backHref="/admin/warehouse" backLabel="Склад" />
       <StocktakeNewSession />
       <StocktakeSessionList sessions={sessions} />
     </div>

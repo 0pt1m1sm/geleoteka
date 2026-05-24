@@ -42,7 +42,7 @@ export default async function StocktakeSessionPage({ params }: Props) {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Инвентаризация" title={`Пересчёт · ${eyebrow}`} description={`Статус: ${countSession.status}`} />
+      <PageHeader eyebrow="Инвентаризация" title={`Пересчёт · ${eyebrow}`} description={`Статус: ${countSession.status}`} backHref="/admin/warehouse/stocktake" backLabel="Инвентаризация" />
 
       {countSession.status === "OPEN" && (
         <StocktakeCountBox

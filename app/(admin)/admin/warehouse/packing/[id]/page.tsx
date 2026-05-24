@@ -29,6 +29,8 @@ export default async function PackingOrderPage({ params }: Props) {
         eyebrow="Упаковка"
         title={`Заказ ${order.orderNumber ?? id.slice(0, 8)}`}
         description={`${order.contactName} · ${order.status}`}
+        backHref="/admin/warehouse/packing"
+        backLabel="Упаковка"
       />
       <PackBox orderId={id} lines={lines} />
     </div>

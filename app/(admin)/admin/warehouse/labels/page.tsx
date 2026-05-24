@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth";
@@ -67,6 +68,13 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
 
   return (
     <div>
+      <Link
+        href="/admin/warehouse"
+        className="mb-2 inline-flex w-fit items-center gap-1 py-1 text-sm text-[var(--foreground-muted)] transition-colors hover:text-[var(--color-accent)] print:hidden"
+      >
+        <span aria-hidden="true">←</span>
+        Склад
+      </Link>
       <h1 className="text-display text-2xl font-bold mb-4 print:hidden">Печать этикеток</h1>
       <LabelSheetControls />
 

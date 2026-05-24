@@ -11,7 +11,7 @@ export default async function PickingPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Отбор" description="Отбор запчастей под заказ-наряды" />
+      <PageHeader eyebrow="Запчасти" title="Отбор" description="Отбор запчастей под заказ-наряды" backHref="/admin/warehouse" backLabel="Склад" />
       <PickingOrderList orders={orders} />
     </div>
   );
