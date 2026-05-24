@@ -1,0 +1,1 @@
+ALTER TABLE "StockItem" ADD COLUMN "reorderPoint" INTEGER, ADD COLUMN "reorderUpTo" INTEGER;

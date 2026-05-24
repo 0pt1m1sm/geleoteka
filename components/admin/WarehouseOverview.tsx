@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
 import { incomingByPartIds } from "@/lib/warehouse/incoming";
 import { LOW_STOCK_THRESHOLD, TENANT_KEY } from "@/lib/wms-host";
+import { effectiveReorderPoint } from "@/lib/warehouse/replenishment";
 import { Pagination } from "@/components/ui";
+import { ReorderPolicyCell } from "@/components/admin/ReorderPolicyCell";
 
 const PAGE_SIZE = 25;
 
@@ -11,7 +13,14 @@ interface PartRow {
   id: string;
   name: string;
   article: string;
-  stockItem: { id: string; quantity: number; reserved: number; barcode: string | null } | null;
+  stockItem: {
+    id: string;
+    quantity: number;
+    reserved: number;
+    barcode: string | null;
+    reorderPoint: number | null;
+    reorderUpTo: number | null;
+  } | null;
 }
 
 /** Cross-part stock overview: name/article/barcode + on-hand/reserved/available,
@@ -54,7 +63,7 @@ export async function WarehouseOverview({
       id: true,
       name: true,
       article: true,
-      stockItem: { select: { id: true, quantity: true, reserved: true, barcode: true } },
+      stockItem: { select: { id: true, quantity: true, reserved: true, barcode: true, reorderPoint: true, reorderUpTo: true } },
     },
     orderBy: { name: "asc" },
     skip: (current - 1) * PAGE_SIZE,
@@ -126,6 +135,7 @@ export async function WarehouseOverview({
                 <th className="p-3 font-medium text-right">Доступно</th>
                 <th className="p-3 font-medium text-right">Ожидается</th>
                 <th className="p-3 font-medium text-right">Размещение</th>
+                <th className="p-3 font-medium text-right">Дозаказ</th>
                 <th className="p-3 font-medium text-right">Этикетка</th>
               </tr>
             </thead>
@@ -135,7 +145,8 @@ export async function WarehouseOverview({
                 const onHand = si?.quantity ?? 0;
                 const reserved = si?.reserved ?? 0;
                 const available = si ? availableStock(si) : 0;
-                const low = available <= LOW_STOCK_THRESHOLD;
+                const point = si ? effectiveReorderPoint(si, LOW_STOCK_THRESHOLD) : LOW_STOCK_THRESHOLD;
+                const low = available <= point;
                 const placed = si ? (placedByItem.get(si.id) ?? 0) : 0;
                 const unplaced = Math.max(0, onHand - placed);
                 const reconcile = placed > onHand;
@@ -167,6 +178,14 @@ export async function WarehouseOverview({
                       {reconcile && (
                         <span className="ml-2 badge bg-[var(--color-error-bg)] text-[var(--color-error)]">сверка</span>
                       )}
+                    </td>
+                    <td className="p-3 text-right text-xs">
+                      <ReorderPolicyCell
+                        partId={p.id}
+                        reorderPoint={si?.reorderPoint ?? null}
+                        reorderUpTo={si?.reorderUpTo ?? null}
+                        disabled={!si}
+                      />
                     </td>
                     <td className="p-3 text-right text-xs">
                       <Link

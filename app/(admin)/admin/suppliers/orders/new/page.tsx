@@ -5,8 +5,39 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { SupplierOrderForm } from "@/components/admin/SupplierOrderForm";
+import type { ItemRow } from "@/components/admin/supplier-order-form/types";
 
-export default async function NewSupplierOrderPage() {
+const PREFILL_MAX_ENTRIES = 100;
+const PREFILL_MAX_QTY = 9999;
+
+/** Parse the user-controlled `?prefill=partId:qty,...` param into pre-filled PART
+ *  lines. Defensive: caps entries, clamps qty to 1..9999, drops unknown parts. */
+function parsePrefill(
+  prefill: string | string[] | undefined,
+  partsById: Map<string, { name: string }>,
+): ItemRow[] {
+  // A repeated query key (?prefill=a:1&prefill=b:2) arrives as string[]; flatten
+  // it so we never call .split on a non-string and crash the page.
+  const raw = Array.isArray(prefill) ? prefill.join(",") : prefill;
+  if (!raw) return [];
+  const rows: ItemRow[] = [];
+  for (const entry of raw.split(",").slice(0, PREFILL_MAX_ENTRIES)) {
+    const [partId, qtyRaw] = entry.split(":");
+    if (!partId) continue;
+    const part = partsById.get(partId);
+    if (!part) continue;
+    const qty = parseInt(qtyRaw, 10);
+    if (!Number.isInteger(qty) || qty < 1 || qty > PREFILL_MAX_QTY) continue;
+    rows.push({ type: "PART", partId, description: part.name, quantity: qty, unitCost: 0 });
+  }
+  return rows;
+}
+
+interface Props {
+  searchParams: Promise<{ prefill?: string | string[] }>;
+}
+
+export default async function NewSupplierOrderPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
@@ -37,6 +68,9 @@ export default async function NewSupplierOrderPage() {
     price: p.price as number,
     weightGrams: (p.weightGrams as number | null) ?? null,
   }));
+
+  const { prefill } = await searchParams;
+  const initialItems = parsePrefill(prefill, new Map(partOptions.map((p) => [p.id, { name: p.name }])));
 
   if (supplierOptions.length === 0) {
     return (
@@ -69,7 +103,7 @@ export default async function NewSupplierOrderPage() {
         ← Заказы поставщикам
       </Link>
       <h1 className="text-display text-2xl font-bold mb-6">Новый заказ поставщику</h1>
-      <SupplierOrderForm suppliers={supplierOptions} parts={partOptions} />
+      <SupplierOrderForm suppliers={supplierOptions} parts={partOptions} initialItems={initialItems} />
     </div>
   );
 }

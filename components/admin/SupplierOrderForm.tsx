@@ -23,9 +23,12 @@ import type {
 export function SupplierOrderForm({
   suppliers,
   parts,
+  initialItems,
 }: {
   suppliers: SupplierOption[];
   parts: PartOption[];
+  /** Pre-filled lines (e.g. from the replenishment report). Defaults to one empty PART row. */
+  initialItems?: ItemRow[];
 }): React.ReactElement {
   const nav = useProgressRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -36,9 +39,11 @@ export function SupplierOrderForm({
   const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
   const [orderNumber, setOrderNumber] = useState("");
   const [orderDate, setOrderDate] = useState(today);
-  const [items, setItems] = useState<ItemRow[]>([
-    { type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 },
-  ]);
+  const [items, setItems] = useState<ItemRow[]>(
+    initialItems && initialItems.length > 0
+      ? initialItems
+      : [{ type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 }],
+  );
   const [landedCost, setLandedCost] = useState<LandedCostState>({
     shippingRateUsdCents: 0,
     usdRateKopecks: 0,

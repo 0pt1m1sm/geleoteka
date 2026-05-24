@@ -926,6 +926,12 @@ model StockItem {
   partId    String   @unique
   quantity  Int      @default(0) // physical on-hand
   reserved  Int      @default(0) // held by open reservations; available = quantity - reserved
+  // Replenishment (Phase 5): per-item reorder policy. Null = use the host default
+  // (LOW_STOCK_THRESHOLD). reorderPoint = trigger (min); reorderUpTo = order-up-to
+  // (target). Read only by host code (lib/warehouse, app/actions); the WMS core
+  // never reads these — it selects quantity/reserved explicitly.
+  reorderPoint Int?
+  reorderUpTo  Int?
   barcode   String?
   gtin      String?
   tenantKey String   @default("geleoteka")
