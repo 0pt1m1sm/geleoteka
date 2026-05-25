@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
 
 interface Result {
   error: string | null;
@@ -124,14 +125,21 @@ export async function customerDeclineEstimate(
     return { error: "Нет доступа к этой смете" };
   }
 
-  await db.estimate.update({
-    where: { id: estimateId },
-    data: {
-      stage: "DECLINED",
-      declinedAt: new Date(),
-      declineReason: trimmed,
-    },
+  const now = new Date();
+  const raced = await db.$transaction(async (tx) => {
+    // CAS on the stage so a concurrent approve/decline can't double-process —
+    // and the reservation release below runs exactly once. Mirrors the manager
+    // declineEstimate path, which previously was the ONLY one that released holds.
+    const won = await tx.estimate.updateMany({
+      where: { id: estimateId, stage: { in: ["DRAFT", "SENT"] } },
+      data: { stage: "DECLINED", declinedAt: now, declineReason: trimmed },
+    });
+    if (won.count === 0) return true;
+    // DRAFT/SENT held PART-line reservations — release them now the estimate is dead.
+    await releasePartLinesForEstimate(tx, estimateId, session?.id);
+    return false;
   });
+  if (raced) return { error: "Смета уже закрыта" };
 
   revalidatePath(`/admin/crm/deals/${est.dealId}`);
   revalidatePath(`/admin/crm/estimates/${estimateId}`);

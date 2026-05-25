@@ -121,23 +121,35 @@ export async function setDealStage(
     data.lostReason = null;
   }
 
-  await db.deal.update({ where: { id: dealId }, data });
+  const raced = await db.$transaction(async (tx) => {
+    // CAS on the observed stage: a concurrent double-submit (e.g. double-click
+    // on the Kanban WON column) matches 0 rows on the loser, so the
+    // lifetimeValue adjustment below runs exactly once per real transition —
+    // and the stage update + LTV upsert commit atomically (audit finding C3).
+    // where cast to a loose record (matches `data` above) — `deal.stage` is a
+    // valid DealStage at runtime but typed as string through the db singleton.
+    const stageWhere = { id: dealId, stage: deal.stage } as Record<string, unknown>;
+    const moved = await tx.deal.updateMany({ where: stageWhere, data });
+    if (moved.count === 0) return true;
 
-  // Maintain CustomerProfile.lifetimeValue across the WON boundary so it stays
-  // in sync without a full recompute (mirrors the WON/rollback transitions).
-  if (nextStage === "WON" && deal.stage !== "WON") {
-    await db.customerProfile.upsert({
-      where: { userId: deal.customerUserId },
-      update: { lifetimeValue: { increment: deal.total }, lastTouchAt: now },
-      create: { userId: deal.customerUserId, lifetimeValue: deal.total, lastTouchAt: now, firstSeenAt: now },
-    });
-  } else if (deal.stage === "WON" && nextStage !== "WON") {
-    await db.customerProfile.upsert({
-      where: { userId: deal.customerUserId },
-      update: { lifetimeValue: { decrement: deal.total }, lastTouchAt: now },
-      create: { userId: deal.customerUserId, lifetimeValue: 0, lastTouchAt: now, firstSeenAt: now },
-    });
-  }
+    // Maintain CustomerProfile.lifetimeValue across the WON boundary so it stays
+    // in sync without a full recompute (mirrors the WON/rollback transitions).
+    if (nextStage === "WON" && deal.stage !== "WON") {
+      await tx.customerProfile.upsert({
+        where: { userId: deal.customerUserId },
+        update: { lifetimeValue: { increment: deal.total }, lastTouchAt: now },
+        create: { userId: deal.customerUserId, lifetimeValue: deal.total, lastTouchAt: now, firstSeenAt: now },
+      });
+    } else if (deal.stage === "WON" && nextStage !== "WON") {
+      await tx.customerProfile.upsert({
+        where: { userId: deal.customerUserId },
+        update: { lifetimeValue: { decrement: deal.total }, lastTouchAt: now },
+        create: { userId: deal.customerUserId, lifetimeValue: 0, lastTouchAt: now, firstSeenAt: now },
+      });
+    }
+    return false;
+  });
+  if (raced) return { error: "Сделка уже изменена — обновите страницу" };
 
   revalidatePath(`/admin/crm/deals/${dealId}`);
   revalidatePath("/admin/crm/deals");

@@ -250,8 +250,6 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
           customerUserId: true,
           vehicleId: true,
           customer: { select: { name: true, phone: true, email: true } },
-          repairOrders: { select: { id: true }, take: 1 },
-          partShipments: { select: { id: true }, take: 1 },
         },
       },
     },
@@ -265,8 +263,6 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
       customerUserId: string;
       vehicleId: string | null;
       customer: { name: string; phone: string; email: string };
-      repairOrders: Array<{ id: string }>;
-      partShipments: Array<{ id: string }>;
     };
   } | null;
   if (!est) return { error: "Смета не найдена" };
@@ -275,16 +271,35 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
   }
 
   const now = new Date();
-  await db.$transaction(async (tx) => {
-    await tx.estimate.update({
-      where: { id: estimateId },
+  const raced = await db.$transaction(async (tx) => {
+    // Serialize all approvals on this deal so the fulfillment-existence read
+    // below can't see a stale (pre-create) value and double-create a
+    // RepairOrder/PartShipment under concurrency (audit finding C1).
+    await tx.$queryRaw`SELECT id FROM "Deal" WHERE id = ${est.deal.id} FOR UPDATE`;
+
+    // CAS: exactly one approval transitions DRAFT/SENT → APPROVED. A concurrent
+    // double-submit matches 0 rows and short-circuits — no second dispatch.
+    const won = await tx.estimate.updateMany({
+      where: { id: estimateId, stage: { in: ["DRAFT", "SENT"] } },
       data: { stage: "APPROVED", approvedAt: now },
     });
+    if (won.count === 0) return true;
+
     await tx.deal.update({
       where: { id: est.deal.id },
       data: { stage: "IN_PROGRESS", approvedAt: now },
     });
-    // Auto-create the channel's fulfillment if the deal doesn't have one yet.
+
+    // Re-read fulfillment existence INSIDE the serialized tx (the pre-tx read is
+    // stale w.r.t. a concurrent approval) so dispatch stays idempotent.
+    const fresh = (await tx.deal.findUnique({
+      where: { id: est.deal.id },
+      select: {
+        repairOrders: { select: { id: true }, take: 1 },
+        partShipments: { select: { id: true }, take: 1 },
+      },
+    })) as { repairOrders: Array<{ id: string }>; partShipments: Array<{ id: string }> } | null;
+
     await dispatchFulfillment(tx, {
       dealId: est.deal.id,
       channel: est.deal.channel,
@@ -292,10 +307,12 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
       vehicleId: est.deal.vehicleId,
       contact: est.deal.customer,
       estimateTotal: est.total,
-      hasRepairOrder: est.deal.repairOrders.length > 0,
-      hasPartShipment: est.deal.partShipments.length > 0,
+      hasRepairOrder: (fresh?.repairOrders.length ?? 0) > 0,
+      hasPartShipment: (fresh?.partShipments.length ?? 0) > 0,
     });
+    return false;
   });
+  if (raced) return { error: "Смета уже согласована" };
 
   revalidatePath(`/admin/crm/deals/${est.deal.id}`);
   revalidatePath(`/admin/crm/estimates/${estimateId}`);
