@@ -69,11 +69,14 @@ export async function StockHistory({ partId }: { partId: string }): Promise<Reac
       <div className="grid grid-cols-3 gap-3 mb-4">
         {[
           { label: "На складе", value: onHand },
-          { label: "Зарезервировано", value: reserved },
+          // "Резерв" (matches the table column below) — the full word
+          // "Зарезервировано" is one unbreakable token wider than a third of a
+          // phone viewport, so it overflowed the centered card.
+          { label: "Резерв", value: reserved },
           { label: "Доступно", value: available },
         ].map((c) => (
           <div key={c.label} className="card text-center py-3">
-            <div className="text-xs text-[var(--foreground-muted)]">{c.label}</div>
+            <div className="text-xs text-[var(--foreground-muted)] break-words leading-tight">{c.label}</div>
             <div className="text-xl font-bold tabular-nums text-[var(--color-accent)]">{c.value}</div>
           </div>
         ))}

@@ -654,3 +654,18 @@ html.light .hero-image {
   .hero-stagger > *,
   .hero-corner { animation: none; }
 }
+
+/* iOS Safari auto-zooms the viewport when a focused form control has a computed
+   font-size below 16px, and never zooms back — so every input tap on a phone
+   jumps the whole layout (reported site-wide). Force editable controls to 16px
+   on touch devices only; desktop keeps the denser 0.875rem. Unlayered so it
+   reliably beats the .input component rule. Pinch-zoom stays enabled — we do
+   NOT set user-scalable=no (an accessibility regression that newer iOS ignores). */
+@media (pointer: coarse) {
+  .input,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
