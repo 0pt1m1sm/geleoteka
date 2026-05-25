@@ -155,12 +155,23 @@ export async function createCountSession(
   if (scope === "LOCATION") {
     scopeLocations = [...new Set((input.locations ?? []).map(normalizeLocation))].filter(Boolean);
   } else if (scope === "ZONE") {
-    const zone = (input.scopeValue ?? "").trim();
-    const locFind = (client as DbClientPort).stockLocation.findMany as unknown as (
-      args: unknown,
-    ) => Promise<Array<{ code: string }>>;
-    const locs = await locFind({ where: { tenantKey, warehouseId, zone }, select: { code: true } });
-    scopeLocations = [...new Set(locs.map((l) => normalizeLocation(l.code)))];
+    // A "zone" is the leading segment of a cell code: zone "A" → A-1-1, A-2-3;
+    // zone "A-1" → A-1-1, A-1-2. We match by code PREFIX, not the
+    // StockLocation.zone field (which the platform never populates — there is no
+    // UI/action to assign it). Entering a full cell code (e.g. "A-1-1") simply
+    // scopes to that one cell. Empty match → EMPTY_ZONE (no silent empty session).
+    const zone = normalizeLocation(input.scopeValue ?? "");
+    if (zone) {
+      const locFind = (client as DbClientPort).stockLocation.findMany as unknown as (
+        args: unknown,
+      ) => Promise<Array<{ code: string }>>;
+      const locs = await locFind({
+        where: { tenantKey, warehouseId, OR: [{ code: zone }, { code: { startsWith: `${zone}-` } }] },
+        select: { code: true },
+      });
+      scopeLocations = [...new Set(locs.map((l) => normalizeLocation(l.code)))];
+    }
+    if (scopeLocations.length === 0) throw new Error("EMPTY_ZONE");
   }
 
   const run = async (tx: DbClientPort): Promise<CountSession> => {

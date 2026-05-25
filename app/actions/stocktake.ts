@@ -90,16 +90,23 @@ export async function createCountSessionAction(
     partIds = await resolvePartScope(value);
     if (partIds.length === 0) return { error: "Не найдено позиций для пересчёта" };
   }
-  const created = await createCountSession(db, {
-    scope,
-    warehouseId: await resolveWarehouseId(wh),
-    scopeValue: value || null,
-    locations,
-    partIds,
-    actorId: actorId(session),
-    tenantKey: TENANT_KEY,
-  });
-  return { error: null, sessionId: created.id };
+  try {
+    const created = await createCountSession(db, {
+      scope,
+      warehouseId: await resolveWarehouseId(wh),
+      scopeValue: value || null,
+      locations,
+      partIds,
+      actorId: actorId(session),
+      tenantKey: TENANT_KEY,
+    });
+    return { error: null, sessionId: created.id };
+  } catch (e) {
+    if (e instanceof Error && e.message === "EMPTY_ZONE") {
+      return { error: `В зоне «${value}» не найдено ячеек` };
+    }
+    throw e;
+  }
 }
 
 /** Record a counted quantity for a scanned item in a cell. Unresolvable code → UNKNOWN line. */
