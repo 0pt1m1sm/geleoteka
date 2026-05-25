@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { consumeApprovedEstimateParts } from "@/lib/fulfillment/consume-parts";
 import { actorId } from "@/lib/wms-host";
+import { parseDatetimeLocalInput } from "@/lib/timezone";
 
 async function recomputeRepairOrderTotals(repairOrderId: string): Promise<void> {
   const allJobs = await db.jobLine.findMany({
@@ -266,8 +267,10 @@ export async function updateRepairOrderDetails(
     if (promisedAtRaw.trim() === "") {
       data.promisedAt = null;
     } else {
-      const d = new Date(promisedAtRaw);
-      if (Number.isNaN(d.getTime())) return { error: "Некорректная дата готовности" };
+      // datetime-local has no TZ; interpret it as BUSINESS_TZ wall-clock (the
+      // shop's local time) → UTC, matching how the value is rendered back.
+      const d = parseDatetimeLocalInput(promisedAtRaw);
+      if (!d) return { error: "Некорректная дата готовности" };
       data.promisedAt = d;
     }
   }

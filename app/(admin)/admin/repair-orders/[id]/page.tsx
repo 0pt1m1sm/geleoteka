@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
+import { formatForDatetimeLocalInput } from "@/lib/timezone";
 import {
   REPAIR_ORDER_STATUS_LABELS,
   formatDateTime,
@@ -55,13 +56,6 @@ interface MasterUser {
 
 interface Props {
   params: Promise<{ id: string }>;
-}
-
-function toLocalInputValue(d: Date | null): string {
-  if (!d) return "";
-  // Format as "yyyy-MM-ddTHH:mm" in local time for <input type="datetime-local">.
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 export default async function AdminRepairOrderDetailPage({ params }: Props) {
@@ -175,7 +169,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
                   notes: ro.notes ?? "",
                   mileageIn: ro.mileageIn?.toString() ?? "",
                   mileageOut: ro.mileageOut?.toString() ?? "",
-                  promisedAt: toLocalInputValue(ro.promisedAt),
+                  promisedAt: formatForDatetimeLocalInput(ro.promisedAt),
                   masterUserId: ro.masterUserId ?? "",
                 }}
                 masters={masters}
