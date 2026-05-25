@@ -2,8 +2,16 @@ import type { DbClientPort } from "./repository";
 
 /** A client able to open an interactive transaction (the base PrismaClient, not
  *  a tx client). The base client's $transaction is overloaded; we only use the
- *  interactive-callback form, so narrow to that single signature for the call. */
-export type TxCapable = { $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>) => Promise<T> };
+ *  interactive-callback form, so narrow to that single signature for the call.
+ *  `options` carries Prisma's interactive-tx settings (e.g. `timeout` — the
+ *  default is 5s, too short for a large multi-part stocktake post). */
+export interface TxOptions {
+  maxWait?: number;
+  timeout?: number;
+}
+export type TxCapable = {
+  $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>, options?: TxOptions) => Promise<T>;
+};
 
 /** True when `client` is a base client that can open its own transaction (vs an
  *  already-open tx client, which has no `$transaction`). Lets a public op

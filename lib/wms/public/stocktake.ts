@@ -25,7 +25,9 @@ export type StockCountStatus = "OPEN" | "REVIEW" | "POSTED" | "CANCELLED";
 export type StockCountClassification = "FOUND" | "MISSING" | "UNEXPECTED" | "UNKNOWN";
 
 /** A client able to open an interactive transaction (the base PrismaClient). */
-type TxCapable = { $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>) => Promise<T> };
+type TxCapable = {
+  $transaction: <T>(fn: (tx: DbClientPort) => Promise<T>, options?: { maxWait?: number; timeout?: number }) => Promise<T>;
+};
 function txCapable(client: DbClientPort): boolean {
   return typeof (client as { $transaction?: unknown }).$transaction === "function";
 }
@@ -462,7 +464,14 @@ export async function postCountSession(
     return { applied: true, status: "POSTED" };
   };
 
-  return txCapable(client) ? (client as unknown as TxCapable).$transaction(run) : run(client);
+  // A FULL-scope post does many sequential per-part/per-cell round-trips
+  // (drift check + reconcile guard + removes/adjust/places). On prod that
+  // exceeded Prisma's default 5s interactive-tx timeout (observed ~6s) → P2028.
+  // 30s gives ample headroom for realistic counts; batching the per-part reads
+  // is the longer-term optimization. (No-op when composed inside a caller tx.)
+  return txCapable(client)
+    ? (client as unknown as TxCapable).$transaction(run, { timeout: 30_000, maxWait: 10_000 })
+    : run(client);
 }
 
 /**
