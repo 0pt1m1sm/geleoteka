@@ -28,6 +28,11 @@ import {
 
 const COUNT_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
 const POST_ROLES = ["ADMIN", "MANAGER"];
+// Upper bound on a counted quantity. Guards against a garbage/test value (e.g.
+// 9999999999) that passes the integer check but overflows Postgres Int
+// (max 2_147_483_647) when posting drives StockItem.quantity/bins past it —
+// which previously surfaced as a 500. 1M is far beyond any real per-cell count.
+const MAX_COUNT_QTY = 1_000_000;
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors app/api/warehouse/scan/route.ts resolution. */
@@ -118,8 +123,8 @@ export async function recordCountAction(
 ): Promise<{ error: string | null; unknown?: boolean }> {
   await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
-  if (!Number.isInteger(countedQty) || countedQty < 0) {
-    return { error: "Количество должно быть целым неотрицательным числом" };
+  if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
+    return { error: "Количество должно быть целым от 0 до 1 000 000" };
   }
   const partId = await resolveItemCode(rawItemCode);
   try {
@@ -145,8 +150,8 @@ export async function recordCountByPartAction(
 ): Promise<{ error: string | null }> {
   await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
-  if (!Number.isInteger(countedQty) || countedQty < 0) {
-    return { error: "Количество должно быть целым неотрицательным числом" };
+  if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
+    return { error: "Количество должно быть целым от 0 до 1 000 000" };
   }
   try {
     await recordCount(db, { sessionId, itemId: partId, location, countedQty, tenantKey: TENANT_KEY });
@@ -167,7 +172,8 @@ export async function finalizeSessionAction(sessionId: string): Promise<{ error:
     const msg = wmsErrorMessage(e);
     if (msg) return { error: msg };
     if (e instanceof Error && e.message === "SESSION_NOT_OPEN") return { error: "Сессия не в статусе подсчёта" };
-    throw e;
+    console.error("[finalizeSessionAction] unexpected error", { sessionId, error: e });
+    return { error: "Не удалось завершить пересчёт — внутренняя ошибка. Сообщите администратору." };
   }
 }
 
@@ -191,7 +197,10 @@ export async function postCountSessionAction(sessionId: string): Promise<{
       return { error: msg };
     }
     if (e instanceof Error && e.message === "SESSION_NOT_REVIEW") return { error: "Сессия не готова к проводке" };
-    throw e;
+    // Never let an unexpected error 500 the whole page — log it (Railway) and
+    // return a graceful message so the reviewer keeps a usable screen.
+    console.error("[postCountSessionAction] unexpected error", { sessionId, error: e });
+    return { error: "Не удалось провести пересчёт — внутренняя ошибка. Сообщите администратору." };
   }
 }
 
@@ -226,7 +235,15 @@ export async function getCountSessionAction(
   await requireRole(COUNT_ROLES);
   const session = await getCountSession(db, sessionId);
   if (!session) return { session: null, variance: [] };
-  const variance = await sessionVariance(db, sessionId, TENANT_KEY);
+  // Variance is a projection for display — never let it 500 the whole session
+  // page on load. Degrade to empty + log so the reviewer can still see lines
+  // and cancel/act on the session.
+  let variance: PartVariance[] = [];
+  try {
+    variance = await sessionVariance(db, sessionId, TENANT_KEY);
+  } catch (e) {
+    console.error("[getCountSessionAction] variance projection failed", { sessionId, error: e });
+  }
   return { session, variance };
 }
 

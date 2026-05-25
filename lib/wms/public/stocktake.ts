@@ -217,7 +217,10 @@ export async function recordCount(
 ): Promise<CountLine> {
   const tenantKey = input.tenantKey ?? DEFAULT_TENANT;
   const location = normalizeLocation(input.location);
-  if (!Number.isInteger(input.countedQty) || input.countedQty < 0) {
+  // Upper bound (defense-in-depth; the action gives the precise message): a
+  // count above 1M would overflow Postgres Int (max 2_147_483_647) when posting
+  // applies the adjustment. Refuse here too so no caller can store a garbage qty.
+  if (!Number.isInteger(input.countedQty) || input.countedQty < 0 || input.countedQty > 1_000_000) {
     throw WmsError.invalidQty("ADJUSTMENT");
   }
   await assertSessionOpen(client, input.sessionId);
