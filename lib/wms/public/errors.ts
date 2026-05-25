@@ -3,6 +3,7 @@ export type WmsErrorCode =
   | "INVALID_QTY"
   | "INSUFFICIENT_UNPLACED"
   | "INSUFFICIENT_BIN"
+  | "INSUFFICIENT_STOCK"
   | "SAME_LOCATION"
   | "LOCATION_BLOCKED"
   | "DUPLICATE_OPERATION"
@@ -56,6 +57,12 @@ export class WmsError extends Error {
   /** Placement: a bin holds less than the requested transfer/remove qty. */
   static insufficientBin(): WmsError {
     return new WmsError("INSUFFICIENT_BIN", "The bin does not hold enough to move that quantity.");
+  }
+
+  /** Consumption: on-hand is less than the requested consume qty — refuse rather
+   *  than drive StockItem.quantity negative (the DB CHECK is the final backstop). */
+  static insufficientStock(): WmsError {
+    return new WmsError("INSUFFICIENT_STOCK", "Not enough on-hand stock to consume that quantity.");
   }
 
   /** Placement: transfer source and destination are the same location. */

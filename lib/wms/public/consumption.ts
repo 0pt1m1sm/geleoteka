@@ -79,6 +79,16 @@ async function consumeStockImpl(
     }
   }
 
+  // Availability floor: never let a consume drive on-hand negative. Fails loud
+  // with a typed INSUFFICIENT_STOCK on the common (sequential / drift) case,
+  // before the movement, so callers get a clean error instead of a raw DB CHECK
+  // violation. The CHECK(quantity>=0) constraint is the ultimate concurrency
+  // backstop; the retail checkout additionally takes a FOR UPDATE lock. Reached
+  // only after the source-triple pre-check, so an idempotent replay never trips
+  // it. recordMovement (the chokepoint) is left untouched.
+  const onHand = await ensureStockItem(client, input.item.itemId, tenantKey, input.item.warehouseId);
+  if (onHand.quantity < input.qty) throw WmsError.insufficientStock();
+
   const mv = await recordMovement(client, {
     item: input.item,
     reason: "CONSUMPTION",

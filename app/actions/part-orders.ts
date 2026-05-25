@@ -68,10 +68,22 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
 
     const partMap = new Map(parts.map((p: Record<string, unknown>) => [p.id as string, p]));
 
+    // Merge duplicate cart lines for the same part. Two rows with the same
+    // partId map to ONE consumption source triple (PartShipment:order:partId),
+    // so the second consume is an idempotent no-op and the order ships short
+    // (audit finding H3). Merging keeps one line per part with summed qty.
+    const mergedItems = Array.from(
+      items.reduce(
+        (m, i) => m.set(i.partId, (m.get(i.partId) ?? 0) + i.quantity),
+        new Map<string, number>(),
+      ),
+      ([partId, quantity]) => ({ partId, quantity }),
+    );
+
     let total = 0;
     const orderItems: Array<{ partId: string; quantity: number; unitPrice: number }> = [];
 
-    for (const item of items) {
+    for (const item of mergedItems) {
       const part = partMap.get(item.partId);
       if (!part) return { success: false, error: `Запчасть не найдена` };
 
@@ -79,6 +91,9 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       const si = (part.stockItems as Array<{ quantity: number; reserved: number }>)[0] ?? null;
       const stock = si ? si.quantity - si.reserved : 0;
 
+      // Fast pre-check for good UX (fail early). NOT authoritative — the
+      // binding availability check runs inside the transaction below with a
+      // row lock, because this read is outside any tx (audit finding H1).
       if (stock < item.quantity) {
         return { success: false, error: `${part.name as string}: недостаточно на складе (${stock} шт.)` };
       }
@@ -130,6 +145,23 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       // through the WMS ledger (not a direct Part write). Idempotency key is
       // per (order, part) so a retry never double-consumes.
       const warehouseId = await defaultWarehouseId(tx);
+
+      // Authoritative availability check INSIDE the tx with a row lock. The
+      // pre-check above runs outside any transaction, so two concurrent
+      // checkouts could both pass it and oversell on-hand into negative
+      // (audit finding H1 — no DB floor on StockItem.quantity). FOR UPDATE
+      // serializes concurrent checkouts on the same part: the second waits for
+      // the first to commit, then re-reads the decremented value and aborts.
+      for (const item of orderItems) {
+        const locked = (await tx.$queryRaw`
+          SELECT quantity, reserved FROM "StockItem"
+          WHERE "partId" = ${item.partId} AND "warehouseId" = ${warehouseId}
+          FOR UPDATE
+        `) as Array<{ quantity: number; reserved: number }>;
+        const available = locked[0] ? locked[0].quantity - locked[0].reserved : 0;
+        if (available < item.quantity) throw new Error("INSUFFICIENT_STOCK");
+      }
+
       for (const item of orderItems) {
         // consumeStock = CONSUMPTION + bin deduction (unplaced-first → oldest
         // bins) so a point-of-sale sale keeps Σbins consistent with on-hand.
@@ -216,6 +248,9 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
       claimToken,
     };
   } catch (err) {
+    if (err instanceof Error && err.message === "INSUFFICIENT_STOCK") {
+      return { success: false, error: "Недостаточно товара на складе — обновите корзину." };
+    }
     console.error("Part order error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };
   }

@@ -29,9 +29,15 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin routes — require MANAGER or ADMIN role
+  // Admin routes — MANAGER/ADMIN have full access; WAREHOUSE_WORKER is scoped
+  // to the warehouse section only (its login lands on /admin/warehouse and the
+  // warehouse pages already requireRole it; finer per-page gating stays there).
   if (pathname.startsWith("/admin")) {
-    if (payload.permissionRole !== "MANAGER" && payload.permissionRole !== "ADMIN") {
+    const role = payload.permissionRole;
+    const isManagerOrAdmin = role === "MANAGER" || role === "ADMIN";
+    const isWarehouseWorkerOnWarehouse =
+      role === "WAREHOUSE_WORKER" && pathname.startsWith("/admin/warehouse");
+    if (!isManagerOrAdmin && !isWarehouseWorkerOnWarehouse) {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }

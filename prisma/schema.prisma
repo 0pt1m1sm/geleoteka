@@ -1228,6 +1228,10 @@ model PartOrderItem {
   order PartShipment @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part         @relation(fields: [partId], references: [id], onDelete: Cascade)
 
+  // One line per (order, part). Duplicate part rows on one order collapse to a
+  // single consumption source triple, so the second consume is an idempotent
+  // no-op and the order ships short — this enforces the dedupe at the DB level.
+  @@unique([orderId, partId])
   @@index([orderId])
   @@index([partId])
 }
