@@ -31,6 +31,7 @@ export function StocktakeCountBox({
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [finalizing, setFinalizing] = useState(false); // drives the finalize-button spinner
 
   const cells = [...new Set(lines.map((l) => l.location))].sort();
   const cellLines = activeCell ? lines.filter((l) => l.location === activeCell) : [];
@@ -86,10 +87,13 @@ export function StocktakeCountBox({
 
   function finalize(): void {
     setError(null);
+    setFinalizing(true);
     startTransition(async () => {
       const res = await finalizeSessionAction(sessionId);
-      if (res.error) setError(res.error);
-      else router.refresh();
+      if (res.error) {
+        setFinalizing(false);
+        setError(res.error);
+      } else router.refresh();
     });
   }
 
@@ -199,8 +203,15 @@ export function StocktakeCountBox({
         </div>
       )}
 
-      <button type="button" onClick={finalize} disabled={isPending} className="btn btn-primary min-h-[44px]">
-        Завершить пересчёт
+      <button
+        type="button"
+        onClick={finalize}
+        disabled={isPending}
+        data-loading={finalizing || undefined}
+        aria-busy={finalizing || undefined}
+        className="btn btn-primary min-h-[44px]"
+      >
+        {finalizing ? "Завершение…" : "Завершить пересчёт"}
       </button>
     </section>
   );

@@ -39,6 +39,10 @@ export function StocktakeReview({
   const [error, setError] = useState<string | null>(null);
   const [driftCells, setDriftCells] = useState<string[]>([]);
   const [isPending, startTransition] = useTransition();
+  // Which action is in flight — drives the in-button spinner (post can take
+  // several seconds on a large count). Cleared on error; on success the page
+  // refreshes into the read-only summary so the buttons are gone anyway.
+  const [busyAction, setBusyAction] = useState<"post" | "reopen" | "cancel" | null>(null);
 
   const name = (id: string | null): string => (id ? (partMap[id]?.name ?? "—") : "—");
   const article = (id: string | null): string => (id ? (partMap[id]?.article ?? "") : "");
@@ -46,12 +50,14 @@ export function StocktakeReview({
   function post(): void {
     setError(null);
     setDriftCells([]);
+    setBusyAction("post");
     startTransition(async () => {
       const res = await postCountSessionAction(sessionId);
       if (!res.error) {
         router.refresh();
         return;
       }
+      setBusyAction(null);
       setError(res.error);
       if (res.drift) setDriftCells(res.drift.map((d) => d.location));
     });
@@ -59,19 +65,25 @@ export function StocktakeReview({
 
   function reopen(): void {
     setError(null);
+    setBusyAction("reopen");
     startTransition(async () => {
       const res = await reopenSessionAction(sessionId);
-      if (res.error) setError(res.error);
-      else router.refresh();
+      if (res.error) {
+        setBusyAction(null);
+        setError(res.error);
+      } else router.refresh();
     });
   }
 
   function cancel(): void {
     setError(null);
+    setBusyAction("cancel");
     startTransition(async () => {
       const res = await cancelSessionAction(sessionId);
-      if (res.error) setError(res.error);
-      else router.refresh();
+      if (res.error) {
+        setBusyAction(null);
+        setError(res.error);
+      } else router.refresh();
     });
   }
 
@@ -153,14 +165,33 @@ export function StocktakeReview({
       {!readOnly && (
         <div className="flex flex-wrap gap-2">
           {canPost && (
-            <button type="button" onClick={post} disabled={isPending} className="btn btn-primary min-h-[44px]">
-              Провести
+            <button
+              type="button"
+              onClick={post}
+              disabled={isPending}
+              data-loading={busyAction === "post" || undefined}
+              aria-busy={busyAction === "post" || undefined}
+              className="btn btn-primary min-h-[44px]"
+            >
+              {busyAction === "post" ? "Проведение…" : "Провести"}
             </button>
           )}
-          <button type="button" onClick={reopen} disabled={isPending} className="btn btn-secondary min-h-[44px]">
+          <button
+            type="button"
+            onClick={reopen}
+            disabled={isPending}
+            data-loading={busyAction === "reopen" || undefined}
+            className="btn btn-secondary min-h-[44px]"
+          >
             Вернуться к подсчёту
           </button>
-          <button type="button" onClick={cancel} disabled={isPending} className="btn btn-secondary min-h-[44px]">
+          <button
+            type="button"
+            onClick={cancel}
+            disabled={isPending}
+            data-loading={busyAction === "cancel" || undefined}
+            className="btn btn-secondary min-h-[44px]"
+          >
             Отменить
           </button>
         </div>
