@@ -20,6 +20,11 @@ interface QrScannerProps {
 export function QrScanner({ onScan, busy = false }: QrScannerProps): React.ReactElement {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<IScannerControls | null>(null);
+  // Set on unmount. Guards the async gap in startCamera: if the component is
+  // torn down (e.g. the parent switches scan target) while decodeFromConstraints
+  // is still awaiting, the late-arriving controls would otherwise leak a live
+  // camera stream that keeps decoding into a stale onScan. We stop them at once.
+  const disposedRef = useRef(false);
   const lastScanRef = useRef<{ code: string; at: number }>({ code: "", at: 0 });
   const manualRef = useRef<HTMLInputElement>(null);
   const [active, setActive] = useState(false);
@@ -46,13 +51,19 @@ export function QrScanner({ onScan, busy = false }: QrScannerProps): React.React
     if (!videoRef.current) return;
     try {
       const reader = new BrowserMultiFormatReader();
-      controlsRef.current = await reader.decodeFromConstraints(
+      const controls = await reader.decodeFromConstraints(
         { video: { facingMode: "environment" } },
         videoRef.current,
         (result) => {
           if (result) dispatch(result.getText());
         },
       );
+      // Unmounted while awaiting: stop the just-started stream and bail.
+      if (disposedRef.current) {
+        controls.stop();
+        return;
+      }
+      controlsRef.current = controls;
       setActive(true);
     } catch {
       setCamError("Камера недоступна. Введите код вручную.");
@@ -60,8 +71,15 @@ export function QrScanner({ onScan, busy = false }: QrScannerProps): React.React
     }
   }
 
-  // Stop the camera + release the MediaStream on unmount.
-  useEffect(() => () => controlsRef.current?.stop(), []);
+  // Stop the camera + release the MediaStream on unmount. disposedRef also
+  // catches a stream whose startCamera await resolves after this teardown.
+  useEffect(
+    () => () => {
+      disposedRef.current = true;
+      controlsRef.current?.stop();
+    },
+    [],
+  );
 
   function handleManualSubmit(e: FormEvent<HTMLFormElement>): void {
     e.preventDefault();

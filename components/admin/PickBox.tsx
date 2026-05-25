@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { pickRepairOrderLine } from "@/app/actions/picking";
+import { QrScanner } from "@/components/warehouse/QrScanner";
 import type { OpenPickLine } from "@/lib/warehouse/pick";
 
 /** Per-line scan-to-pick: for each open line, scan a bin + the part, then pick
@@ -27,6 +28,41 @@ export function PickBox({
   const [success, setSuccess] = useState<string | null>(null);
   const [activeLine, setActiveLine] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // Camera scan: which line's panel is open, and the current sequential step
+  // (caption only). The authoritative step + last-written code live in refs —
+  // QrScanner registers its zxing decode callback once at camera-start, so its
+  // onScan closure captures stale state; refs stay current, state would not.
+  const [scanLine, setScanLine] = useState<string | null>(null);
+  const [scanStep, setScanStep] = useState<"bin" | "part">("bin");
+  const scanStepRef = useRef<"bin" | "part">("bin");
+  const lastCodeRef = useRef<string>("");
+
+  function openScanner(lineId: string): void {
+    // Safe to read bin state directly here: this runs in a click handler, not
+    // inside QrScanner's stale decode callback (see handleLineScan).
+    const step = (bin[lineId] ?? "").trim() ? "part" : "bin";
+    scanStepRef.current = step;
+    lastCodeRef.current = "";
+    setScanStep(step);
+    setScanLine(lineId);
+  }
+
+  function handleLineScan(lineId: string, raw: string): void {
+    const code = raw.trim();
+    if (!code) return;
+    if (scanStepRef.current === "bin") {
+      setBin((m) => ({ ...m, [lineId]: code }));
+      lastCodeRef.current = code;
+      scanStepRef.current = "part";
+      setScanStep("part");
+    } else {
+      // Bin label may still be framed after QrScanner's 1 s dup-guard expires —
+      // ignore the bin code so it cannot bleed into the part field.
+      if (code === lastCodeRef.current) return;
+      setPart((m) => ({ ...m, [lineId]: code }));
+      setScanLine(null);
+    }
+  }
 
   function pick(line: OpenPickLine): void {
     const binCode = (bin[line.lineId] ?? "").trim();
@@ -129,6 +165,28 @@ export function PickBox({
               >
                 Отобрать
               </button>
+            </div>
+
+            <div>
+              <button
+                type="button"
+                onClick={() => openScanner(line.lineId)}
+                aria-label={`Сканировать камерой для ${line.article}`}
+                className="btn btn-secondary min-h-[44px]"
+              >
+                Сканировать камерой
+              </button>
+              {scanLine === line.lineId && (
+                <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3 space-y-2">
+                  <p className="text-xs font-medium text-[var(--foreground-muted)]">
+                    {scanStep === "bin" ? "Шаг 1/2: наведите на ячейку" : "Шаг 2/2: наведите на запчасть"}
+                  </p>
+                  <QrScanner onScan={(raw) => handleLineScan(line.lineId, raw)} />
+                  <button type="button" onClick={() => setScanLine(null)} className="btn btn-secondary btn-sm">
+                    Отмена
+                  </button>
+                </div>
+              )}
             </div>
           </li>
         ))}
