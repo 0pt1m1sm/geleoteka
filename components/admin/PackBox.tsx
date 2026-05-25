@@ -12,9 +12,11 @@ import type { OpenPackLine } from "@/lib/warehouse/pack";
 export function PackBox({
   orderId,
   lines,
+  warehouseId,
 }: {
   orderId: string;
   lines: OpenPackLine[];
+  warehouseId?: string;
 }): React.ReactElement {
   // useRouter only for .refresh() (re-fetch the server-rendered open list); we
   // never .push here. Named to avoid the banned `router.push` pattern.
@@ -66,7 +68,7 @@ export function PackBox({
     setSuccess(null);
     setActiveLine(line.lineKey);
     startTransition(async () => {
-      const res = await packOrderLine(orderId, line.lineKey, partCode, binCode);
+      const res = await packOrderLine(orderId, line.lineKey, partCode, binCode, warehouseId);
       if (res.error) {
         setError(res.error);
         return;

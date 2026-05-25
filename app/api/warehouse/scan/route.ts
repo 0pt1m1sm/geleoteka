@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseScanCode } from "@/lib/wms/public";
 import { TENANT_KEY } from "@/lib/wms-host";
+import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { resolveScan } from "@/lib/warehouse/scan-router";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  let body: { rawCode?: unknown; action?: unknown; deviceId?: unknown; sessionId?: unknown };
+  let body: { rawCode?: unknown; action?: unknown; deviceId?: unknown; sessionId?: unknown; warehouseId?: unknown };
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -37,11 +38,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: { code: "BAD_REQUEST", message: "rawCode is required" } }, { status: 400 });
   }
 
+  const warehouseId = await resolveWarehouseId(
+    typeof body.warehouseId === "string" ? body.warehouseId : undefined,
+  );
   const outcome = await resolveScan(db, parseScanCode(rawCode), TENANT_KEY, {
     userId: session.id,
     action: typeof body.action === "string" && body.action ? body.action : "scan",
     deviceId: typeof body.deviceId === "string" ? body.deviceId : null,
     sessionId: typeof body.sessionId === "string" ? body.sessionId : null,
+    warehouseId,
     articleResolver: async (code) => {
       // No isActive filter: a part deactivated in the shop still physically
       // exists in the warehouse and must be scannable (putaway/move/count).

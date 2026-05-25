@@ -23,6 +23,8 @@ export interface ScanReceiveOrderInput {
   expectedReceived: number;
   location: string;
   actorId?: string;
+  /** Physical warehouse to receive into. Omitted → the tenant default (MAIN). */
+  warehouseId?: string;
 }
 
 /**
@@ -48,9 +50,10 @@ export async function applyScanReceiveOrderLine(
   // applyReceive raises stock + advances the order but its `location.trim()`
   // check skips placement, leaving goods unplaced instead of in ПРИЁМКА.
   const location = (input.location ?? "").trim() || STAGING_LOCATION;
+  const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
   // Reject a blocked/inactive target before any stock change (applyReceive →
   // placeStock does not validate the location itself).
-  await assertLocationUsable(client, location, await defaultWarehouseId(client), TENANT_KEY);
+  await assertLocationUsable(client, location, warehouseId, TENANT_KEY);
   return applyReceive(client, {
     orderId: input.orderId,
     lineId: input.lineId,
@@ -58,6 +61,7 @@ export async function applyScanReceiveOrderLine(
     expectedReceived: input.expectedReceived,
     location,
     actorId: input.actorId,
+    warehouseId,
   });
 }
 
@@ -69,6 +73,8 @@ export interface BlindReceiveInput {
    *  so a network retry never double-counts. */
   idempotencyKey: string;
   actorId?: string;
+  /** Physical warehouse to receive into. Omitted → the tenant default (MAIN). */
+  warehouseId?: string;
 }
 
 export interface BlindReceiveResult {
@@ -91,7 +97,7 @@ export async function applyBlindReceive(
   // Coerce a blank/whitespace cell to the staging default — never place into a
   // normalized empty-string bin.
   const location = (input.location ?? "").trim() || STAGING_LOCATION;
-  const warehouseId = await defaultWarehouseId(client);
+  const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
   await assertLocationUsable(client, location, warehouseId, TENANT_KEY);
   const mv = await recordMovement(client, {
     item: { itemId: partId, warehouseId },

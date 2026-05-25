@@ -74,7 +74,7 @@ type ScanData =
  * client idempotency key (regenerated per operation, reused only on a network
  * retry where the server outcome is unknown).
  */
-export function WarehouseScanBox(): React.ReactElement {
+export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): React.ReactElement {
   const router = useRouter();
   const [item, setItem] = useState<ResolvedItem | null>(null);
   const [locationCard, setLocationCard] = useState<LocationCard | null>(null);
@@ -145,7 +145,7 @@ export function WarehouseScanBox(): React.ReactElement {
       const res = await fetch("/api/warehouse/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rawCode: raw }),
+        body: JSON.stringify({ rawCode: raw, warehouseId }),
       });
       if (res.ok) {
         const body = (await res.json()) as { data: ScanData };
@@ -169,7 +169,7 @@ export function WarehouseScanBox(): React.ReactElement {
           setReceiveError(null);
           setReceiveWarning(null);
           setShowLabelLink(false);
-          const p = await getPlacement(body.data.itemId);
+          const p = await getPlacement(body.data.itemId, warehouseId);
           setPlacement(p.placement ?? null);
           const ol = await openOrderLinesForPartAction(body.data.itemId);
           setOpenLines(ol.lines);
@@ -232,7 +232,7 @@ export function WarehouseScanBox(): React.ReactElement {
     const key = adjustKeyRef.current ?? (adjustKeyRef.current = crypto.randomUUID());
     startTransition(async () => {
       try {
-        const result = await adjustStock(item.itemId, next, undefined, key);
+        const result = await adjustStock(item.itemId, next, undefined, key, warehouseId);
         if (result.error) {
           setAdjustError(result.error);
           adjustKeyRef.current = null; // server rejected definitively → fresh key next time
@@ -240,7 +240,7 @@ export function WarehouseScanBox(): React.ReactElement {
         }
         adjustKeyRef.current = null;
         setItem({ ...item, quantity: result.quantity ?? next, available: result.available ?? item.available });
-        const p = await getPlacement(item.itemId);
+        const p = await getPlacement(item.itemId, warehouseId);
         setPlacement(p.placement ?? null);
         router.refresh();
       } catch {
@@ -256,7 +256,7 @@ export function WarehouseScanBox(): React.ReactElement {
     const key = placeKeyRef.current ?? (placeKeyRef.current = crypto.randomUUID());
     startBinTransition(async () => {
       try {
-        const result = await placeIntoBin(item.itemId, placeLoc, qty, key);
+        const result = await placeIntoBin(item.itemId, placeLoc, qty, key, warehouseId);
         if (result.error) {
           setBinError(result.error);
           placeKeyRef.current = null;
@@ -280,7 +280,7 @@ export function WarehouseScanBox(): React.ReactElement {
     const key = transferKeyRef.current ?? (transferKeyRef.current = crypto.randomUUID());
     startBinTransition(async () => {
       try {
-        const result = await transferBetweenBins(item.itemId, transferFrom, transferTo, qty, key);
+        const result = await transferBetweenBins(item.itemId, transferFrom, transferTo, qty, key, warehouseId);
         if (result.error) {
           setBinError(result.error);
           transferKeyRef.current = null;
@@ -299,7 +299,7 @@ export function WarehouseScanBox(): React.ReactElement {
   }
 
   async function refreshAfterReceive(itemId: string): Promise<void> {
-    const p = await getPlacement(itemId);
+    const p = await getPlacement(itemId, warehouseId);
     setPlacement(p.placement ?? null);
     const ol = await openOrderLinesForPartAction(itemId);
     setOpenLines(ol.lines);
@@ -319,7 +319,7 @@ export function WarehouseScanBox(): React.ReactElement {
     // receivedQuantity (a replay fails closed) — no client key needed.
     startReceiveTransition(async () => {
       try {
-        const result = await scanReceiveOrderLine(line.orderId, line.lineId, qty, line.received, receiveCell);
+        const result = await scanReceiveOrderLine(line.orderId, line.lineId, qty, line.received, receiveCell, warehouseId);
         if (result.error) {
           setReceiveError(result.error);
           if (result.stale) await refreshAfterReceive(item.itemId);
@@ -349,7 +349,7 @@ export function WarehouseScanBox(): React.ReactElement {
     const key = receiveKeyRef.current ?? (receiveKeyRef.current = crypto.randomUUID());
     startReceiveTransition(async () => {
       try {
-        const result = await blindReceive(item.itemId, qty, key, receiveCell);
+        const result = await blindReceive(item.itemId, qty, key, receiveCell, warehouseId);
         if (result.error) {
           setReceiveError(result.error);
           receiveKeyRef.current = null; // server rejected definitively → fresh key next time
@@ -381,7 +381,7 @@ export function WarehouseScanBox(): React.ReactElement {
     const key = transferKeyRef.current ?? (transferKeyRef.current = crypto.randomUUID());
     startBinTransition(async () => {
       try {
-        const result = await transferBetweenBins(itemId, from, to, qty, key);
+        const result = await transferBetweenBins(itemId, from, to, qty, key, warehouseId);
         if (result.error) {
           setBinError(result.error);
           transferKeyRef.current = null;

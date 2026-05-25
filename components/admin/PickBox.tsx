@@ -11,9 +11,11 @@ import type { OpenPickLine } from "@/lib/warehouse/pick";
 export function PickBox({
   repairOrderId,
   lines,
+  warehouseId,
 }: {
   repairOrderId: string;
   lines: OpenPickLine[];
+  warehouseId?: string;
 }): React.ReactElement {
   // useRouter only for .refresh() (re-fetch the server-rendered open-pick list);
   // ProgressRouter has no refresh, and we never .push here. Named to avoid the
@@ -43,7 +45,7 @@ export function PickBox({
     setSuccess(null);
     setActiveLine(line.lineId);
     startTransition(async () => {
-      const res = await pickRepairOrderLine(repairOrderId, line.lineId, partCode, binCode);
+      const res = await pickRepairOrderLine(repairOrderId, line.lineId, partCode, binCode, warehouseId);
       if (res.error) {
         setError(res.error);
         return;

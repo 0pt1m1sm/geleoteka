@@ -53,17 +53,17 @@ export default async function WarehousePage({ searchParams }: Props) {
         </Link>
       </div>
 
-      {/* Scan box — Task 4 */}
-      <WarehouseScanBox />
+      {/* Scan box — Task 4 (writes routed to the active warehouse) */}
+      <WarehouseScanBox warehouseId={warehouseId} />
 
       {/* Location lookup — Task 10 */}
-      <WarehouseLocationLookup />
+      <WarehouseLocationLookup warehouseId={warehouseId} />
 
       {/* Warehouse admin — Phase 6 (admin/manager only) */}
       {canManageLocations && <WarehouseAdmin warehouses={warehouses} />}
 
       {/* Location block/unblock admin — Phase 2.5 (admin/manager only) */}
-      {canManageLocations && <WarehouseLocationsAdmin />}
+      {canManageLocations && <WarehouseLocationsAdmin warehouseId={warehouseId} />}
 
       {/* Stock overview — Task 2 (scoped to the active warehouse) */}
       <WarehouseOverview q={q} page={page} loc={loc} warehouseId={warehouseId} />

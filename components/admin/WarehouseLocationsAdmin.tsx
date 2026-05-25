@@ -9,7 +9,7 @@ import type { WmsLocation } from "@/lib/wms/public";
  * deactivate them. A blocked or inactive location rejects putaway/transfer-in
  * with LOCATION_BLOCKED. Cell configuration is not a warehouse_worker capability.
  */
-export function WarehouseLocationsAdmin(): React.ReactElement {
+export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string }): React.ReactElement {
   const [locations, setLocations] = useState<WmsLocation[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,7 @@ export function WarehouseLocationsAdmin(): React.ReactElement {
 
   useEffect(() => {
     let active = true;
-    listLocationsAction()
+    listLocationsAction(warehouseId)
       .then((r) => {
         if (active) {
           setLocations(r.locations);
@@ -28,12 +28,12 @@ export function WarehouseLocationsAdmin(): React.ReactElement {
     return () => {
       active = false;
     };
-  }, []);
+  }, [warehouseId]);
 
   function toggle(code: string, flags: { isActive?: boolean; isBlocked?: boolean }): void {
     setError(null);
     startTransition(async () => {
-      const res = await setLocationBlockedAction(code, flags);
+      const res = await setLocationBlockedAction(code, flags, warehouseId);
       if (res.error) {
         setError(res.error);
         return;

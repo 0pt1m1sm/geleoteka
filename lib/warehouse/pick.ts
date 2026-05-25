@@ -69,6 +69,7 @@ async function approvedPartLines(
 export async function openPickLinesForOrder(
   client: DbClientPort,
   repairOrderId: string,
+  warehouseId?: string,
 ): Promise<OpenPickLine[]> {
   const lines = await approvedPartLines(client, repairOrderId);
   if (!lines) return [];
@@ -97,7 +98,7 @@ export async function openPickLinesForOrder(
   })) as Array<{ id: string; name: string; article: string }>;
   const byId = new Map(parts.map((p) => [p.id, p]));
 
-  const warehouseId = await defaultWarehouseId(client);
+  warehouseId ??= await defaultWarehouseId(client);
   const result: OpenPickLine[] = [];
   for (const l of open) {
     const placement = await binsForItem(client, l.partId, warehouseId, TENANT_KEY);
@@ -121,6 +122,8 @@ export interface ApplyPickLineInput {
   /** The scanned bin to pick from. */
   location: string;
   actorId?: string;
+  /** Physical warehouse to consume from. Omitted → the tenant default (MAIN). */
+  warehouseId?: string;
 }
 
 /**
@@ -136,13 +139,14 @@ export async function applyPickLine(
   client: DbClientPort,
   input: ApplyPickLineInput,
 ): Promise<{ requiredQty: number }> {
-  const open = await openPickLinesForOrder(client, input.repairOrderId);
+  const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
+  const open = await openPickLinesForOrder(client, input.repairOrderId, warehouseId);
   const line = open.find((l) => l.lineId === input.lineId);
   if (!line || line.partId !== input.partId) {
     throw new PickError("WRONG_ITEM", "Запчасть не из этого заказа");
   }
   await consumeStock(client, {
-    item: { itemId: input.partId, warehouseId: await defaultWarehouseId(client) },
+    item: { itemId: input.partId, warehouseId },
     qty: line.requiredQty,
     source: { type: "RepairOrder", id: `${input.repairOrderId}:${input.lineId}` },
     fromLocation: input.location,

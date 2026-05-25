@@ -11,7 +11,7 @@ interface LocationItem {
 }
 
 /** "What's stored in A-1-1?" — type or scan a location code to list its items. */
-export function WarehouseLocationLookup(): React.ReactElement {
+export function WarehouseLocationLookup({ warehouseId }: { warehouseId?: string }): React.ReactElement {
   const [code, setCode] = useState("");
   const [items, setItems] = useState<LocationItem[] | null>(null);
   const [searched, setSearched] = useState("");
@@ -22,7 +22,7 @@ export function WarehouseLocationLookup(): React.ReactElement {
     const loc = code.trim();
     if (!loc) return;
     startTransition(async () => {
-      const res = await lookupLocation(loc);
+      const res = await lookupLocation(loc, warehouseId);
       setItems(res.items);
       setSearched(loc.toUpperCase());
     });

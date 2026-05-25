@@ -4,16 +4,20 @@ import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getOpenPackLines } from "@/app/actions/packing";
+import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { PageHeader } from "@/components/ui";
 import { PackBox } from "@/components/admin/PackBox";
+import { WarehouseSwitcher } from "@/components/admin/WarehouseSwitcher";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ wh?: string }>;
 }
 
-export default async function PackingOrderPage({ params }: Props) {
+export default async function PackingOrderPage({ params, searchParams }: Props) {
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const { id } = await params;
+  const sp = await searchParams;
 
   const order = (await db.partShipment.findUnique({
     where: { id },
@@ -21,7 +25,9 @@ export default async function PackingOrderPage({ params }: Props) {
   })) as { orderNumber: string | null; status: string; contactName: string } | null;
   if (!order) notFound();
 
-  const lines = await getOpenPackLines(id);
+  const warehouses = await listWarehouses();
+  const warehouseId = await resolveWarehouseId(sp.wh, warehouses);
+  const lines = await getOpenPackLines(id, warehouseId);
 
   return (
     <div className="space-y-8">
@@ -31,8 +37,9 @@ export default async function PackingOrderPage({ params }: Props) {
         description={`${order.contactName} · ${order.status}`}
         backHref="/admin/warehouse/packing"
         backLabel="Упаковка"
+        actions={<WarehouseSwitcher warehouses={warehouses} current={warehouseId} />}
       />
-      <PackBox orderId={id} lines={lines} />
+      <PackBox orderId={id} lines={lines} warehouseId={warehouseId} />
     </div>
   );
 }

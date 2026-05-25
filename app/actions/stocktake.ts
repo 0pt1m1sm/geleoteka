@@ -6,6 +6,7 @@
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
+import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
 import {
@@ -74,6 +75,7 @@ async function resolvePartScope(scopeValue: string): Promise<string[]> {
 export async function createCountSessionAction(
   scope: StockCountScope,
   scopeValue: string,
+  wh?: string,
 ): Promise<{ error: string | null; sessionId?: string }> {
   const session = await requireRole(COUNT_ROLES);
   const value = (scopeValue ?? "").trim();
@@ -90,7 +92,7 @@ export async function createCountSessionAction(
   }
   const created = await createCountSession(db, {
     scope,
-    warehouseId: await defaultWarehouseId(db),
+    warehouseId: await resolveWarehouseId(wh),
     scopeValue: value || null,
     locations,
     partIds,

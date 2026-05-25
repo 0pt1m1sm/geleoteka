@@ -5,7 +5,8 @@
 // attempt writes exactly one ScanEvent (success/rejected) for the audit.
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
+import { actorId, TENANT_KEY } from "@/lib/wms-host";
+import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { revalidatePath } from "next/cache";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
@@ -15,11 +16,11 @@ const PICK_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors stocktake's resolveItemCode. */
-async function resolveItemCode(raw: string): Promise<string | null> {
+async function resolveItemCode(raw: string, warehouseId: string): Promise<string | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
-  const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
+  const view = await lookupByCode(db, code, warehouseId, TENANT_KEY);
   if (view?.itemId) return view.itemId;
   const byArticle = (await db.part.findFirst({
     where: { article: code },
@@ -81,9 +82,9 @@ export async function listOrdersNeedingPicking(): Promise<PickOrderSummary[]> {
 }
 
 /** Open (un-picked) lines for one repair order — drives the pick sheet. */
-export async function getOpenPickLines(repairOrderId: string): Promise<OpenPickLine[]> {
+export async function getOpenPickLines(repairOrderId: string, wh?: string): Promise<OpenPickLine[]> {
   await requireRole(PICK_ROLES);
-  return openPickLinesForOrder(db, repairOrderId);
+  return openPickLinesForOrder(db, repairOrderId, await resolveWarehouseId(wh));
 }
 
 export interface PickResult {
@@ -102,8 +103,10 @@ export async function pickRepairOrderLine(
   lineId: string,
   rawPartCode: string,
   rawLocationCode: string,
+  wh?: string,
 ): Promise<PickResult> {
   const session = await requireRole(PICK_ROLES);
+  const warehouseId = await resolveWarehouseId(wh);
   const parsedPart = parseScanCode(rawPartCode);
 
   const audit = (result: "SUCCESS" | "REJECTED" | "ERROR", errorCode: string | null): Promise<void> =>
@@ -118,7 +121,7 @@ export async function pickRepairOrderLine(
       tenantKey: TENANT_KEY,
     });
 
-  const partId = await resolveItemCode(rawPartCode);
+  const partId = await resolveItemCode(rawPartCode, warehouseId);
   if (!partId) {
     await audit("REJECTED", "UNKNOWN_CODE");
     return { error: "Запчасть не распознана" };
@@ -131,7 +134,7 @@ export async function pickRepairOrderLine(
 
   try {
     const res = await db.$transaction((tx) =>
-      applyPickLine(tx, { repairOrderId, lineId, partId, location, actorId: actorId(session) }),
+      applyPickLine(tx, { repairOrderId, lineId, partId, location, actorId: actorId(session), warehouseId }),
     );
     await audit("SUCCESS", null);
     revalidatePath(`/admin/warehouse/picking/${repairOrderId}`);

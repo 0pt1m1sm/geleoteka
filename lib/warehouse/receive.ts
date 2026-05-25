@@ -29,6 +29,8 @@ export interface ApplyReceiveInput {
   expectedReceived: number;
   location?: string | null;
   actorId?: string;
+  /** Physical warehouse to receive into. Omitted → the tenant default (MAIN). */
+  warehouseId?: string;
 }
 
 /**
@@ -108,7 +110,7 @@ export async function applyReceive(client: DbClientPort, input: ApplyReceiveInpu
   }
 
   const newReceived = expectedReceived + qty;
-  const warehouseId = await defaultWarehouseId(client);
+  const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
 
   await recordMovement(client, {
     item: { itemId: line.partId, warehouseId },

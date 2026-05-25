@@ -13,7 +13,7 @@ const SCOPE_OPTIONS: Array<{ value: StockCountScope; label: string; hint: string
 ];
 
 /** Start a new count session: pick a scope, give its value, and go to the session. */
-export function StocktakeNewSession(): React.ReactElement {
+export function StocktakeNewSession({ warehouseId }: { warehouseId?: string }): React.ReactElement {
   const nav = useProgressRouter();
   const [scope, setScope] = useState<StockCountScope>("ZONE");
   const [value, setValue] = useState("");
@@ -26,7 +26,7 @@ export function StocktakeNewSession(): React.ReactElement {
   function submit(): void {
     setError(null);
     startTransition(async () => {
-      const res = await createCountSessionAction(scope, needsValue ? value : "");
+      const res = await createCountSessionAction(scope, needsValue ? value : "", warehouseId);
       if (res.error) {
         setError(res.error);
         return;

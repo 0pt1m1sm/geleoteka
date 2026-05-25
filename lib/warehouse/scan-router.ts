@@ -61,6 +61,8 @@ export interface ScanContext {
   /** Host catalog fallback: resolve an article string to a partId (the core
    *  resolves barcode/gtin only — article is host catalog identity). */
   articleResolver: (code: string) => Promise<string | null>;
+  /** Active warehouse to scope stock/location reads to. Omitted → tenant default. */
+  warehouseId?: string;
 }
 
 /**
@@ -98,7 +100,7 @@ export async function resolveScan(
     switch (parsed.type) {
       case "PART":
       case "RAW": {
-        const card = await resolvePart(client, parsed.id, tenantKey, ctx.articleResolver);
+        const card = await resolvePart(client, parsed.id, tenantKey, ctx.articleResolver, ctx.warehouseId);
         if (!card) {
           await log("REJECTED", "UNKNOWN_CODE");
           return { status: 404, errorCode: "UNKNOWN_CODE", message: "Не найдено" };
@@ -107,7 +109,7 @@ export async function resolveScan(
         return { status: 200, data: card };
       }
       case "LOC": {
-        const card = await resolveLocation(client, parsed.id, tenantKey);
+        const card = await resolveLocation(client, parsed.id, tenantKey, ctx.warehouseId);
         // A scan of a blocked/inactive location is audited as REJECTED with
         // LOCATION_BLOCKED (Goal Verification Truth 1) — the card is still
         // returned (200) so the UI shows the blocked badge, but the audit trail
@@ -158,9 +160,10 @@ async function resolvePart(
   code: string,
   tenantKey: string,
   articleResolver: (code: string) => Promise<string | null>,
+  warehouseId?: string,
 ): Promise<PartCard | null> {
   // 1) core: barcode / gtin. 2) host fallback: article (catalog identity).
-  const warehouseId = await defaultWarehouseId(client);
+  warehouseId ??= await defaultWarehouseId(client);
   const view = await lookupByCode(client, code, warehouseId, tenantKey);
   const itemId = view?.itemId ?? (await articleResolver(code));
   if (!itemId) return null;
@@ -216,8 +219,8 @@ async function resolveOrder(client: DbClient, code: string): Promise<OrderCard |
   };
 }
 
-async function resolveLocation(client: DbClient, code: string, tenantKey: string): Promise<LocationCard> {
-  const warehouseId = await defaultWarehouseId(client);
+async function resolveLocation(client: DbClient, code: string, tenantKey: string, warehouseId?: string): Promise<LocationCard> {
+  warehouseId ??= await defaultWarehouseId(client);
   const loc = await getLocation(client, code, warehouseId, tenantKey);
   const rows = await itemsInLocation(client, code, warehouseId, tenantKey);
   const parts = (await client.part.findMany({

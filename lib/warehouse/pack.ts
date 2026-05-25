@@ -109,6 +109,7 @@ async function consumedLineKeys(client: DbClientPort, orderId: string): Promise<
 export async function openPackLinesForOrder(
   client: DbClientPort,
   orderId: string,
+  warehouseId?: string,
 ): Promise<OpenPackLine[]> {
   const lines = await requiredLines(client, orderId);
   if (!lines || lines.length === 0) return [];
@@ -123,7 +124,7 @@ export async function openPackLinesForOrder(
   })) as Array<{ id: string; name: string; article: string }>;
   const byId = new Map(parts.map((p) => [p.id, p]));
 
-  const warehouseId = await defaultWarehouseId(client);
+  warehouseId ??= await defaultWarehouseId(client);
   const result: OpenPackLine[] = [];
   for (const l of open) {
     const placement = await binsForItem(client, l.partId, warehouseId, TENANT_KEY);
@@ -149,6 +150,8 @@ export interface ApplyPackLineInput {
   /** The scanned bin to pick from. */
   location: string;
   actorId?: string;
+  /** Physical warehouse to consume from. Omitted → the tenant default (MAIN). */
+  warehouseId?: string;
 }
 
 /**
@@ -164,13 +167,14 @@ export async function applyPackLine(
   client: DbClientPort,
   input: ApplyPackLineInput,
 ): Promise<{ requiredQty: number }> {
-  const open = await openPackLinesForOrder(client, input.orderId);
+  const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
+  const open = await openPackLinesForOrder(client, input.orderId, warehouseId);
   const line = open.find((l) => l.lineKey === input.lineKey);
   if (!line || line.partId !== input.partId) {
     throw new PackError("WRONG_ITEM", "Запчасть не из этого заказа");
   }
   await consumeStock(client, {
-    item: { itemId: input.partId, warehouseId: await defaultWarehouseId(client) },
+    item: { itemId: input.partId, warehouseId },
     qty: line.requiredQty,
     source: { type: "PartShipment", id: `${input.orderId}:${input.lineKey}` },
     fromLocation: input.location,
