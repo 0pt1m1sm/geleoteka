@@ -352,6 +352,51 @@ export async function listLocationRows(
   })) as StockLocationRow[];
 }
 
+/** Rename a location's registry code within a warehouse (no-op if absent). */
+export async function renameLocationCode(
+  client: DbClientPort,
+  fromCode: string,
+  toCode: string,
+  tenantKey: string,
+  warehouseId: string,
+): Promise<void> {
+  await client.stockLocation.updateMany({
+    where: { tenantKey, warehouseId, code: fromCode },
+    data: { code: toCode },
+  });
+}
+
+/** Move every bin at `fromLocation` to `toLocation` within a warehouse. */
+export async function relocateBins(
+  client: DbClientPort,
+  fromLocation: string,
+  toLocation: string,
+  tenantKey: string,
+  warehouseId: string,
+): Promise<void> {
+  await client.stockBin.updateMany({
+    where: { tenantKey, warehouseId, location: fromLocation },
+    data: { location: toLocation },
+  });
+}
+
+/** Total placed on-hand per location code (Σ StockBin.quantity), for display. */
+export async function onHandByLocation(
+  client: DbClientPort,
+  tenantKey: string,
+  warehouseId: string,
+): Promise<Map<string, number>> {
+  const groupBy = client.stockBin.groupBy as unknown as (
+    args: unknown,
+  ) => Promise<Array<{ location: string; _sum: { quantity: number | null } }>>;
+  const rows = await groupBy({
+    by: ["location"],
+    where: { tenantKey, warehouseId },
+    _sum: { quantity: true },
+  });
+  return new Map(rows.map((r) => [r.location, r._sum.quantity ?? 0]));
+}
+
 /** Update a location's active/blocked flags (create-if-absent so the toggle is
  *  usable for an auto-created location that has no explicit row yet). */
 export async function updateLocationFlags(

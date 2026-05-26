@@ -20,8 +20,10 @@ import {
   removeFromBin,
   binsForItem,
   itemsInLocation,
-  listLocations,
   setLocationBlocked,
+  createLocation,
+  renameLocation,
+  listLocationsWithOnHand,
   type ItemPlacement,
   type WmsLocation,
 } from "@/lib/wms/public";
@@ -81,10 +83,86 @@ interface LocationItem {
 
 /** List all warehouse locations for the block/unblock admin surface.
  *  Cell configuration is admin/manager only (PRD §7) — NOT warehouse_worker. */
-export async function listLocationsAction(wh?: string): Promise<{ locations: WmsLocation[] }> {
+export async function listLocationsAction(
+  wh?: string,
+): Promise<{ locations: Array<WmsLocation & { onHand: number }> }> {
   await requireRole(["ADMIN", "MANAGER"]);
-  const locations = await listLocations(db, await resolveWarehouseId(wh), TENANT_KEY);
+  const locations = await listLocationsWithOnHand(db, await resolveWarehouseId(wh), TENANT_KEY);
   return { locations };
+}
+
+const CELL_RE = /^[A-Z0-9-]{1,32}$/;
+
+/** Expand a cell spec into codes: "A-1-1" → [A-1-1]; "A-1-1..A-3-4" → the
+ *  cartesian product over the numeric segments that differ. Returns an error
+ *  string for a malformed/oversized range. */
+function expandCellSpec(spec: string): string[] | { error: string } {
+  const [a, b] = spec.split("..").map((s) => s.trim().toUpperCase());
+  if (!a) return { error: "Укажите код или диапазон ячеек" };
+  if (!b) return [a];
+  const as = a.split("-");
+  const bs = b.split("-");
+  if (as.length !== bs.length) return { error: "Диапазон: коды должны иметь одинаковую структуру" };
+  const dims: string[][] = [];
+  for (let i = 0; i < as.length; i++) {
+    if (as[i] === bs[i]) {
+      dims.push([as[i]]);
+    } else if (/^\d+$/.test(as[i]) && /^\d+$/.test(bs[i])) {
+      const lo = Math.min(Number(as[i]), Number(bs[i]));
+      const hi = Math.max(Number(as[i]), Number(bs[i]));
+      if (hi - lo > 500) return { error: "Слишком большой диапазон" };
+      const arr: string[] = [];
+      for (let n = lo; n <= hi; n++) arr.push(String(n));
+      dims.push(arr);
+    } else {
+      return { error: `Сегмент ${i + 1}: перебор возможен только по числам` };
+    }
+  }
+  let acc: string[] = [""];
+  for (const d of dims) {
+    const next: string[] = [];
+    for (const p of acc) for (const v of d) next.push(p ? `${p}-${v}` : v);
+    acc = next;
+    if (acc.length > 1000) return { error: "Слишком много ячеек (макс. 1000)" };
+  }
+  return acc;
+}
+
+/** Create one or more cells (admin/manager). Accepts a single code or a range
+ *  like "A-1-1..A-3-4". Idempotent — existing cells are left as-is. */
+export async function createLocationsAction(
+  spec: string,
+  wh?: string,
+): Promise<{ error: string | null; created?: number }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const expanded = expandCellSpec((spec ?? "").trim());
+  if (!Array.isArray(expanded)) return { error: expanded.error };
+  for (const c of expanded) if (!CELL_RE.test(c)) return { error: `Некорректный код ячейки: ${c}` };
+  const warehouseId = await resolveWarehouseId(wh);
+  for (const c of expanded) await createLocation(db, c, warehouseId, TENANT_KEY);
+  return { error: null, created: expanded.length };
+}
+
+/** Rename a cell — moves its registry code AND all its bins atomically (admin/manager). */
+export async function renameLocationAction(
+  from: string,
+  to: string,
+  wh?: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  const t = (to ?? "").trim().toUpperCase();
+  if (!from?.trim() || !t) return { error: "Укажите старый и новый код" };
+  if (!CELL_RE.test(t)) return { error: "Код: латиница/цифры/дефис, до 32 символов" };
+  try {
+    await renameLocation(db, from, t, await resolveWarehouseId(wh), TENANT_KEY);
+    return { error: null };
+  } catch (e) {
+    const m = e instanceof Error ? e.message : "";
+    if (m === "LOCATION_EXISTS") return { error: "Ячейка с таким кодом уже существует" };
+    if (m === "LOCATION_NOT_FOUND") return { error: "Исходная ячейка не найдена" };
+    if (m === "INVALID_LOCATION") return { error: "Некорректный код ячейки" };
+    throw e;
+  }
 }
 
 /** Toggle a location's active/blocked flags (admin/manager only). */

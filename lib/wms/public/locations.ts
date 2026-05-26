@@ -4,9 +4,13 @@ import {
   ensureLocation,
   listLocationRows,
   updateLocationFlags,
+  renameLocationCode,
+  relocateBins,
+  onHandByLocation,
   type DbClientPort,
   type StockLocationRow,
 } from "../internal/repository";
+import { txCapable, type TxCapable } from "../internal/tx";
 
 const DEFAULT_TENANT = "default";
 
@@ -67,4 +71,52 @@ export async function setLocationBlocked(
   flags: { isActive?: boolean; isBlocked?: boolean },
 ): Promise<WmsLocation> {
   return updateLocationFlags(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT, warehouseId, flags);
+}
+
+/** Create a location (active+unblocked) in a warehouse; no-op if it already exists. */
+export async function createLocation(
+  client: DbClientPort,
+  code: string,
+  warehouseId: string,
+  tenantKey?: string,
+): Promise<WmsLocation> {
+  return ensureLocation(client, normalizeLocation(code), tenantKey ?? DEFAULT_TENANT, warehouseId);
+}
+
+/** Rename a location: move its registry code AND all its bins, atomically.
+ *  Rejects when the target code already exists (LOCATION_EXISTS) or the source
+ *  is unknown (LOCATION_NOT_FOUND). Self-wraps in a tx when given the base client. */
+export async function renameLocation(
+  client: DbClientPort,
+  from: string,
+  to: string,
+  warehouseId: string,
+  tenantKey?: string,
+): Promise<void> {
+  const tenant = tenantKey ?? DEFAULT_TENANT;
+  const fromN = normalizeLocation(from);
+  const toN = normalizeLocation(to);
+  if (!toN) throw new Error("INVALID_LOCATION");
+  if (fromN === toN) return;
+  const run = async (tx: DbClientPort): Promise<void> => {
+    if (!(await findLocation(tx, fromN, tenant, warehouseId))) throw new Error("LOCATION_NOT_FOUND");
+    if (await findLocation(tx, toN, tenant, warehouseId)) throw new Error("LOCATION_EXISTS");
+    await renameLocationCode(tx, fromN, toN, tenant, warehouseId);
+    await relocateBins(tx, fromN, toN, tenant, warehouseId);
+  };
+  return txCapable(client) ? (client as unknown as TxCapable).$transaction(run) : run(client);
+}
+
+/** Locations + their placed on-hand (Σ bins) for the layout view. */
+export async function listLocationsWithOnHand(
+  client: DbClientPort,
+  warehouseId: string,
+  tenantKey?: string,
+): Promise<Array<WmsLocation & { onHand: number }>> {
+  const tenant = tenantKey ?? DEFAULT_TENANT;
+  const [rows, onHand] = await Promise.all([
+    listLocationRows(client, tenant, warehouseId),
+    onHandByLocation(client, tenant, warehouseId),
+  ]);
+  return rows.map((l) => ({ ...l, onHand: onHand.get(l.code) ?? 0 }));
 }
