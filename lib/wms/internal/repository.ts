@@ -380,6 +380,31 @@ export async function relocateBins(
   });
 }
 
+/** Delete a location's registry row (within a warehouse). */
+export async function deleteLocationRow(
+  client: DbClientPort,
+  code: string,
+  tenantKey: string,
+  warehouseId: string,
+): Promise<void> {
+  await client.stockLocation.deleteMany({
+    where: { tenantKey, warehouseId, code },
+  });
+}
+
+/** Delete every bin at a location (within a warehouse). Caller guarantees the
+ *  location is empty (Σ qty == 0) — this clears the leftover zero-qty bin rows. */
+export async function deleteBinsAt(
+  client: DbClientPort,
+  location: string,
+  tenantKey: string,
+  warehouseId: string,
+): Promise<void> {
+  await client.stockBin.deleteMany({
+    where: { tenantKey, warehouseId, location },
+  });
+}
+
 /** Total placed on-hand per location code (Σ StockBin.quantity), for display. */
 export async function onHandByLocation(
   client: DbClientPort,

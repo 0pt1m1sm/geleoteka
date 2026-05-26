@@ -102,6 +102,13 @@
   }
   .btn-outline:active:not(:disabled) { background: var(--card-hover); }
 
+  /* Compact button — secondary inline actions (rename save/cancel, list-row
+     controls). Modifier on .btn: smaller padding + label. */
+  .btn-sm {
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.8125rem;
+  }
+
   /* Icon-only button — header chrome, drawer/dialog close, FAB triggers, etc.
      Provides consistent hover/active/focus feedback on small touch targets. */
   .btn-icon {

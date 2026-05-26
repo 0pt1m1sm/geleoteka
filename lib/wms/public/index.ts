@@ -19,6 +19,7 @@ export {
   setLocationBlocked,
   createLocation,
   renameLocation,
+  deleteLocation,
   listLocationsWithOnHand,
 } from "./locations";
 export type { WmsLocation } from "./locations";

@@ -6,6 +6,8 @@ import {
   updateLocationFlags,
   renameLocationCode,
   relocateBins,
+  deleteLocationRow,
+  deleteBinsAt,
   onHandByLocation,
   type DbClientPort,
   type StockLocationRow,
@@ -103,6 +105,29 @@ export async function renameLocation(
     if (await findLocation(tx, toN, tenant, warehouseId)) throw new Error("LOCATION_EXISTS");
     await renameLocationCode(tx, fromN, toN, tenant, warehouseId);
     await relocateBins(tx, fromN, toN, tenant, warehouseId);
+  };
+  return txCapable(client) ? (client as unknown as TxCapable).$transaction(run) : run(client);
+}
+
+/** Delete a cell — only when it is empty (Σ placed on-hand == 0). Removes the
+ *  registry row AND any leftover zero-qty bins, atomically. Rejects an unknown
+ *  cell (LOCATION_NOT_FOUND) or one that still holds stock (LOCATION_NOT_EMPTY).
+ *  Self-wraps in a tx when given the base client. */
+export async function deleteLocation(
+  client: DbClientPort,
+  code: string,
+  warehouseId: string,
+  tenantKey?: string,
+): Promise<void> {
+  const tenant = tenantKey ?? DEFAULT_TENANT;
+  const codeN = normalizeLocation(code);
+  if (!codeN) throw new Error("INVALID_LOCATION");
+  const run = async (tx: DbClientPort): Promise<void> => {
+    if (!(await findLocation(tx, codeN, tenant, warehouseId))) throw new Error("LOCATION_NOT_FOUND");
+    const onHand = await onHandByLocation(tx, tenant, warehouseId);
+    if ((onHand.get(codeN) ?? 0) > 0) throw new Error("LOCATION_NOT_EMPTY");
+    await deleteBinsAt(tx, codeN, tenant, warehouseId);
+    await deleteLocationRow(tx, codeN, tenant, warehouseId);
   };
   return txCapable(client) ? (client as unknown as TxCapable).$transaction(run) : run(client);
 }

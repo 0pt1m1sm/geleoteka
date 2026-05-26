@@ -23,6 +23,7 @@ import {
   setLocationBlocked,
   createLocation,
   renameLocation,
+  deleteLocation,
   listLocationsWithOnHand,
   type ItemPlacement,
   type WmsLocation,
@@ -160,6 +161,26 @@ export async function renameLocationAction(
     const m = e instanceof Error ? e.message : "";
     if (m === "LOCATION_EXISTS") return { error: "Ячейка с таким кодом уже существует" };
     if (m === "LOCATION_NOT_FOUND") return { error: "Исходная ячейка не найдена" };
+    if (m === "INVALID_LOCATION") return { error: "Некорректный код ячейки" };
+    throw e;
+  }
+}
+
+/** Delete a cell — empty cells only (admin/manager). A cell holding stock is
+ *  rejected; move or block it first. */
+export async function deleteLocationAction(
+  code: string,
+  wh?: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  if (!code?.trim()) return { error: "Укажите ячейку" };
+  try {
+    await deleteLocation(db, code, await resolveWarehouseId(wh), TENANT_KEY);
+    return { error: null };
+  } catch (e) {
+    const m = e instanceof Error ? e.message : "";
+    if (m === "LOCATION_NOT_EMPTY") return { error: "В ячейке есть товар — сначала переместите или спишите его" };
+    if (m === "LOCATION_NOT_FOUND") return { error: "Ячейка не найдена" };
     if (m === "INVALID_LOCATION") return { error: "Некорректный код ячейки" };
     throw e;
   }

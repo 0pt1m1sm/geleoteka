@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
+import { Pencil, Lock, Unlock, Trash2 } from "lucide-react";
 import {
   listLocationsAction,
   setLocationBlockedAction,
   createLocationsAction,
   renameLocationAction,
+  deleteLocationAction,
 } from "@/app/actions/warehouse";
 import type { WmsLocation } from "@/lib/wms/public";
 
@@ -13,8 +15,8 @@ type Loc = WmsLocation & { onHand: number };
 
 /**
  * Admin/manager warehouse-layout surface: create cells (single or a range like
- * A-1-1..A-3-4), rename them (moves the code + its stock), block/unblock, and
- * review on-hand per cell — grouped by zone (the cell-code prefix).
+ * A-1-1..A-3-4), rename them (moves the code + its stock), block/unblock, delete
+ * empty cells, and review on-hand per cell — grouped by zone (the cell-code prefix).
  */
 export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string }): React.ReactElement {
   const [locations, setLocations] = useState<Loc[]>([]);
@@ -24,6 +26,7 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
   const [createSpec, setCreateSpec] = useState("");
   const [renameCode, setRenameCode] = useState<string | null>(null);
   const [renameTo, setRenameTo] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -86,6 +89,19 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
     });
   }
 
+  function deleteCell(code: string): void {
+    setError(null);
+    startTransition(async () => {
+      const res = await deleteLocationAction(code, warehouseId);
+      setConfirmDelete(null);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      await reload();
+    });
+  }
+
   // Group by zone = the code segment before the first "-" (A-1-1 → "A").
   const groups = new Map<string, Loc[]>();
   for (const l of [...locations].sort((a, b) => a.code.localeCompare(b.code))) {
@@ -111,7 +127,7 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
             className="input font-mono"
           />
         </label>
-        <button type="button" onClick={createCells} disabled={isPending} className="btn btn-secondary min-h-[44px]">
+        <button type="button" onClick={createCells} disabled={isPending} className="btn btn-secondary btn-sm min-h-[44px]">
           Создать
         </button>
       </div>
@@ -131,7 +147,7 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
               </h3>
               <ul className="divide-y divide-[var(--border)]">
                 {cells.map((loc) => (
-                  <li key={loc.code} className="py-2 text-sm">
+                  <li key={loc.code} className="py-1.5 text-sm">
                     {renameCode === loc.code ? (
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-[var(--foreground-muted)]">{loc.code} →</span>
@@ -153,8 +169,25 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
                           Отмена
                         </button>
                       </div>
+                    ) : confirmDelete === loc.code ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-[var(--foreground-muted)]">
+                          Удалить <span className="font-mono text-[var(--foreground)]">{loc.code}</span>?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => deleteCell(loc.code)}
+                          disabled={isPending}
+                          className="btn btn-secondary btn-sm text-[var(--color-error)]"
+                        >
+                          Удалить
+                        </button>
+                        <button type="button" onClick={() => setConfirmDelete(null)} className="btn btn-ghost btn-sm">
+                          Отмена
+                        </button>
+                      </div>
                     ) : (
-                      <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-3">
                         <span className="font-mono">
                           {loc.code}
                           <span className="ml-2 text-xs text-[var(--foreground-muted)]">на складе: {loc.onHand}</span>
@@ -166,26 +199,46 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
                             <span className="badge ml-2">неактивна</span>
                           ) : null}
                         </span>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex items-center gap-0.5 shrink-0">
                           <button
                             type="button"
                             onClick={() => {
                               setRenameCode(loc.code);
                               setRenameTo(loc.code);
+                              setConfirmDelete(null);
                               setError(null);
                             }}
-                            className="btn btn-ghost btn-sm"
+                            className="btn-icon min-h-[40px] min-w-[40px]"
+                            aria-label={`Переименовать ${loc.code}`}
+                            title="Переименовать"
                           >
-                            Переименовать
+                            <Pencil size={16} aria-hidden />
                           </button>
                           <button
                             type="button"
                             onClick={() => toggleBlock(loc)}
                             disabled={isPending}
-                            className="btn btn-secondary btn-sm"
+                            className="btn-icon min-h-[40px] min-w-[40px]"
+                            aria-label={loc.isBlocked ? `Разблокировать ${loc.code}` : `Заблокировать ${loc.code}`}
+                            title={loc.isBlocked ? "Разблокировать" : "Заблокировать"}
                           >
-                            {loc.isBlocked ? "Разблокировать" : "Заблокировать"}
+                            {loc.isBlocked ? <Unlock size={16} aria-hidden /> : <Lock size={16} aria-hidden />}
                           </button>
+                          {loc.onHand === 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setConfirmDelete(loc.code);
+                                setRenameCode(null);
+                                setError(null);
+                              }}
+                              className="btn-icon min-h-[40px] min-w-[40px] hover:text-[var(--color-error)]"
+                              aria-label={`Удалить ${loc.code}`}
+                              title="Удалить"
+                            >
+                              <Trash2 size={16} aria-hidden />
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
