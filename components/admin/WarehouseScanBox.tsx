@@ -96,6 +96,9 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
   const [receiveError, setReceiveError] = useState<string | null>(null);
   const [receiveWarning, setReceiveWarning] = useState<string | null>(null);
   const [showLabelLink, setShowLabelLink] = useState(false);
+  // Putaway gate: our QR label must be printed + affixed before stock leaves
+  // ПРИЁМКА for a shelf (relabel-on-receipt). Reset per scan.
+  const [labelConfirmed, setLabelConfirmed] = useState(false);
   const [isReceivePending, startReceiveTransition] = useTransition();
   // Putaway from a scanned location (e.g. ПРИЁМКА) to a shelf — per-item target.
   const [putawayTarget, setPutawayTarget] = useState<Record<string, string>>({});
@@ -156,6 +159,7 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
           transferKeyRef.current = null;
           receiveKeyRef.current = null;
           setBlindQty("");
+          setLabelConfirmed(false);
           setReceiveError(null);
           setReceiveWarning(null);
           setShowLabelLink(false);
@@ -587,6 +591,19 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
                   <p className="text-xs text-[var(--foreground-muted)] mb-3">Нет размещений</p>
                 )}
 
+                <label className="mb-3 flex items-start gap-2 text-xs text-[var(--foreground-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={labelConfirmed}
+                    onChange={(e) => setLabelConfirmed(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    Наша QR-наклейка распечатана и наклеена — обязательно перед размещением на полку (вынос из{" "}
+                    <span className="font-mono">{STAGING_CELL}</span>).
+                  </span>
+                </label>
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-[var(--radius-sm)] border border-[var(--border)] p-3">
                     <p className="text-xs font-medium mb-2">Разместить в ячейку</p>
@@ -617,7 +634,12 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
                     <button
                       type="button"
                       onClick={handlePlace}
-                      disabled={isBinPending}
+                      disabled={
+                        isBinPending ||
+                        (placeLoc.trim() !== "" &&
+                          placeLoc.trim().toUpperCase() !== STAGING_CELL &&
+                          !labelConfirmed)
+                      }
                       className="btn btn-secondary btn-sm mt-2 w-full"
                     >
                       Разместить
@@ -663,7 +685,10 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
                     <button
                       type="button"
                       onClick={handleTransfer}
-                      disabled={isBinPending}
+                      disabled={
+                        isBinPending ||
+                        (transferFrom.trim().toUpperCase() === STAGING_CELL && !labelConfirmed)
+                      }
                       className="btn btn-secondary btn-sm mt-2 w-full"
                     >
                       Переместить

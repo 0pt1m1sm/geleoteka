@@ -36,6 +36,9 @@ export default async function WarehousePage({ searchParams }: Props) {
       />
 
       <div className="flex flex-wrap gap-2">
+        <Link href="/admin/warehouse/fulfill" className="btn btn-primary inline-flex w-fit min-h-[44px]">
+          Сканировать заказ →
+        </Link>
         <Link href="/admin/warehouse/stocktake" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Инвентаризация →
         </Link>
