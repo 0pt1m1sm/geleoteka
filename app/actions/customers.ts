@@ -153,6 +153,13 @@ export async function updateCustomer(
 ): Promise<UpdateOk | UpdateFail> {
   await requireRole(["ADMIN", "MANAGER"]);
 
+  // Guard: only edit actual customers, not staff/other accounts (mirrors deleteCustomer).
+  const target = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { isCustomer: true },
+  })) as { isCustomer: boolean } | null;
+  if (!target?.isCustomer) return { ok: false, error: "Это не клиент" };
+
   const name = (formData.get("name") as string | null)?.trim() ?? "";
   const phoneRaw = (formData.get("phone") as string | null)?.trim() ?? "";
   const emailRaw = (formData.get("email") as string | null)?.trim().toLowerCase() ?? "";
@@ -217,6 +224,13 @@ export async function addCustomerNote(
   formData: FormData,
 ): Promise<NoteOk | NoteFail> {
   const session = await requireRole(["ADMIN", "MANAGER"]);
+
+  // Guard: only annotate actual customers, not staff/other accounts.
+  const target = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { isCustomer: true },
+  })) as { isCustomer: boolean } | null;
+  if (!target?.isCustomer) return { ok: false, error: "Это не клиент" };
 
   const body = (formData.get("body") as string | null)?.trim() ?? "";
   if (body.length === 0) {

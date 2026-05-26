@@ -52,5 +52,7 @@ export function computeEstimateMoney(lines: MoneyLine[], taxRate: number): Estim
   const base = Math.max(0, subtotalLabor + subtotalParts + subtotalRental + discount);
   const tax = Math.round((base * (taxRate || 0)) / 100);
 
-  return { subtotalLabor, subtotalParts, subtotalRental, discount, tax, total: linesTotal + tax };
+  // Clamp at 0: an over-discount (DISCOUNT exceeding all positive lines) must not
+  // produce a negative grand total (which would propagate to PartShipment.total).
+  return { subtotalLabor, subtotalParts, subtotalRental, discount, tax, total: Math.max(0, linesTotal + tax) };
 }

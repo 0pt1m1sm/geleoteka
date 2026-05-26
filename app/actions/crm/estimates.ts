@@ -235,7 +235,7 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
  * fulfillment row created at booking time.
  */
 export async function approveEstimate(estimateId: string): Promise<EstimateMutationResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
     where: { id: estimateId },
@@ -287,8 +287,22 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
 
     await tx.deal.update({
       where: { id: est.deal.id },
-      data: { stage: "IN_PROGRESS", approvedAt: now },
+      // Clear close state: approving a (re-opened) estimate on a WON/LOST deal
+      // must not leave a stale closedAt/lostReason behind (audit finding C6).
+      data: { stage: "IN_PROGRESS", approvedAt: now, closedAt: null, lostReason: null },
     });
+
+    // One APPROVED estimate per deal: supersede any other currently-APPROVED
+    // estimate and release its held reservations. WMS pick/pack reads the single
+    // APPROVED estimate; two would feed it stale lines (audit finding C7).
+    const others = (await tx.estimate.findMany({
+      where: { dealId: est.deal.id, stage: "APPROVED", id: { not: estimateId } },
+      select: { id: true },
+    })) as Array<{ id: string }>;
+    for (const o of others) {
+      await tx.estimate.update({ where: { id: o.id }, data: { stage: "SUPERSEDED" } });
+      await releasePartLinesForEstimate(tx, o.id, actorId(session));
+    }
 
     // Re-read fulfillment existence INSIDE the serialized tx (the pre-tx read is
     // stale w.r.t. a concurrent approval) so dispatch stays idempotent.
