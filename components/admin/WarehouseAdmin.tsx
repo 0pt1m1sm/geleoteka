@@ -2,11 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Trash2 } from "lucide-react";
 import {
   createWarehouse,
   editWarehouse,
   setDefaultWarehouse,
   setWarehouseActive,
+  deleteWarehouseAction,
   type WarehouseRow,
 } from "@/app/actions/warehouses";
 
@@ -20,6 +22,7 @@ export function WarehouseAdmin({ warehouses }: { warehouses: WarehouseRow[] }): 
   const [editId, setEditId] = useState<string | null>(null);
   const [editCode, setEditCode] = useState("");
   const [editName, setEditName] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   async function run(fn: () => Promise<{ error: string | null }>, id: string): Promise<boolean> {
     setError(null);
@@ -46,6 +49,11 @@ export function WarehouseAdmin({ warehouses }: { warehouses: WarehouseRow[] }): 
   async function saveEdit(id: string): Promise<void> {
     const ok = await run(() => editWarehouse(id, editCode, editName), id);
     if (ok) setEditId(null);
+  }
+
+  async function deleteWh(id: string): Promise<void> {
+    const ok = await run(() => deleteWarehouseAction(id), id);
+    if (ok) setConfirmDeleteId(null);
   }
 
   return (
@@ -77,6 +85,24 @@ export function WarehouseAdmin({ warehouses }: { warehouses: WarehouseRow[] }): 
                   Сохранить
                 </button>
                 <button type="button" onClick={() => setEditId(null)} className="btn btn-ghost btn-sm">
+                  Отмена
+                </button>
+              </div>
+            ) : confirmDeleteId === w.id ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[var(--foreground-muted)]">
+                  Удалить склад <span className="text-[var(--foreground)]">{w.name}</span>{" "}
+                  <span className="font-mono">({w.code})</span>? История движений будет удалена безвозвратно.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => deleteWh(w.id)}
+                  disabled={pendingId === w.id}
+                  className="btn btn-secondary btn-sm text-[var(--color-error)]"
+                >
+                  Удалить
+                </button>
+                <button type="button" onClick={() => setConfirmDeleteId(null)} className="btn btn-ghost btn-sm">
                   Отмена
                 </button>
               </div>
@@ -120,6 +146,21 @@ export function WarehouseAdmin({ warehouses }: { warehouses: WarehouseRow[] }): 
                       className="btn btn-ghost btn-sm"
                     >
                       {w.isActive ? "Деактивировать" : "Активировать"}
+                    </button>
+                  )}
+                  {!w.isDefault && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmDeleteId(w.id);
+                        setEditId(null);
+                        setError(null);
+                      }}
+                      className="btn-icon min-h-[40px] min-w-[40px] hover:text-[var(--color-error)]"
+                      aria-label={`Удалить склад ${w.code}`}
+                      title="Удалить склад"
+                    >
+                      <Trash2 size={16} aria-hidden />
                     </button>
                   )}
                 </div>

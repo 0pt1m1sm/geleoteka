@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  adjustStock,
   getPlacement,
   placeIntoBin,
   transferBetweenBins,
@@ -69,7 +68,7 @@ type ScanData =
 /**
  * Warehouse scan box. A scan (camera or manual entry) is parsed and resolved by
  * POST /api/warehouse/scan, which logs a ScanEvent and returns a part or
- * location card. Part results expose the inline on-hand adjust + bin placement;
+ * location card. Part results expose bin placement (receive/place/transfer);
  * location results show the cell's state and contents. Write ops carry a
  * client idempotency key (regenerated per operation, reused only on a network
  * retry where the server outcome is unknown).
@@ -82,9 +81,6 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
   const [boxCard, setBoxCard] = useState<BoxCard | null>(null);
   const [notFound, setNotFound] = useState(false);
   const [lookupError, setLookupError] = useState<string | null>(null);
-  const [adjustValue, setAdjustValue] = useState("");
-  const [adjustError, setAdjustError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
   const [placement, setPlacement] = useState<ItemPlacement | null>(null);
   const [placeLoc, setPlaceLoc] = useState("");
   const [placeQty, setPlaceQty] = useState("");
@@ -95,7 +91,6 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
   const [isBinPending, startBinTransition] = useTransition();
   // Receiving (Приёмка): open order lines for the resolved part + blind receipt.
   const [openLines, setOpenLines] = useState<ReceiveLine[]>([]);
-  const [receiveCell, setReceiveCell] = useState(STAGING_CELL);
   const [lineQty, setLineQty] = useState<Record<string, string>>({});
   const [blindQty, setBlindQty] = useState("");
   const [receiveError, setReceiveError] = useState<string | null>(null);
@@ -131,13 +126,11 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
   // unknown); CLEARED on a confirmed server outcome (success or rejection) and
   // on any input change (a different value/location = a different intended
   // operation, not a retry — so it must get a fresh key, never the prior one).
-  const adjustKeyRef = useRef<string | null>(null);
   const placeKeyRef = useRef<string | null>(null);
   const transferKeyRef = useRef<string | null>(null);
   const receiveKeyRef = useRef<string | null>(null);
 
   async function handleScan(raw: string): Promise<void> {
-    setAdjustError(null);
     setBinError(null);
     setNotFound(false);
     setLookupError(null);
@@ -154,17 +147,14 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
           setOrderCard(null);
           setBoxCard(null);
           setItem(body.data);
-          setAdjustValue(String(body.data.quantity));
           setPlaceLoc("");
           setPlaceQty("");
           setTransferFrom("");
           setTransferTo("");
           setTransferQty("");
-          adjustKeyRef.current = null;
           placeKeyRef.current = null;
           transferKeyRef.current = null;
           receiveKeyRef.current = null;
-          setReceiveCell(STAGING_CELL);
           setBlindQty("");
           setReceiveError(null);
           setReceiveWarning(null);
@@ -219,34 +209,6 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
       setLookupError("Ошибка сети");
       setScanNonce((n) => n + 1);
     }
-  }
-
-  function handleAdjust(): void {
-    if (!item) return;
-    const next = parseInt(adjustValue, 10);
-    if (!Number.isInteger(next) || next < 0) {
-      setAdjustError("Введите целое неотрицательное число");
-      return;
-    }
-    setAdjustError(null);
-    const key = adjustKeyRef.current ?? (adjustKeyRef.current = crypto.randomUUID());
-    startTransition(async () => {
-      try {
-        const result = await adjustStock(item.itemId, next, undefined, key, warehouseId);
-        if (result.error) {
-          setAdjustError(result.error);
-          adjustKeyRef.current = null; // server rejected definitively → fresh key next time
-          return;
-        }
-        adjustKeyRef.current = null;
-        setItem({ ...item, quantity: result.quantity ?? next, available: result.available ?? item.available });
-        const p = await getPlacement(item.itemId, warehouseId);
-        setPlacement(p.placement ?? null);
-        router.refresh();
-      } catch {
-        setAdjustError("Ошибка сети — повторите"); // keep key: outcome unknown, retry is idempotent
-      }
-    });
   }
 
   function handlePlace(): void {
@@ -319,7 +281,7 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
     // receivedQuantity (a replay fails closed) — no client key needed.
     startReceiveTransition(async () => {
       try {
-        const result = await scanReceiveOrderLine(line.orderId, line.lineId, qty, line.received, receiveCell, warehouseId);
+        const result = await scanReceiveOrderLine(line.orderId, line.lineId, qty, line.received, STAGING_CELL, warehouseId);
         if (result.error) {
           setReceiveError(result.error);
           if (result.stale) await refreshAfterReceive(item.itemId);
@@ -349,7 +311,7 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
     const key = receiveKeyRef.current ?? (receiveKeyRef.current = crypto.randomUUID());
     startReceiveTransition(async () => {
       try {
-        const result = await blindReceive(item.itemId, qty, key, receiveCell, warehouseId);
+        const result = await blindReceive(item.itemId, qty, key, STAGING_CELL, warehouseId);
         if (result.error) {
           setReceiveError(result.error);
           receiveKeyRef.current = null; // server rejected definitively → fresh key next time
@@ -404,7 +366,7 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
   return (
     <section aria-label="Сканирование" className="card">
       <h2 className="text-lg font-semibold mb-3">Сканирование</h2>
-      <QrScanner onScan={handleScan} busy={isPending || isBinPending || isReceivePending} />
+      <QrScanner onScan={handleScan} busy={isBinPending || isReceivePending} />
 
       <div ref={resultRef} aria-live="polite" className="mt-4 scroll-mt-4 rounded-[var(--radius-md)]">
         {notFound && <p className="alert-error">Не найдено</p>}
@@ -515,18 +477,11 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
             </div>
             <div className="mt-4 border-t border-[var(--border)] pt-4">
               <h3 className="text-sm font-semibold mb-2">Приёмка</h3>
-              <label className="block mb-3">
-                <span className="block text-sm font-medium mb-1">Ячейка приёмки</span>
-                <input
-                  value={receiveCell}
-                  onChange={(e) => {
-                    setReceiveCell(e.target.value);
-                    receiveKeyRef.current = null;
-                  }}
-                  aria-label="Ячейка приёмки"
-                  className="input w-40 font-mono"
-                />
-              </label>
+              <p className="mb-3 text-xs text-[var(--foreground-muted)]">
+                Принятый товар поступает в ячейку{" "}
+                <span className="font-mono text-[var(--foreground)]">{STAGING_CELL}</span>. Распечатайте и наклейте нашу
+                QR-наклейку, затем разместите на полку (раздел «Размещение по ячейкам» ниже).
+              </p>
 
               {openLines.length > 0 && (
                 <ul className="space-y-2 mb-3">
@@ -597,40 +552,19 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
               )}
               {receiveError && <p className="alert-error mt-2">{receiveError}</p>}
               {showLabelLink && (
-                <a
-                  href={`/admin/warehouse/labels?part=${item.itemId}`}
-                  className="btn btn-secondary btn-sm mt-2 inline-block"
-                >
-                  Печать наклейки
-                </a>
+                <div className="mt-3 rounded-[var(--radius-sm)] border border-[var(--color-accent)] bg-[var(--color-accent-bg,transparent)] p-3">
+                  <p className="text-sm font-medium mb-2">
+                    Принято в {STAGING_CELL}. Следующий шаг: распечатайте и наклейте нашу QR-наклейку.
+                  </p>
+                  <a
+                    href={`/admin/warehouse/labels?part=${item.itemId}`}
+                    className="btn btn-primary btn-sm inline-block"
+                  >
+                    Печать наклейки
+                  </a>
+                </div>
               )}
             </div>
-
-            <div className="mt-4 flex items-end gap-2">
-              <label className="flex-1">
-                <span className="block text-sm font-medium mb-1">Новый остаток</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={adjustValue}
-                  onChange={(e) => {
-                    setAdjustValue(e.target.value);
-                    adjustKeyRef.current = null;
-                  }}
-                  className="input"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={handleAdjust}
-                disabled={isPending}
-                aria-busy={isPending || undefined}
-                className="btn btn-primary"
-              >
-                {isPending ? "Сохранение..." : "Сохранить"}
-              </button>
-            </div>
-            {adjustError && <p className="alert-error mt-2">{adjustError}</p>}
 
             {placement && (
               <div className="mt-5 border-t border-[var(--border)] pt-4">
@@ -638,11 +572,6 @@ export function WarehouseScanBox({ warehouseId }: { warehouseId?: string }): Rea
                   <h3 className="text-sm font-semibold">Размещение по ячейкам</h3>
                   <span className="text-xs text-[var(--foreground-muted)]">
                     Без места: <span className="font-medium">{placement.unplaced}</span>
-                    {placement.reconcileNeeded && (
-                      <span className="ml-2 badge bg-[var(--color-error-bg)] text-[var(--color-error)]">
-                        требуется сверка
-                      </span>
-                    )}
                   </span>
                 </div>
 

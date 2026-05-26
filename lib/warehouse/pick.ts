@@ -3,8 +3,13 @@
 // exists for its RepairOrder source triple, and consumes a FULL line from a
 // scanned bin (bin-aware via consumeStock). Knows about RepairOrder/Estimate
 // (host knowledge), so it lives OUTSIDE lib/wms (the host-agnostic core).
-import { binsForItem, consumeStock, type DbClientPort, type BinPlacement } from "@/lib/wms/public";
-import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
+import { type DbClientPort, type BinPlacement } from "@/lib/wms/public";
+import { defaultWarehouseId } from "@/lib/wms-host";
+import {
+  enrichOpenConsumeLines,
+  applyScanConsume,
+  type RequiredConsumeLine,
+} from "./scan-consume";
 
 export interface OpenPickLine {
   lineId: string;
@@ -64,6 +69,19 @@ async function approvedPartLines(
   return est?.estimateLines ?? null;
 }
 
+/** Map the RO's APPROVED estimate PART lines to the shared required-line shape
+ *  (lineKey = estimate-line id). Null when the RO is missing / not pickable. */
+async function requiredPickLines(
+  client: DbClientPort,
+  repairOrderId: string,
+): Promise<RequiredConsumeLine[] | null> {
+  const lines = await approvedPartLines(client, repairOrderId);
+  if (!lines) return null;
+  return lines
+    .filter((l) => l.partId)
+    .map((l) => ({ lineKey: l.id, partId: l.partId as string, requiredQty: Math.round(l.qty) }));
+}
+
 /** Lines on this RO's APPROVED estimate that have NOT yet been consumed (picked
  *  or closed), with the part identity, required qty, and current bins to pick from. */
 export async function openPickLinesForOrder(
@@ -71,47 +89,23 @@ export async function openPickLinesForOrder(
   repairOrderId: string,
   warehouseId?: string,
 ): Promise<OpenPickLine[]> {
-  const lines = await approvedPartLines(client, repairOrderId);
-  if (!lines) return [];
-
-  // A line is "done" iff a CONSUMPTION movement exists for `${roId}:${lineId}`.
-  const consumed = (await client.stockMovement.findMany({
-    where: {
-      tenantKey: TENANT_KEY,
-      sourceType: "RepairOrder",
-      sourceId: { startsWith: `${repairOrderId}:` },
-      reason: "CONSUMPTION",
-    },
-    select: { sourceId: true },
-  })) as Array<{ sourceId: string | null }>;
-  const prefixLen = `${repairOrderId}:`.length;
-  const consumedLineIds = new Set(consumed.map((m) => (m.sourceId ?? "").slice(prefixLen)));
-
-  const open = lines
-    .map((l) => ({ lineId: l.id, partId: l.partId as string, requiredQty: Math.round(l.qty) }))
-    .filter((l) => l.requiredQty > 0 && !consumedLineIds.has(l.lineId));
-  if (open.length === 0) return [];
-
-  const parts = (await client.part.findMany({
-    where: { id: { in: open.map((l) => l.partId) } },
-    select: { id: true, name: true, article: true },
-  })) as Array<{ id: string; name: string; article: string }>;
-  const byId = new Map(parts.map((p) => [p.id, p]));
-
   warehouseId ??= await defaultWarehouseId(client);
-  const result: OpenPickLine[] = [];
-  for (const l of open) {
-    const placement = await binsForItem(client, l.partId, warehouseId, TENANT_KEY);
-    result.push({
-      lineId: l.lineId,
-      partId: l.partId,
-      name: byId.get(l.partId)?.name ?? "—",
-      article: byId.get(l.partId)?.article ?? "",
-      requiredQty: l.requiredQty,
-      bins: placement.bins,
-    });
-  }
-  return result;
+  const open = await enrichOpenConsumeLines(
+    client,
+    "RepairOrder",
+    repairOrderId,
+    await requiredPickLines(client, repairOrderId),
+    warehouseId,
+  );
+  // RO callers address lines by `lineId` (the historical field name).
+  return open.map((l) => ({
+    lineId: l.lineKey,
+    partId: l.partId,
+    name: l.name,
+    article: l.article,
+    requiredQty: l.requiredQty,
+    bins: l.bins,
+  }));
 }
 
 export interface ApplyPickLineInput {
@@ -140,18 +134,22 @@ export async function applyPickLine(
   input: ApplyPickLineInput,
 ): Promise<{ requiredQty: number }> {
   const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
-  const open = await openPickLinesForOrder(client, input.repairOrderId, warehouseId);
-  const line = open.find((l) => l.lineId === input.lineId);
-  if (!line || line.partId !== input.partId) {
-    throw new PickError("WRONG_ITEM", "Запчасть не из этого заказа");
-  }
-  await consumeStock(client, {
-    item: { itemId: input.partId, warehouseId },
-    qty: line.requiredQty,
-    source: { type: "RepairOrder", id: `${input.repairOrderId}:${input.lineId}` },
-    fromLocation: input.location,
+  const open = await enrichOpenConsumeLines(
+    client,
+    "RepairOrder",
+    input.repairOrderId,
+    await requiredPickLines(client, input.repairOrderId),
+    warehouseId,
+  );
+  return applyScanConsume(client, {
+    open,
+    sourceType: "RepairOrder",
+    orderId: input.repairOrderId,
+    lineKey: input.lineId,
+    partId: input.partId,
+    location: input.location,
+    warehouseId,
     actorId: input.actorId,
-    tenantKey: TENANT_KEY,
+    wrongItemError: new PickError("WRONG_ITEM", "Запчасть не из этого заказа"),
   });
-  return { requiredQty: line.requiredQty };
 }

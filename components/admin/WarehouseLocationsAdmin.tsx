@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { Pencil, Lock, Unlock, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Lock, Unlock, Trash2, Printer } from "lucide-react";
 import {
   listLocationsAction,
   setLocationBlockedAction,
@@ -24,6 +25,7 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [createSpec, setCreateSpec] = useState("");
+  const [lastCreated, setLastCreated] = useState<string[]>([]);
   const [renameCode, setRenameCode] = useState<string | null>(null);
   const [renameTo, setRenameTo] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
@@ -70,6 +72,7 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
         setError(res.error);
         return;
       }
+      setLastCreated(res.codes ?? []);
       setCreateSpec("");
       await reload();
     });
@@ -131,6 +134,21 @@ export function WarehouseLocationsAdmin({ warehouseId }: { warehouseId?: string 
           Создать
         </button>
       </div>
+
+      {lastCreated.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--card)] p-2">
+          <span className="text-sm text-[var(--foreground-muted)]">
+            Создано ячеек: <span className="font-mono text-[var(--foreground)]">{lastCreated.length}</span>. Распечатайте QR-наклейки и наклейте на полки.
+          </span>
+          <Link
+            href={`/admin/warehouse/labels?loc=${encodeURIComponent(lastCreated.join(","))}`}
+            className="btn btn-secondary btn-sm ml-auto inline-flex items-center gap-1.5"
+          >
+            <Printer size={16} aria-hidden />
+            Печать наклеек
+          </Link>
+        </div>
+      )}
 
       {!loaded ? (
         <p className="text-sm text-[var(--foreground-muted)]">Загрузка…</p>

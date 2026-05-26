@@ -49,16 +49,17 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
   if (partIds.length > 0) {
     const parts = (await db.part.findMany({
       where: { id: { in: partIds } },
-      select: { id: true, name: true, article: true, stockItems: { select: { barcode: true } } },
-    })) as Array<{ id: string; name: string; article: string; stockItems: Array<{ barcode: string | null }> }>;
+      select: { id: true, name: true, article: true },
+    })) as Array<{ id: string; name: string; article: string }>;
     const byId = new Map(parts.map((p) => [p.id, p]));
     for (const id of partIds) {
       const p = byId.get(id);
       if (!p) continue;
-      // QR encodes the typed re-scannable code (barcode if present, else article);
-      // the caption stays the human-readable code.
-      const code = p.stockItems[0]?.barcode ?? p.article;
-      labels.push({ qr: await qr(formatScanCode("PART", code)), title: p.name, sub: code });
+      // Relabel-on-receipt: our internal label always encodes OUR identity (the
+      // article), never a supplier barcode — every item we accept wears one
+      // consistent label. A supplier barcode, if stored, still resolves on scan
+      // as an alias, but it is not what we print.
+      labels.push({ qr: await qr(formatScanCode("PART", p.article)), title: p.name, sub: p.article });
     }
   }
 

@@ -1,20 +1,17 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { packOrderLine, recordPackBoxScan, shipPackedOrder } from "@/app/actions/packing";
 import { QrScanner } from "@/components/warehouse/QrScanner";
+import { ScanConsumeLines } from "@/components/admin/ScanConsumeLines";
 import type { OpenPackLine } from "@/lib/warehouse/pack";
 
-/** Which scan panel is open. A single union makes it structurally impossible to
- *  mount two QrScanners (two camera streams) at once — the короб panel and any
- *  line panel are mutually exclusive by construction. */
-type ScanTarget = { kind: "box" } | { kind: "line"; key: string } | null;
-
-/** Pack flow for one order: scan a parcel (box), then per open line scan a bin +
- *  the part to pick the FULL required quantity (server-derived, bin-aware). When
- *  no open lines remain, confirm shipment (PROCESSING → SHIPPED). WRONG_ITEM /
- *  INSUFFICIENT_BIN surface as an inline alert. */
+/** Pack flow for one order: scan a parcel (box), pack each line via the shared
+ *  <ScanConsumeLines>, then confirm shipment (PROCESSING → SHIPPED) once no open
+ *  lines remain. The open-scanner key is a single union ("box" | lineKey | null)
+ *  so only one camera stream ever mounts (box and line scanners are mutually
+ *  exclusive by construction). */
 export function PackBox({
   orderId,
   lines,
@@ -24,58 +21,21 @@ export function PackBox({
   lines: OpenPackLine[];
   warehouseId?: string;
 }): React.ReactElement {
-  // useRouter only for .refresh() (re-fetch the server-rendered open list); we
-  // never .push here. Named to avoid the banned `router.push` pattern.
+  // useRouter only for .refresh(); we never .push here.
   const refreshRouter = useRouter();
   const [box, setBox] = useState("");
   const [boxConfirmed, setBoxConfirmed] = useState<string | null>(null);
-  const [bin, setBin] = useState<Record<string, string>>({});
-  const [part, setPart] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeLine, setActiveLine] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [openScanKey, setOpenScanKey] = useState<string | null>(null); // "box" | lineKey | null
   const [isShipPending, startShipTransition] = useTransition();
   const [isBoxPending, startBoxTransition] = useTransition();
-  // Camera scan. One union target → only one QrScanner ever mounts. Per-line
-  // sequencing uses refs because QrScanner's decode callback closes over a
-  // stale onScan (registered once at camera-start); refs stay current.
-  const [scanTarget, setScanTarget] = useState<ScanTarget>(null);
-  const [scanStep, setScanStep] = useState<"bin" | "part">("bin");
-  const scanStepRef = useRef<"bin" | "part">("bin");
-  const lastCodeRef = useRef<string>("");
-
-  function openScanner(lineKey: string): void {
-    // Safe to read bin state directly here: this runs in a click handler, not
-    // inside QrScanner's stale decode callback (see handleLineScan).
-    const step = (bin[lineKey] ?? "").trim() ? "part" : "bin";
-    scanStepRef.current = step;
-    lastCodeRef.current = "";
-    setScanStep(step);
-    setScanTarget({ kind: "line", key: lineKey });
-  }
-
-  function handleLineScan(lineKey: string, raw: string): void {
-    const code = raw.trim();
-    if (!code) return;
-    if (scanStepRef.current === "bin") {
-      setBin((m) => ({ ...m, [lineKey]: code }));
-      lastCodeRef.current = code;
-      scanStepRef.current = "part";
-      setScanStep("part");
-    } else {
-      // Ignore the still-framed bin code so it cannot bleed into the part field.
-      if (code === lastCodeRef.current) return;
-      setPart((m) => ({ ...m, [lineKey]: code }));
-      setScanTarget(null);
-    }
-  }
 
   function handleBoxScan(raw: string): void {
     const code = raw.trim();
     if (!code) return;
     setBox(code);
-    setScanTarget(null);
+    setOpenScanKey(null);
   }
 
   function confirmBox(): void {
@@ -94,34 +54,6 @@ export function PackBox({
       }
       setBoxConfirmed(code);
       setSuccess(`Короб принят: ${code}`);
-    });
-  }
-
-  function pack(line: OpenPackLine): void {
-    const binCode = (bin[line.lineKey] ?? "").trim();
-    const partCode = (part[line.lineKey] ?? "").trim();
-    if (!binCode) {
-      setError("Отсканируйте ячейку");
-      setSuccess(null);
-      return;
-    }
-    if (!partCode) {
-      setError("Отсканируйте запчасть");
-      setSuccess(null);
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setActiveLine(line.lineKey);
-    startTransition(async () => {
-      const res = await packOrderLine(orderId, line.lineKey, partCode, binCode, warehouseId);
-      if (res.error) {
-        setError(res.error);
-        return;
-      }
-      setSuccess(`Упаковано: ${line.name} × ${res.requiredQty ?? line.requiredQty}`);
-      setActiveLine(null);
-      refreshRouter.refresh();
     });
   }
 
@@ -167,7 +99,7 @@ export function PackBox({
         </button>
         <button
           type="button"
-          onClick={() => setScanTarget({ kind: "box" })}
+          onClick={() => setOpenScanKey("box")}
           aria-label="Сканировать короб камерой"
           className="btn btn-secondary min-h-[44px]"
         >
@@ -176,105 +108,29 @@ export function PackBox({
         {boxConfirmed && <span className="badge font-mono">{boxConfirmed}</span>}
       </div>
 
-      {scanTarget?.kind === "box" && (
+      {openScanKey === "box" && (
         <div className="rounded-[var(--radius-md)] border border-[var(--border)] p-3 space-y-2">
           <p className="text-xs font-medium text-[var(--foreground-muted)]">Наведите на код короба</p>
           <QrScanner onScan={handleBoxScan} />
-          <button type="button" onClick={() => setScanTarget(null)} className="btn btn-secondary btn-sm">
+          <button type="button" onClick={() => setOpenScanKey(null)} className="btn btn-secondary btn-sm">
             Отмена
           </button>
         </div>
       )}
 
-      {lines.length === 0 ? (
-        <p className="alert-success">Все позиции этого заказа упакованы.</p>
-      ) : (
-        <ul className="space-y-3">
-          {lines.map((line) => (
-            <li
-              key={line.lineKey}
-              className="rounded-[var(--radius-md)] border border-[var(--border)] p-3 space-y-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="text-sm">
-                  {line.name}{" "}
-                  <span className="font-mono text-xs text-[var(--foreground-muted)]">{line.article}</span>
-                </span>
-                <span className="text-xs text-[var(--foreground-muted)]">нужно: {line.requiredQty}</span>
-              </div>
-
-              {line.bins.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1">
-                  <span className="text-xs text-[var(--foreground-muted)]">ячейки:</span>
-                  {line.bins.map((b) => (
-                    <button
-                      key={b.location}
-                      type="button"
-                      onClick={() => setBin({ ...bin, [line.lineKey]: b.location })}
-                      className="badge"
-                    >
-                      {b.location} ({b.quantity})
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">Ячейка</span>
-                  <input
-                    aria-label={`Ячейка для ${line.article}`}
-                    value={bin[line.lineKey] ?? ""}
-                    onChange={(e) => setBin({ ...bin, [line.lineKey]: e.target.value })}
-                    placeholder="A-1-1"
-                    className="input font-mono"
-                  />
-                </label>
-                <label className="flex flex-1 flex-col gap-1">
-                  <span className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">Запчасть</span>
-                  <input
-                    aria-label={`Запчасть для ${line.article}`}
-                    value={part[line.lineKey] ?? ""}
-                    onChange={(e) => setPart({ ...part, [line.lineKey]: e.target.value })}
-                    placeholder="Артикул / штрихкод / QR"
-                    className="input font-mono"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => pack(line)}
-                  disabled={isPending && activeLine === line.lineKey}
-                  className="btn btn-primary min-h-[44px]"
-                >
-                  Упаковать
-                </button>
-              </div>
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => openScanner(line.lineKey)}
-                  aria-label={`Сканировать камерой для ${line.article}`}
-                  className="btn btn-secondary min-h-[44px]"
-                >
-                  Сканировать камерой
-                </button>
-                {scanTarget?.kind === "line" && scanTarget.key === line.lineKey && (
-                  <div className="mt-3 rounded-[var(--radius-md)] border border-[var(--border)] p-3 space-y-2">
-                    <p className="text-xs font-medium text-[var(--foreground-muted)]">
-                      {scanStep === "bin" ? "Шаг 1/2: наведите на ячейку" : "Шаг 2/2: наведите на запчасть"}
-                    </p>
-                    <QrScanner onScan={(raw) => handleLineScan(line.lineKey, raw)} />
-                    <button type="button" onClick={() => setScanTarget(null)} className="btn btn-secondary btn-sm">
-                      Отмена
-                    </button>
-                  </div>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ScanConsumeLines
+        lines={lines}
+        actionLabel="Упаковать"
+        successVerb="Упаковано"
+        emptyMessage="Все позиции этого заказа упакованы."
+        onConsume={(lineKey, partCode, binCode) =>
+          packOrderLine(orderId, lineKey, partCode, binCode, warehouseId)
+        }
+        openScanKey={openScanKey}
+        onOpenScanKey={setOpenScanKey}
+        setError={setError}
+        setSuccess={setSuccess}
+      />
 
       <div className="border-t border-[var(--border)] pt-4">
         <button

@@ -8,17 +8,18 @@
 // existing consume paths use, so packing a line makes the manual dispatch path
 // idempotent. Knows about PartShipment/Estimate (host knowledge), so it lives
 // OUTSIDE lib/wms (the host-agnostic core).
-import { binsForItem, consumeStock, type DbClientPort, type BinPlacement } from "@/lib/wms/public";
-import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
+import { type DbClientPort } from "@/lib/wms/public";
+import { defaultWarehouseId } from "@/lib/wms-host";
+import {
+  enrichOpenConsumeLines,
+  applyScanConsume,
+  consumedLineKeys,
+  type OpenConsumeLine,
+  type RequiredConsumeLine,
+} from "./scan-consume";
 
-export interface OpenPackLine {
-  lineKey: string;
-  partId: string;
-  name: string;
-  article: string;
-  requiredQty: number;
-  bins: BinPlacement[];
-}
+/** A pack line is structurally the shared open-consume line. */
+export type OpenPackLine = OpenConsumeLine;
 
 /** WRONG_ITEM is an order-line concept (host knowledge), so it is NOT a WmsError
  *  — mirrors pick.ts's PickError and scan-router's WRONG_OBJECT_TYPE plain code.
@@ -33,12 +34,6 @@ export class PackError extends Error {
   }
 }
 
-interface RequiredLine {
-  lineKey: string;
-  partId: string;
-  requiredQty: number;
-}
-
 /** Statuses for which packing/shipping is allowed. The check lives here (not only
  *  in applyPackLine) so openPackLinesForOrder / isFullyPacked / packProgress all
  *  inherit the gate — a direct mutation against a CANCELLED/SHIPPED order id can
@@ -50,7 +45,7 @@ const PACKABLE_STATUSES = new Set(["PROCESSING"]);
  *  key by partId to match the sale source `orderId:partId`; CRM orders draw from
  *  the deal's latest APPROVED estimate PART lines, keyed by estimate-line id to
  *  match the dispatch source `orderId:estimateLineId`. */
-async function requiredLines(client: DbClientPort, orderId: string): Promise<RequiredLine[] | null> {
+async function requiredLines(client: DbClientPort, orderId: string): Promise<RequiredConsumeLine[] | null> {
   const order = (await client.partShipment.findUnique({
     where: { id: orderId },
     select: {
@@ -88,22 +83,6 @@ async function requiredLines(client: DbClientPort, orderId: string): Promise<Req
     .filter((l) => l.requiredQty > 0);
 }
 
-/** The set of lineKeys already consumed for this order — a line is "packed" iff a
- *  CONSUMPTION movement exists for `PartShipment:${orderId}:${lineKey}`. */
-async function consumedLineKeys(client: DbClientPort, orderId: string): Promise<Set<string>> {
-  const consumed = (await client.stockMovement.findMany({
-    where: {
-      tenantKey: TENANT_KEY,
-      sourceType: "PartShipment",
-      sourceId: { startsWith: `${orderId}:` },
-      reason: "CONSUMPTION",
-    },
-    select: { sourceId: true },
-  })) as Array<{ sourceId: string | null }>;
-  const prefixLen = `${orderId}:`.length;
-  return new Set(consumed.map((m) => (m.sourceId ?? "").slice(prefixLen)));
-}
-
 /** Lines on this order that have NOT yet been consumed (packed), with the part
  *  identity, required qty, and current bins to pick from. */
 export async function openPackLinesForOrder(
@@ -111,33 +90,14 @@ export async function openPackLinesForOrder(
   orderId: string,
   warehouseId?: string,
 ): Promise<OpenPackLine[]> {
-  const lines = await requiredLines(client, orderId);
-  if (!lines || lines.length === 0) return [];
-  const consumed = await consumedLineKeys(client, orderId);
-
-  const open = lines.filter((l) => !consumed.has(l.lineKey));
-  if (open.length === 0) return [];
-
-  const parts = (await client.part.findMany({
-    where: { id: { in: open.map((l) => l.partId) } },
-    select: { id: true, name: true, article: true },
-  })) as Array<{ id: string; name: string; article: string }>;
-  const byId = new Map(parts.map((p) => [p.id, p]));
-
   warehouseId ??= await defaultWarehouseId(client);
-  const result: OpenPackLine[] = [];
-  for (const l of open) {
-    const placement = await binsForItem(client, l.partId, warehouseId, TENANT_KEY);
-    result.push({
-      lineKey: l.lineKey,
-      partId: l.partId,
-      name: byId.get(l.partId)?.name ?? "—",
-      article: byId.get(l.partId)?.article ?? "",
-      requiredQty: l.requiredQty,
-      bins: placement.bins,
-    });
-  }
-  return result;
+  return enrichOpenConsumeLines(
+    client,
+    "PartShipment",
+    orderId,
+    await requiredLines(client, orderId),
+    warehouseId,
+  );
 }
 
 export interface ApplyPackLineInput {
@@ -168,20 +128,24 @@ export async function applyPackLine(
   input: ApplyPackLineInput,
 ): Promise<{ requiredQty: number }> {
   const warehouseId = input.warehouseId ?? (await defaultWarehouseId(client));
-  const open = await openPackLinesForOrder(client, input.orderId, warehouseId);
-  const line = open.find((l) => l.lineKey === input.lineKey);
-  if (!line || line.partId !== input.partId) {
-    throw new PackError("WRONG_ITEM", "Запчасть не из этого заказа");
-  }
-  await consumeStock(client, {
-    item: { itemId: input.partId, warehouseId },
-    qty: line.requiredQty,
-    source: { type: "PartShipment", id: `${input.orderId}:${input.lineKey}` },
-    fromLocation: input.location,
+  const open = await enrichOpenConsumeLines(
+    client,
+    "PartShipment",
+    input.orderId,
+    await requiredLines(client, input.orderId),
+    warehouseId,
+  );
+  return applyScanConsume(client, {
+    open,
+    sourceType: "PartShipment",
+    orderId: input.orderId,
+    lineKey: input.lineKey,
+    partId: input.partId,
+    location: input.location,
+    warehouseId,
     actorId: input.actorId,
-    tenantKey: TENANT_KEY,
+    wrongItemError: new PackError("WRONG_ITEM", "Запчасть не из этого заказа"),
   });
-  return { requiredQty: line.requiredQty };
 }
 
 /** True iff the order is packable AND every required line is consumed. Drives the
@@ -190,7 +154,7 @@ export async function applyPackLine(
 export async function isFullyPacked(client: DbClientPort, orderId: string): Promise<boolean> {
   const lines = await requiredLines(client, orderId);
   if (!lines) return false;
-  const consumed = await consumedLineKeys(client, orderId);
+  const consumed = await consumedLineKeys(client, "PartShipment", orderId);
   return lines.every((l) => consumed.has(l.lineKey));
 }
 
@@ -202,7 +166,7 @@ export async function packProgress(
 ): Promise<{ packed: number; required: number }> {
   const lines = await requiredLines(client, orderId);
   if (!lines) return { packed: 0, required: 0 };
-  const consumed = await consumedLineKeys(client, orderId);
+  const consumed = await consumedLineKeys(client, "PartShipment", orderId);
   const packed = lines.filter((l) => consumed.has(l.lineKey)).length;
   return { packed, required: lines.length };
 }

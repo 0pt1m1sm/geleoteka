@@ -59,6 +59,9 @@ export async function adjustStock(
     );
     return { error: null, quantity: result.quantity, available: result.available };
   } catch (e) {
+    if (e instanceof Error && e.message === "PLACED_EXCEEDS_ONHAND") {
+      return { error: "Остаток нельзя сделать меньше, чем уже размещено в ячейках — скорректируйте количество в ячейке" };
+    }
     if (e instanceof Error && e.message === "NEGATIVE_ON_HAND") {
       return { error: "Остаток нельзя сделать отрицательным" };
     }
@@ -134,14 +137,14 @@ function expandCellSpec(spec: string): string[] | { error: string } {
 export async function createLocationsAction(
   spec: string,
   wh?: string,
-): Promise<{ error: string | null; created?: number }> {
+): Promise<{ error: string | null; created?: number; codes?: string[] }> {
   await requireRole(["ADMIN", "MANAGER"]);
   const expanded = expandCellSpec((spec ?? "").trim());
   if (!Array.isArray(expanded)) return { error: expanded.error };
   for (const c of expanded) if (!CELL_RE.test(c)) return { error: `Некорректный код ячейки: ${c}` };
   const warehouseId = await resolveWarehouseId(wh);
   for (const c of expanded) await createLocation(db, c, warehouseId, TENANT_KEY);
-  return { error: null, created: expanded.length };
+  return { error: null, created: expanded.length, codes: expanded };
 }
 
 /** Rename a cell — moves its registry code AND all its bins atomically (admin/manager). */

@@ -5,6 +5,7 @@
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TENANT_KEY } from "@/lib/wms-host";
+import { deleteWarehouse } from "@/lib/warehouse/delete-warehouse";
 
 export interface WarehouseRow {
   id: string;
@@ -100,6 +101,24 @@ export async function setWarehouseActive(id: string, active: boolean): Promise<{
   if (!active && wh.isDefault) return { error: "Нельзя деактивировать склад по умолчанию — сначала назначьте другой" };
   await db.warehouse.update({ where: { id }, data: { isActive: active } });
   return { error: null };
+}
+
+/** Hard-delete a warehouse (admin/manager). Refuses the default warehouse and
+ *  any warehouse still holding stock; otherwise cascades its WMS rows (movement
+ *  history included) and removes the site. Mirrors the empty-only cell delete. */
+export async function deleteWarehouseAction(id: string): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  if (!id?.trim()) return { error: "Укажите склад" };
+  try {
+    await db.$transaction((tx) => deleteWarehouse(tx, id, TENANT_KEY));
+    return { error: null };
+  } catch (e) {
+    const m = e instanceof Error ? e.message : "";
+    if (m === "WAREHOUSE_NOT_FOUND") return { error: "Склад не найден" };
+    if (m === "WAREHOUSE_IS_DEFAULT") return { error: "Нельзя удалить склад по умолчанию — сначала назначьте другой" };
+    if (m === "WAREHOUSE_HAS_STOCK") return { error: "На складе есть товар — переместите или спишите его перед удалением" };
+    throw e;
+  }
 }
 
 /** Resolve a `?wh` query param to a valid warehouse id for this tenant, else the
