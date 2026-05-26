@@ -14,6 +14,7 @@ import {
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { WorkPhotosManager } from "@/components/admin/WorkPhotosManager";
 import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsForm";
+import { getApprovedWorksCost } from "@/lib/crm/approved-estimate";
 
 interface RepairOrderDetail {
   id: string;
@@ -115,6 +116,11 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
     orderBy: { name: "asc" },
   })) as MasterUser[];
 
+  // Works cost (Работы) lives on the deal's APPROVED estimate, not on the RO —
+  // service ROs are created (dispatch-fulfillment) with no financial fields, so
+  // ro.total is always 0. Surface the approved estimate's labor subtotal.
+  const worksCost = (await getApprovedWorksCost(ro.dealId)) ?? ro.total;
+
   const statusLabel = REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status;
 
   return (
@@ -122,7 +128,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
       <PageHeader
         eyebrow={ro.roNumber ? `№${ro.roNumber}` : "Заказ-наряд"}
         title={`Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`}
-        description={`${statusLabel} · ${formatDateTime(ro.dateTime)} · ${formatPrice(ro.total)}`}
+        description={`${statusLabel} · ${formatDateTime(ro.dateTime)} · ${formatPrice(worksCost)}`}
         actions={
           <Link href="/admin/repair-orders" className="back-link">
             ← К списку
@@ -140,7 +146,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
               <div className="mt-1 text-sm">
                 {ro.jobLines.length === 0
                   ? "Нет работ в смете"
-                  : `${ro.jobLines.length} работ · ${formatPrice(ro.total)}`}
+                  : `${ro.jobLines.length} работ · ${formatPrice(worksCost)}`}
               </div>
               <p className="mt-2 text-xs text-[var(--foreground-muted)]">
                 Цены и согласование — в CRM. Эта страница отвечает за исполнение.
