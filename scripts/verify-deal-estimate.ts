@@ -180,7 +180,10 @@ async function main(): Promise<void> {
 
   // 2c. computeEstimateMoney pure-helper edge cases.
   const clamp = computeEstimateMoney([{ type: "LABOR", total: 1000 }, { type: "DISCOUNT", total: -2000 }], 20);
-  assert(clamp.tax === 0 && clamp.total === -1000, `discount ≥ subtotal clamps base to 0 (tax ${clamp.tax}/total ${clamp.total})`);
+  // Over-discount: the taxable base clamps to 0 (tax 0) AND the grand total clamps
+  // to 0 — audit finding C10 (commit 704d52c): a negative total must not propagate
+  // to PartShipment.total. subtotal 1000 − discount 2000 → base 0, total 0.
+  assert(clamp.tax === 0 && clamp.total === 0, `over-discount clamps base AND total to 0 (tax ${clamp.tax}/total ${clamp.total})`);
   const zero = computeEstimateMoney([{ type: "PART", total: 5000 }], 0);
   assert(zero.tax === 0 && zero.total === 5000, `rate 0 → no tax (tax ${zero.tax}/total ${zero.total})`);
   const fee = computeEstimateMoney([{ type: "PART", total: 1000 }, { type: "FEE", total: 500 }], 10);
