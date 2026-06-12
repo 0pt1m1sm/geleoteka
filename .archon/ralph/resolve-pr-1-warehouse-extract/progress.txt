@@ -1,0 +1,39 @@
+## Codebase Patterns
+
+### PR branch lives in a sibling worktree
+- **Where**: `~/.archon/workspaces/claude-dev/Geleoteka/worktrees/archon/task-archon-architect-1781275339869`
+- **Pattern**: PR #1's head branch `archon/task-archon-architect-1781275339869` is already checked out in a sibling worktree. Make story-scoped edits there, commit, and push directly to that branch. Do NOT try to push from the ralph worktree (different base; would corrupt history).
+- **Example**: `cd <sibling-worktree> && <edit file> && git add <file> && git commit -m ... && git push origin HEAD:archon/task-archon-architect-1781275339869`
+
+### prisma generate requires DATABASE_URL to be set
+- **Where**: `prisma.config.ts:14`
+- **Pattern**: `prisma.config.ts` calls `env("DATABASE_URL")`. The resolver throws on missing/empty even for schema-only commands like `prisma generate`. Any non-empty string satisfies it; no real connection happens during generate.
+- **Example**: `DATABASE_URL='postgresql://prisma-generate-stub:stub@localhost:5432/stub' npx prisma generate`
+
+### Verifier script shape (DB-free flavour)
+- **Where**: `scripts/verify-stock-analysis.ts:1-20` (canonical), `scripts/verify-warehouse.ts:23` (import-path convention)
+- **Pattern**: `import "dotenv/config"`, local `assert(cond, msg)` that `console.error`s and `process.exit(1)`, single `async function main()` invoked at module bottom with `.catch(...)`. For pure-function verifiers, drop the `db` import / fixtures / cleanup.
+- **Example**: see PRD US-002 technicalNotes for the skeleton
+
+---
+
+## 2026-06-12 — US-001: Stub DATABASE_URL for prisma generate in verify.yml
+
+**Status**: PASSED
+**Files changed** (committed on PR branch `archon/task-archon-architect-1781275339869` in sibling worktree, pushed to origin as commit `60306c6`):
+- `.github/workflows/verify.yml` — added a step-scoped `env: DATABASE_URL` block on the `Generate Prisma client` step with the stub value `postgresql://prisma-generate-stub:stub@localhost:5432/stub`; replaced the inline comment with one explaining that `prisma.config.ts:14` calls `env("DATABASE_URL")` (throws when unset) and that `prisma generate` never connects.
+
+**Acceptance criteria verified**:
+- [x] Step-scoped `env:` block with the stubbed `DATABASE_URL` value present (verify.yml:26-30)
+- [x] `env:` is on the step (under `- name: Generate Prisma client`), NOT the job — Type check + Lint steps don't see it
+- [x] Inline comment explains the prisma.config.ts:14 `env()` resolver throws when unset (lines 27-29)
+- [x] No edits to `prisma.config.ts`, `package.json`, or any non-CI file (diff is exactly 1 file)
+- [x] Pushed to `archon/task-archon-architect-1781275339869` (origin); `verify` re-run will start automatically — confirmation deferred to US-003 pre-merge check
+- [x] Type-check passes locally: `npx tsc --noEmit` → "No errors found"
+
+**Learnings**:
+- The PR branch is already checked out in a sibling worktree at `~/.archon/workspaces/claude-dev/Geleoteka/worktrees/archon/task-archon-architect-1781275339869`. Future stories should work there for any change that needs to land on the PR.
+- `prisma generate` was confirmed locally to succeed with the stub value and fail with `Missing required environment variable: DATABASE_URL` when unset — exact match of the CI failure log.
+- The sibling worktree has no `node_modules` of its own; type-check was run from the ralph worktree (which does), and that is sufficient since the only changed file is a CI YAML with no TypeScript impact.
+
+---

@@ -19,8 +19,8 @@
       "technicalNotes": "Edit `.github/workflows/verify.yml`. Insert an `env:` block under the `Generate Prisma client` step (between `# Required so tsc can resolve...` comment block and `run: npx prisma generate`). YAML pattern:\n```yaml\n      - name: Generate Prisma client\n        env:\n          # prisma.config.ts:14 calls env(\"DATABASE_URL\") which throws when unset.\n          # `prisma generate` only reads the schema and never connects, so any\n          # non-empty value satisfies the env() resolver.\n          DATABASE_URL: postgresql://prisma-generate-stub:stub@localhost:5432/stub\n        run: npx prisma generate\n```\nRoot cause confirmed at `prisma.config.ts:14` (`url: env(\"DATABASE_URL\")`) and the failing run log `https://github.com/0pt1m1sm/geleoteka/actions/runs/27423993649/job/81056748222` line `Missing required environment variable: DATABASE_URL`. Push via `git push origin HEAD:archon/task-archon-architect-1781275339869`. Verify CI with `gh pr checks 1 --repo 0pt1m1sm/geleoteka --watch`.",
       "dependsOn": [],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in iteration 1. Files: .github/workflows/verify.yml. Commit 60306c6 was made on the PR head branch archon/task-archon-architect-1781275339869 in sibling worktree and pushed to origin. Stub DATABASE_URL is scoped to the Generate Prisma client step only. Locally verified `DATABASE_URL=postgresql://prisma-generate-stub:stub@localhost:5432/stub npx prisma generate` succeeds and unstubbed run fails with `Missing required environment variable: DATABASE_URL`. Type-check passes."
     },
     {
       "id": "US-002",
