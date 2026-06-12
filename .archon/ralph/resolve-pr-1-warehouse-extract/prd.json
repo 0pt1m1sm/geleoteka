@@ -60,8 +60,8 @@
       "technicalNotes": "Do NOT use `--admin` or any force flag. Do NOT skip checks. If `Verify` is not yet green when this story runs, BLOCK — return control to US-001/US-002 rather than waiting indefinitely or attempting a merge override.\n\nMerge command (verbatim):\n```bash\ngh pr merge 1 --squash --delete-branch --repo 0pt1m1sm/geleoteka\n```\nVerification command (verbatim):\n```bash\ngh pr view 1 --repo 0pt1m1sm/geleoteka --json state,mergedAt,mergeCommit\n```\nIf `gh pr merge` fails with `Pull request is not mergeable` despite green checks, inspect with `gh pr view 1 --repo 0pt1m1sm/geleoteka --json mergeStateStatus,reviewDecision` and STOP — do not work around. Most likely cause would be a base-branch divergence (rebase needed) or a missing review approval; both are out of this story's scope to resolve.\n\nDo NOT proactively run `git push --force` to PR #1's branch under any circumstance — it would break the review trail. Squash is the merge strategy, NOT a pre-merge rebase.",
       "dependsOn": ["US-001", "US-002"],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Implemented in iteration 3. PR #1 squash-merged (mergeCommit 71c1275, mergedAt 2026-06-12T15:59:58Z). Pre-merge state: verify SUCCESS, mergeable MERGEABLE, mergeStateStatus CLEAN. Post-merge: state MERGED, branch archon/task-archon-architect-1781275339869 deleted, origin/main HEAD subject is `refactor(warehouse): move expandCellSpec to lib/warehouse/codes (#1)`."
     }
   ]
 }

@@ -64,3 +64,23 @@
 - Mismatched segment count is exercised with `A-1..A-1-2` (2 vs 3 segments). The PRD example `A-1-1..A-3-4` actually has equal segment counts and would NOT trigger this error.
 
 ---
+
+## 2026-06-12 — US-003: Merge PR #1 once Verify is green
+
+**Status**: PASSED
+**Files changed**: none in ralph worktree (merge is a remote-only operation against origin)
+
+**Acceptance criteria verified**:
+- [x] Pre-merge `gh pr checks 1 --repo 0pt1m1sm/geleoteka` → `verify  SUCCESS  Verify` (workflow "Verify", state SUCCESS)
+- [x] Pre-merge `gh pr view 1 --repo 0pt1m1sm/geleoteka --json mergeable,mergeStateStatus` → `{"mergeStateStatus":"CLEAN","mergeable":"MERGEABLE"}`
+- [x] Executed `gh pr merge 1 --squash --delete-branch --repo 0pt1m1sm/geleoteka` (no --admin, no force flag)
+- [x] Post-merge state: `{"state":"MERGED","mergedAt":"2026-06-12T15:59:58Z","mergeCommit":{"oid":"71c1275692f5ea09088507c0c84064162e7919ac"}}`
+- [x] Branch `archon/task-archon-architect-1781275339869` deleted from origin (grep against `gh api repos/.../branches` returns no match)
+- [x] `git log origin/main -1 --format='%s'` → `refactor(warehouse): move expandCellSpec to lib/warehouse/codes (#1)` (contains `expandCellSpec` ✓)
+
+**Learnings**:
+- US-001 + US-002 commits (60306c6, ff5feaa) on the PR head branch made Verify green; merge completed cleanly without any --admin override.
+- The `gh pr checks` JSON shape does not have a `conclusion` field — use `name`/`state`/`workflow` (state=SUCCESS) instead.
+- Squash commit title was auto-derived from the PR title (`refactor(warehouse): move expandCellSpec to lib/warehouse/codes`) with a `#1` suffix appended by GitHub. No PR title or body edits were needed before the squash.
+
+---
