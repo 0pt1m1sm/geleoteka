@@ -1,0 +1,67 @@
+{
+  "project": "Geleoteka",
+  "branchName": "archon/task-archon-architect-1781275339869",
+  "prdFile": "prd.md",
+  "description": "Drive PR #1 (refactor: move expandCellSpec to lib/warehouse/codes) to MERGED by unblocking the Verify CI workflow and locking in the moved function's behaviour with a verifier script.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Stub DATABASE_URL for prisma generate in verify.yml",
+      "description": "As the PR #1 author, I want the Verify workflow's `Generate Prisma client` step to succeed without a real database, so that the PR's required CI check turns green and merge becomes possible.",
+      "acceptanceCriteria": [
+        "`.github/workflows/verify.yml` step `Generate Prisma client` (currently at lines 25-28) gains a step-scoped `env:` block setting `DATABASE_URL` to an obviously-stubbed value such as `postgresql://prisma-generate-stub:stub@localhost:5432/stub`.",
+        "The `env:` block is on the step, NOT on the job — subsequent steps (`Type check`, `Lint`) must NOT see this stub value.",
+        "The inline comment at line 27 (`No DATABASE_URL needed for prisma generate; it reads the schema only.`) is updated to explain that the stub is required because `prisma.config.ts:14` calls `env(\"DATABASE_URL\")` which throws when unset — not a real DB connection.",
+        "No edits to `prisma.config.ts`, `package.json`, or any non-CI file in this story.",
+        "After pushing to branch `archon/task-archon-architect-1781275339869`, the `verify` check on PR #1 reports `pass` (`gh pr checks 1 --repo 0pt1m1sm/geleoteka` shows `verify  pass`).",
+        "Type-check passes locally: `npx tsc --noEmit`."
+      ],
+      "technicalNotes": "Edit `.github/workflows/verify.yml`. Insert an `env:` block under the `Generate Prisma client` step (between `# Required so tsc can resolve...` comment block and `run: npx prisma generate`). YAML pattern:\n```yaml\n      - name: Generate Prisma client\n        env:\n          # prisma.config.ts:14 calls env(\"DATABASE_URL\") which throws when unset.\n          # `prisma generate` only reads the schema and never connects, so any\n          # non-empty value satisfies the env() resolver.\n          DATABASE_URL: postgresql://prisma-generate-stub:stub@localhost:5432/stub\n        run: npx prisma generate\n```\nRoot cause confirmed at `prisma.config.ts:14` (`url: env(\"DATABASE_URL\")`) and the failing run log `https://github.com/0pt1m1sm/geleoteka/actions/runs/27423993649/job/81056748222` line `Missing required environment variable: DATABASE_URL`. Push via `git push origin HEAD:archon/task-archon-architect-1781275339869`. Verify CI with `gh pr checks 1 --repo 0pt1m1sm/geleoteka --watch`.",
+      "dependsOn": [],
+      "priority": 1,
+      "passes": true,
+      "notes": "Implemented in iteration 1. Files: .github/workflows/verify.yml. Commit 60306c6 was made on the PR head branch archon/task-archon-architect-1781275339869 in sibling worktree and pushed to origin. Stub DATABASE_URL is scoped to the Generate Prisma client step only. Locally verified `DATABASE_URL=postgresql://prisma-generate-stub:stub@localhost:5432/stub npx prisma generate` succeeds and unstubbed run fails with `Missing required environment variable: DATABASE_URL`. Type-check passes."
+    },
+    {
+      "id": "US-002",
+      "title": "Add scripts/verify-cell-codes.ts to lock in expandCellSpec behaviour",
+      "description": "As the PR #1 author, I want a runnable verifier for `expandCellSpec` so that the PR's stated motivation (`the function was un-unit-testable without the Next.js runtime`) is realised as a delivered artifact and any future refactor of `lib/warehouse/codes.ts` (the deferred `lib/warehouse/` rename) has a regression baseline.",
+      "acceptanceCriteria": [
+        "New file `scripts/verify-cell-codes.ts` exists on branch `archon/task-archon-architect-1781275339869`.",
+        "The file follows the verifier shape established by `scripts/verify-stock-analysis.ts:1-60`: `import \"dotenv/config\"` at top, a local `assert(cond, msg)` helper that `console.error`s and `process.exit(1)`, a single `main()` invoked at module bottom with `.catch(...)`.",
+        "It imports `expandCellSpec` and `CELL_RE` from `../lib/warehouse/codes` (same import-path convention as `scripts/verify-warehouse.ts:23`).",
+        "No DB code: no `db` import, no fixtures, no cleanup — `expandCellSpec` is pure.",
+        "Positive cases asserted: `expandCellSpec(\"A-1-1\")` returns `[\"A-1-1\"]`; `expandCellSpec(\"A-1-1..A-1-3\")` returns `[\"A-1-1\",\"A-1-2\",\"A-1-3\"]`; `expandCellSpec(\" a-1-1 .. A-1-2 \")` returns `[\"A-1-1\",\"A-1-2\"]` (case + whitespace normalisation).",
+        "2-D range covered: `expandCellSpec(\"A-1-1..A-2-2\")` returns `[\"A-1-1\",\"A-1-2\",\"A-2-1\",\"A-2-2\"]` (cartesian product over differing numeric segments).",
+        "Negative cases asserted with the exact Russian strings already in `lib/warehouse/codes.ts`: empty spec → `\"Укажите код или диапазон ячеек\"`; mismatched segment count → `\"Диапазон: коды должны иметь одинаковую структуру\"`; oversized numeric range (e.g. `A-0..A-501`) → `\"Слишком большой диапазон\"`; oversized product (range whose cartesian explodes past 1000) → `\"Слишком много ячеек (макс. 1000)\"`; non-numeric range segment (e.g. `A-1..B-1`) → `\"Сегмент 1: перебор возможен только по числам\"`.",
+        "`CELL_RE` smoke-tested: matches `\"A-1-1\"`, rejects `\"a-1\"` (lowercase), rejects 33-char string.",
+        "Script runs cleanly: `npx tsx scripts/verify-cell-codes.ts` exits 0 with no DB connection required.",
+        "Script fails loudly when an assertion breaks (verified by temporarily inverting one assertion during development — restore before commit).",
+        "Type-check passes: `npx tsc --noEmit`. Lint passes: `npm run lint`."
+      ],
+      "technicalNotes": "Mirror `scripts/verify-stock-analysis.ts` lines 1-20 for the file header + assert helper, then drop everything DB-related — `expandCellSpec` is pure (no Prisma, no `db`, no `TENANT_KEY`). The `dotenv/config` import is kept only for consistency with sibling verifiers; nothing here actually reads env. Skeleton:\n```ts\nimport \"dotenv/config\";\nimport { CELL_RE, expandCellSpec } from \"../lib/warehouse/codes\";\n\nfunction assert(cond: unknown, msg: string): asserts cond {\n  if (!cond) { console.error(`FAIL: ${msg}`); process.exit(1); }\n}\n\nfunction expectArray(r: string[] | { error: string }, msg: string): string[] {\n  assert(Array.isArray(r), `${msg} — expected array, got error: ${(r as { error: string }).error}`);\n  return r as string[];\n}\n\nfunction expectError(r: string[] | { error: string }, expected: string, msg: string): void {\n  assert(!Array.isArray(r), `${msg} — expected error, got array`);\n  assert((r as { error: string }).error === expected, `${msg} — error text mismatch: got \"${(r as { error: string }).error}\"`);\n}\n\nasync function main(): Promise<void> {\n  // positive\n  const a = expectArray(expandCellSpec(\"A-1-1\"), \"single code\");\n  assert(a.length === 1 && a[0] === \"A-1-1\", \"single code body\");\n  // ... etc\n  console.log(\"OK: verify-cell-codes\");\n}\n\nmain().catch((e) => { console.error(e); process.exit(1); });\n```\nKnown current behaviour to lock in (read off `lib/warehouse/codes.ts:42-77` post-PR):\n- `split(\"..\")` then `.trim().toUpperCase()` per side\n- Equal-segment shortcut: if `as[i] === bs[i]` after upper, dim is `[as[i]]`\n- Numeric range guard: `hi - lo > 500` → `\"Слишком большой диапазон\"`\n- Cartesian guard: `acc.length > 1000` → `\"Слишком много ячеек (макс. 1000)\"`\n- Non-numeric mismatch: `\"Сегмент ${i + 1}: перебор возможен только по числам\"` (1-indexed)\nDo NOT add the script to `package.json` scripts — sibling `verify-*.ts` files are not registered there (confirmed: `scripts` block only has `dev`/`build`/`lint`/Prisma plumbing).",
+      "dependsOn": ["US-001"],
+      "priority": 2,
+      "passes": true,
+      "notes": "Implemented in iteration 2. Files: scripts/verify-cell-codes.ts (new, on PR branch archon/task-archon-architect-1781275339869). Commit ff5feaa pushed to origin. Verifier exits 0 locally; loud-fail verified by temporarily inverting one assertion (FAIL: single code body, exit 1) then restored. Type-check + lint clean."
+    },
+    {
+      "id": "US-003",
+      "title": "Merge PR #1 once Verify is green",
+      "description": "As the repository maintainer, I want PR #1 squash-merged with its branch deleted, so that the architectural-sweep baseline lands on `main` and unblocks the next deferred follow-up PRs (`lib/warehouse/` rename, `generateTempPassword` dedup, typed-delegate shim, etc.).",
+      "acceptanceCriteria": [
+        "Before merging: `gh pr checks 1 --repo 0pt1m1sm/geleoteka` reports `verify  pass`.",
+        "Before merging: `gh pr view 1 --repo 0pt1m1sm/geleoteka --json mergeable,mergeStateStatus` reports `\"mergeable\":\"MERGEABLE\"` and `\"mergeStateStatus\":\"CLEAN\"` (or `\"UNSTABLE\"` only if the failing check is one we explicitly don't gate on — there is none).",
+        "Merge executed with: `gh pr merge 1 --squash --delete-branch --repo 0pt1m1sm/geleoteka`. Squash matches the existing one-commit-per-feature history (`acadba6`, `61d1f04`, `ed34535`, …).",
+        "Post-merge: `gh pr view 1 --repo 0pt1m1sm/geleoteka --json state` reports `\"state\":\"MERGED\"`.",
+        "Post-merge: branch `archon/task-archon-architect-1781275339869` is gone from `gh api repos/0pt1m1sm/geleoteka/branches --jq '.[].name'`.",
+        "Post-merge: `git log origin/main -1 --format='%s'` shows the squashed commit title contains `expandCellSpec` (or the PR title verbatim)."
+      ],
+      "technicalNotes": "Do NOT use `--admin` or any force flag. Do NOT skip checks. If `Verify` is not yet green when this story runs, BLOCK — return control to US-001/US-002 rather than waiting indefinitely or attempting a merge override.\n\nMerge command (verbatim):\n```bash\ngh pr merge 1 --squash --delete-branch --repo 0pt1m1sm/geleoteka\n```\nVerification command (verbatim):\n```bash\ngh pr view 1 --repo 0pt1m1sm/geleoteka --json state,mergedAt,mergeCommit\n```\nIf `gh pr merge` fails with `Pull request is not mergeable` despite green checks, inspect with `gh pr view 1 --repo 0pt1m1sm/geleoteka --json mergeStateStatus,reviewDecision` and STOP — do not work around. Most likely cause would be a base-branch divergence (rebase needed) or a missing review approval; both are out of this story's scope to resolve.\n\nDo NOT proactively run `git push --force` to PR #1's branch under any circumstance — it would break the review trail. Squash is the merge strategy, NOT a pre-merge rebase.",
+      "dependsOn": ["US-001", "US-002"],
+      "priority": 3,
+      "passes": true,
+      "notes": "Implemented in iteration 3. PR #1 squash-merged (mergeCommit 71c1275, mergedAt 2026-06-12T15:59:58Z). Pre-merge state: verify SUCCESS, mergeable MERGEABLE, mergeStateStatus CLEAN. Post-merge: state MERGED, branch archon/task-archon-architect-1781275339869 deleted, origin/main HEAD subject is `refactor(warehouse): move expandCellSpec to lib/warehouse/codes (#1)`."
+    }
+  ]
+}
