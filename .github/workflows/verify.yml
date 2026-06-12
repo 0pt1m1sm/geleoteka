@@ -23,8 +23,12 @@ jobs:
         run: npm ci
 
       - name: Generate Prisma client
+        env:
+          # prisma.config.ts:14 calls env("DATABASE_URL") which throws when unset.
+          # `prisma generate` only reads the schema and never connects, so any
+          # non-empty value satisfies the env() resolver.
+          DATABASE_URL: postgresql://prisma-generate-stub:stub@localhost:5432/stub
         # Required so tsc can resolve `@/app/generated/prisma/client` imports.
-        # No DATABASE_URL needed for `prisma generate`; it reads the schema only.
         run: npx prisma generate
 
       - name: Type check
