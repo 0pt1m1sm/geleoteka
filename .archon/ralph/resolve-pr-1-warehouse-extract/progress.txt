@@ -37,3 +37,30 @@
 - The sibling worktree has no `node_modules` of its own; type-check was run from the ralph worktree (which does), and that is sufficient since the only changed file is a CI YAML with no TypeScript impact.
 
 ---
+
+## 2026-06-12 — US-002: Add scripts/verify-cell-codes.ts to lock in expandCellSpec behaviour
+
+**Status**: PASSED
+**Files changed** (committed on PR branch `archon/task-archon-architect-1781275339869` in sibling worktree, pushed to origin as commit `ff5feaa`):
+- `scripts/verify-cell-codes.ts` — new file, 110 lines. `import "dotenv/config"`, local `assert` + `expectArray` + `expectError` helpers, single `main()` invoked at module bottom with `.catch(...)`. Imports `CELL_RE, expandCellSpec` from `../lib/warehouse/codes`. No DB code.
+
+**Acceptance criteria verified**:
+- [x] File exists on PR branch (commit `ff5feaa`)
+- [x] Follows verify-stock-analysis.ts shape (dotenv/config, assert, main + .catch)
+- [x] Imports from `../lib/warehouse/codes` (same convention as verify-warehouse.ts:23)
+- [x] No DB code (no `db` import, no fixtures, no cleanup)
+- [x] Positive cases asserted: single `A-1-1`, 1-D `A-1-1..A-1-3`, case+ws ` a-1-1 .. A-1-2 `
+- [x] 2-D cartesian asserted: `A-1-1..A-2-2` → `["A-1-1","A-1-2","A-2-1","A-2-2"]`
+- [x] Negative cases asserted (exact Russian strings): empty, mismatched segment count (`A-1..A-1-2`), oversized numeric range (`A-0..A-501`), oversized cartesian (`A-1-1..A-30-40` → 1200 codes), non-numeric segment (`A-1..B-1`)
+- [x] CELL_RE smoke: `A-1-1` matches, `a-1` rejected, 33-char rejected
+- [x] `npx tsx scripts/verify-cell-codes.ts` exits 0 — "OK: verify-cell-codes"
+- [x] Loud-fail verified by inverting one assertion (`["A-9-9"]`) → `FAIL: single code body`, exit 1 — then restored
+- [x] `npx tsc --noEmit` → No errors found
+- [x] `npm run lint` → No issues found
+
+**Learnings**:
+- Running the script in the sibling worktree required (a) symlinking `node_modules` from the ralph worktree (package.json identical) and (b) running `DATABASE_URL=postgresql://prisma-generate-stub:stub@localhost:5432/stub npx prisma generate` to materialize `@/app/generated/prisma/client`. Without prisma client the script fails at module-load time because `lib/warehouse/codes.ts` transitively imports `lib/wms-host` → `lib/db.ts` → the generated client. None of this transitive load actually connects to the DB at runtime — the prisma client only needs to *exist* on disk.
+- The cartesian-product guard `acc.length > 1000` test case: `A-1-1..A-30-40` gives 30 × 40 = 1200 cells (each per-dim diff stays under 500, so neither dim hits the 500 guard first).
+- Mismatched segment count is exercised with `A-1..A-1-2` (2 vs 3 segments). The PRD example `A-1-1..A-3-4` actually has equal segment counts and would NOT trigger this error.
+
+---
