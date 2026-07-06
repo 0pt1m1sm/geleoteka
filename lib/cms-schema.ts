@@ -227,9 +227,21 @@ const FOOTER_SERVICES_DEFAULT: ReadonlyArray<Record<string, string>> = [
   { label: "Все услуги →", href: "/services" },
 ];
 
+// Телефон мессенджеров и шаблон первого сообщения. Telegram по номеру
+// не поддерживает предзаполненный текст — шаблон только у WhatsApp.
+const FAB_PHONE = "79637680642";
+const FAB_MESSAGE_TEMPLATE = encodeURIComponent(
+  "Здравствуйте! Пишу с сайта Geleoteka — хочу записаться на сервис.",
+);
+
 const FAB_CHANNELS_DEFAULT: ReadonlyArray<Record<string, string>> = [
-  { name: "Telegram", href: "https://t.me/geleoteka", color: "#229ED9", iconKey: "telegram" },
-  { name: "WhatsApp", href: "https://wa.me/74951234567", color: "#25D366", iconKey: "whatsapp" },
+  { name: "Telegram", href: `https://t.me/+${FAB_PHONE}`, color: "#229ED9", iconKey: "telegram" },
+  {
+    name: "WhatsApp",
+    href: `https://wa.me/${FAB_PHONE}?text=${FAB_MESSAGE_TEMPLATE}`,
+    color: "#25D366",
+    iconKey: "whatsapp",
+  },
   { name: "Max", href: "https://max.ru/geleoteka", color: "#E60023", iconKey: "max" },
 ];
 
