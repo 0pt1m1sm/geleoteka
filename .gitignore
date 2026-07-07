@@ -50,5 +50,6 @@ certificates
 
 # Claude Code local state
 .claude/scheduled_tasks.lock
-.claude/settings.local.json.memsearch/
+.claude/settings.local.json
+.memsearch/
 .omc/
