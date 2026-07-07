@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(railway variables *)",
+      "Bash(psql $PROD_DB *)"
+    ]
+  }
+}
