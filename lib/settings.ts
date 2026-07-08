@@ -124,6 +124,40 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     label: "S3 endpoint",
     description: "По умолчанию https://storage.yandexcloud.net. Менять только при переезде на другой провайдер.",
   },
+
+  // ── Вход через соцсети (149-ФЗ: российские ИС) ───────────────────────
+  // Кнопки на /login появляются автоматически, как только задан client_id
+  // соответствующего провайдера. Redirect URI при регистрации приложения:
+  //   Яндекс: https://geleoteka.ru/api/auth/oauth/yandex/callback
+  //   VK ID:  https://geleoteka.ru/api/auth/oauth/vk/callback
+  {
+    group: "Вход через Яндекс и VK",
+    key: "YANDEX_OAUTH_CLIENT_ID",
+    label: "Яндекс — ClientID",
+    description:
+      "oauth.yandex.ru → создать приложение → Веб-сервисы. Redirect URI: https://geleoteka.ru/api/auth/oauth/yandex/callback. Доступы: email, имя, номер телефона.",
+  },
+  {
+    group: "Вход через Яндекс и VK",
+    key: "YANDEX_OAUTH_CLIENT_SECRET",
+    label: "Яндекс — Client secret",
+    description: "Секрет из того же приложения на oauth.yandex.ru.",
+    secret: true,
+  },
+  {
+    group: "Вход через Яндекс и VK",
+    key: "VKID_CLIENT_ID",
+    label: "VK ID — ID приложения",
+    description:
+      "id.vk.ru → бизнес-кабинет → создать приложение (Web). Redirect URI: https://geleoteka.ru/api/auth/oauth/vk/callback. Доступы: email, phone.",
+  },
+  {
+    group: "Вход через Яндекс и VK",
+    key: "VKID_CLIENT_SECRET",
+    label: "VK ID — Защищённый ключ",
+    description: "Сейчас не используется (обмен кода идёт по PKCE), поле на будущее.",
+    secret: true,
+  },
 ];
 
 export async function getSetting(key: string): Promise<string | null> {

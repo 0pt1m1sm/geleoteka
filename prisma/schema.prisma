@@ -324,6 +324,7 @@ model User {
   loyaltyAccount LoyaltyAccount?
   notifications  Notification[]
   passwordResets PasswordReset[]
+  oauthAccounts  OAuthAccount[]
   blogPosts      BlogPost[]
   partShipments  PartShipment[]
   rentalBookings RentalBooking[]
@@ -512,6 +513,22 @@ model PasswordReset {
 
   @@index([userId])
   @@index([code])
+}
+
+// Привязка внешнего входа (Яндекс ID / VK ID) к локальному аккаунту.
+// providerUserId — стабильный идентификатор пользователя у провайдера;
+// матчинг при входе: сперва эта таблица, затем email/телефон из профиля.
+model OAuthAccount {
+  id             String   @id @default(cuid())
+  provider       String // "yandex" | "vk"
+  providerUserId String
+  userId         String
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
 }
 
 // ============================================
