@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(railway variables *)",
-      "Bash(psql $PROD_DB *)"
+      "Bash(psql $PROD_DB *)",
+      "Bash(.claude/scripts/twc-api.sh *)"
     ]
   }
 }
