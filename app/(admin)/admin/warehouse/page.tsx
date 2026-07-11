@@ -36,8 +36,11 @@ export default async function WarehousePage({ searchParams }: Props) {
       />
 
       <div className="flex flex-wrap gap-2">
-        <Link href="/admin/warehouse/fulfill" className="btn btn-primary inline-flex w-fit min-h-[44px]">
-          Сканировать заказ →
+        <Link href="/admin/warehouse/receiving" className="btn btn-primary inline-flex w-fit min-h-[44px]">
+          Приёмка →
+        </Link>
+        <Link href="/admin/warehouse/fulfill" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
+          Отбор / Упаковка →
         </Link>
         <Link href="/admin/warehouse/stocktake" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Инвентаризация →
@@ -55,6 +58,34 @@ export default async function WarehousePage({ searchParams }: Props) {
           Отчёты →
         </Link>
       </div>
+
+      {/* Workflow cheat sheet — docs/warehouse/storekeeper-workflow.md, in-app */}
+      <details className="card">
+        <summary className="cursor-pointer font-semibold select-none">Как работает склад</summary>
+        <ol className="mt-3 space-y-1.5 text-sm text-[var(--foreground-muted)] list-decimal list-inside">
+          <li>
+            <Link href="/admin/warehouse/receiving" className="text-[var(--color-accent)] hover:underline">Приёмка</Link>
+            {" — принятый товар всегда попадает в ячейку ПРИЁМКА (или указанную вами). Наклейте наш QR-ярлык: "}
+            <Link href="/admin/warehouse/labels" className="text-[var(--color-accent)] hover:underline">печать этикеток</Link>.
+          </li>
+          <li>Раскладка — в скан-боксе ниже отсканируйте товар, затем полку: перенос ПРИЁМКА → полка.</li>
+          <li>
+            <Link href="/admin/warehouse/picking" className="text-[var(--color-accent)] hover:underline">Отбор</Link>
+            {" — выдача запчастей на заказ-наряд: скан товара + скан полки."}
+          </li>
+          <li>
+            <Link href="/admin/warehouse/packing" className="text-[var(--color-accent)] hover:underline">Упаковка</Link>
+            {" — сборка отгрузки клиенту, затем скан коробки и отправка."}
+          </li>
+          <li>
+            <Link href="/admin/warehouse/stocktake" className="text-[var(--color-accent)] hover:underline">Инвентаризация</Link>
+            {" — пересчёт по ячейкам; остатки исправляются только через неё."}
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+          Одна деталь = один QR-ярлык (артикул). Весь остаток живёт в ячейках: приняли → разложили → отобрали.
+        </p>
+      </details>
 
       {/* Scan box — Task 4 (writes routed to the active warehouse) */}
       <WarehouseScanBox warehouseId={warehouseId} />

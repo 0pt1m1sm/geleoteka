@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import Link from "next/link";
-import { createSupplierOrder } from "@/app/actions/supplier-orders";
+import { createSupplierOrder, updateSupplierOrder } from "@/app/actions/supplier-orders";
 import { Alert, Button, Card, Textarea } from "@/components/ui";
 import { SupplierPicker } from "./supplier-order-form/SupplierPicker";
 import { OrderLineItems } from "./supplier-order-form/OrderLineItems";
@@ -20,15 +20,36 @@ import type {
   SupplierOption,
 } from "./supplier-order-form/types";
 
+/** Everything the edit page pre-fills from the persisted order. */
+export interface OrderFormInitialValues {
+  supplierId: string;
+  orderNumber: string;
+  orderDate: string; // yyyy-mm-dd
+  items: ItemRow[];
+  landedCost: LandedCostState;
+  trackingNumber: string;
+  estimatedArrival: string; // yyyy-mm-dd or ""
+  notes: string;
+}
+
 export function SupplierOrderForm({
   suppliers,
   parts,
   initialItems,
+  mode = "create",
+  orderId,
+  initialValues,
 }: {
   suppliers: SupplierOption[];
   parts: PartOption[];
   /** Pre-filled lines (e.g. from the replenishment report). Defaults to one empty PART row. */
   initialItems?: ItemRow[];
+  /** "edit" reuses the form for a DRAFT order — submit routes to updateSupplierOrder. */
+  mode?: "create" | "edit";
+  /** Required when mode === "edit". */
+  orderId?: string;
+  /** Persisted values for edit mode. */
+  initialValues?: OrderFormInitialValues;
 }): React.ReactElement {
   const nav = useProgressRouter();
   const [submitting, setSubmitting] = useState(false);
@@ -36,25 +57,29 @@ export function SupplierOrderForm({
 
   const today = new Date().toISOString().split("T")[0];
 
-  const [supplierId, setSupplierId] = useState(suppliers[0]?.id ?? "");
-  const [orderNumber, setOrderNumber] = useState("");
-  const [orderDate, setOrderDate] = useState(today);
+  const [supplierId, setSupplierId] = useState(initialValues?.supplierId ?? suppliers[0]?.id ?? "");
+  const [orderNumber, setOrderNumber] = useState(initialValues?.orderNumber ?? "");
+  const [orderDate, setOrderDate] = useState(initialValues?.orderDate ?? today);
   const [items, setItems] = useState<ItemRow[]>(
-    initialItems && initialItems.length > 0
-      ? initialItems
-      : [{ type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 }],
+    initialValues?.items && initialValues.items.length > 0
+      ? initialValues.items
+      : initialItems && initialItems.length > 0
+        ? initialItems
+        : [{ type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 }],
   );
-  const [landedCost, setLandedCost] = useState<LandedCostState>({
-    shippingRateUsdCents: 0,
-    usdRateKopecks: 0,
-    customsMode: "PERCENT_CIF",
-    customsPercentBps: DEFAULT_CUSTOMS_PERCENT_BPS,
-    cargoRateUsdCents: 0,
-    manualWeightOverrideGrams: null,
-  });
-  const [trackingNumber, setTrackingNumber] = useState("");
-  const [estimatedArrival, setEstimatedArrival] = useState("");
-  const [notes, setNotes] = useState("");
+  const [landedCost, setLandedCost] = useState<LandedCostState>(
+    initialValues?.landedCost ?? {
+      shippingRateUsdCents: 0,
+      usdRateKopecks: 0,
+      customsMode: "PERCENT_CIF",
+      customsPercentBps: DEFAULT_CUSTOMS_PERCENT_BPS,
+      cargoRateUsdCents: 0,
+      manualWeightOverrideGrams: null,
+    },
+  );
+  const [trackingNumber, setTrackingNumber] = useState(initialValues?.trackingNumber ?? "");
+  const [estimatedArrival, setEstimatedArrival] = useState(initialValues?.estimatedArrival ?? "");
+  const [notes, setNotes] = useState(initialValues?.notes ?? "");
 
   const itemsCost = items.reduce((sum, i) => sum + i.unitCost * i.quantity, 0);
 
@@ -79,7 +104,7 @@ export function SupplierOrderForm({
       : computeCustomsRub({ mode: "CARGO_PER_KG", weightGrams: effectiveWeightGrams, cargoRateUsdCents: landedCost.cargoRateUsdCents, usdRateKopecks: landedCost.usdRateKopecks });
   const totalCost = itemsCost + shippingCost + customsCost;
 
-  async function handleSubmit(e: React.FormEvent): Promise<void> {
+  async function handleSubmit(e: React.SubmitEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
@@ -102,7 +127,7 @@ export function SupplierOrderForm({
       return;
     }
 
-    const result = await createSupplierOrder({
+    const payload = {
       supplierId,
       orderNumber: orderNumber || undefined,
       orderDate,
@@ -123,12 +148,17 @@ export function SupplierOrderForm({
       trackingNumber: trackingNumber || undefined,
       estimatedArrival: estimatedArrival || undefined,
       notes: notes || undefined,
-    });
+    };
+
+    const result =
+      mode === "edit" && orderId
+        ? await updateSupplierOrder(orderId, payload)
+        : await createSupplierOrder(payload);
 
     if (result.success && result.orderId) {
       nav.push(`/admin/suppliers/orders/${result.orderId}`);
     } else {
-      setError(result.error || "Ошибка при создании заказа");
+      setError(result.error || (mode === "edit" ? "Ошибка при сохранении заказа" : "Ошибка при создании заказа"));
       setSubmitting(false);
     }
   }
@@ -169,10 +199,21 @@ export function SupplierOrderForm({
       </Card>
 
       <div className="flex gap-4">
-        <Link href="/admin/suppliers/orders" className="btn btn-secondary">Отмена</Link>
+        <Link
+          href={mode === "edit" && orderId ? `/admin/suppliers/orders/${orderId}` : "/admin/suppliers/orders"}
+          className="btn btn-secondary"
+        >
+          Отмена
+        </Link>
         <div className="flex-1" />
         <Button type="submit" variant="primary" isLoading={submitting} disabled={submitting}>
-          {submitting ? "Создание..." : "Создать заказ"}
+          {submitting
+            ? mode === "edit"
+              ? "Сохранение..."
+              : "Создание..."
+            : mode === "edit"
+              ? "Сохранить изменения"
+              : "Создать заказ"}
         </Button>
       </div>
     </form>

@@ -8,7 +8,8 @@ import { formatDate } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 const EXPORT_CAP = 50000;
-const REASONS = ["RECEIPT", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
+// NOT compile-enforced (as-const allow-list) — keep in sync with StockMovementReason.
+const REASONS = ["RECEIPT", "RECEIPT_REVERSAL", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
 
 interface MovementRow {
   createdAt: Date;

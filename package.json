@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-443}",
     "lint": "eslint",
+    "test": "vitest run",
     "migrate-static-photos": "tsx scripts/migrate-static-photos.ts",
     "backfill-fulfillment-deals": "tsx scripts/backfill-fulfillment-deals.ts",
     "verify-vehicle-catalog": "tsx scripts/verify-vehicle-catalog.ts",
@@ -24,6 +25,7 @@
     "verify-crm-task-unique": "tsx scripts/verify-crm-task-unique.ts",
     "verify-auto-task": "tsx scripts/verify-auto-task.ts",
     "verify-warehouse": "tsx scripts/verify-warehouse.ts",
+    "verify-undo-receive": "tsx scripts/verify-undo-receive.ts",
     "verify-landed-cost": "tsx scripts/verify-landed-cost.ts",
     "verify-qr-scanning": "tsx scripts/verify-qr-scanning.ts",
     "verify-stocktake": "tsx scripts/verify-stocktake.ts",
@@ -65,6 +67,7 @@
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

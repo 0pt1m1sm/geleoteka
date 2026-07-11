@@ -17,6 +17,7 @@ export interface WmsItemRef {
 
 export type MovementReason =
   | "RECEIPT" // inbound on-hand
+  | "RECEIPT_REVERSAL" // сторно — undo of an erroneous receipt (−on-hand, reserved untouched)
   | "CONSUMPTION" // outbound on-hand (also releases the matching hold)
   | "ADJUSTMENT" // manual correction; the ONLY reason allowed a null source / signed qty
   | "RESERVATION" // raise reserved, leave on-hand

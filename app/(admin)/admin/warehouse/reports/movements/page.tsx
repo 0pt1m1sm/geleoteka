@@ -10,7 +10,8 @@ import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { formatDateTime } from "@/lib/utils";
 import { MOVEMENT_REASON_LABELS } from "@/lib/warehouse/movement-csv";
 
-const REASONS = ["RECEIPT", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
+// NOT compile-enforced (as-const allow-list) — keep in sync with StockMovementReason.
+const REASONS = ["RECEIPT", "RECEIPT_REVERSAL", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
 
 interface Props {
   searchParams: Promise<{ from?: string; to?: string; reason?: string; wh?: string }>;

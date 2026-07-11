@@ -7,6 +7,9 @@ import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierOrderStatusChanger } from "@/components/admin/SupplierOrderStatusChanger";
 import { SupplierOrderReceiving, type ReceivingLine } from "@/components/admin/SupplierOrderReceiving";
+import { SupplierOrderMetaForm } from "@/components/admin/SupplierOrderMetaForm";
+import { DeleteSupplierOrderButton } from "@/components/admin/DeleteSupplierOrderButton";
+import { canDeleteOrder, canEditOrderMeta, canFullyEditOrder } from "@/lib/suppliers/order-lifecycle";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -85,14 +88,36 @@ export default async function SupplierOrderDetailPage({ params }: Props) {
               {formatDate(order.orderDate)}
             </p>
           </div>
-          <SupplierOrderStatusChanger orderId={order.id} currentStatus={order.status} />
+          <div className="flex items-center gap-3 shrink-0">
+            {canFullyEditOrder(order.status) && (
+              <Link href={`/admin/suppliers/orders/${order.id}/edit`} className="btn btn-secondary btn-sm">
+                Редактировать
+              </Link>
+            )}
+            {canDeleteOrder(
+              order.status,
+              order.items.map((it: { receivedQuantity: number }) => ({ receivedQuantity: it.receivedQuantity }))
+            ) && <DeleteSupplierOrderButton orderId={order.id} />}
+            <SupplierOrderStatusChanger orderId={order.id} currentStatus={order.status} />
+          </div>
         </div>
       </div>
 
       <div className="max-w-3xl">
         <div className="space-y-6">
+          {/* Meta edit — alive orders only; lines/costs are DRAFT-only on /edit */}
+          {canEditOrderMeta(order.status) && !canFullyEditOrder(order.status) && (
+            <SupplierOrderMetaForm
+              orderId={order.id}
+              orderNumber={order.orderNumber ?? ""}
+              trackingNumber={order.trackingNumber ?? ""}
+              estimatedArrival={order.estimatedArrival ? new Date(order.estimatedArrival).toISOString().split("T")[0] : ""}
+              notes={order.notes ?? ""}
+            />
+          )}
+
           {/* Items + receiving */}
-          <SupplierOrderReceiving orderId={order.id} status={order.status} lines={receivingLines} />
+          <SupplierOrderReceiving orderId={order.id} status={order.status} lines={receivingLines} allowUndo />
 
           {/* Financial summary */}
           <div>

@@ -4,6 +4,7 @@ import { formatDate } from "@/lib/utils";
 
 const REASON_LABELS: Record<string, string> = {
   RECEIPT: "Приёмка",
+  RECEIPT_REVERSAL: "Сторно приёмки",
   CONSUMPTION: "Расход",
   ADJUSTMENT: "Корректировка",
   RESERVATION: "Резерв",

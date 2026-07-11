@@ -13,6 +13,7 @@ const EOL = "\r\n";
 /** Reason → Russian label (kept in sync with WarehouseMovementsFeed). */
 export const MOVEMENT_REASON_LABELS: Record<string, string> = {
   RECEIPT: "Приёмка",
+  RECEIPT_REVERSAL: "Сторно приёмки",
   CONSUMPTION: "Расход",
   ADJUSTMENT: "Корректировка",
   RESERVATION: "Резерв",

@@ -932,6 +932,7 @@ model Part {
 
 enum StockMovementReason {
   RECEIPT // inbound on-hand (supplier receipt)
+  RECEIPT_REVERSAL // сторно — undo of an erroneous supplier receipt (−on-hand)
   CONSUMPTION // outbound on-hand (RO close / shipment / retail sale)
   ADJUSTMENT // manual correction (the only reason allowed a null source)
   RESERVATION // raise reserved, leave on-hand
