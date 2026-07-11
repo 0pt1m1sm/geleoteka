@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev --port 443 --experimental-https",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p ${PORT:-443}",
+    "start": "npx prisma migrate deploy || echo '[start] migrate deploy failed — app boots anyway, investigate logs'; next start -H 0.0.0.0 -p ${PORT:-443}",
     "lint": "eslint",
     "test": "vitest run",
     "migrate-static-photos": "tsx scripts/migrate-static-photos.ts",
