@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { QrScanner } from "@/components/warehouse/QrScanner";
-import type { OpenConsumeLine } from "@/lib/warehouse/scan-consume";
+import type { DoneConsumeLine, OpenConsumeLine } from "@/lib/warehouse/scan-consume";
 
 export interface ScanConsumeResult {
   error: string | null;
@@ -32,6 +32,8 @@ export function ScanConsumeLines({
   onOpenScanKey,
   setError,
   setSuccess,
+  doneLines,
+  doneTitle,
 }: {
   lines: OpenConsumeLine[];
   actionLabel: string;
@@ -42,6 +44,11 @@ export function ScanConsumeLines({
   onOpenScanKey: (key: string | null) => void;
   setError: (msg: string | null) => void;
   setSuccess: (msg: string | null) => void;
+  /** Already-consumed lines — rendered as a checked-off recap so a finished
+   *  sheet names WHAT was picked/packed, not just «все позиции обработаны». */
+  doneLines?: DoneConsumeLine[];
+  /** Recap heading, e.g. «Упаковано» / «Отобрано». */
+  doneTitle?: string;
 }): React.ReactElement {
   // useRouter only for .refresh() (re-fetch the server-rendered open list); we
   // never .push here. Named to avoid the banned `router.push` pattern.
@@ -111,11 +118,39 @@ export function ScanConsumeLines({
     });
   }
 
+  const recap =
+    doneLines && doneLines.length > 0 ? (
+      <div className="space-y-1">
+        <p className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">
+          {doneTitle ?? "Выполнено"} ({doneLines.length})
+        </p>
+        <ul className="space-y-1">
+          {doneLines.map((l) => (
+            <li
+              key={l.lineKey}
+              className="flex items-center justify-between gap-2 text-sm text-[var(--foreground-muted)]"
+            >
+              <span>
+                ✓ {l.name} <span className="font-mono text-xs">{l.article}</span>
+              </span>
+              <span className="shrink-0">× {l.requiredQty}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    ) : null;
+
   if (lines.length === 0) {
-    return <p className="alert-success">{emptyMessage}</p>;
+    return (
+      <div className="space-y-3">
+        <p className="alert-success">{emptyMessage}</p>
+        {recap}
+      </div>
+    );
   }
 
   return (
+    <div className="space-y-3">
     <ul className="space-y-3">
       {lines.map((line) => (
         <li
@@ -201,5 +236,7 @@ export function ScanConsumeLines({
         </li>
       ))}
     </ul>
+    {recap}
+    </div>
   );
 }

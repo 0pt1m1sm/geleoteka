@@ -12,14 +12,22 @@ import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
 import {
   openPackLinesForOrder,
+  packedLinesForOrder,
   applyPackLine,
   isFullyPacked,
   packProgress,
   PackError,
   type OpenPackLine,
 } from "@/lib/warehouse/pack";
+import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
 const PACK_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
+
+/** Already-packed lines of an order — the box-contents recap under the pack sheet. */
+export async function getPackedLines(orderId: string): Promise<DoneConsumeLine[]> {
+  await requireRole(PACK_ROLES);
+  return packedLinesForOrder(db, orderId);
+}
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors picking's resolveItemCode. */

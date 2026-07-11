@@ -14,6 +14,8 @@ import {
   enrichOpenConsumeLines,
   applyScanConsume,
   consumedLineKeys,
+  consumedLinesRecap,
+  type DoneConsumeLine,
   type OpenConsumeLine,
   type RequiredConsumeLine,
 } from "./scan-consume";
@@ -45,7 +47,11 @@ const PACKABLE_STATUSES = new Set(["PROCESSING"]);
  *  key by partId to match the sale source `orderId:partId`; CRM orders draw from
  *  the deal's latest APPROVED estimate PART lines, keyed by estimate-line id to
  *  match the dispatch source `orderId:estimateLineId`. */
-async function requiredLines(client: DbClientPort, orderId: string): Promise<RequiredConsumeLine[] | null> {
+async function requiredLines(
+  client: DbClientPort,
+  orderId: string,
+  opts?: { statusGate?: boolean },
+): Promise<RequiredConsumeLine[] | null> {
   const order = (await client.partShipment.findUnique({
     where: { id: orderId },
     select: {
@@ -58,7 +64,9 @@ async function requiredLines(client: DbClientPort, orderId: string): Promise<Req
     dealId: string;
     items: Array<{ partId: string; quantity: number }>;
   } | null;
-  if (!order || !PACKABLE_STATUSES.has(order.status)) return null;
+  // The status gate protects MUTATION paths; read-only recaps may relax it
+  // (statusGate:false) so a SHIPPED order still names its packed contents.
+  if (!order || ((opts?.statusGate ?? true) && !PACKABLE_STATUSES.has(order.status))) return null;
 
   if (order.items.length > 0) {
     return order.items
@@ -97,6 +105,20 @@ export async function openPackLinesForOrder(
     orderId,
     await requiredLines(client, orderId),
     warehouseId,
+  );
+}
+
+/** Already-packed lines — the box contents. Read-only recap (no status gate),
+ *  so the sheet names WHAT is packed both before the ship confirm and after. */
+export async function packedLinesForOrder(
+  client: DbClientPort,
+  orderId: string,
+): Promise<DoneConsumeLine[]> {
+  return consumedLinesRecap(
+    client,
+    "PartShipment",
+    orderId,
+    await requiredLines(client, orderId, { statusGate: false }),
   );
 }
 

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getOpenPackLines } from "@/app/actions/packing";
+import { getOpenPackLines, getPackedLines } from "@/app/actions/packing";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { PageHeader } from "@/components/ui";
 import { PackBox } from "@/components/admin/PackBox";
@@ -27,7 +27,7 @@ export default async function PackingOrderPage({ params, searchParams }: Props) 
 
   const warehouses = await listWarehouses();
   const warehouseId = await resolveWarehouseId(sp.wh, warehouses);
-  const lines = await getOpenPackLines(id, warehouseId);
+  const [lines, packedLines] = await Promise.all([getOpenPackLines(id, warehouseId), getPackedLines(id)]);
 
   return (
     <div className="space-y-8">
@@ -35,11 +35,11 @@ export default async function PackingOrderPage({ params, searchParams }: Props) 
         eyebrow="Упаковка"
         title={`Заказ ${order.orderNumber ?? id.slice(0, 8)}`}
         description={`${order.contactName} · ${order.status}`}
-        backHref="/admin/warehouse/packing"
-        backLabel="Упаковка"
+        backHref="/admin/warehouse/fulfill"
+        backLabel="Выдача"
         actions={<WarehouseSwitcher warehouses={warehouses} current={warehouseId} />}
       />
-      <PackBox orderId={id} lines={lines} warehouseId={warehouseId} />
+      <PackBox orderId={id} lines={lines} packedLines={packedLines} warehouseId={warehouseId} />
     </div>
   );
 }

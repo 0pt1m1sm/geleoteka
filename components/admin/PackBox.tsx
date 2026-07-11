@@ -6,6 +6,7 @@ import { packOrderLine, recordPackBoxScan, shipPackedOrder } from "@/app/actions
 import { QrScanner } from "@/components/warehouse/QrScanner";
 import { ScanConsumeLines } from "@/components/admin/ScanConsumeLines";
 import type { OpenPackLine } from "@/lib/warehouse/pack";
+import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
 /** Pack flow for one order: scan a parcel (box), pack each line via the shared
  *  <ScanConsumeLines>, then confirm shipment (PROCESSING → SHIPPED) once no open
@@ -15,10 +16,13 @@ import type { OpenPackLine } from "@/lib/warehouse/pack";
 export function PackBox({
   orderId,
   lines,
+  packedLines,
   warehouseId,
 }: {
   orderId: string;
   lines: OpenPackLine[];
+  /** Already-packed lines — the box-contents recap. */
+  packedLines?: DoneConsumeLine[];
   warehouseId?: string;
 }): React.ReactElement {
   // useRouter only for .refresh(); we never .push here.
@@ -123,6 +127,8 @@ export function PackBox({
         actionLabel="Упаковать"
         successVerb="Упаковано"
         emptyMessage="Все позиции этого заказа упакованы."
+        doneLines={packedLines}
+        doneTitle="Упаковано"
         onConsume={(lineKey, partCode, binCode) =>
           packOrderLine(orderId, lineKey, partCode, binCode, warehouseId)
         }

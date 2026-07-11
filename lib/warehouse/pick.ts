@@ -8,6 +8,8 @@ import { defaultWarehouseId } from "@/lib/wms-host";
 import {
   enrichOpenConsumeLines,
   applyScanConsume,
+  consumedLinesRecap,
+  type DoneConsumeLine,
   type RequiredConsumeLine,
 } from "./scan-consume";
 
@@ -50,12 +52,15 @@ const PICKABLE_STATUSES = new Set(["SCHEDULED", "IN_PROGRESS", "READY"]);
 async function approvedPartLines(
   client: DbClientPort,
   repairOrderId: string,
+  opts?: { statusGate?: boolean },
 ): Promise<EstLine[] | null> {
   const ro = (await client.repairOrder.findUnique({
     where: { id: repairOrderId },
     select: { dealId: true, status: true },
   })) as { dealId: string; status: string } | null;
-  if (!ro || !PICKABLE_STATUSES.has(ro.status)) return null;
+  // The status gate protects MUTATION paths; read-only recaps may relax it
+  // (statusGate:false) so a COMPLETED order still names its picked parts.
+  if (!ro || ((opts?.statusGate ?? true) && !PICKABLE_STATUSES.has(ro.status))) return null;
   const est = (await client.estimate.findFirst({
     where: { dealId: ro.dealId, stage: "APPROVED" },
     orderBy: { approvedAt: "desc" },
@@ -74,12 +79,27 @@ async function approvedPartLines(
 async function requiredPickLines(
   client: DbClientPort,
   repairOrderId: string,
+  opts?: { statusGate?: boolean },
 ): Promise<RequiredConsumeLine[] | null> {
-  const lines = await approvedPartLines(client, repairOrderId);
+  const lines = await approvedPartLines(client, repairOrderId, opts);
   if (!lines) return null;
   return lines
     .filter((l) => l.partId)
     .map((l) => ({ lineKey: l.id, partId: l.partId as string, requiredQty: Math.round(l.qty) }));
+}
+
+/** Already-picked lines — what has left the shelf for this RO. Read-only recap
+ *  (no status gate), so a finished sheet names WHAT was picked. */
+export async function pickedLinesForOrder(
+  client: DbClientPort,
+  repairOrderId: string,
+): Promise<DoneConsumeLine[]> {
+  return consumedLinesRecap(
+    client,
+    "RepairOrder",
+    repairOrderId,
+    await requiredPickLines(client, repairOrderId, { statusGate: false }),
+  );
 }
 
 /** Lines on this RO's APPROVED estimate that have NOT yet been consumed (picked

@@ -23,6 +23,15 @@ export interface OpenConsumeLine extends RequiredConsumeLine {
   bins: BinPlacement[];
 }
 
+/** A required line already consumed — the recap shown so a finished sheet names
+ *  WHAT was picked/packed instead of a bare «все позиции обработаны». */
+export interface DoneConsumeLine {
+  lineKey: string;
+  name: string;
+  article: string;
+  requiredQty: number;
+}
+
 /** The keys already consumed for an order — a line is "done" iff a CONSUMPTION
  *  movement exists for `${sourceType}:${orderId}:${lineKey}`. */
 export async function consumedLineKeys(
@@ -77,6 +86,34 @@ export async function enrichOpenConsumeLines(
     });
   }
   return result;
+}
+
+/** The already-consumed subset of `required`, enriched with part identity —
+ *  the box-contents / picked-parts recap. Mirrors enrichOpenConsumeLines with
+ *  the filter inverted (and no bin lookup — the stock already left the bins). */
+export async function consumedLinesRecap(
+  client: DbClientPort,
+  sourceType: string,
+  orderId: string,
+  required: RequiredConsumeLine[] | null,
+): Promise<DoneConsumeLine[]> {
+  if (!required || required.length === 0) return [];
+  const consumed = await consumedLineKeys(client, sourceType, orderId);
+  const done = required.filter((l) => consumed.has(l.lineKey));
+  if (done.length === 0) return [];
+
+  const parts = (await client.part.findMany({
+    where: { id: { in: done.map((l) => l.partId) } },
+    select: { id: true, name: true, article: true },
+  })) as Array<{ id: string; name: string; article: string }>;
+  const byId = new Map(parts.map((p) => [p.id, p]));
+
+  return done.map((l) => ({
+    lineKey: l.lineKey,
+    name: byId.get(l.partId)?.name ?? "—",
+    article: byId.get(l.partId)?.article ?? "",
+    requiredQty: l.requiredQty,
+  }));
 }
 
 export interface ApplyScanConsumeInput {

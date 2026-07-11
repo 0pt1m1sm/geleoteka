@@ -10,9 +10,16 @@ import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { revalidatePath } from "next/cache";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
-import { openPickLinesForOrder, applyPickLine, PickError, type OpenPickLine } from "@/lib/warehouse/pick";
+import { openPickLinesForOrder, pickedLinesForOrder, applyPickLine, PickError, type OpenPickLine } from "@/lib/warehouse/pick";
+import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
 const PICK_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
+
+/** Already-picked lines of an RO — the recap under the pick sheet. */
+export async function getPickedLines(repairOrderId: string): Promise<DoneConsumeLine[]> {
+  await requireRole(PICK_ROLES);
+  return pickedLinesForOrder(db, repairOrderId);
+}
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors stocktake's resolveItemCode. */

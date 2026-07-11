@@ -4,16 +4,20 @@ import { useState } from "react";
 import { pickRepairOrderLine } from "@/app/actions/picking";
 import { ScanConsumeLines } from "@/components/admin/ScanConsumeLines";
 import type { OpenPickLine } from "@/lib/warehouse/pick";
+import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
 /** Per-line scan-to-pick for a repair order. The line list + scan mechanic is the
  *  shared <ScanConsumeLines>; this wrapper supplies the RO consume action. */
 export function PickBox({
   repairOrderId,
   lines,
+  pickedLines,
   warehouseId,
 }: {
   repairOrderId: string;
   lines: OpenPickLine[];
+  /** Already-picked lines — the what-left-the-shelf recap. */
+  pickedLines?: DoneConsumeLine[];
   warehouseId?: string;
 }): React.ReactElement {
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +34,8 @@ export function PickBox({
         actionLabel="Отобрать"
         successVerb="Отобрано"
         emptyMessage="Все позиции этого заказа отобраны."
+        doneLines={pickedLines}
+        doneTitle="Отобрано"
         onConsume={(lineKey, partCode, binCode) =>
           pickRepairOrderLine(repairOrderId, lineKey, partCode, binCode, warehouseId)
         }

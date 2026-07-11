@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { getOpenPickLines } from "@/app/actions/picking";
+import { getOpenPickLines, getPickedLines } from "@/app/actions/picking";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { PageHeader } from "@/components/ui";
 import { PickBox } from "@/components/admin/PickBox";
@@ -27,7 +27,7 @@ export default async function PickingOrderPage({ params, searchParams }: Props) 
 
   const warehouses = await listWarehouses();
   const warehouseId = await resolveWarehouseId(sp.wh, warehouses);
-  const lines = await getOpenPickLines(id, warehouseId);
+  const [lines, pickedLines] = await Promise.all([getOpenPickLines(id, warehouseId), getPickedLines(id)]);
 
   return (
     <div className="space-y-8">
@@ -35,11 +35,11 @@ export default async function PickingOrderPage({ params, searchParams }: Props) 
         eyebrow="Отбор"
         title={`Заказ-наряд ${ro.roNumber ?? ""}`}
         description={ro.user?.name ?? ""}
-        backHref="/admin/warehouse/picking"
-        backLabel="Отбор"
+        backHref="/admin/warehouse/fulfill"
+        backLabel="Выдача"
         actions={<WarehouseSwitcher warehouses={warehouses} current={warehouseId} />}
       />
-      <PickBox repairOrderId={id} lines={lines} warehouseId={warehouseId} />
+      <PickBox repairOrderId={id} lines={lines} pickedLines={pickedLines} warehouseId={warehouseId} />
     </div>
   );
 }

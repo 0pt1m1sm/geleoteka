@@ -70,6 +70,12 @@ export interface FakeLocation {
   isBlocked: boolean;
 }
 
+export interface FakePart {
+  id: string;
+  name: string;
+  article: string;
+}
+
 export interface FakeSupplierOrder {
   id: string;
   status: string;
@@ -111,6 +117,7 @@ export class FakeDb {
   locations: FakeLocation[] = [];
   supplierOrders: FakeSupplierOrder[] = [];
   supplierOrderItems: FakeSupplierOrderItem[] = [];
+  parts: FakePart[] = [];
 
   /** Test hook: the next stockMovement.create throws P2002 (forced source-triple
    *  collision) — lets atomicity tests simulate `recordMovement` no-op/abort paths
@@ -132,6 +139,7 @@ export class FakeDb {
       locations: structuredClone(this.locations),
       supplierOrders: structuredClone(this.supplierOrders),
       supplierOrderItems: structuredClone(this.supplierOrderItems),
+      parts: structuredClone(this.parts),
     };
     try {
       return await fn(this.txView());
@@ -143,6 +151,7 @@ export class FakeDb {
       this.locations = snapshot.locations;
       this.supplierOrders = snapshot.supplierOrders;
       this.supplierOrderItems = snapshot.supplierOrderItems;
+      this.parts = snapshot.parts;
       throw e;
     }
   }
@@ -198,6 +207,11 @@ export class FakeDb {
     const row: FakeLocation = { zone: null, isActive: true, isBlocked: false, ...partial };
     this.locations.push(row);
     return row;
+  }
+
+  seedPart(partial: FakePart): FakePart {
+    this.parts.push(partial);
+    return partial;
   }
 
   binQty(stockItemId: string, location: string): number {
@@ -306,6 +320,37 @@ export class FakeDb {
         );
         return row ? { id: row.id } : null;
       },
+      findMany: async (args: {
+        where: {
+          tenantKey?: string;
+          sourceType?: string;
+          reason?: string;
+          sourceId?: { startsWith: string };
+        };
+        select?: unknown;
+      }) => {
+        const w = args.where;
+        return this.movements
+          .filter(
+            (m) =>
+              (w.tenantKey === undefined || m.tenantKey === w.tenantKey) &&
+              (w.sourceType === undefined || m.sourceType === w.sourceType) &&
+              (w.reason === undefined || m.reason === w.reason) &&
+              (w.sourceId === undefined || (m.sourceId ?? "").startsWith(w.sourceId.startsWith)),
+          )
+          .map((m) => ({ ...m }));
+      },
+    };
+  }
+
+  get part() {
+    return {
+      findMany: async (args: { where: { id?: { in: string[] } }; select?: unknown }) => {
+        const ids = args.where.id?.in;
+        if (!ids) unsupported("part", "findMany", args);
+        return this.parts.filter((p) => ids!.includes(p.id)).map((p) => ({ ...p }));
+      },
+      findUnique: async (args: unknown) => unsupported("part", "findUnique", args),
     };
   }
 
