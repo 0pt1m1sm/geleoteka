@@ -20,7 +20,7 @@ export function FulfilScanForm({ notFoundCode }: { notFoundCode: string | null }
   }
 
   return (
-    <section aria-label="Отбор / Упаковка" className="card space-y-4">
+    <section aria-label="Выдача" className="card space-y-4">
       {notFoundCode && (
         <p className="alert-error">
           Заказ не найден: <span className="font-mono">{notFoundCode}</span>

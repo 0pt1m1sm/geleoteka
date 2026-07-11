@@ -1,18 +1,7 @@
-export const dynamic = "force-dynamic";
+import { redirect } from "next/navigation";
 
-import { requireRole } from "@/lib/auth";
-import { listOrdersNeedingPacking } from "@/app/actions/packing";
-import { PageHeader } from "@/components/ui";
-import { PackingOrderList } from "@/components/admin/PackingOrderList";
-
-export default async function PackingPage() {
-  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
-  const orders = await listOrdersNeedingPacking();
-
-  return (
-    <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Упаковка" description="Упаковка и отгрузка заказов запчастей" backHref="/admin/warehouse" backLabel="Склад" />
-      <PackingOrderList orders={orders} />
-    </div>
-  );
+/** The standalone packing list merged into the unified «Выдача» queue —
+ *  deep links keep working via this redirect. Detail stays at ./[id]. */
+export default function PackingListRedirect(): never {
+  redirect("/admin/warehouse/fulfill");
 }

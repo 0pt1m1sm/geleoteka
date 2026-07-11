@@ -40,16 +40,10 @@ export default async function WarehousePage({ searchParams }: Props) {
           Приёмка →
         </Link>
         <Link href="/admin/warehouse/fulfill" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
-          Отбор / Упаковка →
+          Выдача →
         </Link>
         <Link href="/admin/warehouse/stocktake" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Инвентаризация →
-        </Link>
-        <Link href="/admin/warehouse/picking" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
-          Отбор →
-        </Link>
-        <Link href="/admin/warehouse/packing" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
-          Упаковка →
         </Link>
         <Link href="/admin/warehouse/replenishment" className="btn btn-secondary inline-flex w-fit min-h-[44px]">
           Дозаказ →
@@ -70,12 +64,8 @@ export default async function WarehousePage({ searchParams }: Props) {
           </li>
           <li>Раскладка — в скан-боксе ниже отсканируйте товар, затем полку: перенос ПРИЁМКА → полка.</li>
           <li>
-            <Link href="/admin/warehouse/picking" className="text-[var(--color-accent)] hover:underline">Отбор</Link>
-            {" — выдача запчастей на заказ-наряд: скан товара + скан полки."}
-          </li>
-          <li>
-            <Link href="/admin/warehouse/packing" className="text-[var(--color-accent)] hover:underline">Упаковка</Link>
-            {" — сборка отгрузки клиенту, затем скан коробки и отправка."}
+            <Link href="/admin/warehouse/fulfill" className="text-[var(--color-accent)] hover:underline">Выдача</Link>
+            {" — отсканируйте номер заказа: наряд → отбор в цех (скан товара + полки), заказ клиента → упаковка и отгрузка."}
           </li>
           <li>
             <Link href="/admin/warehouse/stocktake" className="text-[var(--color-accent)] hover:underline">Инвентаризация</Link>

@@ -31,6 +31,11 @@ scan our QR (part) + scan shelf cell   → transfer ПРИЁМКА → shelf
 
 Bin-to-bin transfer; conserves on-hand. `placeStock` refuses to bin more than `unplaced = on-hand − placed`.
 
+> UI entry (2026-07-11): both outbound flows share one door — **Выдача**
+> (`/admin/warehouse/fulfill`): scan the order code (auto-routes to picking or
+> packing) or pick from the unified queue («В цех» / «Отгрузка» badges).
+> The picker/packer processes below are unchanged.
+
 ## Picker (repair order)
 
 ```

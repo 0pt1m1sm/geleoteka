@@ -1,18 +1,7 @@
-export const dynamic = "force-dynamic";
+import { redirect } from "next/navigation";
 
-import { requireRole } from "@/lib/auth";
-import { listOrdersNeedingPicking } from "@/app/actions/picking";
-import { PageHeader } from "@/components/ui";
-import { PickingOrderList } from "@/components/admin/PickingOrderList";
-
-export default async function PickingPage() {
-  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
-  const orders = await listOrdersNeedingPicking();
-
-  return (
-    <div className="space-y-8">
-      <PageHeader eyebrow="Запчасти" title="Отбор" description="Отбор запчастей под заказ-наряды" backHref="/admin/warehouse" backLabel="Склад" />
-      <PickingOrderList orders={orders} />
-    </div>
-  );
+/** The standalone picking list merged into the unified «Выдача» queue —
+ *  deep links keep working via this redirect. Detail stays at ./[id]. */
+export default function PickingListRedirect(): never {
+  redirect("/admin/warehouse/fulfill");
 }
