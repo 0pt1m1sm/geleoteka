@@ -123,7 +123,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       continue;
     }
 
-    const quantity = parseInt(quantityStr) || 0;
+    // An empty quantity cell defaults to 0, but a negative or non-numeric value
+    // must fail the row rather than silently writing bad stock on-hand.
+    const quantity = quantityStr ? parseInt(quantityStr, 10) : 0;
+    if (isNaN(quantity) || quantity < 0) {
+      errors.push(`Строка ${lineNum}: некорректное количество "${quantityStr}"`);
+      continue;
+    }
     const isOEM = oemStr === "1";
     const categoryId = categorySlug ? (catMap.get(categorySlug) ?? null) : null;
     const trimIds = await expandToTrimIds(
@@ -158,22 +164,26 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
         updated++;
       } else {
-        const created_ = (await db.part.create({
-          data: {
-            slug,
-            article,
-            name,
-            description: description || null,
-            price,
-            isOEM,
-            categoryId,
-            photos: [],
-            partTrims: { create: trimIds.map((trimId) => ({ trimId })) },
-          },
-          select: { id: true },
-        })) as { id: string };
-        await db.stockItem.create({
-          data: { partId: created_.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(db) },
+        // Create the part and its StockItem atomically — otherwise a failure
+        // after part.create leaves a part with no stock row.
+        await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+          const created_ = (await tx.part.create({
+            data: {
+              slug,
+              article,
+              name,
+              description: description || null,
+              price,
+              isOEM,
+              categoryId,
+              photos: [],
+              partTrims: { create: trimIds.map((trimId) => ({ trimId })) },
+            },
+            select: { id: true },
+          })) as { id: string };
+          await tx.stockItem.create({
+            data: { partId: created_.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(tx) },
+          });
         });
         created++;
       }

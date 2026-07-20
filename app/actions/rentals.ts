@@ -145,7 +145,9 @@ export async function updateRentalBooking(
   const notes = ((formData.get("notes") as string | null) ?? "").trim() || null;
 
   if (!contactName) return { error: "Имя обязательно" };
-  if (!isValidRussianPhone(contactPhoneRaw)) {
+  // isValidRussianPhone expects the normalised +7XXXXXXXXXX form, so normalise
+  // before validating — otherwise valid "8XXX…"/formatted inputs are rejected.
+  if (!isValidRussianPhone(normalizePhone(contactPhoneRaw))) {
     return { error: "Телефон должен быть в формате +7XXXXXXXXXX" };
   }
   if (!startRaw || !endRaw) return { error: "Укажите даты начала и конца" };

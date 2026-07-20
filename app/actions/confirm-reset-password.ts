@@ -47,7 +47,7 @@ export async function confirmResetPasswordAction(_prevState: { error: string | n
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await db.$transaction([
-    db.user.update({ where: { id: user.id }, data: { passwordHash } }),
+    db.user.update({ where: { id: user.id }, data: { passwordHash, isTempPassword: false } }),
     db.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
   ]);
 

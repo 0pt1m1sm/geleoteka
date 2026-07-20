@@ -8,7 +8,10 @@ import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
 /** Register a new user */
 export async function registerAction(_prevState: { error: string | null } | null, formData: FormData) {
-  const email = formData.get("email") as string;
+  // Normalise casing/whitespace up front so the uniqueness check and the row
+  // we insert both use the same canonical form the login lookup expects —
+  // otherwise "User@x.ru" and "user@x.ru" create duplicate, unloginnable accounts.
+  const email = ((formData.get("email") as string | null) ?? "").trim().toLowerCase();
   const phone = normalizePhone(formData.get("phone") as string);
   const password = formData.get("password") as string;
   const name = formData.get("name") as string;
