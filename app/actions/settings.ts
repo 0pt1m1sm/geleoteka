@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
+import { getSetting, invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
 import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail, resolveEmailFrom } from "@/lib/email/send";
+import { normalizeTransportName } from "@/lib/email/transport";
 
 export interface UpsertSettingsResult {
   error: string | null;
@@ -68,19 +69,22 @@ export interface TestSendResult {
   from?: string;
   /** Effective recipient (admin's own email by default). */
   to?: string;
-  /** Source the API key came from at this exact moment — "db" | "env" | "none". */
-  apiKeySource?: "db" | "env" | "none";
+  /** Which transport the send actually went through. */
+  transport?: "smtp" | "resend";
+  /** Where the transport credential came from RIGHT NOW — "db" | "env" | "none". */
+  credentialSource?: "db" | "env" | "none";
 }
 
 /**
- * Diagnostic: send a test email to the calling admin's own address through
- * the full Resend transport. Surfaces whatever the transport returns —
- * mock-mode notice, Resend 4xx (e.g. unverified domain), or success id —
- * so the operator can verify the integration without digging through
- * Railway logs.
+ * Diagnostic: send a test email to the calling admin's own address through the
+ * CONFIGURED transport (generic SMTP by default, Resend only when explicitly
+ * selected). Surfaces whatever the transport returns — mock-mode notice, a
+ * definite rejection (e.g. bad credentials / unverified domain), an ambiguous
+ * timeout, or a success id — so the operator can verify the integration without
+ * digging through container logs.
  *
- * Bypasses the getSetting cache by checking source freshly to give a
- * truthful "where did the API key come from RIGHT NOW" badge.
+ * Reports the active transport and the freshest credential source, and no
+ * longer hard-codes "Resend": an SMTP send says SMTP.
  */
 export async function sendTestEmail(): Promise<TestSendResult> {
   const session = await requireRole(["ADMIN"]);
@@ -88,72 +92,77 @@ export async function sendTestEmail(): Promise<TestSendResult> {
   const to = session.email;
   if (!to) return { ok: false, detail: "У админа не задан email" };
 
-  // Fresh read to report accurate source (the getSetting cache may still
-  // hold an older state; this query talks directly to the DB).
-  const apiKeyRow = (await db.setting.findUnique({
-    where: { key: "RESEND_API_KEY" },
-    select: { value: true },
-  })) as { value: string } | null;
-  const apiKeySource: "db" | "env" | "none" = apiKeyRow?.value
-    ? "db"
-    : process.env.RESEND_API_KEY?.trim()
-      ? "env"
-      : "none";
+  const transport = normalizeTransportName(await getSetting("EMAIL_TRANSPORT"));
 
-  const fromVerifiedRow = (await db.setting.findUnique({
-    where: { key: "RESEND_FROM" },
-    select: { value: true },
-  })) as { value: string } | null;
-  const fromFallbackRow = (await db.setting.findUnique({
-    where: { key: "RESEND_FROM_FALLBACK" },
-    select: { value: true },
-  })) as { value: string } | null;
-  const effectiveFrom =
-    fromVerifiedRow?.value?.trim() ||
-    fromFallbackRow?.value?.trim() ||
-    process.env.RESEND_FROM?.trim() ||
-    process.env.RESEND_FROM_FALLBACK?.trim() ||
-    "onboarding@resend.dev";
+  // Credential source, read freshly. The SMTP password lives ONLY in secret env
+  // (never the Setting table), so its only sources are "env" or "none".
+  let credentialSource: "db" | "env" | "none";
+  if (transport === "resend") {
+    const apiKeyRow = (await db.setting.findUnique({
+      where: { key: "RESEND_API_KEY" },
+      select: { value: true },
+    })) as { value: string } | null;
+    credentialSource = apiKeyRow?.value ? "db" : process.env.RESEND_API_KEY?.trim() ? "env" : "none";
+  } else {
+    credentialSource = process.env.SMTP_PASSWORD?.trim() ? "env" : "none";
+  }
 
   // Invalidate cache so the send picks up whatever was just saved.
-  invalidateSetting("RESEND_API_KEY");
-  invalidateSetting("RESEND_FROM");
-  invalidateSetting("RESEND_FROM_FALLBACK");
+  for (const key of [
+    "EMAIL_TRANSPORT",
+    "EMAIL_FROM",
+    "EMAIL_REPLY_TO",
+    "RESEND_API_KEY",
+    "RESEND_FROM",
+    "RESEND_FROM_FALLBACK",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_SECURE",
+    "SMTP_USER",
+  ]) {
+    invalidateSetting(key);
+  }
+
+  const effectiveFrom = await resolveEmailFrom();
+  const transportLabel = transport === "resend" ? "Resend" : "SMTP";
 
   const ts = new Date().toISOString();
   const result = await sendEmail({
     to,
     subject: `Geleoteka — тестовое письмо ${ts}`,
-    html: `<p>Это диагностическое письмо из /admin/settings/integrations.</p><p>Если вы это видите — Resend API key работает, верифицированный домен принимается, всё в порядке.</p><p>Отправлено: ${ts}</p>`,
-    text: `Тестовое письмо из /admin/settings/integrations.\nЕсли получено — Resend настроен корректно.\nОтправлено: ${ts}`,
+    html: `<p>Это диагностическое письмо из /admin/settings/integrations.</p><p>Если вы это видите — транспорт «${transportLabel}» настроен и письмо ушло.</p><p>Отправлено: ${ts}</p>`,
+    text: `Тестовое письмо из /admin/settings/integrations.\nТранспорт: ${transportLabel}.\nОтправлено: ${ts}`,
   });
 
   if (result.success) {
-    if (apiKeySource === "none") {
+    if (credentialSource === "none") {
+      const missing = transport === "resend" ? "RESEND_API_KEY" : "SMTP_PASSWORD (secret env) / SMTP_USER";
       return {
         ok: false,
-        detail:
-          "Письмо прошло в mock-режиме (RESEND_API_KEY не задан ни в админке, ни в env). Реальное письмо НЕ отправлено.",
+        detail: `Письмо прошло в mock-режиме (${missing} не задан). Реальное письмо НЕ отправлено. Транспорт: ${transportLabel}.`,
         from: effectiveFrom,
         to,
-        apiKeySource,
+        transport,
+        credentialSource,
       };
     }
     return {
       ok: true,
-      detail: `Письмо отправлено через Resend (id=${result.id ?? "?"}). Проверьте почту ${to}.`,
+      detail: `Письмо отправлено через ${transportLabel}${result.id ? ` (id=${result.id})` : ""}. Проверьте почту ${to}.`,
       from: effectiveFrom,
       to,
-      apiKeySource,
+      transport,
+      credentialSource,
     };
   }
 
   return {
     ok: false,
-    detail: `Resend отклонил отправку: ${result.error}`,
+    detail: `${transportLabel} не принял отправку: ${result.error}`,
     from: effectiveFrom,
     to,
-    apiKeySource,
+    transport,
+    credentialSource,
   };
 }
 

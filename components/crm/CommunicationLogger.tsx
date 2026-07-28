@@ -22,6 +22,7 @@ import {
   isPhoneChannel,
 } from "@/lib/crm-labels";
 import { formatDateTime } from "@/lib/utils";
+import { emailAttachmentHref } from "@/lib/email/attachment-url";
 import { EmailReplyForm } from "@/components/crm/EmailReplyForm";
 
 interface CommAttachment {
@@ -42,7 +43,9 @@ interface CommView {
   /** Email-only — null for non-email rows. */
   subject?: string | null;
   attachments?: CommAttachment[];
-  /** Resend's UUID — needed to build attachment proxy URLs. */
+  /** Canonical provider-neutral email id — drives the new attachment route. */
+  emailMessageId?: string | null;
+  /** Legacy Resend UUID — drives the old proxy for pre-migration rows. */
   resendEmailId?: string | null;
   /** Per-message read state. null = unread, Date = when an admin first opened
    *  the customer/deal page. Drives the unread visual treatment in EntryRow. */
@@ -418,18 +421,22 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
           {entry.body ? (
             <EntryBody body={entry.body} truncate={isEmail} />
           ) : null}
-          {isEmail && entry.attachments && entry.attachments.length > 0 && entry.resendEmailId ? (
+          {isEmail && entry.attachments && entry.attachments.length > 0 ? (
             <ul className="flex flex-wrap gap-1.5 mt-2">
-              {entry.attachments.map((a) => (
-                <li key={a.id}>
-                  <a
-                    href={`/api/admin/inbox/attachments/${a.id}?email_id=${entry.resendEmailId}`}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 border border-[var(--border)] rounded text-xs hover:bg-[var(--background-elevated)]"
-                  >
-                    📎 {a.filename}
-                  </a>
-                </li>
-              ))}
+              {entry.attachments.map((a) => {
+                const href = emailAttachmentHref(entry, a.id);
+                if (!href) return null;
+                return (
+                  <li key={a.id}>
+                    <a
+                      href={href}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 border border-[var(--border)] rounded text-xs hover:bg-[var(--background-elevated)]"
+                    >
+                      📎 {a.filename}
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
           ) : null}
           {canReply ? (

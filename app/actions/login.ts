@@ -13,6 +13,7 @@ interface MinimalUser {
   passwordHash: string | null;
   permissionRole: string;
   isTempPassword: boolean;
+  deletedAt: Date | null;
 }
 
 /**
@@ -32,22 +33,27 @@ async function findUserByIdentifier(identifierRaw: string): Promise<MinimalUser 
     passwordHash: true,
     permissionRole: true,
     isTempPassword: true,
+    deletedAt: true,
   } as const;
 
+  let user: MinimalUser | null;
   if (identifier.includes("@")) {
-    const u = (await db.user.findUnique({
+    user = (await db.user.findUnique({
       where: { email: identifier.toLowerCase() },
       select,
     })) as MinimalUser | null;
-    return u;
+  } else {
+    const phone = normalizePhone(identifier);
+    if (!/^\+7\d{10}$/.test(phone)) return null;
+    user = (await db.user.findUnique({
+      where: { phone },
+      select,
+    })) as MinimalUser | null;
   }
 
-  const phone = normalizePhone(identifier);
-  if (!/^\+7\d{10}$/.test(phone)) return null;
-  return (await db.user.findUnique({
-    where: { phone },
-    select,
-  })) as MinimalUser | null;
+  // Soft-deleted accounts must not authenticate on any login path.
+  if (user?.deletedAt) return null;
+  return user;
 }
 
 /**
@@ -100,6 +106,12 @@ export async function loginAction(_prevState: { error: string | null } | null, f
 
   if (user.permissionRole === "NONE") {
     return { error: "Учётная запись не может выполнить вход" };
+  }
+
+  // Temp/guest passwords aren't real credentials — mirror the guard already
+  // enforced in loginInlineForCheckout so the main form can't bypass it.
+  if (user.isTempPassword) {
+    return { error: "Пароль не задан. Восстановите его по SMS." };
   }
 
   const valid = await bcrypt.compare(password, user.passwordHash);

@@ -6,6 +6,13 @@ export interface EnsureFollowUpTaskInput {
   customerUserId: string;
   customerName: string;
   dealId: string | null;
+  /**
+   * The email's own date. The SLA `dueAt` is deliberately computed from the
+   * moment of ingestion (see below), so after a long downtime the task is
+   * immediately overdue rather than dated weeks into the past — but the body
+   * still shows when the mail actually arrived. Optional for older callers.
+   */
+  messageOccurredAt?: Date;
 }
 
 export interface EnsureFollowUpTaskResult {
@@ -58,13 +65,17 @@ export async function ensureFollowUpTask(
   input: EnsureFollowUpTaskInput,
 ): Promise<EnsureFollowUpTaskResult> {
   const ownerUserId = await pickTaskOwner(input.dealId);
+  // dueAt runs from ingestion, NOT from the message date: a backlog imported
+  // after downtime should surface as "act now", not carry a due date already
+  // weeks past. The factual message date lives in the body instead.
   const dueAt = addHours(new Date(), FOLLOW_UP_SLA_HOURS);
+  const messageWhen = (input.messageOccurredAt ?? new Date()).toLocaleString("ru-RU");
 
   try {
     const created = (await db.crmTask.create({
       data: {
         title: `Ответить клиенту: ${input.customerName}`,
-        body: "Клиент ответил по email. Откройте сделку и ответьте.",
+        body: `Клиент ответил по email (письмо от ${messageWhen}). Откройте сделку и ответьте.`,
         kind: "FOLLOW_UP",
         status: "OPEN",
         dueAt,
@@ -99,7 +110,7 @@ export async function ensureFollowUpTask(
     );
   }
 
-  const appendedBody = `${existing.body ?? ""}\n+ ещё 1 ответ ${new Date().toLocaleString("ru-RU")}`
+  const appendedBody = `${existing.body ?? ""}\n+ ещё 1 ответ (письмо от ${messageWhen})`
     .slice(-BODY_MAX_CHARS);
 
   // Reassign owner when it changed (e.g. a manager claimed an unowned deal

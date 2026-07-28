@@ -189,6 +189,49 @@ async function main(): Promise<void> {
   );
   console.log("  ✓ (g) reassigns owner when deal ownership changes between dedup hits");
 
+  // (h) dueAt runs from the moment of INGESTION, not the message date. A reply
+  //     that physically arrived months ago (imported after a long downtime)
+  //     must produce a task due ~now+4h — immediately actionable — while the
+  //     body still shows the factual message date so the manager has context.
+  const dealForDue = (await db.deal.create({
+    data: {
+      customerUserId: customer.id,
+      channel: "SERVICE",
+      source: "verify-auto-task",
+      stage: "NEW",
+      ownerUserId: admin.id,
+    },
+    select: { id: true },
+  })) as { id: string };
+  const messageDate = new Date("2026-01-15T10:00:00.000Z"); // months before "now"
+  const expectedDueMs = Date.now() + 4 * 60 * 60 * 1000;
+  const rh = await ensureFollowUpTask({
+    customerUserId: customer.id,
+    customerName: customer.name,
+    dealId: dealForDue.id,
+    messageOccurredAt: messageDate,
+  });
+  assert(rh.created === true, `(h) expected a fresh task, got created=${rh.created}`);
+  const th = (await db.crmTask.findUnique({
+    where: { id: rh.taskId },
+    select: { dueAt: true, body: true },
+  })) as { dueAt: Date; body: string | null } | null;
+  assert(th, "(h) task not found");
+  assert(
+    Math.abs(th.dueAt.getTime() - expectedDueMs) < 60_000,
+    `(h) dueAt must be ~now+4h (from ingestion), got ${th.dueAt.toISOString()}`,
+  );
+  assert(
+    th.dueAt.getTime() - messageDate.getTime() > 30 * 24 * 60 * 60 * 1000,
+    "(h) dueAt must NOT be anchored to the (months-old) message date",
+  );
+  const whenStr = messageDate.toLocaleString("ru-RU");
+  assert(
+    th.body?.includes(`письмо от ${whenStr}`),
+    `(h) body must show the factual message date '${whenStr}', got: ${th.body}`,
+  );
+  console.log("  ✓ (h) dueAt from ingestion moment; factual message date in body");
+
   await cleanup(customer.id);
 
   console.log("[verify-auto-task] PASS");

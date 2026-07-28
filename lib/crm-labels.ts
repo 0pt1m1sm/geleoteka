@@ -109,6 +109,7 @@ export const COMM_OUTCOME_LABELS: Record<string, string> = {
   NO_ANSWER: "Не ответил",
   REPLIED: "Ответил",
   DELIVERED: "Доставлено",
+  ACCEPTED: "Принято к отправке",
   FAILED: "Не доставлено",
   N_A: "—",
 };

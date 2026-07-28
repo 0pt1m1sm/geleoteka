@@ -236,6 +236,53 @@ enum CommOutcome {
   DELIVERED
   FAILED
   N_A
+  // Provider took custody of the message (Resend HTTP 200 / SMTP 250). This is
+  // NOT proof of inbox delivery — only a provider event or DSN can confirm that.
+  // Outbound email moves to ACCEPTED once the transport abstraction lands; the
+  // legacy DELIVERED value stays for rows written before that.
+  ACCEPTED
+}
+
+// ============================================
+// PROVIDER-NEUTRAL EMAIL SYNC
+// ============================================
+
+/// Which transport delivered a message into the system. Both providers map to
+/// the same canonical `EmailMessage`; nothing downstream branches on this
+/// except the attachment locator, which is inherently provider-specific.
+enum EmailProvider {
+  RESEND
+  TIMEWEB_IMAP
+}
+
+/// Direction is decided by matching the normalized From against MailIdentity —
+/// never by which mailbox/folder the message physically sits in, because the
+/// outgoing-control archive receives our own sent mail into its INBOX.
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum EmailIngestStatus {
+  PENDING // Fetched, not yet committed to CRM
+  PROCESSED // Committed; a CommunicationLog or InboxMessage exists
+  DUPLICATE // Same message already ingested via another provider/UID
+  DEAD // Bounded retries exhausted; kept for manual replay
+}
+
+/// What a synced mailbox/folder is used for. INBOUND sources are the human
+/// mailboxes polled with BODY.PEEK; OUTBOUND_ARCHIVE is the crm-archive box
+/// that Timeweb "outgoing control" copies sent mail into.
+enum MailboxRole {
+  INBOUND
+  OUTBOUND_ARCHIVE
+}
+
+enum MailIdentityType {
+  MANAGER // A named manager's personal mailbox
+  SHARED // info@ and similar shared addresses
+  TRANSACTIONAL // From/Reply-To used by app-generated mail
+  ARCHIVE // crm-archive@ — service mailbox, never a real correspondent
 }
 
 // CRM tasks (CRM Phase 4) — manager reminders / follow-ups with
@@ -363,6 +410,10 @@ model User {
 
   // Inbound email inbox — messages assigned to this manager during triage
   assignedInboxMessages InboxMessage[] @relation("InboxAssignee")
+
+  // Mailboxes on our own domain that belong to this manager. Outbound mail
+  // synced from the archive gets its author from here.
+  mailIdentities MailIdentity[] @relation("MailIdentityUser")
 
   // Settings audit — admin who last updated a Setting row
   settingsUpdated Setting[] @relation("SettingUpdater")
@@ -1634,6 +1685,10 @@ model CommunicationLog {
   subject        String?
   resendEmailId  String? // Resend's UUID — required for the attachment proxy
   attachments    Json        @default("[]") // [{ id, filename, content_type, content_disposition, content_id? }]
+  // Canonical provider-neutral email this row was derived from. NULL on every
+  // row written before the Timeweb migration and on non-email channels; the
+  // legacy Resend fields above stay authoritative for those.
+  emailMessageId String?
   createdAt      DateTime    @default(now())
   // Per-message read state for in-page timeline styling on Customer 360 / Deal
   // pages. Set non-null by `markRepliesRead` server action when a manager opens
@@ -1646,12 +1701,14 @@ model CommunicationLog {
   author              User?          @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
   deal                Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   linkedInboxMessages InboxMessage[] @relation("InboxLinkedCommLog")
+  emailMessage        EmailMessage?  @relation("CommLogEmailMessage", fields: [emailMessageId], references: [id], onDelete: SetNull)
 
   @@index([customerUserId, createdAt])
   @@index([dealId])
   @@index([channel])
   @@index([resendEmailId])
   @@index([customerUserId, channel, readAt])
+  @@index([emailMessageId])
 }
 
 /// Bucket for inbound emails from unknown senders (no User.email match, no
@@ -1671,18 +1728,161 @@ model InboxMessage {
   messageId                String             @unique
   inReplyTo                String?
   references               String[]           @default([])
-  resendEmailId            String             @unique
+  // Nullable since the Timeweb migration: mail arriving over IMAP has no Resend
+  // UUID. Still @unique and still populated for legacy/webhook rows, which keep
+  // using the Resend attachment proxy. Postgres treats NULLs as distinct, so any
+  // number of IMAP rows can coexist.
+  resendEmailId            String?            @unique
   receivedAt               DateTime           @default(now())
   status                   InboxMessageStatus @default(PENDING)
+  // Every row that existed before the migration is an inbound Resend webhook
+  // message, so INBOUND is the factually correct backfill default. Manager mail
+  // picked up from the outgoing archive lands here as OUTBOUND when it can't be
+  // matched to exactly one customer.
+  direction                EmailDirection     @default(INBOUND)
   assignedToUserId         String?
   linkedCommunicationLogId String?
+  emailMessageId           String?
 
   assignedTo             User?             @relation("InboxAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
   linkedCommunicationLog CommunicationLog? @relation("InboxLinkedCommLog", fields: [linkedCommunicationLogId], references: [id], onDelete: SetNull)
+  emailMessage           EmailMessage?     @relation("InboxEmailMessage", fields: [emailMessageId], references: [id], onDelete: SetNull)
 
   @@index([status, receivedAt])
   @@index([inReplyTo])
   @@index([fromEmail])
+  @@index([emailMessageId])
+  @@index([status, direction])
+}
+
+/// Canonical, provider-neutral record of a single email. Both the Resend webhook
+/// and the Timeweb IMAP worker map their payloads onto this model, so the CRM
+/// domain never sees a provider envelope.
+///
+/// Two independent dedupe keys:
+///   - `rfcMessageId` (@unique) collapses the same message seen through two
+///     providers — e.g. a reply that arrives via the legacy Resend webhook AND
+///     via IMAP during the dual-ingest window.
+///   - `(provider, sourceMailbox, sourceFolder, uidValidity, uid)` stops a
+///     re-read of the same IMAP UID from importing twice. Resend rows leave the
+///     UID columns NULL, where Postgres treats every row as distinct — those
+///     rely on `rfcMessageId` alone, which is exactly the intent.
+model EmailMessage {
+  id        String         @id @default(cuid())
+  provider  EmailProvider
+  direction EmailDirection
+
+  // Normalized (lower-cased, angle-brackets stripped) addresses. The display
+  // name is kept only for `from`, which is the only one shown in the UI.
+  fromEmail String
+  fromName  String?
+  toEmails  String[] @default([])
+  ccEmails  String[] @default([])
+  bccEmails String[] @default([])
+
+  subject  String?
+  bodyText String?
+  bodyHtml String?
+
+  // Normalized RFC 5322 Message-Id, always angle-wrapped. When the source
+  // message carries none (or an unparseable one) the ingest layer derives a
+  // deterministic synthetic id from the source tuple and flags it here, so a
+  // re-fetch of the same UID produces the same id instead of a fresh duplicate.
+  rfcMessageId          String   @unique
+  rfcMessageIdSynthetic Boolean  @default(false)
+  inReplyTo             String?
+  references            String[] @default([])
+
+  // Time the message actually happened (Date header / IMAP INTERNALDATE), NOT
+  // the time the worker synced it — otherwise a downtime backlog would compress
+  // days of correspondence onto one CRM timestamp. Set the flag when we had to
+  // fall back because the header was missing or unparseable.
+  occurredAt          DateTime
+  occurredAtEstimated Boolean  @default(false)
+
+  // Where this copy was read from. For Resend the mailbox is the accepted
+  // recipient and the folder is a synthetic marker — the webhook has no folder.
+  sourceMailbox String
+  sourceFolder  String
+  uidValidity   BigInt?
+  uid           BigInt?
+
+  // Coordinates for fetching attachment bytes later: `{ kind: "resend",
+  // resendEmailId }` or `{ kind: "imap", mailbox, folder, uidValidity, uid }`.
+  // Never contains credentials.
+  providerLocator Json?
+  attachments     Json  @default("[]")
+
+  ingestStatus   EmailIngestStatus @default(PENDING)
+  ingestAttempts Int               @default(0)
+  ingestError    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  communicationLogs CommunicationLog[] @relation("CommLogEmailMessage")
+  inboxMessages     InboxMessage[]     @relation("InboxEmailMessage")
+
+  @@unique([provider, sourceMailbox, sourceFolder, uidValidity, uid], name: "sourceUid")
+  @@index([direction, occurredAt])
+  @@index([ingestStatus, occurredAt])
+  @@index([fromEmail])
+  @@index([inReplyTo])
+}
+
+/// Per-(mailbox, folder) IMAP replay position. The cursor only advances past a
+/// UID once that UID reached a durable terminal state (PROCESSED/DUPLICATE/DEAD),
+/// so a crash between fetch and commit re-reads rather than skips.
+///
+/// `leaseOwner`/`leaseUntil` are the mutual exclusion between App Platform
+/// replicas: a worker claims the source for a bounded window and a crashed
+/// worker's lease simply expires.
+model MailboxSyncCursor {
+  id      String      @id @default(cuid())
+  mailbox String
+  folder  String
+  role    MailboxRole
+
+  // A UIDVALIDITY change means the server renumbered the mailbox: the worker
+  // rescans under the new validity and leans on rfcMessageId to avoid
+  // re-importing the history it already has.
+  uidValidity BigInt?
+  lastUid     BigInt?
+
+  lastSuccessAt DateTime?
+  lastError     String?
+  leaseOwner    String?
+  leaseUntil    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([mailbox, folder])
+  @@index([role])
+}
+
+/// Explicit registry of addresses that belong to us. This is what decides
+/// inbound vs outbound; guessing from the receiving folder would misclassify
+/// every message in the outgoing-control archive.
+///
+/// Holds no credentials — mailbox passwords live only in secret env.
+model MailIdentity {
+  id       String           @id @default(cuid())
+  /// Stored lower-cased; callers must normalize before lookup.
+  address  String           @unique
+  type     MailIdentityType
+  /// Owning manager, when the address is personal. NULL for shared/service
+  /// boxes, which is why outbound from info@ has no automatic author.
+  userId   String?
+  isActive Boolean          @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User? @relation("MailIdentityUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([isActive])
 }
 
 /// CRM task — a reminder/follow-up assigned to a manager. May be linked

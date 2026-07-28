@@ -57,6 +57,8 @@ export async function linkInboxMessageToCustomer(
       resendEmailId: true,
       status: true,
       fromEmail: true,
+      direction: true,
+      emailMessageId: true,
     },
   })) as
     | {
@@ -65,9 +67,11 @@ export async function linkInboxMessageToCustomer(
         bodyText: string | null;
         bodyHtml: string | null;
         attachments: unknown;
-        resendEmailId: string;
+        resendEmailId: string | null;
         status: string;
         fromEmail: string;
+        direction: string;
+        emailMessageId: string | null;
       }
     | null;
   if (!msg) return { error: "Сообщение не найдено" };
@@ -75,22 +79,32 @@ export async function linkInboxMessageToCustomer(
     return { error: "Уже привязано другим менеджером — обновите страницу" };
   }
 
-  // Decide whether to register the sender address as a secondary contact
-  // so future inbound from it auto-matches this customer. Skip if it's
-  // already the customer's primary email or already an alias (on anyone).
+  // Direction decides the timeline channel. For an OUTBOUND message the sender
+  // is us, so the alias heuristic below (which registers the FROM address as the
+  // customer's secondary email) is only meaningful for inbound.
+  const isOutbound = msg.direction === "OUTBOUND";
+  const channel = isOutbound ? "EMAIL_OUTBOUND" : "EMAIL_INBOUND";
+
+  // Decide whether to register the sender address as a secondary contact so
+  // future inbound from it auto-matches this customer. Skip for outbound (the
+  // sender is us), and skip if it's already the customer's primary email or
+  // already an alias (on anyone).
   const senderEmail = msg.fromEmail.trim().toLowerCase();
-  const customer = (await db.user.findUnique({
-    where: { id: customerUserId },
-    select: { email: true },
-  })) as { email: string } | null;
-  const isPrimary = customer?.email.toLowerCase() === senderEmail;
-  const existingAlias = isPrimary
-    ? true
-    : (await db.customerContact.findUnique({
-        where: { type_value: { type: "EMAIL", value: senderEmail } },
-        select: { id: true },
-      })) !== null;
-  const shouldAddAlias = Boolean(senderEmail) && !isPrimary && !existingAlias;
+  let shouldAddAlias = false;
+  if (!isOutbound && senderEmail) {
+    const customer = (await db.user.findUnique({
+      where: { id: customerUserId },
+      select: { email: true },
+    })) as { email: string } | null;
+    const isPrimary = customer?.email.toLowerCase() === senderEmail;
+    const existingAlias = isPrimary
+      ? true
+      : (await db.customerContact.findUnique({
+          where: { type_value: { type: "EMAIL", value: senderEmail } },
+          select: { id: true },
+        })) !== null;
+    shouldAddAlias = !isPrimary && !existingAlias;
+  }
 
   try {
     const result = await db.$transaction(async (tx) => {
@@ -99,12 +113,15 @@ export async function linkInboxMessageToCustomer(
           customerUserId,
           dealId: resolvedDealId,
           authorUserId: null,
-          channel: "EMAIL_INBOUND",
+          channel: channel as never,
           outcome: "REPLIED",
           externalId: msg.messageId,
           subject: msg.subject,
           body: msg.bodyText ?? "",
           resendEmailId: msg.resendEmailId,
+          // Preserve the canonical link so the timeline row and its provider-
+          // neutral EmailMessage stay joined after a manual triage.
+          emailMessageId: msg.emailMessageId,
           attachments: msg.attachments as never,
         },
         select: { id: true },

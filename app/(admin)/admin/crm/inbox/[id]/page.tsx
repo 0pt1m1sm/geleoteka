@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
+import { emailAttachmentHref } from "@/lib/email/attachment-url";
 import { InboxActions } from "@/components/admin/inbox/InboxActions";
 
 interface Props {
@@ -31,12 +32,18 @@ interface InboxDetail {
   messageId: string;
   inReplyTo: string | null;
   references: string[];
-  resendEmailId: string;
+  // Nullable since the Timeweb migration — IMAP rows have no Resend UUID.
+  resendEmailId: string | null;
+  emailMessageId: string | null;
+  direction: string;
   receivedAt: Date;
   status: string;
   assignedTo: { id: string; name: string } | null;
   linkedCommunicationLogId: string | null;
+  emailMessage: { createdAt: Date; occurredAtEstimated: boolean } | null;
 }
+
+const BACKLOG_GAP_MS = 10 * 60 * 1000;
 
 function parseAttachments(value: unknown): AttachmentMeta[] {
   if (!Array.isArray(value)) return [];
@@ -68,10 +75,13 @@ export default async function InboxMessagePage({ params }: Props) {
       inReplyTo: true,
       references: true,
       resendEmailId: true,
+      emailMessageId: true,
+      direction: true,
       receivedAt: true,
       status: true,
       assignedTo: { select: { id: true, name: true } },
       linkedCommunicationLogId: true,
+      emailMessage: { select: { createdAt: true, occurredAtEstimated: true } },
     },
   })) as InboxDetail | null;
   if (!msg) notFound();
@@ -96,10 +106,32 @@ export default async function InboxMessagePage({ params }: Props) {
         <div className="space-y-4">
           <Card>
             <dl className="grid grid-cols-[120px_1fr] gap-y-1 text-sm">
+              <dt className="text-[var(--foreground-muted)]">Направление</dt>
+              <dd>
+                {msg.direction === "OUTBOUND"
+                  ? "Исходящее (от менеджера)"
+                  : "Входящее (от клиента)"}
+                {msg.emailMessage &&
+                new Date(msg.emailMessage.createdAt).getTime() - new Date(msg.receivedAt).getTime() >
+                  BACKLOG_GAP_MS ? (
+                  <span
+                    className="ml-2 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]"
+                    title="Письмо получено раньше — синхронизировано позже (backlog)"
+                  >
+                    синхр. позже
+                  </span>
+                ) : null}
+              </dd>
               <dt className="text-[var(--foreground-muted)]">Статус</dt>
               <dd>{msg.status}</dd>
+              <dt className="text-[var(--foreground-muted)]">
+                {msg.direction === "OUTBOUND" ? "От (мы)" : "От"}
+              </dt>
+              <dd className="break-all">
+                {msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}
+              </dd>
               <dt className="text-[var(--foreground-muted)]">Кому</dt>
-              <dd>{msg.toEmail}</dd>
+              <dd className="break-all">{msg.toEmail}</dd>
               <dt className="text-[var(--foreground-muted)]">Message-Id</dt>
               <dd className="font-mono text-xs break-all">{msg.messageId}</dd>
               {msg.inReplyTo ? (
@@ -121,16 +153,28 @@ export default async function InboxMessagePage({ params }: Props) {
             <Card>
               <h3 className="font-semibold mb-3">Вложения</h3>
               <ul className="flex flex-wrap gap-2">
-                {attachments.map((a) => (
-                  <li key={a.id}>
-                    <a
-                      href={`/api/admin/inbox/attachments/${a.id}?email_id=${msg.resendEmailId}`}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 border border-[var(--border)] rounded text-sm hover:bg-[var(--background-elevated)]"
-                    >
-                      📎 {a.filename}
-                    </a>
-                  </li>
-                ))}
+                {attachments.map((a) => {
+                  const href = emailAttachmentHref(msg, a.id);
+                  return (
+                    <li key={a.id}>
+                      {href ? (
+                        <a
+                          href={href}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 border border-[var(--border)] rounded text-sm hover:bg-[var(--background-elevated)]"
+                        >
+                          📎 {a.filename}
+                        </a>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-2 px-3 py-1.5 border border-[var(--border)] rounded text-sm text-[var(--foreground-muted)]"
+                          title="Файл больше недоступен"
+                        >
+                          📎 {a.filename}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </Card>
           ) : null}
@@ -160,6 +204,8 @@ export default async function InboxMessagePage({ params }: Props) {
                 inboxMessageId={msg.id}
                 fromEmail={msg.fromEmail}
                 fromName={msg.fromName}
+                toEmail={msg.toEmail}
+                direction={msg.direction}
               />
             ) : (
               <p className="text-sm text-[var(--foreground-muted)]">

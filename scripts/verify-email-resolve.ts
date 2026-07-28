@@ -9,11 +9,14 @@
 
 import "dotenv/config";
 import { db } from "../lib/db";
-import { resolveInboundEmail } from "../lib/email/resolve";
+import { resolveInboundEmail, resolveOutboundEmail } from "../lib/email/resolve";
 import {
+  resendEnvelopeToParsedEmail,
   type ResendInboundEnvelope,
   type ResendInboundContent,
 } from "../lib/email/inbound";
+import { type EmailIngestTx } from "../lib/email/db-port";
+import { type ParsedEmail } from "../lib/email/types";
 import {
   generateOutboundMessageId,
   recordOutboundEmail,
@@ -59,6 +62,57 @@ function content(opts: { headers?: Array<{ name: string; value: string }> } = {}
   };
 }
 
+/**
+ * The waterfall now takes a provider-neutral `ParsedEmail` plus the client it
+ * should write through, so the Resend envelope is mapped first — exactly as the
+ * webhook route does before handing off to `ingestEmail`.
+ */
+function resolve(env: ResendInboundEnvelope, ctx: ResendInboundContent) {
+  return resolveInboundEmail({
+    parsed: resendEnvelopeToParsedEmail({ envelope: env, content: ctx }),
+    client: db as unknown as EmailIngestTx,
+  });
+}
+
+/** Build an OUTBOUND ParsedEmail — the archive copy of one of our own sends. */
+function outboundParsed(opts: {
+  messageId: string;
+  from: string;
+  to: string[];
+  uid: bigint;
+}): ParsedEmail {
+  return {
+    provider: "TIMEWEB_IMAP",
+    direction: "OUTBOUND",
+    from: { email: opts.from },
+    to: opts.to.map((email) => ({ email })),
+    cc: [],
+    bcc: [],
+    subject: "verify-resolve outbound",
+    bodyText: "outgoing body",
+    bodyHtml: null,
+    rfcMessageId: opts.messageId,
+    rfcMessageIdSynthetic: false,
+    inReplyTo: null,
+    references: [],
+    occurredAt: new Date(),
+    occurredAtEstimated: false,
+    source: { mailbox: "crm-archive@geleoteka.ru", folder: "INBOX", uidValidity: 77n, uid: opts.uid },
+    providerLocator: {
+      kind: "imap",
+      mailbox: "crm-archive@geleoteka.ru",
+      folder: "INBOX",
+      uidValidity: "77",
+      uid: opts.uid.toString(),
+    },
+    attachments: [],
+  };
+}
+
+function resolveOutbound(parsed: ParsedEmail) {
+  return resolveOutboundEmail({ parsed, client: db as unknown as EmailIngestTx });
+}
+
 async function cleanup(prefix: string): Promise<void> {
   await db.communicationLog.deleteMany({
     where: { OR: [{ externalId: { contains: prefix } }, { resendEmailId: { contains: prefix } }] },
@@ -95,7 +149,7 @@ async function main(): Promise<void> {
       emailId: `${TAG}-1-resend-uuid`,
       from: "stranger@example.test",
     });
-    const r = await resolveInboundEmail({ envelope: env, content: content() });
+    const r = await resolve(env, content());
     assert(r.kind === "inbox", `expected kind=inbox, got ${r.kind}`);
     const row = await db.inboxMessage.findUnique({ where: { id: r.id }, select: { fromEmail: true, status: true, attachments: true } });
     assert(row?.status === "PENDING", `expected PENDING, got ${row?.status}`);
@@ -111,7 +165,7 @@ async function main(): Promise<void> {
       emailId: `${TAG}-2-resend-uuid`,
       from: "Client <client@test.ru>",
     });
-    const r = await resolveInboundEmail({ envelope: env, content: content() });
+    const r = await resolve(env, content());
     assert(r.kind === "customer", `expected kind=customer, got ${r.kind}`);
     const row = await db.communicationLog.findUnique({
       where: { id: r.id },
@@ -123,22 +177,10 @@ async function main(): Promise<void> {
     assert(Array.isArray(row?.attachments) && (row!.attachments as unknown[]).length === 1, "attachments not stored");
     console.log("  ✓ known customer → CommunicationLog(EMAIL_INBOUND)");
 
-    // 2a. Auto-task side effect: a FOLLOW_UP CrmTask must exist for this customer.
-    const followUp = await db.crmTask.findFirst({
-      where: { customerUserId: customerId, kind: "FOLLOW_UP", status: "OPEN" },
-      select: { id: true, title: true },
-    });
-    assert(followUp, "expected an OPEN FOLLOW_UP CrmTask after known-customer inbound");
-    assert(
-      followUp.title.startsWith("Ответить клиенту:"),
-      `unexpected task title: ${followUp.title}`,
-    );
-    console.log("  ✓ auto-task created for known customer (FOLLOW_UP, OPEN)");
-
-    // Cleanup the auto-task before subsequent assertions so we don't pollute later runs.
-    await db.crmTask.deleteMany({
-      where: { customerUserId: customerId, kind: "FOLLOW_UP", title: { startsWith: "Ответить клиенту:" } },
-    });
+    // The auto-task assertion moved to verify-email-ingest: raising the
+    // follow-up is `ingestEmail`'s best-effort step, so resolving a message no
+    // longer has that side effect. Coverage was not dropped — it got stricter
+    // there (it also pins down that duplicates and outgoing copies raise none).
   }
 
   // 3. Thread match: pre-seed an EMAIL_OUTBOUND row, then reply with In-Reply-To.
@@ -156,7 +198,7 @@ async function main(): Promise<void> {
       from: "someone-else@example.test", // not a customer — proves In-Reply-To wins
     });
     const ctx = content({ headers: [{ name: "In-Reply-To", value: outId }] });
-    const r = await resolveInboundEmail({ envelope: env, content: ctx });
+    const r = await resolve(env, ctx);
     assert(r.kind === "thread", `expected kind=thread, got ${r.kind}`);
     const row = await db.communicationLog.findUnique({
       where: { id: r.id },
@@ -167,7 +209,63 @@ async function main(): Promise<void> {
     console.log("  ✓ In-Reply-To → threaded to original CommunicationLog");
   }
 
+  // ── Outbound resolution (Story 3) ──────────────────────────────────────────
+  const MANAGER_ADDR = `${TAG}-manager@geleoteka.ru`;
+  await db.mailIdentity.deleteMany({ where: { address: MANAGER_ADDR } });
+  const admin = (await db.user.findFirst({
+    where: { email: "admin@geleoteka.ru" },
+    select: { id: true },
+  })) as { id: string } | null;
+  assert(admin, "seed admin@geleoteka.ru not found");
+  await db.mailIdentity.create({
+    data: { address: MANAGER_ADDR, type: "MANAGER", userId: admin.id, isActive: true },
+  });
+
+  // 4. Outbound to exactly one known customer → EMAIL_OUTBOUND with the manager
+  //    (from MailIdentity) as author, attached to the customer. No follow-up.
+  {
+    const r = await resolveOutbound(
+      outboundParsed({
+        messageId: `<${TAG}-out-1@geleoteka.ru>`,
+        from: MANAGER_ADDR,
+        to: ["client@test.ru"],
+        uid: 1n,
+      }),
+    );
+    assert(r.kind === "customer", `expected kind=customer, got ${r.kind}`);
+    assert(r.followUp === null, "outbound must never carry a follow-up");
+    const row = (await db.communicationLog.findUnique({
+      where: { id: r.id },
+      select: { channel: true, customerUserId: true, authorUserId: true },
+    })) as { channel: string; customerUserId: string; authorUserId: string | null } | null;
+    assert(row?.channel === "EMAIL_OUTBOUND", `expected EMAIL_OUTBOUND, got ${row?.channel}`);
+    assert(row?.customerUserId === customerId, "outbound attached to wrong customer");
+    assert(row?.authorUserId === admin.id, `expected author=${admin.id}, got ${row?.authorUserId}`);
+    console.log("  ✓ outbound to one known recipient → EMAIL_OUTBOUND with manager author");
+  }
+
+  // 5. Outbound to an unknown recipient → parked as OUTBOUND for manual linking.
+  {
+    const r = await resolveOutbound(
+      outboundParsed({
+        messageId: `<${TAG}-out-2@geleoteka.ru>`,
+        from: MANAGER_ADDR,
+        to: ["nobody@stranger.test"],
+        uid: 2n,
+      }),
+    );
+    assert(r.kind === "inbox", `expected kind=inbox, got ${r.kind}`);
+    const row = (await db.inboxMessage.findUnique({
+      where: { id: r.id },
+      select: { direction: true, status: true },
+    })) as { direction: string; status: string } | null;
+    assert(row?.direction === "OUTBOUND", `expected OUTBOUND, got ${row?.direction}`);
+    assert(row?.status === "PENDING", `expected PENDING, got ${row?.status}`);
+    console.log("  ✓ outbound to unknown recipient → InboxMessage(PENDING, OUTBOUND)");
+  }
+
   // Cleanup.
+  await db.mailIdentity.deleteMany({ where: { address: MANAGER_ADDR } });
   await cleanup(TAG);
   await db.communicationLog.deleteMany({ where: { subject: `${TAG} outbound` } });
 

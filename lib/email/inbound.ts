@@ -1,5 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+import {
+  buildSyntheticMessageId,
+  normalizeAddress,
+  normalizeAddressList,
+  normalizeMessageId,
+  parseReferencesHeader,
+  resolveOccurredAt,
+  RESEND_SOURCE_FOLDER,
+  type EmailAttachmentMeta,
+  type EmailSource,
+  type ParsedEmail,
+} from "@/lib/email/types";
+
 /**
  * Resend inbound (`email.received`) webhook envelope. The webhook does NOT
  * include the body or headers — those live behind a follow-up GET on
@@ -148,6 +161,91 @@ export function extractHeader(
 export function parseReferences(raw: string | null): string[] {
   if (!raw) return [];
   return raw.split(/\s+/).filter((s) => /^<[^>]+>$/.test(s));
+}
+
+/**
+ * Map a verified Resend webhook onto the provider-neutral `ParsedEmail`.
+ *
+ * This is the boundary: above it everything is Resend-shaped, below it nothing
+ * knows Resend exists. The Timeweb IMAP adapter will produce the same shape
+ * from a raw MIME message, which is what lets one message arriving over both
+ * transports collapse into a single CRM row.
+ *
+ * `mailbox` is the recipient we accepted the message for — the caller has it
+ * from settings and it is what the source tuple is anchored to.
+ */
+export function resendEnvelopeToParsedEmail(input: {
+  envelope: ResendInboundEnvelope;
+  content: ResendInboundContent;
+  mailbox?: string;
+  now?: Date;
+}): ParsedEmail {
+  const { envelope, content } = input;
+  const data = envelope.data;
+
+  const source: EmailSource = {
+    mailbox: (input.mailbox ?? DEFAULT_INBOUND_RECIPIENT).toLowerCase(),
+    folder: RESEND_SOURCE_FOLDER,
+    uidValidity: null,
+    uid: null,
+  };
+
+  // The fetched headers are the authoritative copy; the envelope field is a
+  // convenience mirror and is occasionally empty or unbracketed.
+  const rfcMessageId =
+    normalizeMessageId(extractHeader(content.headers, "Message-Id")) ??
+    normalizeMessageId(data.message_id);
+
+  const occurred = resolveOccurredAt({
+    headerDate: extractHeader(content.headers, "Date"),
+    internalDate: parseIsoDate(data.created_at),
+    now: input.now,
+  });
+
+  const attachments = content.attachments ?? data.attachments ?? [];
+
+  return {
+    provider: "RESEND",
+    // The receiving webhook fires only for mail addressed to us, so there is no
+    // direction to infer here. Deciding direction from `MailIdentity` matters
+    // for the IMAP archive, which also holds our own sent mail.
+    direction: "INBOUND",
+    from: normalizeAddress(data.from) ?? { email: data.from.trim().toLowerCase() },
+    to: normalizeAddressList(data.to),
+    cc: normalizeAddressList(data.cc),
+    bcc: normalizeAddressList(data.bcc),
+    subject: data.subject ?? "",
+    bodyText: content.text,
+    bodyHtml: content.html,
+    // Every webhook shares one source tuple, so the Resend email id has to
+    // discriminate — otherwise two id-less messages would hash to the same
+    // synthetic id and the second would be dropped as a replay.
+    rfcMessageId: rfcMessageId ?? buildSyntheticMessageId("RESEND", source, data.email_id),
+    rfcMessageIdSynthetic: rfcMessageId === null,
+    inReplyTo: normalizeMessageId(extractHeader(content.headers, "In-Reply-To")),
+    references: parseReferencesHeader(extractHeader(content.headers, "References")),
+    occurredAt: occurred.occurredAt,
+    occurredAtEstimated: occurred.estimated,
+    source,
+    providerLocator: { kind: "resend", resendEmailId: data.email_id },
+    attachments: attachments.map(toAttachmentMeta),
+  };
+}
+
+function toAttachmentMeta(a: ResendInboundAttachment): EmailAttachmentMeta {
+  return {
+    id: a.id,
+    filename: a.filename,
+    contentType: a.content_type ?? null,
+    contentDisposition: a.content_disposition ?? null,
+    contentId: a.content_id ?? null,
+  };
+}
+
+function parseIsoDate(raw: string | null | undefined): Date | null {
+  if (!raw) return null;
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 /**
