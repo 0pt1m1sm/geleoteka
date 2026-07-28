@@ -43,31 +43,88 @@ export interface SettingDescriptor {
  *   - NEXT_PUBLIC_* — baked into the client bundle at build time
  */
 export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
-  // ── Email (Resend) ───────────────────────────────────────────────────
+  // ── Email (отправка / transport) ─────────────────────────────────────
+  // Провайдер-нейтральная отправка: дефолт — generic SMTP (nodemailer),
+  // host/port/креды конфигурируемы на тенант/автосервис. Resend — опциональный
+  // legacy-адаптер (ниже), включается только EMAIL_TRANSPORT=resend.
+  // ПАРОЛЬ SMTP — ТОЛЬКО secret env (SMTP_PASSWORD), НЕ в этой таблице.
   {
-    group: "Email (Resend)",
+    group: "Email (отправка)",
+    key: "EMAIL_TRANSPORT",
+    label: "Транспорт отправки",
+    description:
+      "smtp (по умолчанию) — generic SMTP через nodemailer. resend — опциональный legacy-адаптер. Автопереключения между провайдерами нет (риск двойной отправки): смена значения = одно осознанное изменение конфига.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "EMAIL_FROM",
+    label: "Отправитель (From)",
+    description:
+      "Формат: «Geleoteka <info@geleoteka.ru>». Единый видимый From для любого транспорта. Если пусто — берётся legacy RESEND_FROM / RESEND_FROM_FALLBACK.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "EMAIL_REPLY_TO",
+    label: "Reply-To",
+    description:
+      "Адрес для ответов клиента. По умолчанию info@geleoteka.ru. Должен быть реальным ящиком, чтобы ответы попадали в CRM.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "SMTP_HOST",
+    label: "SMTP host",
+    description:
+      "Для Гелеотеки — smtp.timeweb.ru. Для другого тенанта — его сервер. По умолчанию smtp.timeweb.ru. Только TLS.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "SMTP_PORT",
+    label: "SMTP порт",
+    description: "465 (implicit TLS, по умолчанию) или 587 (STARTTLS). Открытый 25 не использовать.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "SMTP_SECURE",
+    label: "SMTP implicit TLS",
+    description:
+      "true для 465 (implicit TLS), false для 587 (STARTTLS с обязательным апгрейдом). Если пусто — выводится из порта.",
+  },
+  {
+    group: "Email (отправка)",
+    key: "SMTP_USER",
+    label: "SMTP логин",
+    description:
+      "Логин SMTP = полный адрес отправляющего ящика (сервисный, не пароль менеджера). Пароль задаётся ТОЛЬКО в env SMTP_PASSWORD, не здесь.",
+  },
+
+  // ── Email (Resend — LEGACY, опциональный) ────────────────────────────
+  // Работает только при EMAIL_TRANSPORT=resend. Оставлен как переходный
+  // адаптер и будет удалён после катовера на SMTP (план Task 6–7). Входящий
+  // Resend webhook (ниже) пока остаётся единственным рабочим inbound.
+  {
+    group: "Email (Resend, legacy)",
     key: "RESEND_API_KEY",
     label: "Resend API key",
     description:
-      "Resend dashboard → API Keys. Без неё все исходящие письма работают в mock-режиме (логируются, не отправляются).",
+      "Только для EMAIL_TRANSPORT=resend. Без неё resend-отправка работает в mock-режиме (логируется, не отправляется).",
     secret: true,
   },
   {
-    group: "Email (Resend)",
+    group: "Email (Resend, legacy)",
     key: "RESEND_FROM",
     label: "Отправитель (verified domain)",
     description:
-      "Формат: «Geleoteka <info@geleoteka.ru>». Используется только когда домен geleoteka.ru верифицирован в Resend (SPF + DKIM зелёные). До этого — заполнено только RESEND_FROM_FALLBACK.",
+      "Legacy-фолбэк для EMAIL_FROM. Формат: «Geleoteka <info@geleoteka.ru>». Используется когда EMAIL_FROM пуст.",
   },
   {
-    group: "Email (Resend)",
+    group: "Email (Resend, legacy)",
     key: "RESEND_FROM_FALLBACK",
     label: "Отправитель (fallback)",
     description:
-      "Используется когда RESEND_FROM пустой. По умолчанию onboarding@resend.dev — резервный адрес Resend для тестов.",
+      "Используется когда EMAIL_FROM и RESEND_FROM пусты. По умолчанию onboarding@resend.dev — резервный адрес Resend для тестов.",
   },
   {
-    group: "Email (Resend)",
+    group: "Email (Resend, legacy)",
     key: "RESEND_WEBHOOK_SECRET",
     label: "Webhook signing secret",
     description:
@@ -75,11 +132,42 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     secret: true,
   },
   {
-    group: "Email (Resend)",
+    group: "Email (Resend, legacy)",
     key: "INBOUND_EMAIL",
     label: "Адрес входящей почты",
     description:
       "Email-адрес на verified-домене, на который Resend будет отправлять webhooks для входящих писем. По умолчанию info@geleoteka.ru. Остальные адреса (sales@, billing@) игнорируются.",
+  },
+
+  // ── Email (Timeweb IMAP sync) ────────────────────────────────────────
+  // NON-SECRET ONLY. Mailbox passwords live exclusively in env
+  // (TIMEWEB_IMAP_PASSWORD / TIMEWEB_IMAP_PASSWORD_<SLUG>) and MUST NOT be
+  // added here — this table is plaintext and rendered in the admin UI.
+  {
+    group: "Email (Timeweb IMAP)",
+    key: "MAIL_SYNC_ENABLED",
+    label: "Синхронизация почты включена",
+    description:
+      "true/false. Главный рубильник mail-sync воркера. Пока false, воркер простаивает и ничего не читает по IMAP. Пароли ящиков задаются ТОЛЬКО в env, не здесь.",
+  },
+  {
+    group: "Email (Timeweb IMAP)",
+    key: "TIMEWEB_IMAP_HOST",
+    label: "IMAP host",
+    description: "По умолчанию imap.timeweb.ru. Только IMAPS (TLS), порт 993.",
+  },
+  {
+    group: "Email (Timeweb IMAP)",
+    key: "TIMEWEB_IMAP_PORT",
+    label: "IMAP порт",
+    description: "По умолчанию 993 (IMAPS/TLS). Открытый 143 запрещён.",
+  },
+  {
+    group: "Email (Timeweb IMAP)",
+    key: "MAIL_SYNC_SOURCES",
+    label: "Источники синхронизации (JSON)",
+    description:
+      'JSON-массив источников: [{"mailbox":"info@geleoteka.ru","folder":"INBOX","role":"INBOUND"},{"mailbox":"crm-archive@geleoteka.ru","folder":"INBOX","role":"OUTBOUND_ARCHIVE"}]. role: INBOUND (прямой опрос ящика) или OUTBOUND_ARCHIVE (архив «Контроля исходящих»). Имена папок английские (INBOX, Sent).',
   },
 
   // ── SMS (smsc.ru) ────────────────────────────────────────────────────
