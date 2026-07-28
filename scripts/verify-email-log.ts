@@ -3,12 +3,14 @@
  *
  *   - generateOutboundMessageId() returns a fresh id matching the contract
  *   - recordOutboundEmail() inserts an EMAIL_OUTBOUND CommunicationLog row
- *     with subject/externalId populated and outcome=N_A (initial "undelivered"
- *     state — flipped to DELIVERED only after Resend confirms the send).
+ *     with subject/externalId populated and outcome=N_A (initial "unconfirmed"
+ *     state — flipped to ACCEPTED only after a transport takes custody).
  *   - Calling recordOutboundEmail() twice with the same messageId is idempotent
  *     (second call returns null, no duplicate row, no thrown P2002)
- *   - markOutboundEmailSent() flips outcome from N_A to DELIVERED.
- *   - markOutboundEmailFailed() flips outcome to FAILED on the matching row
+ *   - markOutboundEmailSent() flips outcome from N_A to ACCEPTED (a transport
+ *     accepting the message is NOT proof of inbox delivery).
+ *   - markOutboundEmailFailed() flips a DEFINITE reject to FAILED, but leaves an
+ *     AMBIGUOUS timeout (TRANSPORT_UNKNOWN_PREFIX) in N_A so nobody blind-resends.
  *
  * Run: `npm run verify-email-log` (added in package.json scripts in Task 2)
  *      or directly: `npx tsx scripts/verify-email-log.ts`
@@ -24,6 +26,7 @@ import {
   markOutboundEmailFailed,
   markOutboundEmailSent,
 } from "../lib/email/log";
+import { TRANSPORT_UNKNOWN_PREFIX } from "../lib/email/transport";
 
 const MESSAGE_ID_RE = /^<[0-9a-f]{24}@geleoteka\.ru>$/;
 
@@ -99,23 +102,45 @@ async function main(): Promise<void> {
   assert(dupCount === 1, `expected 1 row, got ${dupCount}`);
   console.log("  ✓ duplicate messageId is no-op");
 
-  // 4. markOutboundEmailSent flips N_A → DELIVERED.
+  // 4. markOutboundEmailSent flips N_A → ACCEPTED (custody, not delivery).
   await markOutboundEmailSent(messageId);
   const sent = (await db.communicationLog.findUnique({
     where: { externalId: messageId },
     select: { outcome: true },
   })) as { outcome: string } | null;
-  assert(sent?.outcome === "DELIVERED", `expected DELIVERED after markSent, got ${sent?.outcome}`);
-  console.log("  ✓ markOutboundEmailSent flips to DELIVERED");
+  assert(sent?.outcome === "ACCEPTED", `expected ACCEPTED after markSent, got ${sent?.outcome}`);
+  console.log("  ✓ markOutboundEmailSent flips to ACCEPTED");
 
-  // 5. markOutboundEmailFailed flips outcome to FAILED.
+  // 5. markOutboundEmailFailed flips a DEFINITE reject to FAILED.
   await markOutboundEmailFailed(messageId, "test failure");
   const failed = (await db.communicationLog.findUnique({
     where: { externalId: messageId },
-    select: { outcome: true },
-  })) as { outcome: string } | null;
+    select: { outcome: true, body: true },
+  })) as { outcome: string; body: string | null } | null;
   assert(failed?.outcome === "FAILED", `expected FAILED, got ${failed?.outcome}`);
-  console.log("  ✓ markOutboundEmailFailed");
+  assert(failed?.body?.includes("[FAILED:") ?? false, "FAILED note not appended to body");
+  console.log("  ✓ markOutboundEmailFailed (definite reject → FAILED)");
+
+  // 5b. An AMBIGUOUS timeout must NOT be marked FAILED — it stays unconfirmed
+  //     (N_A) with an [UNKNOWN: …] note, so nobody blind-resends a message that
+  //     may already have gone out. Use a fresh row seeded back to N_A.
+  const unknownMessageId = generateOutboundMessageId();
+  await db.communicationLog.deleteMany({ where: { externalId: unknownMessageId } });
+  await recordOutboundEmail({
+    customerUserId: customerId,
+    subject: "verify unknown",
+    body: "verify unknown body",
+    messageId: unknownMessageId,
+  });
+  await markOutboundEmailFailed(unknownMessageId, `${TRANSPORT_UNKNOWN_PREFIX} socket timeout`);
+  const unknown = (await db.communicationLog.findUnique({
+    where: { externalId: unknownMessageId },
+    select: { outcome: true, body: true },
+  })) as { outcome: string; body: string | null } | null;
+  assert(unknown?.outcome === "N_A", `expected N_A for unknown timeout, got ${unknown?.outcome}`);
+  assert(unknown?.body?.includes("[UNKNOWN:") ?? false, "UNKNOWN note not appended to body");
+  console.log("  ✓ markOutboundEmailFailed (ambiguous timeout → stays N_A, [UNKNOWN])");
+  await db.communicationLog.deleteMany({ where: { externalId: unknownMessageId } });
 
   // 6. markOutboundEmailFailed / Sent on missing row is a no-op (does not throw).
   await markOutboundEmailFailed("<missing@geleoteka.ru>", "noop");
