@@ -59,6 +59,7 @@ interface DealDetail {
     deal: { id: string; number: string | null } | null;
     subject: string | null;
     resendEmailId: string | null;
+    emailMessageId: string | null;
     attachments: unknown;
     readAt: Date | null;
   }>;
@@ -139,6 +140,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
           deal: { select: { id: true, number: true } },
           subject: true,
           resendEmailId: true,
+          emailMessageId: true,
           attachments: true,
           readAt: true,
         },
@@ -253,6 +255,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
                 deal: e.deal,
                 subject: e.subject,
                 resendEmailId: e.resendEmailId,
+                emailMessageId: e.emailMessageId,
                 readAt: e.readAt,
                 attachments: Array.isArray(e.attachments)
                   ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)

@@ -17,6 +17,9 @@ interface Props {
   inboxMessageId: string;
   fromEmail: string;
   fromName: string | null;
+  /** First recipient — the correspondent for an OUTBOUND message (we are the sender). */
+  toEmail?: string;
+  direction?: string;
 }
 
 type Panel = null | "link";
@@ -25,7 +28,10 @@ export function InboxActions({
   inboxMessageId,
   fromEmail,
   fromName,
+  toEmail,
+  direction,
 }: Props): React.ReactElement {
+  const isOutbound = direction === "OUTBOUND";
   const nav = useProgressRouter();
   const [panel, setPanel] = useState<Panel>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,8 +83,13 @@ export function InboxActions({
     });
   }
 
-  const createCustomerHref = `/admin/customers/new?email=${encodeURIComponent(fromEmail)}${
-    fromName ? `&name=${encodeURIComponent(fromName)}` : ""
+  // For an OUTBOUND message we are the sender, so the customer to create is the
+  // recipient, not the From address. Fall back to From only when no recipient is
+  // known. The customer name prefill only makes sense for an inbound sender.
+  const prefillEmail = isOutbound && toEmail ? toEmail : fromEmail;
+  const prefillName = !isOutbound && fromName ? fromName : null;
+  const createCustomerHref = `/admin/customers/new?email=${encodeURIComponent(prefillEmail)}${
+    prefillName ? `&name=${encodeURIComponent(prefillName)}` : ""
   }&source=EMAIL`;
 
   return (

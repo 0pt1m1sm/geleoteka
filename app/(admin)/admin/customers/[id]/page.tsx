@@ -105,6 +105,7 @@ export default async function CustomerDetailPage({ params }: Props) {
         deal: { select: { id: true, number: true } },
         subject: true,
         resendEmailId: true,
+        emailMessageId: true,
         attachments: true,
         readAt: true,
       },
@@ -419,6 +420,7 @@ export default async function CustomerDetailPage({ params }: Props) {
                       deal: e.deal,
                       subject: e.subject,
                       resendEmailId: e.resendEmailId,
+                      emailMessageId: e.emailMessageId,
                       readAt: e.readAt,
                       attachments: Array.isArray(e.attachments)
                         ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)

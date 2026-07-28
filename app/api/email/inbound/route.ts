@@ -4,9 +4,11 @@ import {
   verifyResendWebhook,
   shouldAcceptRecipient,
   fetchResendEmailContent,
+  resendEnvelopeToParsedEmail,
+  DEFAULT_INBOUND_RECIPIENT,
   type ResendInboundEnvelope,
 } from "@/lib/email/inbound";
-import { resolveInboundEmail } from "@/lib/email/resolve";
+import { ingestEmail } from "@/lib/email/ingest";
 import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -222,11 +224,33 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const result = await resolveInboundEmail({ envelope, content });
+    // The webhook is now just one adapter feeding the shared ingest — the same
+    // one the Timeweb IMAP worker uses. Dedupe therefore spans both transports,
+    // which is what makes the dual-ingest window during cutover safe.
+    const parsed = resendEnvelopeToParsedEmail({
+      envelope,
+      content,
+      mailbox: inboundEmail ?? DEFAULT_INBOUND_RECIPIENT,
+    });
+    const result = await ingestEmail(parsed);
+
+    if (result.status === "duplicate") {
+      await logAttempt({
+        outcome: "duplicate",
+        httpStatus: 200,
+        detail: `ingest dedupe: ${result.reason}`,
+        recipient: recipientRaw,
+        fromEmail,
+        messageId,
+        ...headerFlags,
+      });
+      return NextResponse.json({ duplicate: true });
+    }
+
     await logAttempt({
       outcome: `accepted_${result.kind}`,
       httpStatus: 200,
-      detail: `id=${result.id}`,
+      detail: `id=${result.id} emailMessageId=${result.emailMessageId}`,
       recipient: recipientRaw,
       fromEmail,
       messageId,
@@ -239,7 +263,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       await logAttempt({
         outcome: "duplicate",
         httpStatus: 200,
-        detail: "P2002 in resolveInboundEmail (concurrent retry)",
+        detail: "P2002 escaped ingestEmail (concurrent retry)",
         recipient: recipientRaw,
         fromEmail,
         messageId,
@@ -248,7 +272,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ duplicate: true });
     }
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error("[EMAIL INBOUND] resolveInboundEmail threw", err);
+    console.error("[EMAIL INBOUND] ingestEmail threw", err);
     await logAttempt({
       outcome: "error_other",
       httpStatus: 500,

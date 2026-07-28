@@ -51,12 +51,20 @@ export default async function InboundLogPage() {
         title="Лог входящих webhook-ов"
         description="Последние 30 попыток POST /api/email/inbound. Помогает понять что именно отправляет Resend (или не отправляет вовсе)."
         actions={
-          <Link
-            href="/admin/settings/integrations"
-            className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-          >
-            ← К настройкам интеграций
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/admin/settings/mail-sync"
+              className="text-xs text-[var(--color-accent)] hover:underline"
+            >
+              Синхронизация IMAP →
+            </Link>
+            <Link
+              href="/admin/settings/integrations"
+              className="text-xs text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
+            >
+              ← К настройкам интеграций
+            </Link>
+          </div>
         }
       />
 

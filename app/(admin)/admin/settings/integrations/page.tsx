@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -86,6 +87,20 @@ export default async function IntegrationsSettingsPage() {
                     Покажет какой API key/from использовался и что ответил Resend.
                   </p>
                   <TestSendButton />
+                  <div className="mt-3 pt-3 border-t border-[var(--border)] flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    <Link
+                      href="/admin/settings/mail-sync"
+                      className="text-[var(--color-accent)] hover:underline"
+                    >
+                      Синхронизация почты (IMAP) →
+                    </Link>
+                    <Link
+                      href="/admin/settings/inbound-log"
+                      className="text-[var(--color-accent)] hover:underline"
+                    >
+                      Лог входящих webhook-ов (Resend) →
+                    </Link>
+                  </div>
                 </div>
               ) : null}
             </div>

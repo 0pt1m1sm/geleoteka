@@ -17,11 +17,12 @@ export function TestSendButton(): React.ReactElement {
   }
 
   const sourceLabel =
-    result?.apiKeySource === "db"
+    result?.credentialSource === "db"
       ? "из админки"
-      : result?.apiKeySource === "env"
+      : result?.credentialSource === "env"
         ? "из переменной окружения"
         : "не задан";
+  const transportLabel = result?.transport === "resend" ? "Resend (legacy)" : "SMTP";
 
   return (
     <div className="space-y-2">
@@ -32,11 +33,12 @@ export function TestSendButton(): React.ReactElement {
         <Alert variant={result.ok ? "success" : "error"}>
           <div className="space-y-1">
             <p>{result.detail}</p>
-            {result.from || result.to || result.apiKeySource ? (
+            {result.from || result.to || result.transport || result.credentialSource ? (
               <p className="text-xs text-[var(--foreground-muted)] mt-2">
                 {result.to ? <>Кому: <span className="font-mono">{result.to}</span><br/></> : null}
                 {result.from ? <>От: <span className="font-mono">{result.from}</span><br/></> : null}
-                {result.apiKeySource ? <>API key: {sourceLabel}</> : null}
+                {result.transport ? <>Транспорт: {transportLabel}<br/></> : null}
+                {result.credentialSource ? <>Учётные данные: {sourceLabel}</> : null}
               </p>
             ) : null}
           </div>

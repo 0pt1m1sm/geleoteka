@@ -24,10 +24,21 @@ interface InboxRow {
   subject: string;
   receivedAt: Date;
   attachments: unknown;
+  direction: string;
+  emailMessage: { createdAt: Date } | null;
 }
 
 function attachmentCount(attachments: unknown): number {
   return Array.isArray(attachments) ? attachments.length : 0;
+}
+
+/** Message that landed noticeably before the sync picked it up — i.e. imported
+ *  from backlog after downtime. A >10 min gap between the mail's own timestamp
+ *  and the row's sync time is the signal. */
+const BACKLOG_GAP_MS = 10 * 60 * 1000;
+function isBacklog(receivedAt: Date, syncedAt: Date | null | undefined): boolean {
+  if (!syncedAt) return false;
+  return new Date(syncedAt).getTime() - new Date(receivedAt).getTime() > BACKLOG_GAP_MS;
 }
 
 export default async function InboxPage({ searchParams }: Props) {
@@ -51,6 +62,8 @@ export default async function InboxPage({ searchParams }: Props) {
         subject: true,
         receivedAt: true,
         attachments: true,
+        direction: true,
+        emailMessage: { select: { createdAt: true } },
       },
     }),
     db.inboxMessage.groupBy({
@@ -112,8 +125,24 @@ export default async function InboxPage({ searchParams }: Props) {
                   className="row-clickable flex items-start gap-4 px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">
-                      {row.fromName ? `${row.fromName} <${row.fromEmail}>` : row.fromEmail}
+                    <div className="font-medium truncate flex items-center gap-2">
+                      <span
+                        className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-accent-muted,#3a3a3a)] text-[var(--foreground-muted)]"
+                        title={row.direction === "OUTBOUND" ? "Исходящее (от менеджера)" : "Входящее"}
+                      >
+                        {row.direction === "OUTBOUND" ? "→ ИСХ" : "← ВХ"}
+                      </span>
+                      <span className="truncate">
+                        {row.fromName ? `${row.fromName} <${row.fromEmail}>` : row.fromEmail}
+                      </span>
+                      {isBacklog(row.receivedAt, row.emailMessage?.createdAt) ? (
+                        <span
+                          className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]"
+                          title="Письмо получено раньше — синхронизировано позже (backlog)"
+                        >
+                          синхр. позже
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-sm text-[var(--foreground-muted)] truncate">
                       {row.subject || "(без темы)"}
