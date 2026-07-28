@@ -1,0 +1,55 @@
+name: mail-sync-cron
+
+# External scheduler for the mail-sync worker (deployment option "b"): instead of
+# a long-running worker process, an out-of-band cron POSTs the internal endpoint,
+# which runs ONE bounded batch per call. The app itself holds no timer.
+#
+# Prerequisites (one-time, in GitHub repo settings → Secrets and variables → Actions):
+#   - Secret  MAIL_SYNC_CRON_SECRET  — same value as the app's env var.
+#   - (optional) Variable MAIL_SYNC_URL — defaults to the production endpoint below.
+#
+# Notes:
+#   - Scheduled workflows only run from the DEFAULT branch, so this activates once
+#     merged to main — not while it sits on a feature branch.
+#   - GitHub cron granularity is ~5 min and best-effort (can be delayed under load).
+#     Each tick drains several batches to keep lag inside the ~5-min RPO target.
+#   - The endpoint is idempotent and never takes a mailbox/UID from the caller, so
+#     re-firing or overlapping ticks cannot double-import or reach another mailbox.
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+# Never let two ticks run at once — a slow batch shouldn't overlap the next.
+concurrency:
+  group: mail-sync-cron
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Drain mail-sync batches
+        env:
+          SECRET: ${{ secrets.MAIL_SYNC_CRON_SECRET }}
+          URL: ${{ vars.MAIL_SYNC_URL || 'https://geleoteka.ru/api/internal/mail-sync' }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "MAIL_SYNC_CRON_SECRET is not set — add it in repo Actions secrets." >&2
+            exit 1
+          fi
+          # A handful of bounded batches per tick drains bursts without one long request.
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$URL" \
+              -H "Authorization: Bearer $SECRET" --max-time 45 || echo 000)
+            echo "batch $i → HTTP $code"
+            if [ "$code" != "200" ]; then
+              # 401/503/000 are configuration/availability issues — stop early, next
+              # tick retries. Body is intentionally terse (no secrets server-side).
+              echo "non-200; stopping this tick" >&2
+              [ "$code" = "000" ] && exit 0 || exit 0
+            fi
+            sleep 6
+          done
