@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { Alert, Button, Input } from "@/components/ui";
 import {
@@ -8,7 +8,7 @@ import {
   deleteScheduleException,
   saveBlockedInterval,
   saveScheduleException,
-  saveWorkingHours,
+  saveWeeklySchedule,
   type ScheduleResult,
 } from "@/app/actions/schedule";
 import { minutesToLabel } from "@/lib/scheduling/availability";
@@ -23,6 +23,13 @@ const WEEKDAYS: ReadonlyArray<{ day: number; label: string }> = [
   { day: 6, label: "Суббота" },
   { day: 0, label: "Воскресенье" },
 ];
+
+/** Shop default when a weekday has no row yet: Пн–Пт 10–20, Сб 10–16, Вс закрыто. */
+function defaultRow(day: number): WorkingHoursRow {
+  if (day === 0) return { dayOfWeek: 0, isOpen: false, openMinute: 600, closeMinute: 1200 };
+  if (day === 6) return { dayOfWeek: 6, isOpen: true, openMinute: 600, closeMinute: 960 };
+  return { dayOfWeek: day, isOpen: true, openMinute: 600, closeMinute: 1200 };
+}
 
 export interface WorkingHoursRow {
   dayOfWeek: number;
@@ -65,39 +72,84 @@ function Feedback({ state }: { state: ScheduleResult | null }): React.ReactEleme
   return null;
 }
 
-function WeekdayRow({ row, label }: { row: WorkingHoursRow; label: string }): React.ReactElement {
-  const [state, formAction, isPending] = useActionState(saveWorkingHours, null);
+/**
+ * The whole week in one form with one Save — a shop changes its hours, not its
+ * Tuesday, and seven separate save buttons made a single decision look like
+ * seven. Each row is a plain grid line so the columns stay aligned and the
+ * times read as a schedule rather than as fourteen unrelated inputs.
+ */
+function WeekEditor({ byDay }: { byDay: Map<number, WorkingHoursRow> }): React.ReactElement {
+  const [state, formAction, isPending] = useActionState(saveWeeklySchedule, null);
 
   return (
-    <form action={formAction} className="flex flex-wrap items-end gap-3 py-3">
-      <input type="hidden" name="dayOfWeek" value={row.dayOfWeek} />
-      <span className="w-32 text-sm">{label}</span>
+    <form action={formAction}>
+      <div className="grid grid-cols-[minmax(7rem,1fr)_auto_auto_auto] gap-x-3 gap-y-1 items-center">
+        <span className="text-xs text-[var(--foreground-muted)]">День</span>
+        <span className="text-xs text-[var(--foreground-muted)] justify-self-center">Работаем</span>
+        <span className="text-xs text-[var(--foreground-muted)]">С</span>
+        <span className="text-xs text-[var(--foreground-muted)]">До</span>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="isOpen" defaultChecked={row.isOpen} />
-        Работаем
-      </label>
+        {WEEKDAYS.map(({ day, label }) => {
+          const row = byDay.get(day) ?? defaultRow(day);
+          return (
+            <WeekdayRow key={day} day={day} label={label} row={row} />
+          );
+        })}
+      </div>
 
-      <Input
-        label="С"
-        name="openTime"
-        type="time"
-        defaultValue={minutesToLabel(row.openMinute)}
-        className="w-28"
-      />
-      <Input
-        label="До"
-        name="closeTime"
-        type="time"
-        defaultValue={minutesToLabel(row.closeMinute)}
-        className="w-28"
-      />
-
-      <Button type="submit" variant="secondary" isLoading={isPending} disabled={isPending}>
-        Сохранить
-      </Button>
-      <Feedback state={state} />
+      <div className="mt-4 flex items-center gap-3">
+        <Button type="submit" isLoading={isPending} disabled={isPending}>
+          {isPending ? "Сохранение..." : "Сохранить"}
+        </Button>
+        <Feedback state={state} />
+      </div>
     </form>
+  );
+}
+
+function WeekdayRow({
+  day,
+  label,
+  row,
+}: {
+  day: number;
+  label: string;
+  row: WorkingHoursRow;
+}): React.ReactElement {
+  // Closed days keep their times in the DOM (just dimmed), so ticking the box
+  // back on restores the hours the shop used to keep instead of blanking them.
+  const [isOpen, setIsOpen] = useState(row.isOpen);
+
+  return (
+    <>
+      <label htmlFor={`open-${day}`} className="text-sm py-1.5">
+        {label}
+      </label>
+      <input
+        id={`open-${day}`}
+        type="checkbox"
+        name={`isOpen-${day}`}
+        checked={isOpen}
+        onChange={(e) => setIsOpen(e.target.checked)}
+        className="justify-self-center"
+      />
+      <input
+        type="time"
+        name={`openTime-${day}`}
+        defaultValue={minutesToLabel(row.openMinute)}
+        disabled={!isOpen}
+        className="input w-28 disabled:opacity-40"
+        aria-label={`${label}: время открытия`}
+      />
+      <input
+        type="time"
+        name={`closeTime-${day}`}
+        defaultValue={minutesToLabel(row.closeMinute)}
+        disabled={!isOpen}
+        className="input w-28 disabled:opacity-40"
+        aria-label={`${label}: время закрытия`}
+      />
+    </>
   );
 }
 
@@ -140,8 +192,8 @@ function BlockedForm(): React.ReactElement {
 
 /**
  * Schedule editing for the admin calendar: weekly hours, exception days and
- * blocked intervals. Each weekday saves independently so two managers editing
- * different days cannot overwrite one another.
+ * blocked intervals — the three things that decide what the booking form
+ * offers.
  */
 export function ScheduleManager({ weekly, exceptions, blocked }: Props): React.ReactElement {
   const byDay = new Map(weekly.map((w) => [w.dayOfWeek, w]));
@@ -155,21 +207,8 @@ export function ScheduleManager({ weekly, exceptions, blocked }: Props): React.R
             Определяют сетку записи на сайте
           </span>
         </summary>
-        <div className="mt-2 divide-y divide-[var(--border)]">
-          {WEEKDAYS.map(({ day, label }) => (
-            <WeekdayRow
-              key={day}
-              label={label}
-              row={
-                byDay.get(day) ?? {
-                  dayOfWeek: day,
-                  isOpen: day >= 1 && day <= 5,
-                  openMinute: 9 * 60,
-                  closeMinute: 19 * 60,
-                }
-              }
-            />
-          ))}
+        <div className="mt-4">
+          <WeekEditor byDay={byDay} />
         </div>
       </details>
 

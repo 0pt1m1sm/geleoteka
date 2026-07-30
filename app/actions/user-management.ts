@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { sendSms } from "@/lib/sms";
+import { isAllowedRole, type AllowedRole } from "@/lib/roles";
 
 const NAME_MAX = 120;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -30,42 +31,124 @@ function generateTempPassword(): string {
 type Ok<T extends object = object> = { ok: true } & T;
 type Fail = { ok: false; error: string };
 
-// Mirrors the UserPermissionRole enum. MASTER and WAREHOUSE_WORKER are
-// assignable from the roles page: both gate their own portal (/master, the
-// warehouse section), so leaving them out meant those accounts could only be
-// provisioned by hand in the database.
-const ALLOWED_ROLES = [
-  "NONE",
-  "CLIENT",
-  "MASTER",
-  "WAREHOUSE_WORKER",
-  "MANAGER",
-  "ADMIN",
-] as const;
-type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
-function isAllowedRole(v: unknown): v is AllowedRole {
-  return typeof v === "string" && (ALLOWED_ROLES as readonly string[]).includes(v);
+
+export interface PurgeBlocker {
+  label: string;
+  count: number;
 }
 
-/** Russian labels for the assignable roles, shared by the admin surfaces. */
-export const ROLE_LABELS: Readonly<Record<AllowedRole, string>> = {
-  NONE: "Без доступа",
-  CLIENT: "Клиент",
-  MASTER: "Мастер",
-  WAREHOUSE_WORKER: "Кладовщик",
-  MANAGER: "Менеджер",
-  ADMIN: "Администратор",
-};
+/**
+ * Why a person cannot be purged — the business records that would be lost.
+ *
+ * Counting is for the OPERATOR's benefit (a clear "3 заказ-наряда, 1 сделка"
+ * beats a constraint error). It is NOT the safety mechanism: the root business
+ * FKs are ON DELETE RESTRICT, so if this list ever misses a relation the
+ * database refuses the delete instead of destroying history. Two layers, and
+ * the database is the one that decides.
+ */
+export async function getPurgeBlockers(
+  userId: string,
+): Promise<Ok<{ blockers: PurgeBlocker[] }> | Fail> {
+  await requireRole(["ADMIN"]);
 
+  const [repairOrders, deals, communications, vehicles, tasks, rentals, loyalty] =
+    (await Promise.all([
+      db.repairOrder.count({ where: { userId } }),
+      db.deal.count({ where: { customerUserId: userId } }),
+      db.communicationLog.count({ where: { customerUserId: userId } }),
+      db.vehicle.count({ where: { ownerUserId: userId } }),
+      db.crmTask.count({ where: { ownerUserId: userId } }),
+      db.rentalBooking.count({ where: { userId } }),
+      // Loyalty hangs off LoyaltyAccount, not the user directly.
+      db.loyaltyTransaction.count({ where: { account: { userId } } }),
+    ])) as number[];
+
+  const blockers: PurgeBlocker[] = [
+    { label: "заказ-наряды", count: repairOrders },
+    { label: "сделки", count: deals },
+    { label: "переписка", count: communications },
+    { label: "автомобили", count: vehicles },
+    { label: "задачи", count: tasks },
+    { label: "аренды", count: rentals },
+    { label: "бонусные операции", count: loyalty },
+  ].filter((b) => b.count > 0);
+
+  return { ok: true, blockers };
+}
 
 /**
- * Reset a user's password to a fresh 10-char temp string. Marks
- * isTempPassword=true so the next login can prompt re-setting it
- * (and so the post-checkout claim panel still works for guest-style
- * accounts). Returns the temp password to the admin to communicate
- * to the user out-of-band, AND fires an SMS so the user gets it
- * immediately. ADMIN/MANAGER only.
+ * Permanently remove a person who has NO business history.
+ *
+ * This is the cleanup path for genuine rubbish — a mistyped duplicate, an
+ * abandoned self-registration, a test row — which archiving alone would leave
+ * piling up in the admin lists forever. It deliberately refuses the moment the
+ * person has anything attached: a real customer is archived, never purged.
+ *
+ * Deliberately NOT a "delete with all history" button. That existed here
+ * briefly and was removed: showing an operator what is about to be destroyed
+ * and then destroying it is a warning, not a safeguard.
+ */
+export async function purgeEmptyUser(userId: string): Promise<Ok | Fail> {
+  const session = await requireRole(["ADMIN"]);
+
+  const target = (await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true, permissionRole: true, isSupplier: true },
+  })) as { id: string; permissionRole: string; isSupplier: boolean } | null;
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+
+  if (target.id === session.id) {
+    return { ok: false, error: "Нельзя удалить собственный аккаунт" };
+  }
+  if (target.permissionRole === "ADMIN") {
+    const admins = await db.user.count({
+      where: { permissionRole: "ADMIN", deletedAt: null },
+    });
+    if (admins <= 1) return { ok: false, error: "Нельзя удалить последнего администратора" };
+  }
+
+  const blockersResult = await getPurgeBlockers(userId);
+  if (!blockersResult.ok) return blockersResult;
+  if (blockersResult.blockers.length > 0) {
+    const detail = blockersResult.blockers.map((b) => `${b.label}: ${b.count}`).join(", ");
+    return {
+      ok: false,
+      error: `Нельзя удалить — есть связанные записи (${detail}). Используйте архивирование.`,
+    };
+  }
+
+  try {
+    await db.user.delete({ where: { id: userId } });
+  } catch (err) {
+    // The RESTRICT constraints caught a relation the checks above do not know
+    // about. That is the safety net doing its job, not a bug to route around.
+    const code = err && typeof err === "object" ? (err as { code?: string }).code : undefined;
+    if (code === "P2003" || (err instanceof Error && err.message.includes("Foreign key"))) {
+      return {
+        ok: false,
+        error: "Нельзя удалить — у пользователя остались связанные записи в системе.",
+      };
+    }
+    throw err;
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/customers");
+  return { ok: true };
+}
+
+/**
+ * Reset a user's password to a fresh 10-char temp string, returned to the admin
+ * and sent by SMS. ADMIN/MANAGER only.
+ *
+ * `isTempPassword` is deliberately set to FALSE. It does not mean "this
+ * password is temporary" — per the schema it means "the hash was generated by
+ * the guest booking/cart flow and the user does not know it", and `login.ts`
+ * refuses any login while it is set. Marking a freshly issued password with it
+ * meant the manager handed the customer a password that could not be used and
+ * got "Пароль не задан" instead. The password produced here IS known to the
+ * user, so the flag does not apply.
  */
 export async function resetUserPassword(
   userId: string,
@@ -89,7 +172,7 @@ export async function resetUserPassword(
 
   await db.user.update({
     where: { id: userId },
-    data: { passwordHash, isTempPassword: true },
+    data: { passwordHash, isTempPassword: false },
   });
 
   // Fire-and-log SMS — failure shouldn't block the admin getting the

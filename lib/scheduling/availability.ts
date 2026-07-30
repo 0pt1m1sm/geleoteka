@@ -18,9 +18,9 @@
 /** Slot length. Two hours, matching the labels the UI renders ("09:00 — 11:00"). */
 export const SLOT_MINUTES = 120;
 
-/** Default weekly hours: Пн–Пт 09:00–19:00, выходные закрыты. */
-export const DEFAULT_OPEN_MINUTE = 9 * 60;
-export const DEFAULT_CLOSE_MINUTE = 19 * 60;
+/** Default opening for a weekday, used when nothing is configured. */
+export const DEFAULT_OPEN_MINUTE = 10 * 60;
+export const DEFAULT_CLOSE_MINUTE = 20 * 60;
 
 export interface WeeklyHours {
   /** 0 = Sunday … 6 = Saturday (JS `getDay()` convention). */
@@ -29,6 +29,24 @@ export interface WeeklyHours {
   openMinute: number;
   closeMinute: number;
 }
+
+/**
+ * The shop's actual opening hours: Пн–Пт 10:00–20:00, Сб 10:00–16:00, Вс закрыто.
+ *
+ * This is the source of truth for a fresh install and for any weekday with no
+ * row yet. It must stay in step with what the contacts page tells customers —
+ * a booking form that offers Sunday while the door is locked is worse than one
+ * that offers nothing.
+ */
+export const DEFAULT_WEEK: readonly WeeklyHours[] = [
+  { dayOfWeek: 0, isOpen: false, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 1, isOpen: true, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 2, isOpen: true, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 3, isOpen: true, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 4, isOpen: true, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 5, isOpen: true, openMinute: 10 * 60, closeMinute: 20 * 60 },
+  { dayOfWeek: 6, isOpen: true, openMinute: 10 * 60, closeMinute: 16 * 60 },
+];
 
 export interface DayException {
   isClosed: boolean;
@@ -97,12 +115,12 @@ export function resolveDayWindow(
     // "Open, but no custom hours" → fall through to the weekly window.
   }
 
-  const weekly = input.weekly.find((w) => w.dayOfWeek === input.dayOfWeek);
-  if (!weekly) {
-    // No configured row: keep the historical default rather than silently
-    // closing the shop, so a missing seed cannot take bookings offline.
-    return { openMinute: DEFAULT_OPEN_MINUTE, closeMinute: DEFAULT_CLOSE_MINUTE };
-  }
+  const weekly = input.weekly.find((w) => w.dayOfWeek === input.dayOfWeek)
+    // No configured row for this weekday: fall back to the shop's stated
+    // opening hours rather than inventing one, so an unseeded deploy offers
+    // what the contacts page promises instead of a different schedule.
+    ?? DEFAULT_WEEK.find((w) => w.dayOfWeek === input.dayOfWeek);
+  if (!weekly) return { openMinute: DEFAULT_OPEN_MINUTE, closeMinute: DEFAULT_CLOSE_MINUTE };
   if (!weekly.isOpen) return null;
   if (weekly.closeMinute <= weekly.openMinute) return null;
   return { openMinute: weekly.openMinute, closeMinute: weekly.closeMinute };

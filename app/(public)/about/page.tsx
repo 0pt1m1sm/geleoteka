@@ -25,9 +25,19 @@ interface MasterData {
 export default async function AboutPage(): Promise<React.ReactElement> {
   const [users, eyebrow, title, description, historyTitle, historyItems, teamTitle, certTitle, certBody] =
     await Promise.all([
-      db.user.findMany({
-        where: { isMaster: true, masterProfile: { isActive: true } },
-        include: { masterProfile: true },
+      // The roster is site content (see app/actions/team-members.ts), not a
+      // projection of who holds a master account.
+      db.teamMember.findMany({
+        where: { isActive: true },
+        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          role: true,
+          bio: true,
+          yearsExperience: true,
+          certifications: true,
+        },
       }),
       getCMSText("about.eyebrow"),
       getCMSText("about.title"),
@@ -39,26 +49,24 @@ export default async function AboutPage(): Promise<React.ReactElement> {
       getCMSRichtext("about.certificates.body"),
     ]);
 
-  const masters: MasterData[] = users
-    .map((u: Record<string, unknown>) => {
-      const profile = u.masterProfile as {
-        specialty: string | null;
-        bio: string | null;
-        yearsExperience: number | null;
-        certifications: string[];
-        sortOrder: number;
-      } | null;
-      return {
-        id: u.id as string,
-        name: u.name as string,
-        role: profile?.specialty ?? "",
-        bio: profile?.bio ?? null,
-        experience: profile?.yearsExperience ?? null,
-        certifications: profile?.certifications ?? [],
-        sortOrder: profile?.sortOrder ?? 0,
-      };
-    })
-    .sort((a, b) => a.sortOrder - b.sortOrder);
+  // Already ordered by the query; the row shape is the view model.
+  const masters: MasterData[] = (
+    users as Array<{
+      id: string;
+      name: string;
+      role: string | null;
+      bio: string | null;
+      yearsExperience: number | null;
+      certifications: string[];
+    }>
+  ).map((m) => ({
+    id: m.id,
+    name: m.name,
+    role: m.role ?? "",
+    bio: m.bio,
+    experience: m.yearsExperience,
+    certifications: m.certifications,
+  }));
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">

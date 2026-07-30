@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { labelToMinutes } from "@/lib/scheduling/availability";
+import {
+  DEFAULT_CLOSE_MINUTE,
+  DEFAULT_OPEN_MINUTE,
+  labelToMinutes,
+} from "@/lib/scheduling/availability";
 import { parseDatetimeLocalInput } from "@/lib/timezone";
 
 /**
@@ -42,36 +46,65 @@ function readTime(formData: FormData, key: string): { ok: true; value: number | 
 }
 
 /**
- * Save one weekday's hours. Sent per-row rather than as a whole week so a
- * manager editing Monday cannot clobber a colleague's concurrent Friday edit.
+ * Save the whole week in one submit.
+ *
+ * Previously each weekday was its own form and its own Save button — seven
+ * buttons for one decision. Nobody edits a single day in isolation: the shop
+ * changes its hours, not its Tuesday. One form also makes the week validate as
+ * a unit, so "Saturday closes before it opens" is caught before anything is
+ * written rather than leaving six saved days and one rejected.
  */
-export async function saveWorkingHours(
+export async function saveWeeklySchedule(
   _prevState: ScheduleResult | null,
   formData: FormData,
 ): Promise<ScheduleResult> {
   await requireRole(["ADMIN", "MANAGER"]);
 
-  const dayOfWeek = Number(formData.get("dayOfWeek"));
-  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
-    return { error: "Некорректный день недели" };
+  const DAY_NAMES = [
+    "воскресенье",
+    "понедельник",
+    "вторник",
+    "среду",
+    "четверг",
+    "пятницу",
+    "субботу",
+  ];
+
+  const parsed: Array<{
+    dayOfWeek: number;
+    isOpen: boolean;
+    openMinute: number;
+    closeMinute: number;
+  }> = [];
+
+  for (let day = 0; day <= 6; day += 1) {
+    const isOpen = formData.get(`isOpen-${day}`) !== null;
+    const open = readTime(formData, `openTime-${day}`);
+    const close = readTime(formData, `closeTime-${day}`);
+    if (!open.ok || !close.ok) {
+      return { error: `Некорректное время в поле «${DAY_NAMES[day]}» (ожидается ЧЧ:ММ)` };
+    }
+
+    const openMinute = open.value ?? DEFAULT_OPEN_MINUTE;
+    const closeMinute = close.value ?? DEFAULT_CLOSE_MINUTE;
+
+    // Validate the whole week BEFORE writing any of it.
+    if (isOpen && closeMinute <= openMinute) {
+      return { error: `В ${DAY_NAMES[day]} время закрытия должно быть позже открытия` };
+    }
+
+    parsed.push({ dayOfWeek: day, isOpen, openMinute, closeMinute });
   }
 
-  const isOpen = formData.get("isOpen") === "on" || formData.get("isOpen") === "true";
-  const open = readTime(formData, "openTime");
-  const close = readTime(formData, "closeTime");
-  if (!open.ok || !close.ok) return { error: "Некорректное время (ожидается ЧЧ:ММ)" };
-
-  const openMinute = open.value ?? 9 * 60;
-  const closeMinute = close.value ?? 19 * 60;
-  if (isOpen && closeMinute <= openMinute) {
-    return { error: "Время закрытия должно быть позже открытия" };
-  }
-
-  await db.workingHours.upsert({
-    where: { dayOfWeek },
-    update: { isOpen, openMinute, closeMinute },
-    create: { dayOfWeek, isOpen, openMinute, closeMinute },
-  });
+  await db.$transaction(
+    parsed.map((d) =>
+      db.workingHours.upsert({
+        where: { dayOfWeek: d.dayOfWeek },
+        update: { isOpen: d.isOpen, openMinute: d.openMinute, closeMinute: d.closeMinute },
+        create: d,
+      }),
+    ),
+  );
 
   revalidateSchedule();
   return { error: null, success: true };

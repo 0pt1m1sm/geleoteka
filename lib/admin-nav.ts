@@ -48,7 +48,6 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/repair-orders", label: "Записи" },
       { href: "/admin/calendar", label: "Календарь" },
-      { href: "/admin/team", label: "Команда" },
       { href: "/admin/services", label: "Каталог услуг" },
     ],
   },
@@ -92,6 +91,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Доступы",
     items: [
       { href: "/admin/users", label: "Пользователи" },
+      { href: "/admin/roles", label: "Роли" },
     ],
   },
   {
@@ -100,6 +100,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Сайт",
     items: [
       { href: "/admin/cms", label: "Контент" },
+      { href: "/admin/team", label: "Команда" },
       { href: "/admin/vacancies", label: "Вакансии" },
     ],
   },

@@ -72,11 +72,21 @@ describe("computeDaySlots — the grid", () => {
     expect(times(slots)).toEqual(["09:00", "11:00", "13:00", "15:00"]);
   });
 
-  it("keeps taking bookings when no weekly row is configured", () => {
-    // A missing seed must not silently close the shop.
+  it("falls back to the shop's real hours when no weekly row is configured", () => {
+    // An unseeded install must offer what the contacts page promises —
+    // Пн–Пт 10:00–20:00 — not some other invented window.
     const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly: [], bookedMinutes: [] });
 
-    expect(times(slots)).toEqual(["09:00", "11:00", "13:00", "15:00", "17:00"]);
+    expect(times(slots)).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
+  });
+
+  it("falls back to a short Saturday and a closed Sunday", () => {
+    expect(times(computeDaySlots({ dayOfWeek: 6, weekly: [], bookedMinutes: [] }))).toEqual([
+      "10:00",
+      "12:00",
+      "14:00",
+    ]);
+    expect(computeDaySlots({ dayOfWeek: SUNDAY, weekly: [], bookedMinutes: [] })).toEqual([]);
   });
 });
 

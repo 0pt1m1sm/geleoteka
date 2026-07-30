@@ -1,88 +1,84 @@
 export const dynamic = "force-dynamic";
 
-import { getSession } from "@/lib/auth";
-import { redirect } from "next/navigation";
+import Link from "next/link";
+import { Plus } from "lucide-react";
+
+import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { PageHeader } from "@/components/ui";
+import { Button, Card, PageHeader } from "@/components/ui";
+import { DeleteTeamMemberButton } from "@/components/admin/DeleteTeamMemberButton";
 
-export default async function TeamPage() {
-  const session = await getSession();
-  if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
-    redirect("/login");
-  }
+interface MemberRow {
+  id: string;
+  name: string;
+  role: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  certifications: string[];
+}
 
-  const masters = await db.user.findMany({
-    where: { isMaster: true },
-    include: { masterProfile: true },
-  });
+export default async function AdminTeamPage() {
+  await requireRole(["ADMIN", "MANAGER"]);
 
-  // Sort by profile.sortOrder
-  masters.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-    const ap = (a.masterProfile as { sortOrder: number } | null)?.sortOrder ?? 0;
-    const bp = (b.masterProfile as { sortOrder: number } | null)?.sortOrder ?? 0;
-    return ap - bp;
-  });
+  const members = (await db.teamMember.findMany({
+    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      role: true,
+      isActive: true,
+      sortOrder: true,
+      certifications: true,
+    },
+  })) as MemberRow[];
+
+  const activeCount = members.filter((m) => m.isActive).length;
 
   return (
     <div>
-      <PageHeader eyebrow="Сервис" title="Команда" />
+      <PageHeader
+        eyebrow="Сайт"
+        title="Команда"
+        description={`Всего: ${members.length} · На сайте: ${activeCount}`}
+        actions={
+          <Link href="/admin/team/new">
+            <Button size="sm" leftIcon={<Plus size={14} />}>Добавить</Button>
+          </Link>
+        }
+      />
 
-      <div className="space-y-4">
-        {masters.map((m: Record<string, unknown>) => {
-          const profile = m.masterProfile as {
-            specialty: string | null;
-            yearsExperience: number | null;
-            bio: string | null;
-            certifications: string[];
-            isActive: boolean;
-          } | null;
-          const name = m.name as string;
-          return (
-            <div key={m.id as string} className="card flex items-start gap-4">
-              <div className="w-12 h-12 rounded-full bg-[var(--color-secondary)] flex items-center justify-center shrink-0">
-                <span className="text-sm font-bold text-[var(--foreground-muted)]">
-                  {name
-                    .split(" ")
-                    .map((n: string) => n[0])
-                    .join("")}
-                </span>
-              </div>
-              <div className="flex-1">
-                <p className="font-medium">{name}</p>
-                {profile?.specialty && (
-                  <p className="text-sm text-[var(--color-accent)]">{profile.specialty}</p>
-                )}
-                {profile?.bio ? (
-                  <p className="text-sm text-[var(--foreground-muted)] mt-1">{profile.bio}</p>
-                ) : null}
-                {profile?.yearsExperience ? (
-                  <p className="text-xs text-[var(--foreground-muted)]">
-                    Опыт: {profile.yearsExperience} лет
-                  </p>
-                ) : null}
-                {profile?.certifications && profile.certifications.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {profile.certifications.map((cert: string) => (
-                      <span key={cert} className="badge badge-silver text-[10px]">
-                        {cert}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <span
-                className={`badge text-[10px] ${
-                  profile?.isActive
-                    ? "bg-[var(--color-success-bg)] text-[var(--color-success)]"
-                    : "bg-[var(--color-error-bg)] text-[var(--color-error)]"
-                }`}
+      {members.length === 0 ? (
+        <Card className="text-center py-12">
+          <p className="text-[var(--foreground-muted)] mb-4">В команде пока никого</p>
+          <Link href="/admin/team/new">
+            <Button size="sm">Добавить первого</Button>
+          </Link>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {members.map((m) => (
+            <div key={m.id} className="card flex items-center justify-between gap-4">
+              <Link
+                href={`/admin/team/${m.id}`}
+                className="flex-1 min-w-0 hover:opacity-80 transition-opacity"
               >
-                {profile?.isActive ? "Активен" : "Неактивен"}
-              </span>
+                <div className="flex items-center gap-2 mb-1">
+                  <p className="font-medium truncate">{m.name}</p>
+                  {!m.isActive && (
+                    <span className="badge text-[10px] bg-[var(--color-error-bg)] text-[var(--color-error)]">
+                      Скрыт
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                  {m.role ?? "без должности"} · {m.certifications.length} сертификатов · сорт. {m.sortOrder}
+                </p>
+              </Link>
+              <DeleteTeamMemberButton memberId={m.id} memberName={m.name} />
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { CustomerContactsManager } from "@/components/admin/customers/CustomerCo
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 import { DeleteCustomerButton } from "@/components/admin/customers/DeleteCustomerButton";
 import { RestoreCustomerButton } from "@/components/admin/customers/RestoreCustomerButton";
+import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { CustomerTabs } from "@/components/admin/customers/CustomerTabs";
@@ -297,14 +298,20 @@ export default async function CustomerDetailPage({ params }: Props) {
                     ) : (
                       <>
                         <p className="text-sm text-[var(--foreground-muted)] mb-3">
-                          {customer.isTempPassword
-                            ? "Это гостевая запись (без пароля). Удаление безвозвратное — связанные данные тоже исчезнут."
-                            : "Удаление скроет клиента из списков. История сделок и заказ-нарядов сохранится."}
+                          Скрытие убирает клиента из списков, история сделок и заказ-нарядов
+                          сохраняется — действие обратимо.
                         </p>
                         <DeleteCustomerButton
                           customerUserId={customer.id}
                           isGuest={customer.isTempPassword}
                         />
+                        <div className="mt-4 pt-3 border-t border-[var(--border)]">
+                          <EraseCustomerPanel
+                            customerUserId={customer.id}
+                            customerName={customer.name}
+                            confirmPhrase={customer.email ?? customer.phone ?? ""}
+                          />
+                        </div>
                       </>
                     )}
                   </div>
