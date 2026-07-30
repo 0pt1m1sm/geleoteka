@@ -59,16 +59,29 @@ export default async function CalendarPage() {
     orderBy: { dateTime: "asc" },
   });
 
-  const serialized = repairOrders.map((ro: Record<string, unknown>) => ({
-    id: ro.id as string,
-    dateTime: (ro.dateTime as Date).toISOString(),
-    status: ro.status as string,
-    clientName: (ro.user as Record<string, string>).name,
-    clientPhone: (ro.user as Record<string, string>).phone,
-    vehicleModel: (ro.vehicle as Record<string, string>).model,
-    masterName: (ro.master as Record<string, string> | null)?.name ?? null,
-    jobs: (ro.jobLines as Array<{ description: string }>).map((j) => j.description),
-  }));
+  // Every instant is converted to shop wall-clock HERE, once. The calendar is a
+  // client component, and the browser's timezone is not necessarily the shop's —
+  // sending raw ISO would render a Moscow 10:00 booking at whatever hour the
+  // viewer's laptop believes in.
+  const serialized = repairOrders.map((ro: Record<string, unknown>) => {
+    const wall = formatForDatetimeLocalInput(ro.dateTime as Date); // YYYY-MM-DDTHH:mm
+    const [date, time] = wall.split("T");
+    const [h, m] = time.split(":").map(Number);
+    return {
+      id: ro.id as string,
+      date,
+      minute: h * 60 + m,
+      time,
+      status: ro.status as string,
+      clientName: (ro.user as Record<string, string>).name,
+      clientPhone: (ro.user as Record<string, string>).phone,
+      vehicleModel: (ro.vehicle as Record<string, string>).model,
+      masterName: (ro.master as Record<string, string> | null)?.name ?? null,
+      jobs: (ro.jobLines as Array<{ description: string }>).map((j) => j.description),
+    };
+  });
+
+  const todayBusiness = formatForDatetimeLocalInput(new Date()).split("T")[0];
 
   return (
     <div>
@@ -77,7 +90,13 @@ export default async function CalendarPage() {
         title="Календарь записей"
         description="Записи, часы работы, праздники и блокировки времени"
       />
-      <AdminCalendar repairOrders={serialized} />
+      <AdminCalendar
+        repairOrders={serialized}
+        weekly={weeklyRows}
+        exceptions={exceptions}
+        blocked={blocked}
+        today={todayBusiness}
+      />
       <div className="mt-6">
         <ScheduleManager weekly={weeklyRows} exceptions={exceptions} blocked={blocked} />
       </div>

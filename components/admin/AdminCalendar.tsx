@@ -1,13 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import { format, addDays, startOfDay, isSameDay, parseISO } from "date-fns";
+import Link from "next/link";
+import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
+
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import {
+  computeDaySlots,
+  labelToMinutes,
+  minutesToLabel,
+  SLOT_MINUTES,
+  type DayException,
+  type WeeklyHours,
+} from "@/lib/scheduling/availability";
 
 interface CalendarRepairOrder {
   id: string;
-  dateTime: string;
+  /** Shop-local calendar day, "YYYY-MM-DD". */
+  date: string;
+  /** Shop-local minutes from midnight. */
+  minute: number;
+  time: string;
   status: string;
   clientName: string;
   clientPhone: string;
@@ -16,35 +30,116 @@ interface CalendarRepairOrder {
   jobs: string[];
 }
 
+interface CalendarBlock {
+  id: string;
+  /** Shop-local "YYYY-MM-DDTHH:mm". */
+  startAt: string;
+  endAt: string;
+  reason: string | null;
+}
+
+interface ExceptionRow {
+  date: string;
+  isClosed: boolean;
+  openMinute: number | null;
+  closeMinute: number | null;
+  reason: string | null;
+}
+
+interface Props {
+  repairOrders: CalendarRepairOrder[];
+  weekly: WeeklyHours[];
+  exceptions: ExceptionRow[];
+  blocked: CalendarBlock[];
+  /** Today in shop-local time, "YYYY-MM-DD". */
+  today: string;
+}
+
+/** Shift a "YYYY-MM-DD" by whole days without touching the browser timezone. */
+function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function weekdayOf(date: string): number {
+  return new Date(`${date}T00:00:00.000Z`).getUTCDay();
+}
+
+/** Clip a block to one day, in shop-local minutes. Null when it misses the day. */
+function blockRangeOn(block: CalendarBlock, date: string): { start: number; end: number } | null {
+  const [startDate, startTime] = block.startAt.split("T");
+  const [endDate, endTime] = block.endAt.split("T");
+  if (endDate < date || startDate > date) return null;
+  return {
+    start: startDate === date ? labelToMinutes(startTime) ?? 0 : 0,
+    end: endDate === date ? labelToMinutes(endTime) ?? 24 * 60 : 24 * 60,
+  };
+}
+
+/**
+ * The day's slot grid — the same view the customer sees when booking, which is
+ * the point: an agenda list showed what was booked but gave no hint that an
+ * hour was blocked or that the shop was shut. Here every slot is visible and
+ * says why it is not free.
+ */
 export function AdminCalendar({
   repairOrders,
-}: {
-  repairOrders: CalendarRepairOrder[];
-}) {
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  weekly,
+  exceptions,
+  blocked,
+  today,
+}: Props): React.ReactElement {
+  const [selected, setSelected] = useState(today);
 
-  const days = Array.from({ length: 7 }, (_, i) =>
-    addDays(startOfDay(selectedDate), i - 3)
-  );
+  const days = Array.from({ length: 14 }, (_, i) => shiftDate(today, i - 3));
 
-  const dayOrders = repairOrders.filter((a) =>
-    isSameDay(parseISO(a.dateTime), selectedDate)
-  );
+  const exception = exceptions.find((e) => e.date === selected) ?? null;
+  const dayOrders = repairOrders.filter((o) => o.date === selected);
+  const dayBlocks = blocked
+    .map((b) => ({ block: b, range: blockRangeOn(b, selected) }))
+    .filter((x): x is { block: CalendarBlock; range: { start: number; end: number } } =>
+      x.range !== null,
+    );
+
+  const slots = computeDaySlots({
+    dayOfWeek: weekdayOf(selected),
+    weekly,
+    exception: exception
+      ? ({
+          isClosed: exception.isClosed,
+          openMinute: exception.openMinute,
+          closeMinute: exception.closeMinute,
+        } satisfies DayException)
+      : null,
+    bookedMinutes: dayOrders.map((o) => o.minute),
+    blocked: dayBlocks.map((x) => ({ startMinute: x.range.start, endMinute: x.range.end })),
+    // Past slots stay visible to staff: yesterday's schedule is still a record.
+    nowMinute: null,
+  });
+
+  // A booking can sit outside the current grid — the shop shortened its hours,
+  // or a manager moved it deliberately. It must never disappear from the day.
+  const gridMinutes = new Set(slots.map((s) => labelToMinutes(s.time)));
+  const offGrid = dayOrders.filter((o) => !gridMinutes.has(o.minute));
 
   return (
     <div>
-      {/* Day selector */}
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6">
         {days.map((day) => {
-          const isSelected = isSameDay(day, selectedDate);
-          const count = repairOrders.filter((a) =>
-            isSameDay(parseISO(a.dateTime), day)
-          ).length;
+          const isSelected = day === selected;
+          const count = repairOrders.filter((o) => o.date === day).length;
+          const closed = computeDaySlots({
+            dayOfWeek: weekdayOf(day),
+            weekly,
+            exception: exceptions.find((e) => e.date === day) ?? null,
+            bookedMinutes: [],
+          }).length === 0;
           return (
             <button
-              key={day.toISOString()}
+              key={day}
               type="button"
-              onClick={() => setSelectedDate(day)}
+              onClick={() => setSelected(day)}
               className={`flex flex-col items-center px-4 py-2 rounded-lg shrink-0 min-w-[70px] transition-colors ${
                 isSelected
                   ? "bg-[var(--color-accent)] text-white"
@@ -52,82 +147,126 @@ export function AdminCalendar({
               }`}
             >
               <span className="text-[10px] uppercase">
-                {format(day, "EEE", { locale: ru })}
+                {format(parseISO(day), "EEE", { locale: ru })}
               </span>
-              <span className="text-lg font-bold">
-                {format(day, "d")}
+              <span className="text-lg font-bold">{format(parseISO(day), "d")}</span>
+              <span
+                className={`text-[10px] ${
+                  isSelected ? "text-white/80" : "text-[var(--foreground-muted)]"
+                }`}
+              >
+                {closed ? "выходной" : count > 0 ? `${count} зап.` : " "}
               </span>
-              {count > 0 && (
-                <span
-                  className={`text-[10px] ${
-                    isSelected ? "text-white/80" : "text-[var(--color-accent)]"
-                  }`}
-                >
-                  {count} зап.
-                </span>
-              )}
             </button>
           );
         })}
       </div>
 
-      {/* Timeline */}
       <div className="card">
-        <h3 className="font-medium mb-4">
-          {format(selectedDate, "d MMMM, EEEE", { locale: ru })}
-          <span className="text-[var(--foreground-muted)] ml-2">
-            ({dayOrders.length} записей)
-          </span>
+        <h3 className="font-medium mb-1">
+          {format(parseISO(selected), "d MMMM, EEEE", { locale: ru })}
         </h3>
+        <p className="text-xs text-[var(--foreground-muted)] mb-4">
+          {slots.length === 0
+            ? exception?.isClosed
+              ? `Закрыто${exception.reason ? ` — ${exception.reason}` : ""}`
+              : "Нерабочий день по графику"
+            : `${dayOrders.length} записей · ${slots.filter((s) => s.available).length} свободно из ${slots.length}`}
+        </p>
 
-        {dayOrders.length === 0 ? (
-          <p className="text-[var(--foreground-muted)] text-sm py-4">
-            Нет записей на этот день
+        {slots.length === 0 && offGrid.length === 0 ? (
+          <p className="text-sm text-[var(--foreground-muted)] py-2">
+            Слотов нет. Часы работы и праздники настраиваются ниже.
           </p>
         ) : (
-          <div className="space-y-3">
-            {dayOrders
-              .sort(
-                (a, b) =>
-                  new Date(a.dateTime).getTime() -
-                  new Date(b.dateTime).getTime()
-              )
-              .map((ro) => (
-                <div
-                  key={ro.id}
-                  className="flex items-start gap-4 p-3 rounded-lg bg-[var(--background-secondary)]"
-                >
-                  <div className="text-center shrink-0">
-                    <p className="text-lg font-bold">
-                      {format(parseISO(ro.dateTime), "HH:mm")}
-                    </p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium truncate">{ro.clientName}</p>
-                      <span
-                        className={`badge text-[10px] status-${ro.status.toLowerCase()}`}
-                      >
-                        {REPAIR_ORDER_STATUS_LABELS[ro.status] ?? ro.status}
-                      </span>
-                    </div>
-                    <p className="text-sm text-[var(--foreground-muted)]">
-                      {ro.vehicleModel}
-                      {ro.masterName && ` · ${ro.masterName}`}
-                    </p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {ro.jobs.map((s, i) => (
-                        <span key={i} className="badge badge-silver text-[10px]">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
+          <div className="space-y-2">
+            {slots.map((slot) => {
+              const minute = labelToMinutes(slot.time) ?? 0;
+              const order = dayOrders.find((o) => o.minute === minute);
+              const block = dayBlocks.find(
+                (x) => x.range.start < minute + SLOT_MINUTES && x.range.end > minute,
+              );
+              return (
+                <SlotRow
+                  key={slot.time}
+                  label={`${slot.time} — ${minutesToLabel(minute + SLOT_MINUTES)}`}
+                  order={order}
+                  blockReason={block ? block.block.reason ?? "заблокировано" : null}
+                />
+              );
+            })}
+
+            {offGrid.map((order) => (
+              <SlotRow
+                key={order.id}
+                label={`${order.time} — ${minutesToLabel(order.minute + SLOT_MINUTES)}`}
+                order={order}
+                blockReason={null}
+                note="вне графика"
+              />
+            ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SlotRow({
+  label,
+  order,
+  blockReason,
+  note,
+}: {
+  label: string;
+  order?: CalendarRepairOrder;
+  blockReason: string | null;
+  note?: string;
+}): React.ReactElement {
+  const tone = order
+    ? "bg-[var(--background-secondary)]"
+    : blockReason
+      ? "bg-[var(--background-secondary)] opacity-60"
+      : "border border-dashed border-[var(--border)]";
+
+  return (
+    <div className={`flex items-start gap-4 p-3 rounded-lg ${tone}`}>
+      <div className="w-32 shrink-0 text-sm font-medium tabular-nums">{label}</div>
+
+      {order ? (
+        <Link href={`/admin/repair-orders/${order.id}`} className="flex-1 min-w-0 hover:opacity-80">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <span className="font-medium truncate">{order.clientName}</span>
+            <span className={`badge text-[10px] status-${order.status.toLowerCase()}`}>
+              {REPAIR_ORDER_STATUS_LABELS[order.status] ?? order.status}
+            </span>
+            {note ? (
+              <span className="badge text-[10px] bg-[var(--color-warning-bg,rgba(245,158,11,0.12))]">
+                {note}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-sm text-[var(--foreground-muted)]">
+            {order.vehicleModel}
+            {order.masterName ? ` · ${order.masterName}` : ""}
+          </p>
+          {order.jobs.length > 0 ? (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {order.jobs.map((j, i) => (
+                <span key={i} className="badge badge-silver text-[10px]">
+                  {j}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </Link>
+      ) : blockReason ? (
+        <div className="flex-1 text-sm text-[var(--foreground-muted)]">
+          Заблокировано — {blockReason}
+        </div>
+      ) : (
+        <div className="flex-1 text-sm text-[var(--foreground-muted)]">Свободно</div>
+      )}
     </div>
   );
 }
