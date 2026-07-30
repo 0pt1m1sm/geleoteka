@@ -164,7 +164,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     await logAttempt({
       outcome: "ignored_recipient",
       httpStatus: 200,
-      detail: `INBOUND_EMAIL=${inboundEmail ?? "(default info@geleoteka.ru)"}; envelope.to=${recipientRaw}`,
+      detail: `INBOUND_EMAIL=${inboundEmail ?? "(default sales@geleoteka.ru)"}; envelope.to=${recipientRaw}`,
       recipient: recipientRaw,
       fromEmail,
       messageId,

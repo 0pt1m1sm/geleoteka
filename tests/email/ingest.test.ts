@@ -18,7 +18,7 @@ function parsed(overrides: Partial<ParsedEmail> = {}): ParsedEmail {
     provider: "TIMEWEB_IMAP",
     direction: "INBOUND",
     from: { email: "customer@example.test", name: "Customer" },
-    to: [{ email: "info@geleoteka.ru" }],
+    to: [{ email: "sales@geleoteka.ru" }],
     cc: [],
     bcc: [],
     subject: "Вопрос по сервису",
@@ -30,10 +30,10 @@ function parsed(overrides: Partial<ParsedEmail> = {}): ParsedEmail {
     references: [],
     occurredAt: OCCURRED,
     occurredAtEstimated: false,
-    source: { mailbox: "info@geleoteka.ru", folder: "INBOX", uidValidity: 10n, uid: 501n },
+    source: { mailbox: "sales@geleoteka.ru", folder: "INBOX", uidValidity: 10n, uid: 501n },
     providerLocator: {
       kind: "imap",
-      mailbox: "info@geleoteka.ru",
+      mailbox: "sales@geleoteka.ru",
       folder: "INBOX",
       uidValidity: "10",
       uid: "501",
@@ -114,7 +114,7 @@ describe("synthetic Message-Id", () => {
     expect(buildSyntheticMessageId("TIMEWEB_IMAP", { ...source, uid: 1235n })).not.toBe(base);
     expect(buildSyntheticMessageId("TIMEWEB_IMAP", { ...source, uidValidity: 43n })).not.toBe(base);
     expect(buildSyntheticMessageId("TIMEWEB_IMAP", { ...source, folder: "Sent" })).not.toBe(base);
-    expect(buildSyntheticMessageId("TIMEWEB_IMAP", { ...source, mailbox: "info@geleoteka.ru" })).not.toBe(
+    expect(buildSyntheticMessageId("TIMEWEB_IMAP", { ...source, mailbox: "sales@geleoteka.ru" })).not.toBe(
       base,
     );
   });
@@ -235,7 +235,7 @@ describe("ingestEmail", () => {
         provider: "RESEND",
         rfcMessageId: shared,
         source: {
-          mailbox: "info@geleoteka.ru",
+          mailbox: "sales@geleoteka.ru",
           folder: "RESEND_WEBHOOK",
           uidValidity: null,
           uid: null,

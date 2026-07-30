@@ -42,7 +42,7 @@ function envelope(opts: {
       email_id: opts.emailId,
       created_at: new Date().toISOString(),
       from: opts.from,
-      to: ["info@geleoteka.ru"],
+      to: ["sales@geleoteka.ru"],
       bcc: [],
       cc: [],
       message_id: opts.messageId,

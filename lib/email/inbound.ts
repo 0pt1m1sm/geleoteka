@@ -50,7 +50,7 @@ export interface ResendInboundContent {
 }
 
 /** Default recipient when no INBOUND_EMAIL setting is configured. */
-export const DEFAULT_INBOUND_RECIPIENT = "info@geleoteka.ru";
+export const DEFAULT_INBOUND_RECIPIENT = "sales@geleoteka.ru";
 const MAX_CLOCK_SKEW_SEC = 5 * 60;
 
 interface VerifyInput {
@@ -120,7 +120,7 @@ export function verifyResendWebhook(input: VerifyInput): VerifyResult {
 }
 
 /**
- * `to` may be `["info@geleoteka.ru"]` or `["Geleoteka <info@geleoteka.ru>"]`.
+ * `to` may be `["sales@geleoteka.ru"]` or `["Geleoteka <sales@geleoteka.ru>"]`.
  * Case-insensitive substring match on the allowed local-part@domain string.
  */
 export function shouldAcceptRecipient(

@@ -60,14 +60,14 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "EMAIL_FROM",
     label: "Отправитель (From)",
     description:
-      "Формат: «Geleoteka <info@geleoteka.ru>». Единый видимый From для любого транспорта. Если пусто — берётся legacy RESEND_FROM / RESEND_FROM_FALLBACK.",
+      "Формат: «Geleoteka <sales@geleoteka.ru>». Единый видимый From для любого транспорта. Если пусто — берётся legacy RESEND_FROM / RESEND_FROM_FALLBACK.",
   },
   {
     group: "Email (отправка)",
     key: "EMAIL_REPLY_TO",
     label: "Reply-To",
     description:
-      "Адрес для ответов клиента. По умолчанию info@geleoteka.ru. Должен быть реальным ящиком, чтобы ответы попадали в CRM.",
+      "Адрес для ответов клиента. По умолчанию sales@geleoteka.ru. Должен быть реальным ящиком, чтобы ответы попадали в CRM.",
   },
   {
     group: "Email (отправка)",
@@ -114,7 +114,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "RESEND_FROM",
     label: "Отправитель (verified domain)",
     description:
-      "Legacy-фолбэк для EMAIL_FROM. Формат: «Geleoteka <info@geleoteka.ru>». Используется когда EMAIL_FROM пуст.",
+      "Legacy-фолбэк для EMAIL_FROM. Формат: «Geleoteka <sales@geleoteka.ru>». Используется когда EMAIL_FROM пуст.",
   },
   {
     group: "Email (Resend, legacy)",
@@ -136,7 +136,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "INBOUND_EMAIL",
     label: "Адрес входящей почты",
     description:
-      "Email-адрес на verified-домене, на который Resend будет отправлять webhooks для входящих писем. По умолчанию info@geleoteka.ru. Остальные адреса (sales@, billing@) игнорируются.",
+      "Email-адрес на verified-домене, на который Resend будет отправлять webhooks для входящих писем. По умолчанию sales@geleoteka.ru. Остальные адреса (billing@, other@) игнорируются.",
   },
 
   // ── Email (Timeweb IMAP sync) ────────────────────────────────────────
@@ -167,7 +167,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "MAIL_SYNC_SOURCES",
     label: "Источники синхронизации (JSON)",
     description:
-      'JSON-массив источников: [{"mailbox":"info@geleoteka.ru","folder":"INBOX","role":"INBOUND"},{"mailbox":"crm-archive@geleoteka.ru","folder":"INBOX","role":"OUTBOUND_ARCHIVE"}]. role: INBOUND (прямой опрос ящика) или OUTBOUND_ARCHIVE (архив «Контроля исходящих»). Имена папок английские (INBOX, Sent).',
+      'JSON-массив источников: [{"mailbox":"sales@geleoteka.ru","folder":"INBOX","role":"INBOUND"},{"mailbox":"crm-archive@geleoteka.ru","folder":"INBOX","role":"OUTBOUND_ARCHIVE"}]. role: INBOUND (прямой опрос ящика) или OUTBOUND_ARCHIVE (архив «Контроля исходящих»). Имена папок английские (INBOX, Sent).',
   },
 
   // ── SMS (smsc.ru) ────────────────────────────────────────────────────

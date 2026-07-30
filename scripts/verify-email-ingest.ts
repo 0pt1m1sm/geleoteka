@@ -27,7 +27,7 @@ import {
 
 const TAG = "verify-ingest";
 const CUSTOMER_EMAIL = "client@test.ru";
-const INBOX_ADDRESS = "info@geleoteka.ru";
+const INBOX_ADDRESS = "sales@geleoteka.ru";
 const OCCURRED = new Date("2026-07-15T08:30:00.000Z");
 
 function assert(cond: unknown, msg: string): asserts cond {

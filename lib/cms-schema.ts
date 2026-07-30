@@ -569,7 +569,7 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Email",
-    defaultValue: "info@geleoteka.ru",
+    defaultValue: "sales@geleoteka.ru",
   },
   "contacts.address": {
     type: "text",

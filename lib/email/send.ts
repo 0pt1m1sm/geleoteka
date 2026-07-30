@@ -82,7 +82,7 @@ export async function resolveEmailFrom(): Promise<string> {
   return fallback || DEFAULT_FALLBACK_FROM;
 }
 
-/** Resolve the tenant `Reply-To` (was hard-coded to info@geleoteka.ru). */
+/** Resolve the tenant `Reply-To` (was hard-coded to sales@geleoteka.ru). */
 export async function resolveEmailReplyTo(): Promise<string> {
   const explicit = (await getSetting("EMAIL_REPLY_TO"))?.trim();
   return explicit || DEFAULT_EMAIL_REPLY_TO;

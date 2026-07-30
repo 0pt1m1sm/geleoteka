@@ -19,7 +19,7 @@ import { FakeEmailDb } from "./fake-db";
 
 const CUSTOMER_EMAIL = "customer@example.test";
 const MANAGER_EMAIL = "manager@geleoteka.ru";
-const INFO_EMAIL = "info@geleoteka.ru";
+const INFO_EMAIL = "sales@geleoteka.ru";
 /** Weeks before the sync run — proves occurredAt is the message's, not "now". */
 const OCCURRED = new Date("2026-06-01T09:15:00.000Z");
 

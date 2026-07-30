@@ -107,20 +107,20 @@ function main(): void {
   console.log("  ✓ multi-signature with one match accepted");
 
   // 7. shouldAcceptRecipient
-  assert(shouldAcceptRecipient(["info@geleoteka.ru"]), "info@geleoteka.ru should be accepted");
+  assert(shouldAcceptRecipient(["sales@geleoteka.ru"]), "sales@geleoteka.ru should be accepted");
   assert(
-    shouldAcceptRecipient(["Geleoteka <info@geleoteka.ru>"]),
+    shouldAcceptRecipient(["Geleoteka <sales@geleoteka.ru>"]),
     "addr-with-display-name should be accepted",
   );
   assert(
-    shouldAcceptRecipient(["INFO@GELEOTEKA.RU"]),
+    shouldAcceptRecipient(["SALES@GELEOTEKA.RU"]),
     "case-insensitive recipient match",
   );
   assert(
-    shouldAcceptRecipient(["sales@geleoteka.ru", "info@geleoteka.ru"]),
+    shouldAcceptRecipient(["billing@geleoteka.ru", "sales@geleoteka.ru"]),
     "any-one-match is enough",
   );
-  assert(!shouldAcceptRecipient(["sales@geleoteka.ru"]), "non-info should be rejected");
+  assert(!shouldAcceptRecipient(["billing@geleoteka.ru"]), "non-default recipient should be rejected");
   assert(!shouldAcceptRecipient([]), "empty to should be rejected");
   console.log("  ✓ shouldAcceptRecipient");
 

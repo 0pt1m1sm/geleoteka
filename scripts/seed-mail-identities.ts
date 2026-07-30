@@ -1,11 +1,16 @@
 /**
  * Seed the `MailIdentity` registry — the set of addresses the mail-sync worker
  * treats as "ours". Without these rows every archived message looks INBOUND, so
- * a manager's own outgoing copy would be misfiled and could raise a bogus task.
+ * an outgoing copy would be misfiled and could raise a bogus task.
  *
- * Idempotent: upserts by `address`. Manager rows link to the matching `User`
- * (by email) so outgoing mail gets the right author; a shared/service box, or a
- * manager without a platform account yet, is left with `userId = null`.
+ * Model: functional/departmental mailboxes (sales/service/parts/support) are
+ * SHARED — people are NOT tied to a mailbox. Managers are separate platform
+ * accounts (their own personal email) who send "as" a functional box; the author
+ * of an outgoing message comes from the logged-in user, not the mailbox, so all
+ * these rows carry `userId = null`. `sales@` doubles as the general/transactional
+ * address (info@ folded into it). `crm-archive@` is the outbound-archive service box.
+ *
+ * Idempotent: upserts by `address`.
  *
  * Run against the target DB (prod: via the allow-listed operator IP):
  *   DATABASE_URL=<url> npx tsx scripts/seed-mail-identities.ts
@@ -24,13 +29,11 @@ interface Seed {
 }
 
 const IDENTITIES: Seed[] = [
-  { address: "info@geleoteka.ru", type: "SHARED", who: "Общий ящик / From транзакционных писем" },
+  { address: "sales@geleoteka.ru", type: "SHARED", who: "Продажи + общий/транзакционный адрес (info@ свёрнут сюда)" },
+  { address: "service@geleoteka.ru", type: "SHARED", who: "Сервис" },
+  { address: "parts@geleoteka.ru", type: "SHARED", who: "Запчасти" },
+  { address: "support@geleoteka.ru", type: "SHARED", who: "Поддержка / админ" },
   { address: "crm-archive@geleoteka.ru", type: "ARCHIVE", who: "Служебный архив исходящих (не выдавать людям)" },
-  { address: "sales@geleoteka.ru", type: "MANAGER", who: "Михаил Вишняков — гендир" },
-  { address: "service@geleoteka.ru", type: "MANAGER", who: "Дима — менеджер контент" },
-  { address: "parts@geleoteka.ru", type: "MANAGER", who: "Митя Ляхов — менеджер запчасти" },
-  { address: "bablo@geleoteka.ru", type: "MANAGER", who: "Владислав Полтавский — финансист" },
-  { address: "support@geleoteka.ru", type: "MANAGER", who: "Алекс — админ/разработчик" },
 ];
 
 async function main(): Promise<void> {
