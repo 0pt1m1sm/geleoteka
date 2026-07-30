@@ -136,7 +136,12 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
           status: "SCHEDULED",
           claimToken,
           dealId: deal.id,
-          notes: notes || null,
+          // The wizard's free-text field is the CLIENT's own description of the
+          // problem ("Опишите проблему или пожелания"), so it belongs in
+          // `concern` — the customer-complaint field the admin form renders as
+          // «Жалоба клиента». `notes` is the master's internal-notes field and
+          // must stay empty until a technician writes in it.
+          concern: notes || null,
           roNumber,
           jobLines: {
             create: services.map((s: { id: string; name: string; priceMin: number | null }, idx: number) => ({
