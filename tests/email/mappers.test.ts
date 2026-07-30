@@ -32,7 +32,7 @@ const SENT_AT = "Tue, 14 Jul 2026 09:15:00 +0000";
 const SHARED_HEADERS: Array<{ name: string; value: string }> = [
   { name: "Message-Id", value: MESSAGE_ID },
   { name: "From", value: "Customer <Customer@Example.TEST>" },
-  { name: "To", value: "info@geleoteka.ru" },
+  { name: "To", value: "sales@geleoteka.ru" },
   { name: "Subject", value: "Вопрос по сервису" },
   { name: "Date", value: SENT_AT },
   { name: "In-Reply-To", value: "<outbound-1@geleoteka.ru>" },
@@ -52,7 +52,7 @@ function resendEnvelope(overrides: Partial<ResendInboundEnvelope["data"]> = {}):
       email_id: "resend-uuid-1",
       created_at: "2026-07-14T09:15:30.000Z",
       from: "Customer <Customer@Example.TEST>",
-      to: ["info@geleoteka.ru"],
+      to: ["sales@geleoteka.ru"],
       bcc: [],
       cc: [],
       message_id: MESSAGE_ID,
@@ -132,7 +132,7 @@ function sameMessageOverImap(): ParsedEmail {
     headers: SHARED_HEADERS,
     text: "Здравствуйте!",
     html: null,
-    mailbox: "info@geleoteka.ru",
+    mailbox: "sales@geleoteka.ru",
     folder: "INBOX",
     uidValidity: 10n,
     uid: 501n,
@@ -151,7 +151,7 @@ describe("resend envelope → ParsedEmail", () => {
     // The receiving webhook only ever fires for mail addressed to us.
     expect(parsed.direction).toBe("INBOUND");
     expect(parsed.from).toEqual({ email: "customer@example.test", name: "Customer" });
-    expect(parsed.to).toEqual([{ email: "info@geleoteka.ru" }]);
+    expect(parsed.to).toEqual([{ email: "sales@geleoteka.ru" }]);
     expect(parsed.rfcMessageId).toBe(MESSAGE_ID);
     expect(parsed.rfcMessageIdSynthetic).toBe(false);
     expect(parsed.inReplyTo).toBe("<outbound-1@geleoteka.ru>");

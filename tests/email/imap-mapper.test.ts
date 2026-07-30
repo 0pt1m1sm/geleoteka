@@ -12,11 +12,11 @@ import { buildRawEmail } from "./fake-imap";
  * thrown.
  */
 
-const OURS = new Set(["info@geleoteka.ru", "manager@geleoteka.ru"]);
+const OURS = new Set(["sales@geleoteka.ru", "manager@geleoteka.ru"]);
 const isOurAddress = (email: string): boolean => OURS.has(email.toLowerCase());
 
 function inboundSource(uid: bigint = 501n): EmailSource {
-  return { mailbox: "info@geleoteka.ru", folder: "INBOX", uidValidity: 10n, uid };
+  return { mailbox: "sales@geleoteka.ru", folder: "INBOX", uidValidity: 10n, uid };
 }
 function archiveSource(uid: bigint = 1n): EmailSource {
   return { mailbox: "crm-archive@geleoteka.ru", folder: "INBOX", uidValidity: 7n, uid };
@@ -27,7 +27,7 @@ describe("mapMimeToParsedEmail", () => {
     const raw = buildRawEmail({
       messageId: "<reply-9@example.test>",
       from: '"Иван Клиент" <Customer@Example.TEST>',
-      to: "info@geleoteka.ru",
+      to: "sales@geleoteka.ru",
       subject: "Re: смета",
       date: "Tue, 14 Jul 2026 09:15:00 +0000",
       inReplyTo: "<outbound-1@geleoteka.ru>",
@@ -46,7 +46,7 @@ describe("mapMimeToParsedEmail", () => {
     expect(parsed.rfcMessageId).toBe("<reply-9@example.test>");
     expect(parsed.rfcMessageIdSynthetic).toBe(false);
     expect(parsed.from).toEqual({ email: "customer@example.test", name: "Иван Клиент" });
-    expect(parsed.to).toEqual([{ email: "info@geleoteka.ru" }]);
+    expect(parsed.to).toEqual([{ email: "sales@geleoteka.ru" }]);
     expect(parsed.inReplyTo).toBe("<outbound-1@geleoteka.ru>");
     // References stays RFC order: oldest ancestor first.
     expect(parsed.references).toEqual(["<root@geleoteka.ru>", "<outbound-1@geleoteka.ru>"]);
@@ -55,7 +55,7 @@ describe("mapMimeToParsedEmail", () => {
     expect(parsed.occurredAtEstimated).toBe(false);
     expect(parsed.providerLocator).toEqual({
       kind: "imap",
-      mailbox: "info@geleoteka.ru",
+      mailbox: "sales@geleoteka.ru",
       folder: "INBOX",
       uidValidity: "10",
       uid: "501",
@@ -92,7 +92,7 @@ describe("mapMimeToParsedEmail", () => {
 
   it("marks an archive message OUTBOUND only when From is one of ours", async () => {
     const outgoing = await mapMimeToParsedEmail(
-      buildRawEmail({ from: "Geleoteka <info@geleoteka.ru>", to: "client@test.ru" }),
+      buildRawEmail({ from: "Geleoteka <sales@geleoteka.ru>", to: "client@test.ru" }),
       { source: archiveSource(), role: "OUTBOUND_ARCHIVE", internalDate: null, isOurAddress },
     );
     expect(outgoing.direction).toBe("OUTBOUND");
@@ -100,7 +100,7 @@ describe("mapMimeToParsedEmail", () => {
     // An inbound reply can land in the outgoing-control archive too; From, not
     // the folder, is what classifies it.
     const incoming = await mapMimeToParsedEmail(
-      buildRawEmail({ from: "client@test.ru", to: "info@geleoteka.ru" }),
+      buildRawEmail({ from: "client@test.ru", to: "sales@geleoteka.ru" }),
       { source: archiveSource(2n), role: "OUTBOUND_ARCHIVE", internalDate: null, isOurAddress },
     );
     expect(incoming.direction).toBe("INBOUND");
@@ -151,7 +151,7 @@ describe("mapMimeToParsedEmail", () => {
     const raw = Buffer.from(
       [
         "From: client@test.ru",
-        "To: info@geleoteka.ru",
+        "To: sales@geleoteka.ru",
         "Subject: with attachment",
         "Message-ID: <att-msg@example.test>",
         "MIME-Version: 1.0",

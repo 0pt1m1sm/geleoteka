@@ -7,7 +7,7 @@ Transactional email for booking confirmations, estimate-sent notifications, regi
 1. Sign up at https://resend.com and create an API key.
 2. Add `RESEND_API_KEY` to Railway env. Leave `RESEND_FROM` **empty** (or commented out) — the transport falls back to `onboarding@resend.dev` so first sends work immediately.
 3. Verify the `geleoteka.ru` domain in the Resend dashboard (SPF + DKIM TXT records at your DNS provider).
-4. Once the domain status is green, set `RESEND_FROM="Geleoteka <info@geleoteka.ru>"` and redeploy.
+4. Once the domain status is green, set `RESEND_FROM="Geleoteka <sales@geleoteka.ru>"` and redeploy.
 
 Without `RESEND_API_KEY`, helpers run in **mock mode** — they log to console and return success, but nothing leaves the server. Safe for local dev, dangerous in production: the boot log emits a `[EMAIL] WARNING: RESEND_API_KEY not set in production` line so misconfiguration is visible.
 
@@ -25,7 +25,7 @@ Resend rejects sends from unverified custom domains.
 2. Resend shows three to five TXT records to add — typically one SPF, one DKIM, optionally a return-path CNAME, optionally a DMARC policy.
 3. At your DNS provider (where `geleoteka.ru` is hosted), add each record exactly as Resend shows. Common pitfall: don't wrap the value in extra quotes — paste verbatim.
 4. Click **Verify**. Status turns green within minutes (sometimes up to an hour). If it doesn't propagate within 4 hours, double-check that records were added at the apex (`@` or empty subdomain) where Resend specified.
-5. Once green, the sender `info@geleoteka.ru` becomes usable.
+5. Once green, the sender `sales@geleoteka.ru` becomes usable.
 
 ## 3. Configure env vars
 
@@ -38,7 +38,7 @@ RESEND_API_KEY=
 # Custom sender once the domain is verified. LEAVE EMPTY (or commented) until
 # the geleoteka.ru SPF + DKIM records show green in Resend — the transport
 # automatically uses RESEND_FROM_FALLBACK when this is unset.
-# RESEND_FROM="Geleoteka <info@geleoteka.ru>"
+# RESEND_FROM="Geleoteka <sales@geleoteka.ru>"
 
 # Default sender used when RESEND_FROM is empty. onboarding@resend.dev is
 # always usable without DNS setup; perfect for bootstrap + dev.

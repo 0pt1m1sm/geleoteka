@@ -17,7 +17,7 @@ function rawWithAttachment(bytes: Buffer, filename = "report.pdf"): Buffer {
   const b64 = bytes.toString("base64").replace(/(.{76})/g, "$1\r\n");
   const lines = [
     "From: Client <client@test.ru>",
-    "To: info@geleoteka.ru",
+    "To: sales@geleoteka.ru",
     "Subject: With attachment",
     "MIME-Version: 1.0",
     'Content-Type: multipart/mixed; boundary="BOUND"',

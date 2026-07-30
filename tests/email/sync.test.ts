@@ -27,14 +27,14 @@ import { FakeMailDb } from "./fake-mail-db";
  */
 
 const NOW = new Date("2026-07-20T10:00:00.000Z");
-const OURS = new Set(["info@geleoteka.ru", "manager@geleoteka.ru"]);
-const INBOUND: MailSyncSource = { mailbox: "info@geleoteka.ru", folder: "INBOX", role: "INBOUND" };
+const OURS = new Set(["sales@geleoteka.ru", "manager@geleoteka.ru"]);
+const INBOUND: MailSyncSource = { mailbox: "sales@geleoteka.ru", folder: "INBOX", role: "INBOUND" };
 
 function customerMessage(messageId: string): Buffer {
   return buildRawEmail({
     messageId,
     from: "Иван Клиент <client@test.ru>",
-    to: "info@geleoteka.ru",
+    to: "sales@geleoteka.ru",
     subject: "Вопрос",
     date: "Tue, 14 Jul 2026 09:15:00 +0000",
     text: "Здравствуйте.",
@@ -97,7 +97,7 @@ function harness(): Harness {
 describe("syncSource — replay safety", () => {
   it("DoD 1: a crash between fetch and cursor-commit processes the UID exactly once", async () => {
     const h = harness();
-    h.port.box("info@geleoteka.ru", "INBOX").append(customerMessage("<m1@example.test>"));
+    h.port.box("sales@geleoteka.ru", "INBOX").append(customerMessage("<m1@example.test>"));
 
     // Crash in the window after ingest commits, before the cursor advances.
     h.db.failCursorAdvanceOnce = () => {
@@ -122,7 +122,7 @@ describe("syncSource — replay safety", () => {
 
   it("DoD 2: two workers process each source-UID at most once (lease)", async () => {
     const h = harness();
-    const box = h.port.box("info@geleoteka.ru", "INBOX");
+    const box = h.port.box("sales@geleoteka.ru", "INBOX");
     box.append(customerMessage("<a@example.test>"));
     box.append(customerMessage("<b@example.test>"));
 
@@ -149,7 +149,7 @@ describe("syncSource — replay safety", () => {
 
   it("DoD 3: a UIDVALIDITY change rescans without duplicating CRM rows", async () => {
     const h = harness();
-    const box = h.port.box("info@geleoteka.ru", "INBOX", 10n);
+    const box = h.port.box("sales@geleoteka.ru", "INBOX", 10n);
     box.append(customerMessage("<u1@example.test>"));
     box.append(customerMessage("<u2@example.test>"));
 
@@ -173,7 +173,7 @@ describe("syncSource — replay safety", () => {
 
   it("DoD 4: a poison message becomes DEAD, the cursor continues, and replay recovers it", async () => {
     const h = harness();
-    const box = h.port.box("info@geleoteka.ru", "INBOX");
+    const box = h.port.box("sales@geleoteka.ru", "INBOX");
     box.append(customerMessage("<good1@example.test>")); // uid 1
     const poisonUid = box.append(Buffer.from(`${POISON_MARKER} broken`, "utf8")); // uid 2
     box.append(customerMessage("<good3@example.test>")); // uid 3
@@ -208,7 +208,7 @@ describe("syncSource — replay safety", () => {
 
   it("DoD 5: outage drill — 10 queued messages import in order once the worker runs", async () => {
     const h = harness();
-    const box = h.port.box("info@geleoteka.ru", "INBOX");
+    const box = h.port.box("sales@geleoteka.ru", "INBOX");
     for (let i = 1; i <= 10; i += 1) box.append(customerMessage(`<drill-${i}@example.test>`));
 
     const res = await syncSource(INBOUND, h.config(), h.deps);
@@ -225,7 +225,7 @@ describe("syncSource — replay safety", () => {
 
   it("steps over a UID that vanished between listing and fetch", async () => {
     const h = harness();
-    const box = h.port.box("info@geleoteka.ru", "INBOX");
+    const box = h.port.box("sales@geleoteka.ru", "INBOX");
     box.append(customerMessage("<keep@example.test>")); // uid 1
     const goneUid = box.append(customerMessage("<gone@example.test>")); // uid 2
     box.append(customerMessage("<after@example.test>")); // uid 3

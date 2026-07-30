@@ -93,12 +93,12 @@ function scenarioBodies(): Array<{ label: string; subject: string; html: string;
 
 function messageFor(body: { subject: string; html: string; text: string }): OutboundMessage {
   return {
-    from: "Geleoteka <info@geleoteka.ru>",
+    from: "Geleoteka <sales@geleoteka.ru>",
     to: "client@customer.ru",
     subject: body.subject,
     html: body.html,
     text: body.text,
-    replyTo: "info@geleoteka.ru",
+    replyTo: "sales@geleoteka.ru",
     messageId: THREAD.messageId,
     inReplyTo: THREAD.inReplyTo,
     references: THREAD.references,
@@ -171,7 +171,7 @@ describe("transport contract — every template + reply through both adapters", 
         host: "smtp.example.ru",
         port: 465,
         secure: true,
-        auth: { user: "info@geleoteka.ru", pass: "secret" },
+        auth: { user: "sales@geleoteka.ru", pass: "secret" },
         createTransporter: fakeTransporter(smtpCaptured),
       });
 
@@ -193,14 +193,14 @@ describe("transport contract — every template + reply through both adapters", 
       // Subject/body/reply-to survive unchanged.
       expect(rb.subject).toBe(body.subject);
       expect(rb.html).toBe(body.html);
-      expect(rb.reply_to).toBe("info@geleoteka.ru");
+      expect(rb.reply_to).toBe("sales@geleoteka.ru");
 
       // SMTP carries the same ids through nodemailer's native fields.
       expect(so.messageId).toBe(THREAD.messageId);
       expect(so.inReplyTo).toBe(THREAD.inReplyTo);
       expect(joinRefs(so.references)).toBe(THREAD.references.join(" "));
       expect(so.subject).toBe(body.subject);
-      expect(so.replyTo).toBe("info@geleoteka.ru");
+      expect(so.replyTo).toBe("sales@geleoteka.ru");
 
       // Cross-adapter parity: the two agree byte-for-byte on the threading keys.
       expect(so.messageId).toBe(rb.headers?.["Message-Id"]);

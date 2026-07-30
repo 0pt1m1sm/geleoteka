@@ -22,7 +22,7 @@ export type TransportName = "smtp" | "resend";
 export const DEFAULT_TRANSPORT: TransportName = "smtp";
 
 /** Reply-To used when no `EMAIL_REPLY_TO` is configured (Geleoteka default). */
-export const DEFAULT_EMAIL_REPLY_TO = "info@geleoteka.ru";
+export const DEFAULT_EMAIL_REPLY_TO = "sales@geleoteka.ru";
 
 /**
  * A normalized message handed to a transport. Email-shaped for now; a future
