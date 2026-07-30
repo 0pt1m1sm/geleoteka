@@ -7,6 +7,8 @@ import {
   resetUserPassword,
   changeUserRole,
   setUserDisabled,
+  getPurgeBlockers,
+  purgeEmptyUser,
 } from "@/app/actions/user-management";
 
 interface Props {
@@ -40,11 +42,49 @@ export function UserAdminActions({
   isSelf,
 }: Props): React.ReactElement {
   const router = useRouter();
-  const [pending, setPending] = useState<null | "reset" | "role" | "disable">(null);
+  const [pending, setPending] = useState<null | "reset" | "role" | "disable" | "purge">(null);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [role, setRole] = useState(currentRole);
   const isDisabled = currentRole === "NONE";
+
+  /**
+   * Permanently remove a person who has nothing attached — the cleanup path for
+   * duplicates and abandoned registrations, which archiving alone would leave
+   * piling up forever. Anyone with history is refused by the server (and, if
+   * that check ever misses a relation, by the database's RESTRICT constraints).
+   */
+  async function handlePurge(): Promise<void> {
+    setError(null);
+    setPending("purge");
+    try {
+      const check = await getPurgeBlockers(userId);
+      if (!check.ok) {
+        setError(check.error);
+        return;
+      }
+      if (check.blockers.length > 0) {
+        const detail = check.blockers.map((b) => `${b.label}: ${b.count}`).join(", ");
+        setError(
+          `Нельзя удалить — есть связанные записи (${detail}). Такого пользователя можно только заблокировать или архивировать.`,
+        );
+        return;
+      }
+      const ok = await confirm({
+        message: `Удалить «${userName}» безвозвратно? У пользователя нет связанных записей. Действие необратимо.`,
+      });
+      if (!ok) return;
+
+      const res = await purgeEmptyUser(userId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      router.push("/admin/users");
+    } finally {
+      setPending(null);
+    }
+  }
 
   async function handleReset(): Promise<void> {
     if (
@@ -214,6 +254,24 @@ export function UserAdminActions({
             Блокировать может только администратор.
           </p>
         )}
+      </div>
+
+      <div className="border-t border-[var(--border)] pt-4">
+        <p className="text-xs text-[var(--foreground-muted)] mb-2">Очистка</p>
+        <button
+          type="button"
+          onClick={handlePurge}
+          disabled={!viewerIsAdmin || isSelf || pending !== null}
+          data-loading={pending === "purge" || undefined}
+          aria-busy={pending === "purge" || undefined}
+          className="btn btn-secondary text-sm"
+        >
+          {pending === "purge" ? "Проверяем…" : "Удалить безвозвратно"}
+        </button>
+        <p className="text-xs text-[var(--foreground-muted)] mt-1">
+          Только для пустых записей — дублей и брошенных регистраций. Если у пользователя есть
+          заказы, сделки или переписка, удаление будет отклонено: историю не стираем.
+        </p>
       </div>
     </div>
   );

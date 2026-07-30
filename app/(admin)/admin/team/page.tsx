@@ -1,9 +1,10 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 
 export default async function TeamPage() {
   const session = await getSession();
@@ -25,7 +26,20 @@ export default async function TeamPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Сервис" title="Команда" />
+      <PageHeader
+        eyebrow="Сервис"
+        title="Команда"
+        description="Профили мастеров для страницы «О нас». Нажмите на карточку, чтобы отредактировать."
+      />
+
+      {masters.length === 0 ? (
+        <Card>
+          <p className="text-sm text-[var(--foreground-muted)]">
+            В команде пока никого. Мастер сначала регистрируется сам, затем администратор
+            назначает ему роль «Мастер» в разделе «Доступы» — после этого он появится здесь.
+          </p>
+        </Card>
+      ) : null}
 
       <div className="space-y-4">
         {masters.map((m: Record<string, unknown>) => {
@@ -38,7 +52,11 @@ export default async function TeamPage() {
           } | null;
           const name = m.name as string;
           return (
-            <div key={m.id as string} className="card flex items-start gap-4">
+            <Link
+              key={m.id as string}
+              href={`/admin/team/${m.id as string}`}
+              className="card row-clickable flex items-start gap-4"
+            >
               <div className="w-12 h-12 rounded-full bg-[var(--color-secondary)] flex items-center justify-center shrink-0">
                 <span className="text-sm font-bold text-[var(--foreground-muted)]">
                   {name
@@ -79,7 +97,7 @@ export default async function TeamPage() {
               >
                 {profile?.isActive ? "Активен" : "Неактивен"}
               </span>
-            </div>
+            </Link>
           );
         })}
       </div>

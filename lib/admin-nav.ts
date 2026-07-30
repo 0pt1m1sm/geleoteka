@@ -92,6 +92,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Доступы",
     items: [
       { href: "/admin/users", label: "Пользователи" },
+      { href: "/admin/roles", label: "Роли" },
     ],
   },
   {
