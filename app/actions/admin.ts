@@ -8,6 +8,7 @@ import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { consumeApprovedEstimateParts } from "@/lib/fulfillment/consume-parts";
 import { actorId } from "@/lib/wms-host";
 import { parseDatetimeLocalInput } from "@/lib/timezone";
+import { applyReschedule, type ReschedulePort } from "@/lib/scheduling/reschedule";
 
 export async function updateRepairOrderStatus(
   repairOrderId: string,
@@ -257,6 +258,66 @@ export async function updateRepairOrderDetails(
 
   await db.repairOrder.update({ where: { id: repairOrderId }, data });
   revalidatePath(`/admin/repair-orders/${repairOrderId}`);
+  return { error: null, success: true };
+}
+
+interface RescheduleResult {
+  error: string | null;
+  success?: boolean;
+}
+
+/**
+ * Move a booking to a new date/time — the "client phoned and asked to move it"
+ * path, which had no UI at all: `dateTime` was written once at booking and never
+ * again.
+ *
+ * Staff deliberately may pick a time outside the customer-facing `WORK_HOURS`
+ * grid (that grid exists to shape self-service booking, not to overrule the
+ * shop). What staff may NOT do is double-book: `Slot.dateTime` is unique, and
+ * that constraint — not a pre-check — is what actually decides, so a concurrent
+ * booking for the same instant loses here exactly as it would in the wizard.
+ *
+ * The RO and its Slot move together in one transaction; a half-applied
+ * reschedule would leave the calendar and the order disagreeing about when the
+ * car is due.
+ */
+export async function rescheduleRepairOrder(
+  _prevState: RescheduleResult | null,
+  formData: FormData,
+): Promise<RescheduleResult> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const repairOrderId = formData.get("repairOrderId") as string;
+  if (!repairOrderId) return { error: "Не передан заказ-наряд" };
+
+  const raw = formData.get("dateTime");
+  if (typeof raw !== "string" || raw.trim() === "") {
+    return { error: "Укажите новые дату и время" };
+  }
+  // datetime-local carries no zone; read it as shop wall-clock, the same way the
+  // field is rendered back, so a save round-trip cannot drift.
+  const next = parseDatetimeLocalInput(raw);
+  if (!next) return { error: "Некорректные дата и время" };
+
+  const outcome = await applyReschedule(
+    repairOrderId,
+    next,
+    db as unknown as ReschedulePort,
+  );
+
+  if (!outcome.ok) {
+    switch (outcome.reason) {
+      case "not-found":
+        return { error: "Заказ-наряд не найден" };
+      case "cancelled":
+        return { error: "Нельзя перенести отменённую запись" };
+      case "conflict":
+        return { error: "Это время уже занято другой записью. Выберите другое." };
+    }
+  }
+
+  revalidatePath(`/admin/repair-orders/${repairOrderId}`);
+  revalidatePath("/admin/calendar");
   return { error: null, success: true };
 }
 

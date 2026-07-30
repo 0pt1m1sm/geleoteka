@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -8,9 +10,55 @@ import { getCMS } from "@/lib/cms";
 import { trimLabel } from "@/lib/vehicle-catalog-types";
 import { AddToCartButton } from "@/components/parts/AddToCartButton";
 import { ImageGallery } from "@/components/shared/ImageGallery";
+import { pageSeo } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+/** Shared with generateMetadata so the detail lookup runs once per request. */
+const getPartBySlug = cache(async (slug: string) => {
+  return db.part.findUnique({
+    where: { slug },
+    include: {
+      category: { select: { name: true, slug: true } },
+      stockItems: { select: { quantity: true } },
+      partTrims: {
+        include: {
+          trim: {
+            include: {
+              generation: {
+                include: { model: { select: { name: true, slug: true } } },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const part = await getPartBySlug(slug);
+  const p = part as Record<string, unknown> | null;
+
+  if (!p || !p.isActive) {
+    return pageSeo({
+      title: "Запчасть не найдена",
+      description:
+        "Запрошенная запчасть не найдена. Посмотрите полный каталог оригинальных запчастей для Mercedes-Benz G-Class в Geleoteka.",
+      path: `/parts/${slug}`,
+    });
+  }
+
+  return pageSeo({
+    title: p.name as string,
+    description:
+      (p.description as string | null) ??
+      `${p.name as string} (артикул ${p.article as string}) для Mercedes-Benz G-Class — купить в сервисе Geleoteka.`,
+    path: `/parts/${slug}`,
+  });
 }
 
 interface RawPartTrim {
@@ -37,24 +85,7 @@ interface CompatibilityRow {
 
 export default async function PartDetailPage({ params }: Props) {
   const { slug } = await params;
-  const part = await db.part.findUnique({
-    where: { slug },
-    include: {
-      category: { select: { name: true, slug: true } },
-      stockItems: { select: { quantity: true } },
-      partTrims: {
-        include: {
-          trim: {
-            include: {
-              generation: {
-                include: { model: { select: { name: true, slug: true } } },
-              },
-            },
-          },
-        },
-      },
-    },
-  });
+  const part = await getPartBySlug(slug);
 
   if (!part || !(part as Record<string, unknown>).isActive) notFound();
 

@@ -693,7 +693,10 @@ model RepairOrder {
   dealId String
 
   // Relations
-  user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: deleting a person must never be a command to delete
+  // their service history. Cascades stay INSIDE the aggregate (RepairOrder →
+  // JobLine/Slot), where they mean "this order's own parts".
+  user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Restrict)
   vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
   trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
@@ -747,6 +750,53 @@ model Slot {
   createdAt     DateTime @default(now())
 
   repairOrder RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+}
+
+// ─── Schedule configuration ────────────────────────────────────────────────
+// What the shop is OPEN for, as opposed to Slot, which records what is already
+// BOOKED. Kept in separate tables on purpose: Slot.repairOrderId is non-nullable
+// and unique, so a closure or a block has no order to hang off, and widening
+// Slot would weaken the unique constraint that prevents double-booking.
+//
+// All times are minutes from midnight in the business timezone (lib/timezone.ts),
+// never UTC offsets — "the shop opens at 09:00" must survive a server whose
+// clock is not in Moscow.
+
+/// Recurring weekly hours; one row per weekday.
+model WorkingHours {
+  /// 0 = Sunday … 6 = Saturday (JS getDay() convention).
+  dayOfWeek   Int      @id
+  isOpen      Boolean  @default(true)
+  openMinute  Int      @default(540) // 09:00
+  closeMinute Int      @default(1140) // 19:00
+  updatedAt   DateTime @updatedAt
+}
+
+/// A single date that overrides the weekly rule — holiday, closure, or special
+/// hours. `isClosed` wins; custom hours apply only when it is false.
+model ScheduleException {
+  id          String   @id @default(cuid())
+  /// Calendar day in business time, stored at midnight UTC of that day.
+  date        DateTime @unique @db.Date
+  isClosed    Boolean  @default(true)
+  openMinute  Int?
+  closeMinute Int?
+  reason      String?
+  createdAt   DateTime @default(now())
+
+  @@index([date])
+}
+
+/// An arbitrary unavailable range (maintenance, lunch, a car left overnight).
+/// Half-open [startAt, endAt): a block ending at 11:00 leaves 11:00 bookable.
+model BlockedInterval {
+  id        String   @id @default(cuid())
+  startAt   DateTime
+  endAt     DateTime
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([startAt, endAt])
 }
 
 model JobLine {
@@ -1571,7 +1621,8 @@ model Deal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  // Restrict — see RepairOrder.user. A deal carries estimates and money.
+  customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
   vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   estimates        Estimate[]
@@ -1697,7 +1748,8 @@ model CommunicationLog {
   // manager's per-user action queue.
   readAt         DateTime?
 
-  customer            User           @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Cascade)
+  // Restrict — see RepairOrder.user. Correspondence is the audit trail.
+  customer            User           @relation("CommLogCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
   author              User?          @relation("CommLogAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
   deal                Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   linkedInboxMessages InboxMessage[] @relation("InboxLinkedCommLog")

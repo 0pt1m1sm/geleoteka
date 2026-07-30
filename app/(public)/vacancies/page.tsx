@@ -4,6 +4,14 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Вакансии в специализированном сервисе Mercedes-Benz G-Class",
+  description:
+    "Открытые вакансии специализированного сервиса Гелендвагена: мастера, механики, приёмщики. Работа с G-Class, достойная оплата и профессиональный коллектив.",
+  path: "/vacancies",
+});
 
 export default async function VacanciesPage(): Promise<React.ReactElement> {
   const [eyebrow, title, description, items, ctaTitle, ctaBody, ctaButton] = await Promise.all([

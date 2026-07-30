@@ -4,6 +4,14 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "О сервисе Geleoteka: мастера Mercedes-Benz G-Class",
+  description:
+    "Специализированный сервис Mercedes-Benz G-Class: история компании, сертифицированные мастера, опыт работы с Гелендвагеном W463 и индивидуальный подход.",
+  path: "/about",
+});
 
 interface MasterData {
   id: string;

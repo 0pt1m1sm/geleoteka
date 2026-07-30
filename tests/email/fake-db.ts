@@ -174,7 +174,11 @@ export class FakeEmailDb implements EmailIngestDb {
         this.users.find(
           (u) =>
             String(u.email).toLowerCase() === wanted.toLowerCase() &&
-            (where.isCustomer === undefined || u.isCustomer === where.isCustomer),
+            (where.isCustomer === undefined || u.isCustomer === where.isCustomer) &&
+            // Soft-delete filter: `deletedAt: null` must exclude deleted rows, or
+            // the resolver's guard would be untestable here.
+            (where.deletedAt === undefined ||
+              rowEquals(u.deletedAt ?? null, where.deletedAt)),
         ) ?? null
       );
     },

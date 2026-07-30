@@ -2,6 +2,12 @@ import { getDefaultContact } from "@/lib/session-defaults";
 import { getSession } from "@/lib/auth";
 import { PartsCart } from "@/components/parts/PartsCart";
 
+import { NOINDEX } from "@/lib/seo";
+
+/** Private route — kept out of the index (see lib/seo.ts). */
+export const metadata = NOINDEX;
+
+
 export const dynamic = "force-dynamic";
 
 export default async function CartPage() {

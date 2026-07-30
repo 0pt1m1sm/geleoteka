@@ -34,23 +34,61 @@ const fontMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+const SITE_TITLE = "Geleoteka — специализированный сервис Mercedes-Benz G-Class";
+const SITE_DESCRIPTION =
+  "Специализированный сервис Mercedes-Benz G-Class (Гелендваген): ремонт и ТО, оригинальные запчасти, аренда. Онлайн-запись, личный кабинет, отслеживание статуса ремонта в реальном времени.";
+
 export const metadata: Metadata = {
+  // Required before any relative canonical/OG URL can resolve; without it Next
+  // errors on build for URL-based metadata fields.
+  metadataBase: new URL(SITE_URL),
   title: {
-    default: "Geleoteka — специализированный сервис Mercedes-Benz G-Class",
+    default: SITE_TITLE,
     template: "%s | Geleoteka",
   },
-  description:
-    "Специализированный сервис Mercedes-Benz. Онлайн-запись, личный кабинет, отслеживание статуса ремонта в реальном времени.",
+  description: SITE_DESCRIPTION,
   keywords: [
-    "Mercedes-Benz сервис",
-    "ремонт Mercedes",
+    "Гелендваген сервис",
+    "ремонт Гелендвагена",
+    "Mercedes-Benz G-Class сервис",
+    "ремонт G-Class",
+    "Gelandewagen сервис",
+    "G63 AMG ремонт",
+    "G500 ремонт",
+    "W463 сервис",
+    "ТО Mercedes G-Class",
+    "запчасти Гелендваген",
+    "аренда Гелендвагена",
     "автосервис Mercedes",
-    "ТО Mercedes",
   ],
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "ru_RU",
     siteName: "Geleoteka",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [
+      {
+        url: "/images/hero/g-class-hero.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Mercedes-Benz G-Class в сервисе Geleoteka",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/images/hero/g-class-hero.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
   },
 };
 

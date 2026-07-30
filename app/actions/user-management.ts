@@ -30,12 +30,34 @@ function generateTempPassword(): string {
 type Ok<T extends object = object> = { ok: true } & T;
 type Fail = { ok: false; error: string };
 
-const ALLOWED_ROLES = ["NONE", "CLIENT", "MANAGER", "ADMIN"] as const;
+// Mirrors the UserPermissionRole enum. MASTER and WAREHOUSE_WORKER are
+// assignable from the roles page: both gate their own portal (/master, the
+// warehouse section), so leaving them out meant those accounts could only be
+// provisioned by hand in the database.
+const ALLOWED_ROLES = [
+  "NONE",
+  "CLIENT",
+  "MASTER",
+  "WAREHOUSE_WORKER",
+  "MANAGER",
+  "ADMIN",
+] as const;
 type AllowedRole = (typeof ALLOWED_ROLES)[number];
 
 function isAllowedRole(v: unknown): v is AllowedRole {
   return typeof v === "string" && (ALLOWED_ROLES as readonly string[]).includes(v);
 }
+
+/** Russian labels for the assignable roles, shared by the admin surfaces. */
+export const ROLE_LABELS: Readonly<Record<AllowedRole, string>> = {
+  NONE: "Без доступа",
+  CLIENT: "Клиент",
+  MASTER: "Мастер",
+  WAREHOUSE_WORKER: "Кладовщик",
+  MANAGER: "Менеджер",
+  ADMIN: "Администратор",
+};
+
 
 /**
  * Reset a user's password to a fresh 10-char temp string. Marks

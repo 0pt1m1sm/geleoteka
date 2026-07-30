@@ -5,6 +5,12 @@ import { enabledOAuthProviders } from "@/lib/oauth";
 import { LoginForm } from "@/components/shared/LoginForm";
 import { NarrowFormPage } from "@/components/shared/NarrowFormPage";
 
+import { NOINDEX } from "@/lib/seo";
+
+/** Private route — kept out of the index (see lib/seo.ts). */
+export const metadata = NOINDEX;
+
+
 interface PageProps {
   searchParams: Promise<{ oauth_error?: string }>;
 }

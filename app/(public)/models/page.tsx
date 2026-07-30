@@ -3,6 +3,14 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getActiveModels, generationLabel } from "@/lib/vehicle-catalog";
 import { PageHeader } from "@/components/ui";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Модели и поколения Mercedes-Benz G-Class: W460, W461, W463",
+  description:
+    "Каталог поколений Гелендвагена: W460, W461, W463, модели G63 AMG, G500, G350. Отличия версий — подберите свой G-Class и услуги сервиса для него.",
+  path: "/models",
+});
 
 export default async function ModelsPage(): Promise<React.ReactElement> {
   const models = await getActiveModels();

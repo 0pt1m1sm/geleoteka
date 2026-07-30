@@ -4,6 +4,14 @@ import { db } from "@/lib/db";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { Step1ServiceVehicle } from "@/components/booking/Step1ServiceVehicle";
 import { StepIndicator } from "@/components/booking/StepIndicator";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Онлайн-запись на сервис Mercedes-Benz G-Class",
+  description:
+    "Запишитесь на ремонт или техобслуживание Mercedes-Benz G-Class онлайн за пару минут: выберите услугу, автомобиль и удобное время визита в сервис Geleoteka.",
+  path: "/booking",
+});
 
 interface ServiceItem {
   id: string;

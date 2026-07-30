@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useBooking } from "./BookingProvider";
 import { format, addDays, isSameDay } from "date-fns";
 import { ru } from "date-fns/locale";
-import { WORK_HOURS, SLOT_HOURS } from "@/lib/booking-slots";
+import { SLOT_HOURS } from "@/lib/booking-slots";
 
 interface Slot {
   time: string;
@@ -19,6 +19,7 @@ export function CalendarSlotPicker() {
   );
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
 
   const selectedTime = data.dateTime
     ? format(new Date(data.dateTime), "HH:mm")
@@ -26,6 +27,7 @@ export function CalendarSlotPicker() {
 
   const fetchSlots = useCallback(async (date: Date) => {
     setLoading(true);
+    setFailed(false);
     try {
       const dateStr = format(date, "yyyy-MM-dd");
       const res = await fetch(`/api/slots?date=${dateStr}`);
@@ -33,10 +35,15 @@ export function CalendarSlotPicker() {
         const json = await res.json();
         setSlots(json.slots);
       } else {
-        setSlots(WORK_HOURS.map((t) => ({ time: t, available: true })));
+        // Availability is now shop-configurable (hours, holidays, blocks), so a
+        // hardcoded "everything is free" fallback would invite bookings into
+        // hours the shop is closed. Show nothing and say so instead.
+        setSlots([]);
+        setFailed(true);
       }
     } catch {
-      setSlots(WORK_HOURS.map((t) => ({ time: t, available: true })));
+      setSlots([]);
+      setFailed(true);
     } finally {
       setLoading(false);
     }
@@ -88,6 +95,14 @@ export function CalendarSlotPicker() {
         </h3>
         {loading ? (
           <p className="text-[var(--foreground-muted)] text-sm">Загрузка...</p>
+        ) : failed ? (
+          <p className="text-sm text-[var(--color-error,#e5484d)]">
+            Не удалось загрузить свободное время. Обновите страницу или позвоните нам.
+          </p>
+        ) : slots.length === 0 ? (
+          <p className="text-[var(--foreground-muted)] text-sm">
+            В этот день записи нет — выберите другую дату.
+          </p>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {slots.map((slot) => {

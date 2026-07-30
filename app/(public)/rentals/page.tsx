@@ -6,6 +6,14 @@ import { Zap, Activity } from "lucide-react";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Аренда Mercedes-Benz G-Class (Гелендваген) в Москве",
+  description:
+    "Аренда легендарного Гелендвагена G63 AMG и G500 на любой срок: сутки, неделя, месяц. Автомобили в идеальном состоянии, полная страховка, подача в удобное место.",
+  path: "/rentals",
+});
 
 export default async function RentalsPage() {
   const cars = await db.vehicle.findMany({

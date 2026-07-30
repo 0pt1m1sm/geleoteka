@@ -217,7 +217,12 @@ async function findThreadOwner(
       where: { externalId: candidate },
       select: { customerUserId: true, dealId: true },
     })) as { customerUserId: string; dealId: string | null } | null;
-    if (prior) return { customerUserId: prior.customerUserId, dealId: prior.dealId };
+    // A deleted owner is not a match: keep walking the chain rather than
+    // inheriting a customer whose card nobody can open.
+    if (prior && (await customerIsLive(prior.customerUserId, client))) {
+      return { customerUserId: prior.customerUserId, dealId: prior.dealId };
+    }
+    if (prior) continue;
 
     const email = (await client.emailMessage.findFirst({
       where: { rfcMessageId: candidate },
@@ -230,27 +235,54 @@ async function findThreadOwner(
       orderBy: { createdAt: "asc" },
       select: { customerUserId: true, dealId: true },
     })) as { customerUserId: string; dealId: string | null } | null;
-    if (linked) return { customerUserId: linked.customerUserId, dealId: linked.dealId };
+    if (linked && (await customerIsLive(linked.customerUserId, client))) {
+      return { customerUserId: linked.customerUserId, dealId: linked.dealId };
+    }
   }
   return null;
 }
 
-/** Primary `User.email`, then a secondary `CustomerContact` EMAIL alias. */
+/**
+ * Primary `User.email`, then a secondary `CustomerContact` EMAIL alias.
+ *
+ * Soft-deleted customers (`deletedAt != null`) are deliberately NOT matched. A
+ * deleted customer's card cannot be opened, so attaching mail to them writes a
+ * row no UI can reach — the message would exist in the DB and be invisible
+ * everywhere. Refusing the match sends it to the triage inbox instead, where a
+ * human can re-attach it.
+ */
 async function matchCustomerByEmail(
   email: string,
   client: EmailIngestTx,
 ): Promise<{ id: string; name: string } | null> {
   const primary = (await client.user.findFirst({
-    where: { email: { equals: email, mode: "insensitive" }, isCustomer: true },
+    where: { email: { equals: email, mode: "insensitive" }, isCustomer: true, deletedAt: null },
     select: { id: true, name: true },
   })) as { id: string; name: string } | null;
   if (primary) return primary;
 
   const alias = (await client.customerContact.findFirst({
     where: { type: "EMAIL", value: email },
-    select: { user: { select: { id: true, name: true, isCustomer: true } } },
-  })) as { user: { id: string; name: string; isCustomer: boolean } } | null;
-  return alias?.user.isCustomer ? { id: alias.user.id, name: alias.user.name } : null;
+    select: { user: { select: { id: true, name: true, isCustomer: true, deletedAt: true } } },
+  })) as {
+    user: { id: string; name: string; isCustomer: boolean; deletedAt: Date | null };
+  } | null;
+  if (!alias?.user.isCustomer) return null;
+  if ((alias.user.deletedAt ?? null) !== null) return null;
+  return { id: alias.user.id, name: alias.user.name };
+}
+
+/**
+ * Guard for thread inheritance: an ancestor row can point at a customer who has
+ * since been deleted. Inheriting that owner would smuggle the new message onto
+ * an unreachable card, so a deleted (or missing) owner is not a valid target.
+ */
+async function customerIsLive(customerUserId: string, client: EmailIngestTx): Promise<boolean> {
+  const user = (await client.user.findUnique({
+    where: { id: customerUserId },
+    select: { deletedAt: true },
+  })) as { deletedAt: Date | null } | null;
+  return user !== null && (user.deletedAt ?? null) === null;
 }
 
 /**

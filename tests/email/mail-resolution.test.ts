@@ -419,3 +419,121 @@ describe("manual-link idempotency (canonical dedup)", () => {
     expect(db.communicationLogs[0].emailMessageId).toBe("em_canonical");
   });
 });
+
+/**
+ * Story 0 — mail addressed to a SOFT-DELETED customer must stay visible.
+ *
+ * Found in production 2026-07-30: `User.deletedAt` was not consulted anywhere in
+ * resolution, so a message resolving onto a deleted customer was written as a
+ * `CommunicationLog` on a customer card nobody can open — and it never reached
+ * the triage inbox, which only lists `InboxMessage`. The mail existed in the DB
+ * and was invisible in every UI.
+ *
+ * The rule pinned here: a deleted customer is NOT a match. Such mail parks in
+ * triage, where a human can re-attach it, and raises no follow-up task.
+ */
+describe("resolution — soft-deleted customers stay visible", () => {
+  const DELETED_EMAIL = "gone@example.test";
+  const DELETED_ALIAS = "gone-alias@example.test";
+  let db: FakeEmailDb;
+  let ensureFollowUp: Mock<NonNullable<IngestOptions["ensureFollowUp"]>>;
+
+  beforeEach(() => {
+    db = seedDb();
+    db.users.push({
+      id: "user_deleted",
+      email: DELETED_EMAIL,
+      name: "Удалённый Клиент",
+      isCustomer: true,
+      deletedAt: new Date("2026-07-01T00:00:00.000Z"),
+    });
+    db.customerContacts.push({
+      id: "cc_deleted",
+      type: "EMAIL",
+      value: DELETED_ALIAS,
+      userId: "user_deleted",
+    });
+    db.deals.push({ id: "deal_deleted", customerUserId: "user_deleted", stage: "QUALIFIED" });
+    ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+  });
+
+  function run(email: ParsedEmail) {
+    return ingestEmail(email, { client: db, ensureFollowUp });
+  }
+
+  it("parks inbound from a deleted customer's primary email in triage", async () => {
+    const result = await run(
+      parsed({ from: { email: DELETED_EMAIL }, rfcMessageId: "<del-1@example.test>" }),
+    );
+
+    expect(result.kind).toBe("inbox");
+    expect(result.status).toBe("unresolved");
+    expect(db.inboxMessages).toHaveLength(1);
+    expect(db.communicationLogs).toHaveLength(0);
+    expect(ensureFollowUp).not.toHaveBeenCalled();
+  });
+
+  it("parks inbound arriving on a deleted customer's alias in triage", async () => {
+    const result = await run(
+      parsed({ from: { email: DELETED_ALIAS }, rfcMessageId: "<del-2@example.test>" }),
+    );
+
+    expect(result.kind).toBe("inbox");
+    expect(db.communicationLogs).toHaveLength(0);
+    expect(ensureFollowUp).not.toHaveBeenCalled();
+  });
+
+  // The nastiest variant: the thread anchor still points at the deleted
+  // customer, so threading would smuggle the message onto the dead card.
+  it("parks a reply whose thread owner was deleted", async () => {
+    db.communicationLogs.push({
+      id: "cl_dead_thread",
+      externalId: "<txn-to-deleted@geleoteka.ru>",
+      customerUserId: "user_deleted",
+      dealId: "deal_deleted",
+      channel: "EMAIL_OUTBOUND",
+    });
+
+    const result = await run(
+      parsed({
+        from: { email: "someone@gmail.com" },
+        inReplyTo: "<txn-to-deleted@geleoteka.ru>",
+        rfcMessageId: "<del-3@gmail.com>",
+      }),
+    );
+
+    expect(result.kind).toBe("inbox");
+    // Only the pre-seeded anchor remains — no new hidden row was written.
+    expect(db.communicationLogs).toHaveLength(1);
+    expect(ensureFollowUp).not.toHaveBeenCalled();
+  });
+
+  it("parks our own outbound addressed to a deleted customer", async () => {
+    const result = await run(
+      parsed({
+        direction: "OUTBOUND",
+        from: { email: MANAGER_EMAIL },
+        to: [{ email: DELETED_EMAIL }],
+        rfcMessageId: "<del-out@geleoteka.ru>",
+        source: { mailbox: "crm-archive@geleoteka.ru", folder: "INBOX", uidValidity: 7n, uid: 77n },
+      }),
+    );
+
+    expect(result.kind).toBe("inbox");
+    expect(db.inboxMessages).toHaveLength(1);
+    expect(db.inboxMessages[0].direction).toBe("OUTBOUND");
+    expect(db.communicationLogs).toHaveLength(0);
+  });
+
+  // Regression guard: the fix must not make LIVE customers stop resolving.
+  it("still attaches mail from a live customer", async () => {
+    const result = await run(
+      parsed({ from: { email: CUSTOMER_EMAIL }, rfcMessageId: "<live-1@example.test>" }),
+    );
+
+    expect(result.kind).toBe("customer");
+    expect(db.communicationLogs).toHaveLength(1);
+    expect(db.communicationLogs[0].customerUserId).toBe("user_customer");
+    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+  });
+});
