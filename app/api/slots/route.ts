@@ -1,45 +1,33 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { db } from "@/lib/db";
-import { startOfDay, endOfDay, parseISO } from "date-fns";
-import { WORK_HOURS } from "@/lib/booking-slots";
 
+import { getDaySlots } from "@/lib/scheduling/day-availability";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * Availability for one day, as `{ slots: [{ time, available }] }`.
+ *
+ * The response shape is unchanged — CalendarSlotPicker reads it directly — but
+ * the slots now come from the editable schedule (working hours, holidays and
+ * blocked intervals) instead of a hardcoded array, and a closed day correctly
+ * returns an empty list rather than five phantom slots.
+ */
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const dateParam = request.nextUrl.searchParams.get("date");
   if (!dateParam) {
     return NextResponse.json({ error: "date parameter required" }, { status: 400 });
   }
 
-  const date = parseISO(dateParam);
-  if (isNaN(date.getTime())) {
+  // The picker sends a plain calendar day; anything else is a client bug, and
+  // parsing it loosely would silently shift the day across a timezone.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    return NextResponse.json({ error: "invalid date" }, { status: 400 });
+  }
+  if (Number.isNaN(new Date(`${dateParam}T00:00:00.000Z`).getTime())) {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  const dayStart = startOfDay(date);
-  const dayEnd = endOfDay(date);
-
-  const reservedSlots = await db.slot.findMany({
-    where: { dateTime: { gte: dayStart, lte: dayEnd } },
-    select: { dateTime: true },
-  });
-
-  const bookedTimes = new Set(
-    reservedSlots.map((s: { dateTime: Date }) => {
-      const h = s.dateTime.getHours().toString().padStart(2, "0");
-      const m = s.dateTime.getMinutes().toString().padStart(2, "0");
-      return `${h}:${m}`;
-    })
-  );
-
-  const now = new Date();
-  const isToday = dayStart.getTime() === startOfDay(now).getTime();
-
-  const slots = WORK_HOURS.map((time) => ({
-    time,
-    available:
-      !bookedTimes.has(time) &&
-      (!isToday || parseInt(time.split(":")[0]) > now.getHours()),
-  }));
-
+  const slots = await getDaySlots(dateParam);
   return NextResponse.json({ slots });
 }
