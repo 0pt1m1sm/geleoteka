@@ -50,6 +50,12 @@ export async function resolveOAuthLogin(
   if (linked) return guard(linked.user);
 
   // 2-3. Существующий пользователь по email или телефону → привязать и войти.
+  //
+  // Автопривязка разрешена ТОЛЬКО клиентам. Раньше совпадения email/телефона
+  // хватало для любой роли: тот, кто заведёт у провайдера аккаунт с адресом
+  // администратора, получал админскую сессию вообще без пароля. Сотрудник
+  // теперь должен привязать вход осознанно — через уже связанный OAuth-аккаунт
+  // (ветка 1 выше), а не по совпадению почты.
   let existing: MatchedUser | null = null;
   if (profile.email) {
     existing = (await db.user.findUnique({
@@ -63,6 +69,12 @@ export async function resolveOAuthLogin(
       where: { phone },
       select: USER_SELECT,
     })) as MatchedUser | null;
+  }
+  if (existing && existing.permissionRole !== "CLIENT") {
+    return {
+      kind: "rejected",
+      reason: "Для этой учётной записи вход через соцсеть недоступен — войдите по паролю",
+    };
   }
   if (existing) {
     const verdict = guard(existing);
