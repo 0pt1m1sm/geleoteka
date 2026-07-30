@@ -54,7 +54,10 @@ export async function loadCustomersForList(
 ): Promise<CustomerListViewModel[]> {
   const where: Record<string, unknown> = {
     isCustomer: true,
-    permissionRole: { in: ["CLIENT", "NONE"] as const },
+    // Deliberately NOT filtered by permissionRole. Being a customer is a
+    // business fact; the permission role only says what the person may do in
+    // the app. Filtering on it hid every customer who is also staff — a master
+    // or admin servicing their own car vanished from the CRM entirely.
     deletedAt: null,
   };
 

@@ -41,22 +41,21 @@ export async function deleteCustomer(
   if (!target.isCustomer) return { error: "Это не клиент" };
   if (target.deletedAt) return { error: "Клиент уже удалён" };
 
-  const hardDeleted = target.isTempPassword;
-
-  if (hardDeleted) {
-    await db.user.delete({ where: { id: customerUserId } });
-  } else {
-    await db.user.update({
-      where: { id: customerUserId },
-      data: { deletedAt: new Date() },
-    });
-  }
+  // Always soft-delete. This used to hard-delete when `isTempPassword` was set,
+  // on the assumption that a guest account has nothing worth keeping — but
+  // `isTempPassword` describes a CREDENTIAL, not the absence of history, and a
+  // guest row is created BY a booking. Deleting one therefore cascaded away the
+  // very repair order that produced it (verified in production: the single
+  // guest customer owned a repair order and a deal). Archiving keeps the
+  // history and stays reversible via restoreCustomer.
+  await db.user.update({
+    where: { id: customerUserId },
+    data: { deletedAt: new Date() },
+  });
 
   revalidatePath("/admin/customers");
-  if (!hardDeleted) {
-    revalidatePath(`/admin/customers/${customerUserId}`);
-  }
-  return { error: null, hardDeleted };
+  revalidatePath(`/admin/customers/${customerUserId}`);
+  return { error: null, hardDeleted: false };
 }
 
 /** Restore a soft-deleted customer. ADMIN only. */
