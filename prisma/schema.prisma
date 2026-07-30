@@ -1403,6 +1403,32 @@ model RentalBooking {
 // VACANCIES
 // ============================================
 
+/// Team member shown on the public «О нас» page.
+///
+/// Deliberately NOT linked to `User`. Who appears on the website is marketing
+/// content, edited alongside vacancies — not a consequence of somebody holding
+/// an account. `User.isMaster` + `MasterProfile` remain a separate concern:
+/// they decide who can be assigned to a repair order and who reaches the master
+/// portal. Keeping the two apart means a photographer's-choice roster edit can
+/// never revoke a technician's access, and a departing technician does not
+/// silently vanish from the site.
+model TeamMember {
+  id               String   @id @default(cuid())
+  name             String
+  role             String?
+  bio              String?
+  photoUrl         String?
+  yearsExperience  Int?
+  certifications   String[]
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
 model Vacancy {
   id           String   @id @default(cuid())
   title        String

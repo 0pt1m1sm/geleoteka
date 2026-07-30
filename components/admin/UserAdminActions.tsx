@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { confirm } from "@/lib/ui/confirm";
 import {
   resetUserPassword,
@@ -42,6 +43,7 @@ export function UserAdminActions({
   isSelf,
 }: Props): React.ReactElement {
   const router = useRouter();
+  const nav = useProgressRouter();
   const [pending, setPending] = useState<null | "reset" | "role" | "disable" | "purge">(null);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -80,7 +82,7 @@ export function UserAdminActions({
         setError(res.error);
         return;
       }
-      router.push("/admin/users");
+      nav.push("/admin/users");
     } finally {
       setPending(null);
     }

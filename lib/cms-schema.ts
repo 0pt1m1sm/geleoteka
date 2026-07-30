@@ -581,13 +581,13 @@ export const CMS_SCHEMA = {
     type: "text",
     group: "contacts",
     label: "Часы работы — сервис",
-    defaultValue: "Пн–Сб: 9:00–21:00, Вс: выходной",
+    defaultValue: "Пн–Пт: 10:00–20:00, Сб: 10:00–16:00, Вс: выходной",
   },
   "contacts.hours.parts": {
     type: "text",
     group: "contacts",
     label: "Часы работы — запчасти",
-    defaultValue: "Пн–Сб: 9:00–21:00, Вс: выходной",
+    defaultValue: "Пн–Пт: 10:00–20:00, Сб: 10:00–16:00, Вс: выходной",
   },
   "contacts.eyebrow": {
     type: "text",
