@@ -6,6 +6,14 @@ import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext } from "@/lib/cms";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Услуги и цены на ремонт и ТО Mercedes-Benz G-Class",
+  description:
+    "Прайс на ремонт и техобслуживание Mercedes-Benz G-Class: диагностика, двигатель, подвеска, тормоза, кондиционер. Актуальные цены на работы для Гелендвагена.",
+  path: "/services",
+});
 
 interface ServiceData {
   id: string;

@@ -1,9 +1,12 @@
 export const dynamic = "force-dynamic";
 
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { pageSeo } from "@/lib/seo";
 
 interface ServiceDetail {
   slug: string;
@@ -19,9 +22,36 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+/** Shared with generateMetadata so the detail lookup runs once per request. */
+const getServiceBySlug = cache(async (slug: string): Promise<ServiceDetail | null> => {
+  return db.service.findUnique({ where: { slug } });
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const service = await getServiceBySlug(slug);
+
+  if (!service) {
+    return pageSeo({
+      title: "Услуга не найдена",
+      description:
+        "Запрошенная услуга не найдена. Посмотрите полный список услуг по ремонту и ТО Mercedes-Benz G-Class в сервисе Geleoteka.",
+      path: `/services/${slug}`,
+    });
+  }
+
+  return pageSeo({
+    title: service.name,
+    description:
+      service.description ??
+      `Услуга «${service.name}» для Mercedes-Benz G-Class в специализированном сервисе Geleoteka: цена, сроки, запись онлайн.`,
+    path: `/services/${slug}`,
+  });
+}
+
 export default async function ServicePage({ params }: Props) {
   const { slug } = await params;
-  const service: ServiceDetail | null = await db.service.findUnique({ where: { slug } });
+  const service = await getServiceBySlug(slug);
 
   if (!service) notFound();
 

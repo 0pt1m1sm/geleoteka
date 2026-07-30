@@ -9,6 +9,12 @@ import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner"
 import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
 import { getEstimateChain } from "@/lib/crm/estimate-chain";
 
+import { NOINDEX } from "@/lib/seo";
+
+/** Private route — kept out of the index (see lib/seo.ts). */
+export const metadata = NOINDEX;
+
+
 interface DealMin {
   id: string;
   customerUserId: string;

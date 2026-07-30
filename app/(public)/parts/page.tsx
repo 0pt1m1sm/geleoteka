@@ -10,6 +10,14 @@ import { MyCarStrip } from "@/components/parts/MyCarStrip";
 import { PartsFilterSidebar, PartsFilterChips } from "@/components/parts/PartsFilterSidebar";
 import { PartsSearchBox } from "@/components/parts/PartsSearchBox";
 import { Pagination } from "@/components/ui";
+import { pageSeo } from "@/lib/seo";
+
+export const metadata = pageSeo({
+  title: "Оригинальные запчасти для Mercedes-Benz G-Class (Гелендваген)",
+  description:
+    "Каталог оригинальных запчастей и аналогов для Гелендвагена: детали в наличии и под заказ, подбор по VIN и поколению W463. Доставка по Москве и России.",
+  path: "/parts",
+});
 
 const PAGE_SIZE = 24;
 

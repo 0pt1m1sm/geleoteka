@@ -1,5 +1,7 @@
 export const dynamic = "force-dynamic";
 
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -8,16 +10,45 @@ import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
 import { RentalBookingForm } from "@/components/rentals/RentalBookingForm";
 import { ImageGallery } from "@/components/shared/ImageGallery";
+import { pageSeo } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
-export default async function RentalCarPage({ params }: Props) {
-  const { id } = await params;
-  const car = await db.vehicle.findFirst({
+/** Shared with generateMetadata so the detail lookup runs once per request. */
+const getRentalVehicleById = cache(async (id: string) => {
+  return db.vehicle.findFirst({
     where: { id, ownershipType: "RENTAL", isArchived: false },
   });
+});
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { id } = await params;
+  const car = await getRentalVehicleById(id);
+  const c = car as Record<string, unknown> | null;
+
+  if (!c || !c.isAvailable) {
+    return pageSeo({
+      title: "Автомобиль не найден",
+      description:
+        "Запрошенный автомобиль недоступен для аренды. Посмотрите весь парк Mercedes-Benz G-Class, доступный для аренды в Geleoteka.",
+      path: `/rentals/${id}`,
+    });
+  }
+
+  return pageSeo({
+    title: `Аренда Mercedes-Benz ${c.model as string}`,
+    description:
+      (c.description as string | null) ??
+      `Аренда Mercedes-Benz ${c.model as string} ${c.year as number} года: страховка КАСКО включена, подача в удобное место, поддержка 24/7.`,
+    path: `/rentals/${id}`,
+  });
+}
+
+export default async function RentalCarPage({ params }: Props) {
+  const { id } = await params;
+  const car = await getRentalVehicleById(id);
 
   if (!car || !(car as Record<string, unknown>).isAvailable) notFound();
 

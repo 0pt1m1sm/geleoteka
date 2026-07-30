@@ -5,6 +5,12 @@ import { redirect } from "next/navigation";
 import { OAUTH_PENDING_COOKIE, verifyPendingProfile } from "@/lib/oauth-login";
 import { OAuthCompleteForm } from "@/components/shared/OAuthCompleteForm";
 
+import { NOINDEX } from "@/lib/seo";
+
+/** Private route — kept out of the index (see lib/seo.ts). */
+export const metadata = NOINDEX;
+
+
 /**
  * Дозаполнение регистрации после входа через Яндекс/VK: провайдер не отдал
  * телефон и/или email — просим только недостающее. Профиль провайдера лежит

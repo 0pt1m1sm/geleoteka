@@ -4,8 +4,16 @@ import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList, getCMSImage } from "@/lib/cms";
+import { pageSeo } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = pageSeo({
+  title: "Специализированный сервис Mercedes-Benz G-Class",
+  description:
+    "Ремонт и ТО Mercedes-Benz G-Class в Москве: диагностика, подвеска, двигатель, кузовной ремонт. Онлайн-запись, оригинальные запчасти, аренда G63 и G500.",
+  path: "/",
+});
 
 export default async function HomePage(): Promise<React.ReactElement> {
   const [
@@ -91,7 +99,7 @@ export default async function HomePage(): Promise<React.ReactElement> {
         <div className="absolute inset-0">
           <Image
             src={heroImage}
-            alt=""
+            alt="Mercedes-Benz G-Class (Гелендваген) в специализированном сервисе Geleoteka"
             fill
             priority
             sizes="100vw"
@@ -115,9 +123,9 @@ export default async function HomePage(): Promise<React.ReactElement> {
               <div className="mb-6 inline-block border border-accent/40 px-4 py-1.5 text-xs uppercase tracking-[0.3em] text-accent">
                 {heroLeftEyebrow}
               </div>
-              <h2 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
+              <h1 className="mb-4 text-3xl font-bold uppercase tracking-tight sm:text-5xl text-display">
                 {heroLeftTitle}
-              </h2>
+              </h1>
               <div className="mb-8 max-w-md text-base text-white/70 sm:text-lg sm:min-h-[3.5rem] flex items-center">
                 <Markdown source={heroLeftLede} />
               </div>

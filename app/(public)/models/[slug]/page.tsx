@@ -1,18 +1,46 @@
 export const dynamic = "force-dynamic";
 
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getModelBySlug, generationLabel } from "@/lib/vehicle-catalog";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { pageSeo } from "@/lib/seo";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
+/** Shared with generateMetadata so the detail lookup runs once per request. */
+const getCachedModelBySlug = cache(getModelBySlug);
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const model = await getCachedModelBySlug(slug);
+
+  if (!model) {
+    return pageSeo({
+      title: "Модель не найдена",
+      description:
+        "Запрошенная модель не найдена. Посмотрите полный каталог поколений Mercedes-Benz G-Class в сервисе Geleoteka.",
+      path: `/models/${slug}`,
+    });
+  }
+
+  return pageSeo({
+    title: `Mercedes-Benz ${model.name} — модели и поколения`,
+    description:
+      model.description ??
+      `Mercedes-Benz ${model.name}: поколения, двигатели, особенности и услуги сервиса для этого автомобиля в Geleoteka.`,
+    path: `/models/${slug}`,
+  });
+}
+
 export default async function ModelPage({ params }: Props): Promise<React.ReactElement> {
   const { slug } = await params;
-  const model = await getModelBySlug(slug);
+  const model = await getCachedModelBySlug(slug);
 
   if (!model) notFound();
 

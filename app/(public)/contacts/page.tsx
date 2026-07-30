@@ -2,8 +2,16 @@ import Link from "next/link";
 import { getCMSMany, getCMSText, getCMSList } from "@/lib/cms";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
+import { pageSeo } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+export const metadata = pageSeo({
+  title: "Контакты сервиса Geleoteka: адрес, телефон, часы работы",
+  description:
+    "Адрес, телефоны отделов сервиса и запчастей, часы работы и схема проезда к специализированному сервису Mercedes-Benz G-Class. Запишитесь на ремонт онлайн.",
+  path: "/contacts",
+});
 
 const CMS_KEYS = [
   "contacts.phone.service",
