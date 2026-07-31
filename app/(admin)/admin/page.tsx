@@ -10,6 +10,7 @@ import { Card, MetricCard, PageHeader } from "@/components/ui";
 import { UpcomingOrdersTable, type UpcomingOrderRow } from "./UpcomingOrdersTable";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { customerName } from "@/lib/crm/customer-display";
 
 interface OpenDealRow {
   id: string;
@@ -18,7 +19,7 @@ interface OpenDealRow {
   stage: string;
   channel: string;
   updatedAt: Date;
-  customer: { id: string; name: string };
+  customer: { id: string; name: string } | null;
 }
 
 const OPEN_DEAL_STAGES = ["NEW", "IN_PROGRESS"] as const;
@@ -209,7 +210,11 @@ export default async function AdminDashboard() {
                     href={`/admin/crm/deals/${d.id}`}
                     className="flex-1 min-w-0 hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
                   >
-                    <div className="font-medium truncate">{d.customer.name}</div>
+                    <div
+                      className={`font-medium truncate ${d.customer ? "" : "text-[var(--foreground-muted)] italic"}`}
+                    >
+                      {customerName(d.customer)}
+                    </div>
                     <div className="text-xs text-[var(--foreground-muted)]">
                       {d.number ?? "—"} · {DEAL_STAGE_LABELS[d.stage] ?? d.stage} · {d.channel}
                     </div>
@@ -238,13 +243,13 @@ export default async function AdminDashboard() {
       ) : (
         <UpcomingOrdersTable
           rows={upcoming.map((ro: Record<string, unknown>): UpcomingOrderRow => {
-            const user = ro.user as { name: string; phone: string | null };
+            const user = ro.user as { name: string; phone: string | null } | null;
             const vehicle = ro.vehicle as { model: string };
             const jobs = ro.jobLines as Array<{ description: string }>;
             return {
               id: ro.id as string,
-              customerName: user.name,
-              customerPhone: user.phone,
+              customerName: customerName(user),
+              customerPhone: user?.phone ?? null,
               vehicleModel: vehicle.model,
               dateTime: (ro.dateTime as Date).toISOString(),
               status: ro.status as string,

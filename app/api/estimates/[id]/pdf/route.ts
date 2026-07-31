@@ -38,9 +38,9 @@ interface EstimateRow {
   taxRate: number;
   total: number;
   deal: {
-    customerUserId: string;
+    customerUserId: string | null;
     claimToken: string | null;
-    customer: { name: string; phone: string; email: string };
+    customer: { name: string; phone: string; email: string } | null;
     vehicle: {
       make: string;
       model: string;

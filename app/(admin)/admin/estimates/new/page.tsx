@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { EstimateBuilder } from "@/components/admin/EstimateBuilder";
+import { customerName } from "@/lib/crm/customer-display";
 
 export default async function NewEstimatePage() {
   const session = await getSession();
@@ -25,7 +26,7 @@ export default async function NewEstimatePage() {
 
   const options = repairOrders.map((ro: Record<string, unknown>) => ({
     id: ro.id as string,
-    label: `${(ro.user as { name: string }).name} — ${(ro.vehicle as { model: string }).model}`,
+    label: `${customerName(ro.user as { name: string } | null)} — ${(ro.vehicle as { model: string }).model}`,
   }));
 
   return (

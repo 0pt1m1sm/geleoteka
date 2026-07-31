@@ -134,6 +134,16 @@ export async function setDealStage(
 
     // Maintain CustomerProfile.lifetimeValue across the WON boundary so it stays
     // in sync without a full recompute (mirrors the WON/rollback transitions).
+    //
+    // A detached deal has no profile to bill the value to, and passing a null id
+    // to this upsert is a Prisma validation error, so closing out old paperwork
+    // for an erased customer would throw. The stage still moves; only the
+    // lifetime-value bookkeeping is skipped, which is correct — there is no
+    // customer left whose lifetime value it could belong to.
+    if (deal.customerUserId === null) {
+      return false;
+    }
+
     if (nextStage === "WON" && deal.stage !== "WON") {
       await tx.customerProfile.upsert({
         where: { userId: deal.customerUserId },

@@ -157,13 +157,17 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
         deal: {
           id: string;
           claimToken: string | null;
-          customer: { id: string; email: string; name: string; isTempPassword: boolean };
+          customer: { id: string; email: string; name: string; isTempPassword: boolean } | null;
         };
       }
     | null;
-  if (!emailPayload?.deal.customer.email) {
+  // No customer at all means the deal was detached by an erase — there is
+  // nobody to send the estimate to. The estimate itself is still saved; the
+  // `?.` here now covers the customer as well, which it previously did not.
+  if (!emailPayload?.deal.customer?.email) {
     return { error: null, estimateId };
   }
+  const customer = emailPayload.deal.customer;
 
   const {
     sendEstimateSentEmail,
@@ -174,7 +178,7 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
     isPlausibleEmail,
   } = await import("@/lib/email");
 
-  if (!isPlausibleEmail(emailPayload.deal.customer.email)) {
+  if (!isPlausibleEmail(customer.email)) {
     return {
       error: "У клиента не указан корректный email — отправьте смету ссылкой вручную",
       estimateId,
@@ -191,12 +195,12 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
 
   const estimateNumber = emailPayload.number ?? estimateId.slice(-6).toUpperCase();
   const subject = `Geleoteka — смета №${estimateNumber} на согласование`;
-  const bodyText = `Здравствуйте, ${emailPayload.deal.customer.name}. Смета №${estimateNumber} на сумму ${(emailPayload.total / 100).toLocaleString("ru-RU")} ₽. Открыть: ${viewUrl}`;
+  const bodyText = `Здравствуйте, ${customer.name}. Смета №${estimateNumber} на сумму ${(emailPayload.total / 100).toLocaleString("ru-RU")} ₽. Открыть: ${viewUrl}`;
   const messageId = generateOutboundMessageId();
   // Persist FIRST — primary threading anchor: customer replies to estimates
   // most often, and we must capture externalId before Resend accepts.
   await recordOutboundEmail({
-    customerUserId: emailPayload.deal.customer.id,
+    customerUserId: customer.id,
     dealId: emailPayload.deal.id,
     authorUserId: session.id,
     subject,
@@ -205,9 +209,9 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
   });
 
   void sendEstimateSentEmail(
-    emailPayload.deal.customer.email,
+    customer.email,
     {
-      customerName: emailPayload.deal.customer.name,
+      customerName: customer.name,
       estimateNumber,
       total: emailPayload.total,
       validUntil: emailPayload.validUntil,

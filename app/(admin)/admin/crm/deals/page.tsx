@@ -13,6 +13,7 @@ import {
 } from "@/lib/deal-stage-labels";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
 import { DealKanban, type KanbanDeal } from "@/components/crm/DealKanban";
+import { customerName } from "@/lib/crm/customer-display";
 
 interface CustomerOption {
   id: string;
@@ -36,7 +37,7 @@ interface DealRow {
   total: number;
   createdAt: Date;
   updatedAt: Date;
-  customer: { id: string; name: string };
+  customer: { id: string; name: string } | null;
   vehicle: { make: string; model: string } | null;
   tasks: Array<{ id: string; dueAt: Date }>;
 }
@@ -110,7 +111,7 @@ export default async function CrmDealsPage({ searchParams }: Props) {
     stage: d.stage,
     channel: d.channel,
     total: d.total,
-    customerName: d.customer.name,
+    customerName: customerName(d.customer),
     vehicle: d.vehicle ? `${d.vehicle.make} ${d.vehicle.model}` : null,
     openTasks: d.tasks.length,
   }));
@@ -166,7 +167,11 @@ export default async function CrmDealsPage({ searchParams }: Props) {
                   className="card card-hover flex items-start justify-between gap-4"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{d.customer.name}</div>
+                    <div
+                      className={`font-medium truncate ${d.customer ? "" : "text-[var(--foreground-muted)] italic"}`}
+                    >
+                      {customerName(d.customer)}
+                    </div>
                     <div className="mt-1 text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3 items-center">
                       <span>{d.number ?? "—"}</span>
                       <span>{DEAL_STAGE_LABELS[d.stage] ?? d.stage}</span>
