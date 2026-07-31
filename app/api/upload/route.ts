@@ -16,6 +16,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
+  // Приватность выбирает вызывающий: витринные загрузчики её не передают и
+  // получают PUBLIC. Значение по умолчанию именно такое, чтобы забытый параметр
+  // не закрыл картинку каталога, а не наоборот — закрытость ставится осознанно.
+  const visibility = formData.get("visibility") === "private" ? "PRIVATE" : "PUBLIC";
 
   if (!file) {
     return NextResponse.json({ error: "Файл не передан" }, { status: 400 });
@@ -58,6 +62,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       width: processed.width,
       height: processed.height,
       size: processed.size,
+      visibility,
       createdById: session?.id ?? null,
     },
     select: { id: true },

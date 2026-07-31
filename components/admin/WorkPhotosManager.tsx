@@ -49,6 +49,9 @@ export function WorkPhotosManager({
     try {
       const fd = new FormData();
       fd.append("file", file);
+      // Фотоотчёт по машине клиента — не витрина: закрывается на загрузке,
+      // иначе ссылка на файл осталась бы публичной навсегда.
+      fd.append("visibility", "private");
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const json = (await res.json()) as { url?: string; error?: string };
       if (!res.ok || !json.url) {
