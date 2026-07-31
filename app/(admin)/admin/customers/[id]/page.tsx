@@ -12,9 +12,7 @@ import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm"
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerContactsManager } from "@/components/admin/customers/CustomerContactsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
-import { DeleteCustomerButton } from "@/components/admin/customers/DeleteCustomerButton";
-import { RestoreCustomerButton } from "@/components/admin/customers/RestoreCustomerButton";
-import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
+import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { CustomerTabs } from "@/components/admin/customers/CustomerTabs";
@@ -208,6 +206,16 @@ export default async function CustomerDetailPage({ params }: Props) {
               {tag.name}
             </span>
           ))}
+          {session.permissionRole === "ADMIN" ? (
+            <div className="ml-auto">
+              <UserActionsMenu
+                userId={customer.id}
+                userName={customer.name}
+                confirmPhrase={customer.email ?? customer.phone ?? ""}
+                archiving={{ archived: customer.deletedAt !== null }}
+              />
+            </div>
+          ) : null}
         </div>
         <p className="text-[var(--foreground-muted)]">
           {customer.phone} · {customer.email}
@@ -293,39 +301,6 @@ export default async function CustomerDetailPage({ params }: Props) {
                   contacts={customer.contacts}
                 />
 
-                {session.permissionRole === "ADMIN" ? (
-                  <div className="card border-[var(--color-error)]/30">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-error)] mb-2">
-                      Опасная зона
-                    </h2>
-                    {customer.deletedAt ? (
-                      <>
-                        <p className="text-sm text-[var(--foreground-muted)] mb-3">
-                          Клиент скрыт из CRM. Восстановление вернёт его в списки.
-                        </p>
-                        <RestoreCustomerButton customerUserId={customer.id} />
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-[var(--foreground-muted)] mb-3">
-                          Скрытие убирает клиента из списков, история сделок и заказ-нарядов
-                          сохраняется — действие обратимо.
-                        </p>
-                        <DeleteCustomerButton
-                          customerUserId={customer.id}
-                          isGuest={customer.isTempPassword}
-                        />
-                        <div className="mt-4 pt-3 border-t border-[var(--border)]">
-                          <EraseCustomerPanel
-                            customerUserId={customer.id}
-                            customerName={customer.name}
-                            confirmPhrase={customer.email ?? customer.phone ?? ""}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : null}
               </div>
             ),
           },

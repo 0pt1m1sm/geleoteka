@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import {
@@ -17,6 +17,11 @@ interface Props {
   confirmPhrase: string;
   /** Where to go once the person is gone. */
   redirectTo?: string;
+  /**
+   * Skip the panel's own trigger and load the impact straight away — for when
+   * the decision to delete was already made outside, in the actions menu.
+   */
+  autoOpen?: boolean;
 }
 
 /** What actually happens to each kind of record — see customer-erase.ts. */
@@ -44,6 +49,7 @@ export function EraseCustomerPanel({
   customerName,
   confirmPhrase,
   redirectTo = "/admin/customers",
+  autoOpen = false,
 }: Props): React.ReactElement {
   const nav = useProgressRouter();
   const [busy, setBusy] = useState<null | "impact" | "export" | "erase">(null);
@@ -58,7 +64,7 @@ export function EraseCustomerPanel({
   // nowhere — and the operator says so explicitly rather than the code guessing.
   const [deleteRelated, setDeleteRelated] = useState(false);
 
-  async function handleOpen(): Promise<void> {
+  const handleOpen = useCallback(async (): Promise<void> => {
     setError(null);
     setBusy("impact");
     try {
@@ -73,7 +79,16 @@ export function EraseCustomerPanel({
     } finally {
       setBusy(null);
     }
-  }
+  }, [customerUserId]);
+
+  // Fires once. The impact has to be fetched from the server, so there is no
+  // way to have it at first render; the ref keeps a re-render from asking twice.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || opened.current) return;
+    opened.current = true;
+    void handleOpen();
+  }, [autoOpen, handleOpen]);
 
   async function handleExport(): Promise<void> {
     setError(null);
@@ -122,6 +137,13 @@ export function EraseCustomerPanel({
   }
 
   if (counts === null) {
+    if (autoOpen) {
+      return (
+        <p className="text-sm text-[var(--foreground-muted)]">
+          {error ?? "Проверяем связанные данные…"}
+        </p>
+      );
+    }
     return (
       <div>
         <button
