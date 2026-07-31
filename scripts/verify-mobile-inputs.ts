@@ -103,6 +103,44 @@ const MARKUP = `
     </div>
   </div>
 
+  <!-- Карточка письма: старая раскладка (две колонки) против новой (строки с
+       общей базовой линией). Меряем расхождение базовых линий темы и времени. -->
+  <div class="card" data-card="mail">
+    <div class="px-4 py-3" data-row="mail-old">
+      <div class="flex items-start gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-medium truncate" data-align="old-subject">Вторая причина</div>
+          <div class="text-xs truncate">welcome@e.mail.ru</div>
+        </div>
+        <div class="shrink-0 text-right text-xs">
+          <div data-align="old-time">31 июл., 18:18</div>
+          <div class="mt-0.5">sales@geleoteka.ru</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-4 py-3" data-row="mail-new">
+      <div class="flex items-baseline justify-between gap-3">
+        <div class="font-medium truncate min-w-0" data-align="new-subject">Вторая причина</div>
+        <div class="shrink-0 text-xs" data-align="new-time">31 июл., 18:18</div>
+      </div>
+      <div class="flex items-baseline justify-between gap-3">
+        <div class="text-xs truncate min-w-0">welcome@e.mail.ru</div>
+        <div class="shrink-0 text-xs truncate max-w-[10rem]">sales@geleoteka.ru</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Реквизиты письма: длинный Message-Id без пробелов. У трека 1fr
+       минимальная ширина равна содержимому, поэтому колонка распирала карточку.
+       Проверяем и на телефоне, и на десктопе — замечено было на десктопе. -->
+  <div class="card" data-card="meta">
+    <dl class="grid grid-cols-1 sm:grid-cols-[130px_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+      <dt class="text-xs sm:text-sm">Message-Id</dt>
+      <dd class="font-mono text-xs break-all" data-field="meta-msgid">&lt;49469088-8cbf-4b5e-b60c-5a6898f246e7@mlrmr.com&gt;</dd>
+    </dl>
+  </div>
+
   <!-- Часы работы: четыре колонки в одной строке — самое узкое место на телефоне. -->
   <div class="card" data-card="hours">
     <div class="grid grid-cols-[minmax(4rem,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 sm:gap-x-3 gap-y-1 items-center">
@@ -128,10 +166,19 @@ interface Overflow {
 async function measure(
   css: string,
   breakFix: boolean,
-): Promise<{ page: number; fields: Overflow[]; widths: Record<string, number> }> {
+  viewport?: { width: number; height: number },
+): Promise<{
+  page: number;
+  fields: Overflow[];
+  widths: Record<string, number>;
+  bottoms: Record<string, number>;
+  alignedPairs: Record<string, { sameRow: boolean; alignItems: string }>;
+}> {
   const browser = await webkit.launch();
   try {
-    const ctx = await browser.newContext({ ...devices["iPhone 13"] });
+    const ctx = await browser.newContext(
+      viewport ? { viewport } : { ...devices["iPhone 13"] },
+    );
     const page = await ctx.newPage();
     // Контроль ломает вёрстку заведомо — фиксированной шириной шире карточки.
     // Это проверяет чувствительность измерения, а не конкретную гипотезу:
@@ -141,11 +188,14 @@ async function measure(
 
     const result = await page.evaluate(() => {
       const fields = [...document.querySelectorAll("[data-field]")].map((el) => {
-        const input = (el.tagName === "INPUT" ? el : el.querySelector("input")) as HTMLInputElement;
-        const card = input.closest(".card") as HTMLElement;
+        // Мерить можно не только поля: переполнять карточку умеет и обычный
+        // текст без пробелов. Берём вложенный input, если он есть, иначе сам
+        // элемент.
+        const target = (el.tagName === "INPUT" ? el : (el.querySelector("input") ?? el)) as HTMLElement;
+        const card = target.closest(".card") as HTMLElement;
         const cardStyle = getComputedStyle(card);
         const innerRight = card.getBoundingClientRect().right - parseFloat(cardStyle.paddingRight);
-        const r = input.getBoundingClientRect();
+        const r = target.getBoundingClientRect();
         return {
           field: (el as HTMLElement).dataset.field ?? "?",
           inputRight: Math.round(r.right),
@@ -153,6 +203,27 @@ async function measure(
           overflowPx: Math.round(r.right - innerRight),
         };
       });
+      // Выравнивание проверяем СТРУКТУРНО, а не в пикселях: items-baseline
+      // совмещает базовые линии, а нижние границы боксов у текста 16px и 12px
+      // всё равно расходятся на величину выносных элементов. Порог в пикселях
+      // здесь ловил бы не перекос, а разницу кеглей.
+      const alignedPairs = Object.fromEntries(
+        ["old", "new"].map((kind) => {
+          const a = document.querySelector(`[data-align="${kind}-subject"]`);
+          const b = document.querySelector(`[data-align="${kind}-time"]`);
+          const sameRow = a?.parentElement != null && a.parentElement === b?.parentElement;
+          const alignItems = a?.parentElement
+            ? getComputedStyle(a.parentElement).alignItems
+            : "";
+          return [kind, { sameRow, alignItems }];
+        }),
+      );
+      const bottoms = Object.fromEntries(
+        [...document.querySelectorAll("[data-align]")].map((el) => [
+          (el as HTMLElement).dataset.align ?? "?",
+          Math.round(el.getBoundingClientRect().bottom),
+        ]),
+      );
       const widths = Object.fromEntries(
         [...document.querySelectorAll("[data-measure]")].map((el) => [
           (el as HTMLElement).dataset.measure ?? "?",
@@ -163,6 +234,8 @@ async function measure(
         page: Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth),
         fields,
         widths,
+        bottoms,
+        alignedPairs,
       };
     });
     return result;
@@ -206,9 +279,37 @@ async function main(): Promise<void> {
     `  ${senderOk ? "✅" : "❌"} ширина имени отправителя: было ${oldW}px, стало ${newW}px (нужно ≥ ${MIN_SENDER_PX})`,
   );
 
+  // Выравнивание: тема и время должны стоять на одной линии. Старая раскладка
+  // держала их в разных колонках, и они расходились.
+  const oldPair = fixed.alignedPairs.old ?? { sameRow: false, alignItems: "" };
+  const newPair = fixed.alignedPairs.new ?? { sameRow: false, alignItems: "" };
+  const alignOk = newPair.sameRow && newPair.alignItems === "baseline";
+  if (!alignOk) failures++;
+  const oldGap = Math.abs((fixed.bottoms["old-subject"] ?? 0) - (fixed.bottoms["old-time"] ?? 0));
+  const newGap = Math.abs((fixed.bottoms["new-subject"] ?? 0) - (fixed.bottoms["new-time"] ?? 0));
+  console.log(
+    `  ${alignOk ? "✅" : "❌"} тема и время в одной строке по базовой линии: было ` +
+      `sameRow=${oldPair.sameRow}/${oldPair.alignItems || "—"}, стало ` +
+      `sameRow=${newPair.sameRow}/${newPair.alignItems}`,
+  );
+  console.log(`     (расхождение нижних границ: было ${oldGap}px, стало ${newGap}px — разница кеглей)`);
+
   const pageOk = fixed.page <= 1;
   if (!pageOk) failures++;
   console.log(`  ${pageOk ? "✅" : "❌"} горизонтальная прокрутка страницы: ${fixed.page}px`);
+
+  // Десктоп: часть переполнений видна только там, где места больше и никто
+  // их не ждёт — например реквизиты письма с длинным Message-Id.
+  console.log("\nДесктоп (1280px):");
+  const desk = await measure(css, false, { width: 1280, height: 900 });
+  for (const f of desk.fields) {
+    const ok = f.overflowPx <= 1;
+    if (!ok) failures++;
+    console.log(`  ${ok ? "✅" : "❌"} ${f.field.padEnd(11)} выход за карточку: ${f.overflowPx}px`);
+  }
+  const deskPageOk = desk.page <= 1;
+  if (!deskPageOk) failures++;
+  console.log(`  ${deskPageOk ? "✅" : "❌"} горизонтальная прокрутка страницы: ${desk.page}px`);
 
   console.log(failures === 0 ? "\n✅ ВСЁ СОШЛОСЬ" : `\n❌ ПРОВАЛОВ: ${failures}`);
   process.exit(failures === 0 ? 0 : 1);

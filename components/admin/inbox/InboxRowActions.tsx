@@ -29,7 +29,7 @@ export function InboxRowActions({
   status,
 }: {
   inboxMessageId: string;
-  /** Активная вкладка — она и решает, что с письмом можно сделать. */
+  /** Состояние письма: PENDING/ARCHIVED/SPAM/DELETED или JUNK из вкладки. */
   status: string;
 }): React.ReactElement | null {
   const [pending, startTransition] = useTransition();
@@ -63,7 +63,7 @@ export function InboxRowActions({
     onSelect: () => run(() => deleteInboxMessage(inboxMessageId), "В корзине"),
   };
 
-  const byTab: Record<string, ActionsMenuItem[]> = {
+  const byState: Record<string, ActionsMenuItem[]> = {
     // Очередь разбора: письмо нужно куда-то деть.
     PENDING: [toArchive, toSpam, toTrash],
     // Разобрано и сохранено: вернуть к разбору или всё-таки выбросить.
@@ -72,17 +72,24 @@ export function InboxRowActions({
     JUNK: [toQueue, toArchive],
   };
 
-  // «Все письма» — это просмотр архива, включая чужую переписку, уже
-  // привязанную к клиентам. Разбирать письмо надо в его собственной вкладке,
-  // где видно, в каком оно состоянии.
-  const items = byTab[status];
+  // Набор следует СОСТОЯНИЮ письма, а не вкладке. Во «Всех письмах» лежит всё
+  // вперемешку, и увидев там спам, который спамом не является, исправить его
+  // надо на месте, а не искать в другой вкладке.
+  //
+  // Спам и корзина ведут себя одинаково — это два способа сказать «не нужно», и
+  // пути назад у них общие.
+  const state = status === "SPAM" || status === "DELETED" ? "JUNK" : status;
+
+  // ASSIGNED — письмо уже привязано к клиенту и лежит в его переписке.
+  // Разбирать нечего, поэтому меню нет вовсе.
+  const items = byState[state];
   if (!items) return null;
 
   // Блокируем контейнер, а не пункты: ActionsMenu отфильтровывает отключённые,
   // и при пустом списке исчезает целиком — меню пропадало бы прямо во время
   // действия, которое сам же оператор и запустил.
   return (
-    <div className={`pr-3 pt-3 ${pending ? "opacity-50 pointer-events-none" : ""}`}>
+    <div className={`pr-3 pb-3 ${pending ? "opacity-50 pointer-events-none" : ""}`}>
       <ActionsMenu items={items} label="Действия" />
     </div>
   );

@@ -106,9 +106,15 @@ export default async function InboxMessagePage({ params }: Props) {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
         <div className="space-y-4">
           <Card>
-            <dl className="grid grid-cols-[120px_1fr] gap-y-1 text-sm">
-              <dt className="text-[var(--foreground-muted)]">Направление</dt>
-              <dd>
+            {/* minmax(0,1fr), а не 1fr: у трека 1fr минимальная ширина равна
+                содержимому, поэтому Message-Id без единого пробела распирал
+                колонку и вылезал за карточку — на десктопе особенно заметно,
+                там места больше и никто не ждёт переполнения.
+                На узком экране подписи встают над значениями: 120px из 350
+                под слово «Направление» — треть ширины ни за что. */}
+            <dl className="grid grid-cols-1 sm:grid-cols-[130px_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
+              <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">Направление</dt>
+              <dd className="break-words">
                 {msg.direction === "OUTBOUND"
                   ? "Исходящее (от менеджера)"
                   : "Входящее (от клиента)"}
@@ -123,28 +129,28 @@ export default async function InboxMessagePage({ params }: Props) {
                   </span>
                 ) : null}
               </dd>
-              <dt className="text-[var(--foreground-muted)]">Статус</dt>
-              <dd>{msg.status}</dd>
-              <dt className="text-[var(--foreground-muted)]">
+              <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">Статус</dt>
+              <dd className="break-words">{msg.status}</dd>
+              <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">
                 {msg.direction === "OUTBOUND" ? "От (мы)" : "От"}
               </dt>
               <dd className="break-all">
                 {msg.fromName ? `${msg.fromName} <${msg.fromEmail}>` : msg.fromEmail}
               </dd>
-              <dt className="text-[var(--foreground-muted)]">Кому</dt>
+              <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">Кому</dt>
               <dd className="break-all">{msg.toEmail}</dd>
-              <dt className="text-[var(--foreground-muted)]">Message-Id</dt>
+              <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">Message-Id</dt>
               <dd className="font-mono text-xs break-all">{msg.messageId}</dd>
               {msg.inReplyTo ? (
                 <>
-                  <dt className="text-[var(--foreground-muted)]">In-Reply-To</dt>
+                  <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">In-Reply-To</dt>
                   <dd className="font-mono text-xs break-all">{msg.inReplyTo}</dd>
                 </>
               ) : null}
               {msg.assignedTo ? (
                 <>
-                  <dt className="text-[var(--foreground-muted)]">Привязал</dt>
-                  <dd>{msg.assignedTo.name}</dd>
+                  <dt className="text-[var(--foreground-muted)] text-xs sm:text-sm">Привязал</dt>
+                  <dd className="break-words">{msg.assignedTo.name}</dd>
                 </>
               ) : null}
             </dl>

@@ -73,7 +73,7 @@ interface AllMailRow {
   sourceMailbox: string;
   occurredAt: Date;
   attachments: unknown;
-  inboxMessages: Array<{ id: string }>;
+  inboxMessages: Array<{ id: string; status: string }>;
   communicationLogs: Array<{ customerUserId: string | null }>;
 }
 
@@ -98,13 +98,28 @@ function compactDateTime(d: Date, now: Date): string {
   });
 }
 
-/** Начало письма одной строкой: переносы и лишние пробелы схлопнуты, иначе
- *  предпросмотр занимает пол-экрана рваными обрывками. */
+/**
+ * Начало письма одной строкой: переносы и лишние пробелы схлопнуты, иначе
+ * предпросмотр занимает пол-экрана рваными обрывками.
+ *
+ * Обрезаем по длине только чтобы не гнать на клиент килобайты текста ради двух
+ * строк. Многоточие НЕ добавляем: его ставит line-clamp по фактической ширине,
+ * а своё повисало отдельной строкой посреди карточки.
+ */
 function previewOf(text: string | null): string | null {
   if (!text) return null;
   const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat || null;
+  return flat.slice(0, 300) || null;
 }
+
+/** Где письмо лежит — словами, для вкладки «Все письма». */
+const INBOX_STATUS_MARKS: Readonly<Record<string, string>> = {
+  PENDING: "в разборе",
+  ASSIGNED: "привязано",
+  ARCHIVED: "в архиве",
+  SPAM: "спам",
+  DELETED: "в корзине",
+};
 
 const BACKLOG_GAP_MS = 10 * 60 * 1000;
 function isBacklog(receivedAt: Date, syncedAt: Date | null | undefined): boolean {
@@ -178,7 +193,7 @@ export default async function InboxPage({ searchParams }: Props) {
           occurredAt: true,
           attachments: true,
           sourceMailbox: true,
-          inboxMessages: { select: { id: true }, take: 1 },
+          inboxMessages: { select: { id: true, status: true }, take: 1 },
           communicationLogs: { select: { customerUserId: true }, take: 1 },
         },
       })) as AllMailRow[])
@@ -219,7 +234,8 @@ export default async function InboxPage({ searchParams }: Props) {
             <ul className="divide-y divide-[var(--border)]">
               {allMail.map((m) => {
                 const outbound = m.direction === "OUTBOUND";
-                const inboxId = m.inboxMessages[0]?.id ?? null;
+                const inbox = m.inboxMessages[0] ?? null;
+                const inboxId = inbox?.id ?? null;
                 const customerId = m.communicationLogs[0]?.customerUserId ?? null;
                 return (
                   <li key={m.id}>
@@ -240,8 +256,25 @@ export default async function InboxPage({ searchParams }: Props) {
                       time={compactDateTime(m.occurredAt, now)}
                       folder={m.sourceMailbox}
                       attachments={attachmentCount(m.attachments)}
-                      marks={inboxId ? ["в разборе"] : customerId ? [] : ["без клиента"]}
+                      // Метка говорит, ГДЕ письмо лежит. Раньше здесь стояло
+                      // «в разборе» для всего, у чего есть строка в очереди, —
+                      // но в очереди четыре разных статуса, и спам подписывался
+                      // как ожидающий разбора.
+                      marks={
+                        inbox
+                          ? [INBOX_STATUS_MARKS[inbox.status] ?? inbox.status]
+                          : customerId
+                            ? []
+                            : ["без клиента"]
+                      }
                     />
+                    {/* Действия и здесь: письмо в общем списке ничем не хуже
+                        письма во вкладке, а состояние у него своё. */}
+                    {inbox ? (
+                      <div className="flex justify-end">
+                        <InboxRowActions inboxMessageId={inbox.id} status={inbox.status} />
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
@@ -256,7 +289,7 @@ export default async function InboxPage({ searchParams }: Props) {
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
             {rows.map((row) => (
-              <li key={row.id} className="flex items-start">
+              <li key={row.id} className="flex items-stretch">
                 <div className="flex-1 min-w-0">
                   <InboxCard
                     href={`/admin/crm/inbox/${row.id}`}
@@ -281,7 +314,10 @@ export default async function InboxPage({ searchParams }: Props) {
                 </div>
                 {/* Разбор из списка: иначе очередь чистится только по одному
                     письму за заход в карточку и обратно. */}
-                <div className="shrink-0">
+                {/* Меню внизу справа: сверху у строки тема и время, и кнопка
+                    рядом с ними спорила бы с ними за внимание. Внизу она стоит
+                    у служебной полосы, к которой и относится. */}
+                <div className="shrink-0 flex items-end">
                   <InboxRowActions inboxMessageId={row.id} status={status} />
                 </div>
               </li>
