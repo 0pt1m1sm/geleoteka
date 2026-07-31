@@ -39,17 +39,54 @@ export interface CustomerSnapshot {
 }
 
 /**
- * A cheap deterministic token over the row counts, proving the snapshot the
- * operator holds describes the customer as they are right now. If anything is
- * added between export and erase the token stops matching and the erase is
- * refused, so nobody destroys an order that arrived after the download.
+ * A cheap deterministic token over the row counts, proving the operator is
+ * acting on the person as they are right now. If anything is added between
+ * looking and deleting, the token stops matching and the erase is refused —
+ * nobody destroys an order that arrived after they last looked.
+ *
+ * The prefix records HOW the token was obtained. `eraseCustomer` insists on an
+ * `exported` one whenever there is anything to lose, which is what makes the
+ * download a real precondition rather than a button the UI could skip.
  */
-function snapshotToken(userId: string, counts: Record<string, number>): string {
+function stateToken(
+  userId: string,
+  counts: Record<string, number>,
+  origin: "preview" | "exported",
+): string {
   const parts = Object.keys(counts)
     .sort()
     .map((k) => `${k}:${counts[k]}`)
     .join(",");
-  return `${userId}|${parts}`;
+  return `${origin}|${userId}|${parts}`;
+}
+
+async function countAttached(userId: string): Promise<Record<string, number>> {
+  const [vehicles, repairOrders, deals, communications] = (await Promise.all([
+    db.vehicle.count({ where: { ownerUserId: userId } }),
+    db.repairOrder.count({ where: { userId } }),
+    db.deal.count({ where: { customerUserId: userId } }),
+    db.communicationLog.count({ where: { customerUserId: userId } }),
+  ])) as number[];
+  return { vehicles, repairOrders, deals, communications };
+}
+
+/**
+ * What deleting this person would take with them — shown BEFORE anything is
+ * downloaded or typed, so the operator decides with the numbers in front of
+ * them. Returns a `preview` token, which is enough to erase only when there is
+ * nothing attached.
+ */
+export async function getEraseImpact(
+  userId: string,
+): Promise<Ok<{ counts: Record<string, number>; token: string; needsExport: boolean }> | Fail> {
+  await requireRole(["ADMIN"]);
+
+  const exists = await db.user.count({ where: { id: userId } });
+  if (exists === 0) return { ok: false, error: "Пользователь не найден" };
+
+  const counts = await countAttached(userId);
+  const needsExport = Object.values(counts).some((n) => n > 0);
+  return { ok: true, counts, token: stateToken(userId, counts, "preview"), needsExport };
 }
 
 export async function exportCustomerSnapshot(
@@ -99,7 +136,7 @@ export async function exportCustomerSnapshot(
       communications: communications as unknown[],
       counts,
     },
-    token: snapshotToken(userId, counts),
+    token: stateToken(userId, counts, "exported"),
   };
 }
 
@@ -138,19 +175,24 @@ export async function eraseCustomer(
     return { ok: false, error: "Подтверждение не совпадает" };
   }
 
-  // Re-derive the token from CURRENT data: if a new order or message arrived
-  // after the operator downloaded their copy, the counts differ and we stop.
-  const [vehicles, repairOrders, deals, communications] = await Promise.all([
-    db.vehicle.count({ where: { ownerUserId: userId } }),
-    db.repairOrder.count({ where: { userId } }),
-    db.deal.count({ where: { customerUserId: userId } }),
-    db.communicationLog.count({ where: { customerUserId: userId } }),
-  ]);
-  const counts = { vehicles, repairOrders, deals, communications };
-  if (snapshotToken(userId, counts) !== token) {
+  // Re-derive from CURRENT data: if anything arrived since the operator looked,
+  // the counts differ and we stop rather than destroy something unseen.
+  const counts = await countAttached(userId);
+  const hasData = Object.values(counts).some((n) => n > 0);
+
+  // A preview token is enough for an empty record — there is nothing to export.
+  // Anything with data demands the `exported` token, so the copy really was
+  // downloaded and this cannot be reduced to a single careless click.
+  const accepted = hasData
+    ? [stateToken(userId, counts, "exported")]
+    : [stateToken(userId, counts, "exported"), stateToken(userId, counts, "preview")];
+
+  if (!accepted.includes(token)) {
     return {
       ok: false,
-      error: "Данные клиента изменились после выгрузки. Выгрузите копию заново.",
+      error: hasData
+        ? "Данные изменились с момента выгрузки — выгрузите копию заново."
+        : "Данные изменились — откройте удаление заново.",
     };
   }
 
