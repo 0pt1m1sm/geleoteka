@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { nextEstimateNumber, dispatchFulfillment, recomputeEstimateTotals } from "@/lib/crm/public";
 import {
@@ -410,8 +411,8 @@ export async function deleteEstimate(estimateId: string): Promise<DeleteEstimate
 
   const est = (await db.estimate.findUnique({
     where: { id: estimateId },
-    select: { id: true, dealId: true, stage: true },
-  })) as { id: string; dealId: string; stage: string } | null;
+    select: { id: true, dealId: true, stage: true, number: true },
+  })) as { id: string; dealId: string; stage: string; number: string | null } | null;
   if (!est) return { error: "Смета не найдена" };
   if (est.stage === "APPROVED") {
     return { error: "Согласованную смету нельзя удалить. Сначала откатите согласование." };
@@ -426,6 +427,17 @@ export async function deleteEstimate(estimateId: string): Promise<DeleteEstimate
   await db.$transaction(async (tx) => {
     await releasePartLinesForEstimate(tx, estimateId, actorId(session));
     await tx.estimate.delete({ where: { id: estimateId } });
+    await recordAudit(
+      {
+        actor: session,
+        action: "estimate.delete",
+        targetType: "Estimate",
+        targetId: estimateId,
+        targetLabel: est.number ?? estimateId,
+        metadata: { stage: est.stage, dealId: est.dealId },
+      },
+      tx,
+    );
   });
 
   revalidatePath(`/admin/crm/deals/${est.dealId}`);

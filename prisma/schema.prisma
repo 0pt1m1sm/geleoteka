@@ -2031,3 +2031,38 @@ model RolePermission {
   @@unique([tenantKey, role, permission])
   @@index([tenantKey, role])
 }
+
+/// Who did what, and to whom.
+///
+/// Deliberately WITHOUT foreign keys. An audit trail whose rows vanish when the
+/// subject is deleted is worthless precisely when it matters most — the whole
+/// point is to answer "who erased this customer" after the customer is gone.
+/// So the actor and the target are plain ids, and the human-readable names are
+/// denormalised at write time: the log records what was true when it happened,
+/// not what a join would say today.
+///
+/// Append-only by convention: nothing in the app updates or deletes a row.
+model AuditLog {
+  id          String   @id @default(cuid())
+  tenantKey   String   @default("geleoteka")
+  /// Null only for system-initiated actions (cron, worker).
+  actorUserId String?
+  /// Name as it stood when the action happened — survives the actor's deletion.
+  actorName   String
+  actorRole   String
+  /// Dotted verb, e.g. "customer.erase", "user.role_change", "role.permissions".
+  action      String
+  targetType  String
+  targetId    String?
+  /// Human-readable target as it stood — same reasoning as actorName.
+  targetLabel String?
+  /// Action-specific detail: what changed, which option was chosen, counts.
+  metadata    Json     @default("{}")
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantKey, createdAt])
+  @@index([tenantKey, actorUserId, createdAt])
+  @@index([tenantKey, targetType, targetId])
+  @@index([tenantKey, action, createdAt])
+}

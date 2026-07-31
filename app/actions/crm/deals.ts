@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { createDeal as createDealPublic } from "@/lib/crm/public/create-deal";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
@@ -200,10 +201,14 @@ export async function deleteDeal(
     where: { id: dealId },
     select: {
       stage: true,
+      number: true,
+      total: true,
       _count: { select: { repairOrders: true, partShipments: true, rentalBookings: true } },
     },
   })) as {
     stage: string;
+    number: string | null;
+    total: number;
     _count: { repairOrders: number; partShipments: number; rentalBookings: number };
   } | null;
   if (!deal) return { error: "Сделка не найдена" };
@@ -233,6 +238,25 @@ export async function deleteDeal(
       await releasePartLinesForEstimate(tx, est.id, actorId(session));
     }
     await tx.deal.delete({ where: { id: dealId } });
+    await recordAudit(
+      {
+        actor: session,
+        action: "deal.delete",
+        targetType: "Deal",
+        targetId: dealId,
+        targetLabel: deal.number ?? dealId,
+        // The sum and the fulfillment count are what make a deletion worth
+        // questioning later; the stage says whether it was live.
+        metadata: {
+          stage: deal.stage,
+          total: deal.total,
+          deleteFulfillment: options.deleteFulfillment === true,
+          fulfilments,
+          estimates: estimates.length,
+        },
+      },
+      tx,
+    );
   });
 
   revalidatePath("/admin/crm/deals");

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { isSolelyTheirs } from "@/lib/email/erasure";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
 import { actorId } from "@/lib/wms-host";
@@ -235,6 +236,7 @@ export async function eraseCustomer(
       id: true,
       email: true,
       phone: true,
+      name: true,
       isCustomer: true,
       isSupplier: true,
       permissionRole: true,
@@ -243,6 +245,7 @@ export async function eraseCustomer(
     id: string;
     email: string | null;
     phone: string | null;
+    name: string;
     isCustomer: boolean;
     isSupplier: boolean;
     permissionRole: string;
@@ -389,6 +392,25 @@ export async function eraseCustomer(
       // The card's own timeline always goes: CommunicationLog REQUIRES a
       // customer (the FK is not nullable), so there is no one left to own it.
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });
+      // Inside the transaction, so the record and the deletion commit together:
+      // an erasure can never end up unlogged, and the log can never describe an
+      // erasure that rolled back.
+      await recordAudit(
+        {
+          actor: session,
+          action: "customer.erase",
+          targetType: "User",
+          targetId: userId,
+          targetLabel: target.name,
+          metadata: {
+            deleteRelated,
+            wasCustomer: target.isCustomer,
+            role: target.permissionRole,
+            counts,
+          },
+        },
+        tx,
+      );
       // Profile, contacts, notes, tags, notifications and loyalty hang off the
       // row by ON DELETE CASCADE and go with it.
       await tx.user.delete({ where: { id: userId } });
