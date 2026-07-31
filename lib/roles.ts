@@ -21,6 +21,15 @@ export function isAllowedRole(v: unknown): v is AllowedRole {
   return typeof v === "string" && (ALLOWED_ROLES as readonly string[]).includes(v);
 }
 
+/**
+ * Label for a role that arrives as a plain string — which is how it comes back
+ * through the db singleton and the session. Falls back to the raw value so an
+ * enum member added without a label shows up as itself rather than as blank.
+ */
+export function roleLabel(role: string): string {
+  return isAllowedRole(role) ? ROLE_LABELS[role] : role;
+}
+
 export const ROLE_LABELS: Readonly<Record<AllowedRole, string>> = {
   NONE: "Без доступа",
   CLIENT: "Клиент",

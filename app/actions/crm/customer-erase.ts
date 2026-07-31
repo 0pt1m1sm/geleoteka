@@ -4,6 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isSolelyTheirs } from "@/lib/email/erasure";
+import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 /**
  * Erasing a customer together with their entire history.
@@ -150,10 +153,76 @@ export async function exportCustomerSnapshot(
   };
 }
 
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * Remove the mail this person is the only outside party to.
+ *
+ * Mail is matched by address, and an address is a shared key: a thread where
+ * they were one of several recipients is somebody else's correspondence too, so
+ * deleting the row would take a supplier's or another customer's conversation
+ * with it. Those stay in the mailbox — the same failure mode as an over-eager
+ * stock release eating another estimate's hold.
+ *
+ * `InboxMessage` needs no such care: it holds one counterparty per row
+ * (`fromEmail` inbound, `toEmail` outbound), so an address match there names
+ * exactly this person.
+ */
+async function deleteMailFor(tx: TxClient, addresses: string[]): Promise<void> {
+  if (addresses.length === 0) return;
+  const known = new Set(addresses);
+
+  const candidates = (await tx.emailMessage.findMany({
+    where: {
+      OR: [
+        { fromEmail: { in: addresses } },
+        { toEmails: { hasSome: addresses } },
+        { ccEmails: { hasSome: addresses } },
+      ],
+    },
+    select: { id: true, fromEmail: true, toEmails: true, ccEmails: true },
+  })) as Array<{ id: string; fromEmail: string; toEmails: string[]; ccEmails: string[] }>;
+
+  const solelyTheirs = candidates.filter((m) => isSolelyTheirs(m, known)).map((m) => m.id);
+
+  if (solelyTheirs.length > 0) {
+    await tx.emailMessage.deleteMany({ where: { id: { in: solelyTheirs } } });
+  }
+  await tx.inboxMessage.deleteMany({
+    where: { OR: [{ fromEmail: { in: addresses } }, { toEmail: { in: addresses } }] },
+  });
+}
+
+/**
+ * Erase a customer.
+ *
+ * `deleteRelated` is the operator's explicit choice, defaulting to false:
+ *
+ *   false — personal data goes, the commercial record stays, detached. Right
+ *           for a real customer: the revenue was the shop's, the repair order
+ *           documents work on a car that may be sold, and both are kept by law
+ *           for years. Deleting them would change last year's takings. The mail
+ *           stays in the CRM mailbox for the same reason — it is the shop's own
+ *           correspondence, and an operator looking up a past job expects to
+ *           find the thread that produced it.
+ *   true  — everything goes, including deals, estimates, orders, bookings and
+ *           the mail. Right for a mistake: a duplicate, a test row, a lead that
+ *           went nowhere. Stock reservations are released first.
+ *
+ * Either way the customer CARD goes, and with it the card's own timeline
+ * (`CommunicationLog`), whose FK requires a customer to belong to.
+ *
+ * An earlier version decided this automatically ("keep if there are deals"),
+ * which was both unpredictable for the operator and wrong in practice: every
+ * deal gets an estimate the moment it is created (`createDeal` makes both in
+ * one transaction), so "has an estimate" says nothing about whether the deal
+ * ever mattered.
+ */
 export async function eraseCustomer(
   userId: string,
   confirmation: string,
   token: string,
+  options: { deleteRelated?: boolean } = {},
 ): Promise<Ok<{ erased: Record<string, number> }> | Fail> {
   const session = await requireRole(["ADMIN"]);
 
@@ -164,6 +233,7 @@ export async function eraseCustomer(
       email: true,
       phone: true,
       isCustomer: true,
+      isSupplier: true,
       permissionRole: true,
     },
   })) as {
@@ -171,6 +241,7 @@ export async function eraseCustomer(
     email: string | null;
     phone: string | null;
     isCustomer: boolean;
+    isSupplier: boolean;
     permissionRole: string;
   } | null;
   if (!target) return { ok: false, error: "Клиент не найден" };
@@ -187,6 +258,16 @@ export async function eraseCustomer(
     return {
       ok: false,
       error: "Это не клиент. Сотрудников и поставщиков через это действие удалять нельзя.",
+    };
+  }
+  // A person can be flagged both customer and supplier. `SupplierOrder.userId`
+  // is Restrict, so such a row passes every gate above and then dies on a raw
+  // foreign-key error inside the transaction — after the operator has already
+  // exported the snapshot and retyped the address. Refuse readably instead.
+  if (target.isSupplier) {
+    return {
+      ok: false,
+      error: "Этот клиент одновременно поставщик — сначала снимите роль поставщика.",
     };
   }
 
@@ -227,59 +308,73 @@ export async function eraseCustomer(
     };
   }
 
+  const deleteRelated = options.deleteRelated === true;
+
   await db.$transaction(
     async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
-      // The commercial and service record is DETACHED, not destroyed. A deal
-      // still totals and a repair order still documents what was done to a car;
-      // both are needed for accounting and warranty long after a person asks to
-      // be removed, and an erase that turns out to have hit the wrong duplicate
-      // can be undone by re-attaching them.
-      // Revoke the guest links FIRST. `Deal.claimToken` is not just a read
-      // capability: customer-estimates.ts accepts it to APPROVE or DECLINE an
-      // estimate, so a link mailed to someone we are erasing would otherwise let
-      // them keep changing a deal that no longer has an owner.
+      // Revoke the guest links FIRST, on either branch. `Deal.claimToken` is not
+      // just a read capability: customer-estimates.ts accepts it to APPROVE or
+      // DECLINE an estimate, so a link mailed to someone being erased would
+      // otherwise let them keep acting on the deal.
       await tx.deal.updateMany({
         where: { customerUserId: userId },
-        data: { customerUserId: null, claimToken: null },
+        data: { claimToken: null },
       });
-      await tx.repairOrder.updateMany({
-        where: { userId },
-        data: { userId: null, claimToken: null },
-      });
+      await tx.repairOrder.updateMany({ where: { userId }, data: { claimToken: null } });
 
-      // A car that has been through the shop is DETACHED, not deleted.
-      // `RepairOrder.vehicleId` is ON DELETE CASCADE, so deleting the car would
-      // take the repair orders we just preserved with it — silently undoing the
-      // whole point of detaching. The service record needs the car it describes.
-      await tx.vehicle.updateMany({
-        where: { ownerUserId: userId, repairOrders: { some: {} } },
-        data: { ownerUserId: null },
-      });
-      // Cars with no service history are pure profile data and can go.
-      await tx.vehicle.deleteMany({
-        where: { ownerUserId: userId, repairOrders: { none: {} } },
-      });
-      // Personal data does NOT survive. Deleting CommunicationLog alone was not
-      // enough: the mail itself lives in EmailMessage / InboxMessage keyed by
-      // address, so the person's name, address, subject, body and attachment
-      // metadata stayed behind while the UI claimed the correspondence was gone.
-      // Those are matched by every address we know for them.
-      if (addresses.length > 0) {
-        await tx.emailMessage.deleteMany({
+      if (deleteRelated) {
+        // Everything goes. Release the stock holds first — they are keyed by a
+        // string, not a foreign key, so no cascade can free them and the
+        // reserved quantity would stay inflated forever.
+        const estimates = (await tx.estimate.findMany({
+          where: { deal: { customerUserId: userId } },
+          select: { id: true },
+        })) as Array<{ id: string }>;
+        for (const est of estimates) {
+          await releasePartLinesForEstimate(tx, est.id, actorId(session));
+        }
+        // Deleting the deals cascades their estimates, repair orders, job lines,
+        // slots, work photos, shipments and bookings.
+        await tx.deal.deleteMany({ where: { customerUserId: userId } });
+        // Repair orders created outside a deal, if any, have no parent to take
+        // them; remove them explicitly before their cars.
+        await tx.repairOrder.deleteMany({ where: { userId } });
+        // Cars last: `RepairOrder.vehicleId` is RESTRICT, so this only succeeds
+        // once the orders above are gone.
+        await tx.vehicle.deleteMany({ where: { ownerUserId: userId } });
+      } else {
+        // The commercial and service record is DETACHED, not destroyed. A deal
+        // still totals and a repair order still documents work on a car that may
+        // be sold; both are kept for accounting and warranty long after a person
+        // asks to be removed.
+        await tx.deal.updateMany({
+          where: { customerUserId: userId },
+          data: { customerUserId: null },
+        });
+        await tx.repairOrder.updateMany({ where: { userId }, data: { userId: null } });
+        // Cars with nothing attached are pure profile data and can go; the rest
+        // keep their history and simply lose their owner.
+        await tx.vehicle.deleteMany({
           where: {
-            OR: [
-              { fromEmail: { in: addresses } },
-              { toEmails: { hasSome: addresses } },
-              { ccEmails: { hasSome: addresses } },
-            ],
+            ownerUserId: userId,
+            repairOrders: { none: {} },
+            rentalBookings: { none: {} },
+            deals: { none: {} },
           },
         });
-        await tx.inboxMessage.deleteMany({
-          where: {
-            OR: [{ fromEmail: { in: addresses } }, { toEmail: { in: addresses } }],
-          },
+        await tx.vehicle.updateMany({
+          where: { ownerUserId: userId },
+          data: { ownerUserId: null },
         });
       }
+      // The mail itself belongs to the shop's mailbox, not to the customer
+      // card, so it goes only on the branch that removes the commercial record
+      // too. Detaching a real customer leaves the correspondence where an
+      // operator expects to find it — the same reasoning that keeps their deals
+      // and repair orders.
+      if (deleteRelated) await deleteMailFor(tx, addresses);
+      // The card's own timeline always goes: CommunicationLog REQUIRES a
+      // customer (the FK is not nullable), so there is no one left to own it.
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });
       // Profile, contacts, notes, tags, notifications and loyalty hang off the
       // row by ON DELETE CASCADE and go with it.

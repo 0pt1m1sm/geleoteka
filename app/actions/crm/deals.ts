@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { createDeal as createDealPublic } from "@/lib/crm/public/create-deal";
+import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 interface DealMutationResult {
   error: string | null;
@@ -167,26 +169,72 @@ export async function setDealStage(
 }
 
 /**
- * Delete a deal. Soft policy:
- *   - WON → blocked (commercial history; rollback to IN_PROGRESS first)
- *   - any other stage → permitted with confirm at the UI
+ * Delete a deal — only ever a way to remove a mistake, never a way to close one out.
  *
- * Cascades: Estimate[] (and their EstimateLine[]) drop via onDelete: Cascade.
- * Fulfillment rows (RepairOrder/PartOrder/RentalBooking) keep their dealId
- * column NULL via onDelete: SetNull — work history survives, the commercial
- * thread is gone.
+ * WON is blocked outright — roll it back to IN_PROGRESS first.
+ *
+ * A deal that produced fulfillment (repair order, shipment, rental) needs
+ * `deleteFulfillment: true`, which the UI asks for with a checkbox that is off
+ * by default. Deleting is a legitimate way to undo a deal entered wrongly —
+ * often faster than editing every field — so this is a confirmation, not a ban.
+ *
+ * The docstring this replaces was actively misleading: it claimed fulfillment
+ * rows "keep their dealId column NULL via onDelete: SetNull — work history
+ * survives". The schema says `Cascade`. Deleting an in-progress deal destroyed
+ * the repair order, its job/labor/part lines, its slot, its work photos, the
+ * shipment and every estimate — while the comment above the live button
+ * promised the opposite.
+ *
+ * Estimates DO still cascade — an estimate belongs to its deal — but their
+ * stock reservations are released first, because those are keyed by a string,
+ * not a foreign key, and the database cascade cannot see them. Only holds that
+ * are still outstanding come back: parts already fitted or shipped were
+ * consumed, which cleared their hold when the stock physically left.
  */
-export async function deleteDeal(dealId: string): Promise<SetStageResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+export async function deleteDeal(
+  dealId: string,
+  options: { deleteFulfillment?: boolean } = {},
+): Promise<SetStageResult> {
+  const session = await requireRole(["ADMIN", "MANAGER"]);
   const deal = (await db.deal.findUnique({
     where: { id: dealId },
-    select: { stage: true },
-  })) as { stage: string } | null;
+    select: {
+      stage: true,
+      _count: { select: { repairOrders: true, partShipments: true, rentalBookings: true } },
+    },
+  })) as {
+    stage: string;
+    _count: { repairOrders: number; partShipments: number; rentalBookings: number };
+  } | null;
   if (!deal) return { error: "Сделка не найдена" };
   if (deal.stage === "WON") {
     return { error: "Выигранную сделку нельзя удалить. Сначала откатите её в «В работе»." };
   }
-  await db.deal.delete({ where: { id: dealId } });
+
+  const fulfilments =
+    deal._count.repairOrders + deal._count.partShipments + deal._count.rentalBookings;
+  if (fulfilments > 0 && options.deleteFulfillment !== true) {
+    return {
+      error:
+        `По сделке есть исполнение (${fulfilments}): заказ-наряд, отгрузка или аренда. ` +
+        "Удаление уничтожит и их вместе с работами и фотографиями. Подтвердите галочкой, если сделка заведена ошибочно.",
+    };
+  }
+
+  const estimates = (await db.estimate.findMany({
+    where: { dealId },
+    select: { id: true },
+  })) as Array<{ id: string }>;
+
+  await db.$transaction(async (tx) => {
+    // Reservations are held per estimate line under a string source id; the
+    // cascade below cannot release them, so do it explicitly first.
+    for (const est of estimates) {
+      await releasePartLinesForEstimate(tx, est.id, actorId(session));
+    }
+    await tx.deal.delete({ where: { id: dealId } });
+  });
+
   revalidatePath("/admin/crm/deals");
   return { error: null };
 }

@@ -75,8 +75,30 @@ export async function updateModel(id: string, input: Partial<ModelFields>): Prom
   revalidateAllConsumers();
 }
 
+/**
+ * Delete a model — refused once anything real hangs off it.
+ *
+ * The whole catalogue below a model cascades: generations, trims, and the
+ * part↔trim compatibility mapping that took manual work to build. Until now
+ * this ran with no guard at all, so one click could erase that mapping and null
+ * out `RepairOrder.trimId` across the shop's history. Rebuilding it is manual,
+ * which makes an accidental click expensive and irreversible.
+ */
 export async function deleteModel(id: string): Promise<void> {
   await requireRole(["ADMIN"]);
+
+  const blocking = (await db.vehicleTrim.count({
+    where: {
+      generation: { modelId: id },
+      OR: [{ partTrims: { some: {} } }, { repairOrders: { some: {} } }],
+    },
+  })) as number;
+  if (blocking > 0) {
+    throw new Error(
+      `Нельзя удалить модель: за её комплектациями закреплены запчасти или заказ-наряды (${blocking}). Сначала снимите привязки.`,
+    );
+  }
+
   await db.vehicleModel.delete({ where: { id } });
   revalidateAllConsumers();
 }
@@ -123,8 +145,22 @@ export async function updateGeneration(
   revalidateAllConsumers();
 }
 
+/** Delete a generation — same guard as deleteModel, one level down. */
 export async function deleteGeneration(id: string): Promise<void> {
   await requireRole(["ADMIN"]);
+
+  const blocking = (await db.vehicleTrim.count({
+    where: {
+      generationId: id,
+      OR: [{ partTrims: { some: {} } }, { repairOrders: { some: {} } }],
+    },
+  })) as number;
+  if (blocking > 0) {
+    throw new Error(
+      `Нельзя удалить поколение: за его комплектациями закреплены запчасти или заказ-наряды (${blocking}). Сначала снимите привязки.`,
+    );
+  }
+
   await db.vehicleGeneration.delete({ where: { id } });
   revalidateAllConsumers();
 }

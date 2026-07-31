@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { roleLabel as roleLabelOf } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
 import { UserContactsForm } from "@/components/admin/UserContactsForm";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
@@ -27,12 +28,15 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Администратор",
-  MANAGER: "Менеджер",
-  CLIENT: "Клиент",
-  NONE: "Без доступа",
+const ROLE_BADGE_CLASS: Record<string, string> = {
+  ADMIN: "bg-[var(--color-accent)]/15 text-[var(--color-accent)]",
+  MANAGER: "bg-[var(--color-info-bg,rgba(59,130,246,0.12))] text-[var(--color-info,#3b82f6)]",
+  CLIENT: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
+  MASTER: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
+  WAREHOUSE_WORKER: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
+  NONE: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
 };
+
 
 export default async function UserDetailPage({ params }: Props) {
   const session = await requireRole(["ADMIN", "MANAGER"]);
@@ -67,20 +71,34 @@ export default async function UserDetailPage({ params }: Props) {
 
   const viewerIsAdmin = session.permissionRole === "ADMIN";
   const isSelf = session.id === user.id;
-  const roleLabel = ROLE_LABEL[user.permissionRole] ?? user.permissionRole;
+  const roleLabel = roleLabelOf(user.permissionRole);
 
   return (
     <div>
       <PageHeader
         eyebrow="Пользователи"
         title={user.name}
-        description={`${roleLabel}${flags.length > 0 ? ` · ${flags.join(", ")}` : ""}`}
+        description={flags.length > 0 ? flags.join(" · ") : undefined}
         actions={
           <Link href="/admin/users" className="back-link">
             ← К списку
           </Link>
         }
       />
+
+      {/* Role is what this page is mostly about — show it as a badge rather than
+          as grey text in the subtitle, matching how the list renders it. */}
+      <div className="mb-6 flex items-center gap-2">
+        <span className="text-xs text-[var(--foreground-muted)]">Роль:</span>
+        <span
+          className={`badge text-[11px] ${
+            ROLE_BADGE_CLASS[user.permissionRole] ??
+            "bg-[var(--background-secondary)] text-[var(--foreground-muted)]"
+          }`}
+        >
+          {roleLabel}
+        </span>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <UserContactsForm
@@ -117,8 +135,9 @@ export default async function UserDetailPage({ params }: Props) {
             Опасная зона
           </h2>
           <p className="text-sm text-[var(--foreground-muted)] mb-3">
-            Удаление вместе со всеми связанными данными — заказ-нарядами, сделками, сметами,
-            перепиской и автомобилями. Сначала выгружается копия, без неё удаление не выполнится.
+            Стирает персональные данные — карточку, контакты, заметки и ленту общения. Сделки,
+            заказ-наряды и письма в почтовом ящике по умолчанию сохраняются: это записи сервиса,
+            нужные для бухгалтерии и гарантии. Удалить и их можно галочкой. Сначала выгружается копия.
           </p>
           <EraseCustomerPanel
             customerUserId={user.id}

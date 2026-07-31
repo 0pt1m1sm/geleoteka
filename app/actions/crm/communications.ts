@@ -131,7 +131,21 @@ export async function deleteCommunication(id: string): Promise<void> {
     select: { customerUserId: true, dealId: true },
   })) as { customerUserId: string; dealId: string | null } | null;
   if (!existing) return;
-  await db.communicationLog.delete({ where: { id } });
+
+  // Linking an inbox message flipped it PENDING → ASSIGNED. Its FK to this log
+  // is SetNull, so deleting the log left the mail ASSIGNED with a dead link:
+  // gone from the triage queue (which lists only PENDING) AND gone from the
+  // customer timeline — present in the database, reachable from no screen.
+  // Send it back to triage so a human sees it again.
+  await db.$transaction(async (tx) => {
+    await tx.inboxMessage.updateMany({
+      where: { linkedCommunicationLogId: id },
+      data: { status: "PENDING", linkedCommunicationLogId: null },
+    });
+    await tx.communicationLog.delete({ where: { id } });
+  });
+
+  revalidatePath("/admin/crm/inbox");
   revalidatePath(`/admin/customers/${existing.customerUserId}`);
   if (existing.dealId) revalidatePath(`/admin/crm/deals/${existing.dealId}`);
 }
