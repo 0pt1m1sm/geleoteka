@@ -26,6 +26,7 @@ type DbLike = Pick<typeof db, "auditLog">;
  * the log unfilterable.
  */
 export type AuditAction =
+  | "user.create"
   | "customer.erase"
   | "customer.archive"
   | "customer.restore"
@@ -39,6 +40,7 @@ export type AuditAction =
   | "vehicle.delete";
 
 export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
+  "user.create": "Создание пользователя",
   "customer.erase": "Удаление клиента",
   "customer.archive": "Скрытие клиента из CRM",
   "customer.restore": "Восстановление клиента",

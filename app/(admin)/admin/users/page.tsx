@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
+import { CreateUserDialog } from "@/components/admin/users/CreateUserDialog";
 import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 import { db } from "@/lib/db";
 import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
@@ -94,6 +95,7 @@ export default async function UsersAdminPage({ searchParams }: Props) {
         eyebrow="Пользователи"
         title="Управление аккаунтами"
         description={`Найдено: ${users.length}${users.length >= 200 ? " (показаны последние 200)" : ""}`}
+        actions={viewerIsAdmin ? <CreateUserDialog /> : undefined}
       />
 
       <form className="mb-6 flex flex-wrap items-center gap-3">
