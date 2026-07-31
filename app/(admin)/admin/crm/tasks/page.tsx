@@ -158,32 +158,37 @@ export default async function CrmTasksPage({ searchParams }: Props) {
     <div>
       <PageHeader eyebrow="CRM · Задачи" title="Задачи" />
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        <Chip scope={scope} ownerScope={ownerScope} value="today" label="Сегодня" />
-        <Chip scope={scope} ownerScope={ownerScope} value="overdue" label="Просрочено" />
-        <Chip scope={scope} ownerScope={ownerScope} value="week" label="На неделе" />
-        <Chip scope={scope} ownerScope={ownerScope} value="open" label="Все открытые" />
-        <Chip scope={scope} ownerScope={ownerScope} value="done" label="Выполненные" />
-        <Chip scope={scope} ownerScope={ownerScope} value="all" label="Все" />
-        <span className="mx-2 text-[var(--foreground-muted)]">·</span>
-        <OwnerChip
-          scope={scope}
-          ownerScope={ownerScope}
-          value="mine"
-          label="Мои"
-        />
-        <OwnerChip
-          scope={scope}
-          ownerScope={ownerScope}
-          value="team"
-          label="Команда"
-        />
-        <OwnerChip
-          scope={scope}
-          ownerScope={ownerScope}
-          value="replies"
-          label="Ответы клиентов"
-        />
+      <div className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Диапазон задач">
+          <Chip scope={scope} ownerScope={ownerScope} value="today" label="Сегодня" />
+          <Chip scope={scope} ownerScope={ownerScope} value="overdue" label="Просрочено" />
+          <Chip scope={scope} ownerScope={ownerScope} value="week" label="На неделе" />
+          <Chip scope={scope} ownerScope={ownerScope} value="open" label="Все открытые" />
+          <Chip scope={scope} ownerScope={ownerScope} value="done" label="Выполненные" />
+          <Chip scope={scope} ownerScope={ownerScope} value="all" label="Все" />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Ответственные">
+          <OwnerChip
+            scope={scope}
+            ownerScope={ownerScope}
+            value="mine"
+            label="Мои"
+          />
+          <OwnerChip
+            scope={scope}
+            ownerScope={ownerScope}
+            value="team"
+            label="Команда"
+          />
+        </div>
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Очереди задач">
+          <OwnerChip
+            scope={scope}
+            ownerScope={ownerScope}
+            value="replies"
+            label="Ответы клиентов"
+          />
+        </div>
       </div>
 
       <Card>
