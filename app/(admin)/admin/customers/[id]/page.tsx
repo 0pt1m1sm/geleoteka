@@ -12,6 +12,7 @@ import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm"
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerContactsManager } from "@/components/admin/customers/CustomerContactsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
+import { NewDealDialog } from "@/components/crm/NewDealDialog";
 import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
@@ -37,6 +38,7 @@ interface RawCustomer {
     model: string;
     year: number;
     vin: string | null;
+    make: string | null;
     _count: { repairOrders: number };
   }>;
   loyaltyAccount: { points: number } | null;
@@ -188,6 +190,23 @@ export default async function CustomerDetailPage({ params }: Props) {
     authorName: n.author?.name ?? null,
   }));
 
+  // Диалогу нужен список клиентов; здесь он ровно из одного — того, чья
+  // карточка открыта. Машины отдаём его же, чтобы в форме можно было сразу
+  // выбрать автомобиль.
+  const dealDialogCustomers = [
+    {
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      vehicles: customer.vehicles.map((v) => ({
+        id: v.id,
+        make: v.make ?? "Mercedes-Benz",
+        model: v.model,
+        year: v.year,
+      })),
+    },
+  ];
+
   return (
     <div>
       {customer.deletedAt ? (
@@ -337,11 +356,16 @@ export default async function CustomerDetailPage({ params }: Props) {
             label: `Сделки (${deals.length})`,
             content:
               deals.length === 0 ? (
-                <div className="card text-sm text-[var(--foreground-muted)]">
-                  У клиента ещё нет сделок.
+                <div className="card text-sm text-[var(--foreground-muted)] flex items-center justify-between gap-3">
+                  <span>У клиента ещё нет сделок.</span>
+                  <NewDealDialog customers={dealDialogCustomers} lockedCustomerId={customer.id} />
                 </div>
               ) : (
-                <div className="card p-0">
+                <div className="space-y-3">
+                  <div className="flex justify-end">
+                    <NewDealDialog customers={dealDialogCustomers} lockedCustomerId={customer.id} />
+                  </div>
+                  <div className="card p-0">
                   <ul className="divide-y divide-[var(--border)]">
                     {deals.map((d) => (
                       <li key={d.id}>
@@ -390,6 +414,7 @@ export default async function CustomerDetailPage({ params }: Props) {
                       </li>
                     ))}
                   </ul>
+                  </div>
                 </div>
               ),
           },

@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
+import { CreateRepairOrderDialog } from "@/components/admin/CreateRepairOrderDialog";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
 import { Card, PageHeader } from "@/components/ui";
 import { customerName } from "@/lib/crm/customer-display";
@@ -49,6 +50,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         eyebrow="Сервис"
         title="Записи"
         description="Операционная сторона: статус, мастер, фото. Цены и согласование клиента — в CRM."
+        actions={<CreateRepairOrderDialog />}
       />
 
       <StatusFilter active={filterStatus} />

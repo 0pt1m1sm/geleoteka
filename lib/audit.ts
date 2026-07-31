@@ -37,7 +37,8 @@ export type AuditAction =
   | "role.permissions_reset"
   | "deal.delete"
   | "estimate.delete"
-  | "vehicle.delete";
+  | "vehicle.delete"
+  | "repairOrder.create";
 
 export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "user.create": "Создание пользователя",
@@ -52,6 +53,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "deal.delete": "Удаление сделки",
   "estimate.delete": "Удаление сметы",
   "vehicle.delete": "Удаление автомобиля",
+  "repairOrder.create": "Создание заказ-наряда",
 };
 
 export interface AuditActor {
@@ -63,7 +65,7 @@ export interface AuditActor {
 export interface AuditInput {
   actor: AuditActor;
   action: AuditAction;
-  targetType: "User" | "Deal" | "Estimate" | "Vehicle" | "Role";
+  targetType: "User" | "Deal" | "Estimate" | "Vehicle" | "Role" | "RepairOrder";
   targetId?: string | null;
   /** How the target was known at the time — a name, a number, a role label. */
   targetLabel?: string | null;
