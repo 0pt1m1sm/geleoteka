@@ -36,6 +36,90 @@ type Fail = { ok: false; error: string };
 
 
 /**
+ * Create an account from the admin panel.
+ *
+ * ADMIN only: creating a user is granting access, and the role is chosen right
+ * here. The password is generated, never typed — an operator inventing one
+ * would reuse it, and nobody needs to know a password they are about to hand
+ * over anyway. It is shown once and sent by SMS, like a reset.
+ *
+ * `isTempPassword` stays FALSE. Despite the name it does not mean "temporary":
+ * per the schema it marks a hash produced by the guest booking flow that the
+ * person does not know, and `login.ts` refuses any login while it is set.
+ * Setting it here would hand out a password that cannot be used.
+ */
+export async function createUser(
+  _prev: (Ok<{ tempPassword: string; userId: string }> | Fail) | null,
+  formData: FormData,
+): Promise<Ok<{ tempPassword: string; userId: string }> | Fail> {
+  const session = await requireRole(["ADMIN"]);
+
+  const name = ((formData.get("name") as string | null) ?? "").trim();
+  const email = ((formData.get("email") as string | null) ?? "").trim().toLowerCase();
+  const phoneRaw = ((formData.get("phone") as string | null) ?? "").trim();
+  const permissionRole = ((formData.get("permissionRole") as string | null) ?? "CLIENT").trim();
+  const isCustomer = formData.get("isCustomer") === "on";
+  const isMaster = formData.get("isMaster") === "on";
+
+  if (!name) return { ok: false, error: "Укажите имя" };
+  if (name.length > NAME_MAX) return { ok: false, error: "Слишком длинное имя" };
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Некорректный email" };
+  if (!isValidRussianPhone(phoneRaw)) return { ok: false, error: "Некорректный телефон" };
+  if (!isAllowedRole(permissionRole)) return { ok: false, error: "Неизвестная роль" };
+
+  const phone = normalizePhone(phoneRaw);
+  const tempPassword = generateTempPassword();
+
+  let userId: string;
+  try {
+    const created = (await db.user.create({
+      data: {
+        name,
+        email,
+        phone,
+        // NONE means "no login at all", so giving it a hash would be a lie the
+        // login page then refuses anyway.
+        passwordHash: permissionRole === "NONE" ? null : await bcrypt.hash(tempPassword, 10),
+        isTempPassword: false,
+        permissionRole: permissionRole as AllowedRole,
+        isCustomer,
+        isMaster,
+      },
+      select: { id: true },
+    })) as { id: string };
+    userId = created.id;
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { ok: false, error: "Пользователь с таким email или телефоном уже существует" };
+    }
+    throw err;
+  }
+
+  await recordAudit({
+    actor: session,
+    action: "user.create",
+    targetType: "User",
+    targetId: userId,
+    targetLabel: name,
+    metadata: { role: permissionRole, isCustomer, isMaster },
+  });
+
+  if (permissionRole !== "NONE") {
+    // Best effort: a failed SMS must not undo an account that already exists —
+    // the password is on screen either way.
+    try {
+      await sendSms(phone, `Доступ в Гелеотеку: ${email} / ${tempPassword}`);
+    } catch {
+      // проглатываем: пароль показан администратору
+    }
+  }
+
+  revalidatePath("/admin/users");
+  revalidatePath("/admin/customers");
+  return { ok: true, tempPassword, userId };
+}
+
+/**
  * Reset a user's password to a fresh 10-char temp string, returned to the admin
  * and sent by SMS. ADMIN/MANAGER only.
  *
