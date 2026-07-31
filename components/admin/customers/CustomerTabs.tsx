@@ -13,13 +13,33 @@ export interface CustomerTab {
  * passed in as `content`; all stay mounted (toggled via `hidden`) so embedded
  * client components (CommunicationLogger, CrmTaskList) keep their state and
  * don't re-fetch on tab switch.
+ *
+ * На узком экране — список, а не прокручиваемая полоса. Полоса уезжала за край:
+ * «Обзор» оказывался обрезан слева, а «Задачи» — за правым краем, и о них
+ * попросту не догадывались. Список всегда показывает, где ты сейчас, и содержит
+ * все разделы разом. То же решение и в почтовом ящике — см. `InboxTabs`.
  */
 export function CustomerTabs({ tabs }: { tabs: CustomerTab[] }): React.ReactElement {
   const [active, setActive] = useState(tabs[0]?.key ?? "");
 
   return (
     <div>
-      <div role="tablist" className="flex gap-1 border-b border-[var(--border)] mb-6 overflow-x-auto">
+      <div className="sm:hidden mb-6">
+        <select
+          className="input"
+          value={active}
+          onChange={(e) => setActive(e.target.value)}
+          aria-label="Раздел"
+        >
+          {tabs.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div role="tablist" className="hidden sm:flex gap-1 border-b border-[var(--border)] mb-6">
         {tabs.map((t) => (
           <button
             key={t.key}
