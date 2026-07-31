@@ -355,6 +355,12 @@ model User {
   // field existed will have unknown source.
   referralSource ReferralSource?
 
+  /// Часовой пояс и язык — предпочтения самого человека.
+  /// НЕ управляют показом времени записи: у сервиса одни часы, те что на стене
+  /// в цехе, и «когда привозить машину» не зависит от того, где сейчас клиент.
+  timeZone String?
+  locale   String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -155,6 +155,16 @@ function SidebarShell({
               ← На сайт
             </Link>
           ) : null}
+          {/* Профиль рядом с выходом: оба про самого вошедшего, а не про раздел. */}
+          {showLogout ? (
+            <Link
+              href="/profile"
+              onClick={onNavigate}
+              className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors"
+            >
+              Профиль
+            </Link>
+          ) : null}
           {showLogout ? (
             <LogoutButton className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors w-full text-left" />
           ) : null}

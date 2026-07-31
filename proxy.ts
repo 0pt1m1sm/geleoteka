@@ -54,6 +54,8 @@ export async function proxy(request: NextRequest) {
 
 // Only protected sections — public pages never enter the proxy, so the old
 // publicPaths allow-list is unnecessary here (the matcher IS the allow-list).
+// /profile лежит вне обеих групп: профиль есть у всех вошедших, а не только у
+// клиентов или только у сотрудников, — но защищать его всё равно надо.
 export const config = {
-  matcher: ["/cabinet/:path*", "/admin/:path*"],
+  matcher: ["/cabinet/:path*", "/admin/:path*", "/profile"],
 };
