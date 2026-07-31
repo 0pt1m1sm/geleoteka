@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { LogoutButton } from "@/components/shared/LogoutButton";
+import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import {
   type AdminNavEntry,
   type AdminNavGroup,
@@ -144,9 +145,14 @@ function SidebarShell({
           );
         })}
       </nav>
-      {(showSiteLink || showLogout) && (
-        <div className="p-4 border-t border-[var(--border)] space-y-1">
-          {showSiteLink ? (
+      <div className="p-4 border-t border-[var(--border)] space-y-1">
+        {/* Переключатель темы здесь, а не только в шапке сайта: из админки и
+            кабинета за ним приходилось уходить на публичные страницы. */}
+        <div className="flex items-center justify-between px-3 py-1">
+          <span className="text-sm text-[var(--foreground-muted)]">Тема</span>
+          <ThemeToggle />
+        </div>
+        {showSiteLink ? (
             <Link
               href="/"
               onClick={onNavigate}
@@ -165,11 +171,10 @@ function SidebarShell({
               Профиль
             </Link>
           ) : null}
-          {showLogout ? (
-            <LogoutButton className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors w-full text-left" />
-          ) : null}
-        </div>
-      )}
+        {showLogout ? (
+          <LogoutButton className="flex items-center px-3 py-2 rounded-[var(--radius-lg)] text-sm text-[var(--foreground-muted)] hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors w-full text-left" />
+        ) : null}
+      </div>
     </div>
   );
 }

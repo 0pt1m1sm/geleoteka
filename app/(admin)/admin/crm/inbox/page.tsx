@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
-import { formatDate, formatDateTime } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
 import { InboxCard } from "@/components/admin/inbox/InboxCard";
 
@@ -82,11 +82,15 @@ interface AllMailRow {
  * оставалось «Alex Tern…». Год в почтовом ящике почти никогда не нужен —
  * письма читают свежими.
  */
-function compactDateTime(d: Date): string {
+function compactDateTime(d: Date, now: Date): string {
+  // Год добавляется только для писем прошлых лет — как в любом почтовом
+  // клиенте: для свежей почты он шум, для старой без него не разобраться.
+  const sameYear = d.getFullYear() === now.getFullYear();
   return formatDate(d, {
     dateStyle: undefined,
     day: "numeric",
     month: "short",
+    ...(sameYear ? {} : { year: "numeric" }),
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -116,6 +120,9 @@ export default async function InboxPage({ searchParams }: Props) {
   const status = STATUS_TABS.find((t) => t.key === (sp.status ?? "PENDING"))?.key ?? "PENDING";
 
   const showAll = status === "ALL";
+  // Одна отметка времени на рендер: даты в списке сравниваются с одним и тем же
+  // «сейчас», иначе строки на границе года разъедутся между собой.
+  const now = new Date();
 
   const [rows, counts] = (await Promise.all([
     showAll
@@ -245,7 +252,7 @@ export default async function InboxPage({ searchParams }: Props) {
                       preview={previewOf(m.bodyText)}
                       outbound={outbound}
                       party={outbound ? (m.toEmails[0] ?? "—") : m.fromEmail}
-                      time={compactDateTime(m.occurredAt)}
+                      time={compactDateTime(m.occurredAt, now)}
                       folder={m.sourceMailbox}
                       attachments={attachmentCount(m.attachments)}
                       marks={inboxId ? ["в разборе"] : customerId ? [] : ["без клиента"]}
@@ -272,7 +279,7 @@ export default async function InboxPage({ searchParams }: Props) {
                     preview={previewOf(row.bodyText)}
                     outbound={row.direction === "OUTBOUND"}
                     party={row.direction === "OUTBOUND" ? row.toEmail : row.fromEmail}
-                    time={compactDateTime(row.receivedAt)}
+                    time={compactDateTime(row.receivedAt, now)}
                     folder={row.toEmail}
                     attachments={attachmentCount(row.attachments)}
                     marks={[
