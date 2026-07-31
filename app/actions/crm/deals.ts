@@ -187,7 +187,9 @@ export async function setDealStage(
  *
  * Estimates DO still cascade — an estimate belongs to its deal — but their
  * stock reservations are released first, because those are keyed by a string,
- * not a foreign key, and the database cascade cannot see them.
+ * not a foreign key, and the database cascade cannot see them. Only holds that
+ * are still outstanding come back: parts already fitted or shipped were
+ * consumed, which cleared their hold when the stock physically left.
  */
 export async function deleteDeal(
   dealId: string,
