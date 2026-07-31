@@ -66,6 +66,43 @@ const MARKUP = `
     </div>
   </div>
 
+  <!-- Строка почтового ящика: старая раскладка (дата и кнопки в одну строку с
+       именем) против новой (дата уходит под тему). Меряем, сколько ширины
+       достаётся имени отправителя — именно оно обрезалось до «Alex Tern…». -->
+  <div class="card" data-card="inbox">
+    <div class="flex items-start" data-row="old">
+      <a class="flex-1 min-w-0 flex items-start gap-4 px-4 py-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-medium truncate flex items-center gap-2">
+            <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded">← ВХ</span>
+            <span class="truncate" data-measure="sender-old">Alex Terner &lt;aleksandr.spiskov@gmail.com&gt;</span>
+          </div>
+          <div class="text-sm truncate">Re: Test mail</div>
+        </div>
+        <div class="text-xs shrink-0">30 июл. 2026 г., 19:05</div>
+      </a>
+      <div class="flex items-center gap-1 shrink-0 pr-3 pt-3">
+        <span class="btn-icon">A</span><span class="btn-icon">B</span><span class="btn-icon">C</span>
+      </div>
+    </div>
+
+    <div class="flex flex-col" data-row="new">
+      <a class="flex-1 min-w-0 flex items-start gap-4 px-4 py-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-medium truncate flex items-center gap-2">
+            <span class="shrink-0 text-[10px] px-1.5 py-0.5 rounded">← ВХ</span>
+            <span class="truncate" data-measure="sender-new">Alex Terner &lt;aleksandr.spiskov@gmail.com&gt;</span>
+          </div>
+          <div class="text-sm truncate">Re: Test mail</div>
+          <div class="mt-1 text-xs">30 июл., 19:05</div>
+        </div>
+      </a>
+      <div class="flex items-center gap-1 self-end pr-3 pb-2">
+        <span class="btn-icon">A</span><span class="btn-icon">B</span><span class="btn-icon">C</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Часы работы: четыре колонки в одной строке — самое узкое место на телефоне. -->
   <div class="card" data-card="hours">
     <div class="grid grid-cols-[minmax(4rem,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 sm:gap-x-3 gap-y-1 items-center">
@@ -88,7 +125,10 @@ interface Overflow {
   overflowPx: number;
 }
 
-async function measure(css: string, breakFix: boolean): Promise<{ page: number; fields: Overflow[] }> {
+async function measure(
+  css: string,
+  breakFix: boolean,
+): Promise<{ page: number; fields: Overflow[]; widths: Record<string, number> }> {
   const browser = await webkit.launch();
   try {
     const ctx = await browser.newContext({ ...devices["iPhone 13"] });
@@ -113,9 +153,16 @@ async function measure(css: string, breakFix: boolean): Promise<{ page: number; 
           overflowPx: Math.round(r.right - innerRight),
         };
       });
+      const widths = Object.fromEntries(
+        [...document.querySelectorAll("[data-measure]")].map((el) => [
+          (el as HTMLElement).dataset.measure ?? "?",
+          Math.round(el.getBoundingClientRect().width),
+        ]),
+      );
       return {
         page: Math.round(document.documentElement.scrollWidth - document.documentElement.clientWidth),
         fields,
+        widths,
       };
     });
     return result;
@@ -148,6 +195,17 @@ async function main(): Promise<void> {
     if (!ok) failures++;
     console.log(`  ${ok ? "✅" : "❌"} ${f.field.padEnd(9)} выход за карточку: ${f.overflowPx}px`);
   }
+  // Читаемость: имени отправителя должно доставаться не меньше 200px, иначе
+  // от «Alex Terner <…@gmail.com>» остаётся «Alex Tern…».
+  const MIN_SENDER_PX = 200;
+  const oldW = fixed.widths["sender-old"] ?? 0;
+  const newW = fixed.widths["sender-new"] ?? 0;
+  const senderOk = newW >= MIN_SENDER_PX;
+  if (!senderOk) failures++;
+  console.log(
+    `  ${senderOk ? "✅" : "❌"} ширина имени отправителя: было ${oldW}px, стало ${newW}px (нужно ≥ ${MIN_SENDER_PX})`,
+  );
+
   const pageOk = fixed.page <= 1;
   if (!pageOk) failures++;
   console.log(`  ${pageOk ? "✅" : "❌"} горизонтальная прокрутка страницы: ${fixed.page}px`);
