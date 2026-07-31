@@ -1,0 +1,147 @@
+import type { InboundCommChannel } from "@/lib/crm/inbound-communications";
+import type { Permission } from "@/lib/permissions";
+
+export const STAFF_NOTIFICATION_PRIORITIES = ["P0", "P1", "P2"] as const;
+export type StaffNotificationPriority = (typeof STAFF_NOTIFICATION_PRIORITIES)[number];
+
+export interface StaffNotificationEventDefinition {
+  priority: StaffNotificationPriority;
+  fallbackPermission: Permission;
+  requiresInboundChannel: boolean;
+}
+
+/**
+ * The closed event catalogue. Database values stay strings so adding a type is
+ * one application deploy, not a PostgreSQL enum migration.
+ */
+export const STAFF_NOTIFICATION_EVENT_CATALOG = {
+  INBOUND_CUSTOMER_MESSAGE: {
+    priority: "P0",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: true,
+  },
+  SERVICE_BOOKING_CREATED: {
+    priority: "P0",
+    fallbackPermission: "service.manage",
+    requiresInboundChannel: false,
+  },
+  ESTIMATE_CUSTOMER_APPROVED: {
+    priority: "P0",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: false,
+  },
+  ESTIMATE_CUSTOMER_DECLINED: {
+    priority: "P0",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: false,
+  },
+  PARTS_ORDER_CREATED: {
+    priority: "P1",
+    fallbackPermission: "parts.manage",
+    requiresInboundChannel: false,
+  },
+  RENTAL_BOOKING_CREATED: {
+    priority: "P1",
+    fallbackPermission: "rentals.manage",
+    requiresInboundChannel: false,
+  },
+  INBOUND_MESSAGE_UNRESOLVED: {
+    priority: "P1",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: true,
+  },
+  CRM_TASK_OVERDUE: {
+    priority: "P1",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: false,
+  },
+  STAFF_DELIVERY_DEAD: {
+    priority: "P2",
+    fallbackPermission: "settings.manage",
+    requiresInboundChannel: false,
+  },
+} as const satisfies Record<string, StaffNotificationEventDefinition>;
+
+export type StaffNotificationType = keyof typeof STAFF_NOTIFICATION_EVENT_CATALOG;
+
+const STAFF_NOTIFICATION_TYPE_SET = new Set<string>(
+  Object.keys(STAFF_NOTIFICATION_EVENT_CATALOG),
+);
+
+export function isStaffNotificationType(value: unknown): value is StaffNotificationType {
+  return typeof value === "string" && STAFF_NOTIFICATION_TYPE_SET.has(value);
+}
+
+/** Adapter channels are strings in PostgreSQL and closed here. */
+export const STAFF_NOTIFICATION_CHANNELS = ["TELEGRAM"] as const;
+export type StaffNotificationChannel = (typeof STAFF_NOTIFICATION_CHANNELS)[number];
+
+const STAFF_NOTIFICATION_CHANNEL_SET = new Set<string>(STAFF_NOTIFICATION_CHANNELS);
+
+export function isStaffNotificationChannel(value: unknown): value is StaffNotificationChannel {
+  return typeof value === "string" && STAFF_NOTIFICATION_CHANNEL_SET.has(value);
+}
+
+export const STAFF_NOTIFICATION_ROUTING_STATUSES = [
+  "PENDING",
+  "PROCESSING",
+  "RETRY",
+  "ROUTED",
+  "DEAD",
+] as const;
+export type StaffNotificationRoutingStatus =
+  (typeof STAFF_NOTIFICATION_ROUTING_STATUSES)[number];
+
+export const TELEGRAM_DESTINATION_KINDS = ["PERSONAL", "SHARED"] as const;
+export type TelegramDestinationKind = (typeof TELEGRAM_DESTINATION_KINDS)[number];
+
+export const TELEGRAM_LINK_PURPOSES = ["PERSONAL", "SHARED"] as const;
+export type TelegramLinkPurpose = (typeof TELEGRAM_LINK_PURPOSES)[number];
+
+/**
+ * The only event content a channel adapter may receive. In particular there is
+ * no arbitrary metadata, message subject/body, contact detail or provider URL.
+ */
+export interface SafeChannelPayload {
+  eventId: string;
+  type: StaffNotificationType;
+  priority: StaffNotificationPriority;
+  safeSummary: string;
+  occurredAt: Date;
+  actionUrl: string;
+}
+
+export interface StaffNotificationEventRecord {
+  id: string;
+  tenantKey: string;
+  type: string;
+  priority: string;
+  channel: string | null;
+  dedupeKey: string;
+  sourceType: string;
+  sourceId: string;
+  relatedCustomerUserId: string | null;
+  relatedDealId: string | null;
+  relatedTaskId: string | null;
+  targetUserId: string | null;
+  fallbackPermission: string | null;
+  summary: string;
+  actionPath: string;
+  occurredAt: Date;
+}
+
+export interface PublishStaffNotificationInput {
+  type: StaffNotificationType;
+  /** Required for channel-aware inbound event types; forbidden otherwise. */
+  channel?: InboundCommChannel | null;
+  dedupeKey: string;
+  sourceType: string;
+  sourceId: string;
+  relatedCustomerUserId?: string | null;
+  relatedDealId?: string | null;
+  relatedTaskId?: string | null;
+  targetUserId?: string | null;
+  safeSummary: string;
+  actionPath: string;
+  occurredAt: Date;
+}

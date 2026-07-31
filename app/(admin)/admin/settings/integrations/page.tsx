@@ -23,8 +23,10 @@ export default async function IntegrationsSettingsPage() {
     redirect("/login");
   }
 
+  const visibleSettings = KNOWN_SETTINGS.filter((setting) => setting.visibleInUi !== false);
+
   const rows = (await db.setting.findMany({
-    where: { key: { in: KNOWN_SETTINGS.map((s) => s.key) } },
+    where: { key: { in: visibleSettings.map((s) => s.key) } },
     select: { key: true, value: true },
   })) as Array<{ key: string; value: string }>;
 
@@ -32,7 +34,7 @@ export default async function IntegrationsSettingsPage() {
 
   // Group descriptors by `group` field, preserving definition order.
   const groups = new Map<string, SettingDescriptor[]>();
-  for (const s of KNOWN_SETTINGS) {
+  for (const s of visibleSettings) {
     const list = groups.get(s.group) ?? [];
     list.push(s);
     groups.set(s.group, list);

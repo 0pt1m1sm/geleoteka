@@ -118,10 +118,10 @@ enum RentalBookingStatus {
 // docs/prd/2026-05-10-deal-fulfillment-architecture.md.
 
 enum DealStage {
-  NEW         // создана; нет ещё APPROVED-сметы. Заменяет DRAFT + QUOTED.
+  NEW // создана; нет ещё APPROVED-сметы. Заменяет DRAFT + QUOTED.
   IN_PROGRESS // есть APPROVED estimate; fulfillment либо ждёт, либо идёт, либо ждёт оплаты. Заменяет APPROVED + IN_FULFILLMENT + DELIVERED.
-  WON         // фулфилмент завершён + оплачено. Manual transition.
-  LOST        // отказ клиента / протух / отменён. Manual transition.
+  WON // фулфилмент завершён + оплачено. Manual transition.
+  LOST // отказ клиента / протух / отменён. Manual transition.
 }
 
 enum DealChannel {
@@ -200,7 +200,7 @@ model InboundAttempt {
   id         String   @id @default(cuid())
   receivedAt DateTime @default(now())
   httpStatus Int
-  outcome    String   // accepted_thread / accepted_customer / accepted_inbox / duplicate / rejected_signature / ignored_recipient / ignored_type / error_no_secret / error_no_api_key / error_upstream / error_other
+  outcome    String // accepted_thread / accepted_customer / accepted_inbox / duplicate / rejected_signature / ignored_recipient / ignored_type / error_no_secret / error_no_api_key / error_upstream / error_other
   detail     String?
   recipient  String?
   fromEmail  String?
@@ -304,6 +304,17 @@ enum CrmTaskKind {
   GENERIC
 }
 
+/// Stable delivery lifecycle. Unlike event types and channel names this is a
+/// closed persistence state machine, so PostgreSQL enforces it as an enum.
+enum StaffNotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  RETRY
+  SENT
+  DEAD
+  CANCELLED
+}
+
 enum FuelType {
   PETROL
   DIESEL
@@ -386,14 +397,14 @@ model User {
   rentalBookings RentalBooking[]
 
   // CRM — manager timeline notes about this customer + tag assignments
-  customerNotes        CustomerNote[]            @relation("CustomerNoteCustomer")
-  authoredCustomerNotes CustomerNote[]           @relation("CustomerNoteAuthor")
-  tagAssignments       CustomerTagAssignment[]
+  customerNotes         CustomerNote[]          @relation("CustomerNoteCustomer")
+  authoredCustomerNotes CustomerNote[]          @relation("CustomerNoteAuthor")
+  tagAssignments        CustomerTagAssignment[]
 
   // Secondary email/phone aliases — a customer who writes from a new
   // address gets it added here so future inbound auto-matches them.
   // The primary email/phone stay on this model; aliases are extras.
-  contacts             CustomerContact[]
+  contacts CustomerContact[]
 
   // Relations — as master/technician
   assignedRepairOrders RepairOrder[] @relation("RepairOrderMaster")
@@ -409,9 +420,9 @@ model User {
   uploadedRepairOrderPhotos RepairOrderPhoto[] @relation("RepairOrderPhotoUploader")
 
   // CRM — Deal/Estimate relations
-  dealsAsCustomer    Deal[]     @relation("DealCustomer")
-  dealsAsOwner       Deal[]     @relation("DealOwner")
-  estimatesPrepared  Estimate[] @relation("EstimatePreparedBy")
+  dealsAsCustomer   Deal[]     @relation("DealCustomer")
+  dealsAsOwner      Deal[]     @relation("DealOwner")
+  estimatesPrepared Estimate[] @relation("EstimatePreparedBy")
 
   // CRM Phase 3 — Communications
   commLogsAsCustomer CommunicationLog[] @relation("CommLogCustomer")
@@ -428,7 +439,7 @@ model User {
   settingsUpdated Setting[] @relation("SettingUpdater")
 
   // CRM Phase 4 — Tasks
-  crmTasksOwned    CrmTask[] @relation("CrmTaskOwner")
+  crmTasksOwned      CrmTask[] @relation("CrmTaskOwner")
   crmTasksAsCustomer CrmTask[] @relation("CrmTaskCustomer")
 
   // Self-referential — referrals
@@ -948,14 +959,14 @@ enum ImageVisibility {
 }
 
 model UploadedImage {
-  id          String   @id @default(cuid())
+  id          String          @id @default(cuid())
   visibility  ImageVisibility @default(PUBLIC)
   bytes       Bytes
   mimeType    String
   width       Int
   height      Int
   size        Int
-  createdAt   DateTime @default(now())
+  createdAt   DateTime        @default(now())
   createdById String?
 
   createdBy User? @relation("UploadedImageCreator", fields: [createdById], references: [id], onDelete: SetNull)
@@ -1095,27 +1106,27 @@ model Warehouse {
 }
 
 model StockItem {
-  id        String   @id @default(cuid())
-  partId    String
-  warehouseId String
-  quantity  Int      @default(0) // physical on-hand
-  reserved  Int      @default(0) // held by open reservations; available = quantity - reserved
+  id           String   @id @default(cuid())
+  partId       String
+  warehouseId  String
+  quantity     Int      @default(0) // physical on-hand
+  reserved     Int      @default(0) // held by open reservations; available = quantity - reserved
   // Replenishment (Phase 5): per-item reorder policy. Null = use the host default
   // (LOW_STOCK_THRESHOLD). reorderPoint = trigger (min); reorderUpTo = order-up-to
   // (target). Read only by host code (lib/warehouse, app/actions); the WMS core
   // never reads these — it selects quantity/reserved explicitly.
   reorderPoint Int?
   reorderUpTo  Int?
-  barcode   String?
-  gtin      String?
-  tenantKey String   @default("geleoteka")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  barcode      String?
+  gtin         String?
+  tenantKey    String   @default("geleoteka")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Restrict: строка проданного заказа хранит цену и состав отгрузки —
   // удаление позиции каталога не должно стирать факт продажи.
-  part         Part                @relation(fields: [partId], references: [id], onDelete: Restrict)
-  warehouse    Warehouse           @relation(fields: [warehouseId], references: [id])
+  part         Part               @relation(fields: [partId], references: [id], onDelete: Restrict)
+  warehouse    Warehouse          @relation(fields: [warehouseId], references: [id])
   movements    StockMovement[]
   bins         StockBin[]
   binMovements StockBinMovement[]
@@ -1127,22 +1138,22 @@ model StockItem {
 }
 
 model StockMovement {
-  id            String              @id @default(cuid())
-  itemId        String
-  reason        StockMovementReason
-  quantityDelta Int                 @default(0) // signed on-hand delta
-  reservedDelta Int                 @default(0) // signed reserved delta
-  sourceType    String
-  sourceId      String?
-  actorUserId   String?
-  note          String?
+  id             String              @id @default(cuid())
+  itemId         String
+  reason         StockMovementReason
+  quantityDelta  Int                 @default(0) // signed on-hand delta
+  reservedDelta  Int                 @default(0) // signed reserved delta
+  sourceType     String
+  sourceId       String?
+  actorUserId    String?
+  note           String?
   // Client-supplied idempotency key (phone retry safety). Nullable: NULLs are
   // distinct in PG so only keyed writes dedupe. Independent of the source-triple
   // below — recordMovement disambiguates which unique fired on P2002.
   idempotencyKey String?
-  warehouseId   String
-  tenantKey     String              @default("geleoteka")
-  createdAt     DateTime            @default(now())
+  warehouseId    String
+  tenantKey      String              @default("geleoteka")
+  createdAt      DateTime            @default(now())
 
   item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
@@ -1171,14 +1182,14 @@ enum StockBinMovementReason {
 }
 
 model StockBin {
-  id        String   @id @default(cuid())
-  itemId    String
+  id          String   @id @default(cuid())
+  itemId      String
   warehouseId String
-  location  String
-  quantity  Int      @default(0)
-  tenantKey String   @default("geleoteka")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  location    String
+  quantity    Int      @default(0)
+  tenantKey   String   @default("geleoteka")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   item      StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
@@ -1188,19 +1199,19 @@ model StockBin {
 }
 
 model StockBinMovement {
-  id           String                 @id @default(cuid())
-  itemId       String
-  reason       StockBinMovementReason
-  fromLocation String?
-  toLocation   String?
-  quantity     Int
-  actorUserId  String?
-  note         String?
+  id             String                 @id @default(cuid())
+  itemId         String
+  reason         StockBinMovementReason
+  fromLocation   String?
+  toLocation     String?
+  quantity       Int
+  actorUserId    String?
+  note           String?
   // Client-supplied idempotency key (phone retry safety). Nullable; NULLs are
   // distinct in PG so only keyed placement writes dedupe.
   idempotencyKey String?
-  tenantKey    String                 @default("geleoteka")
-  createdAt    DateTime               @default(now())
+  tenantKey      String                 @default("geleoteka")
+  createdAt      DateTime               @default(now())
 
   item StockItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
@@ -1214,15 +1225,15 @@ model StockBinMovement {
 // ALL items. `code` is normalized upper/trimmed by callers. LOCATION_BLOCKED
 // (putaway/transfer-in rejection) checks isActive/isBlocked here.
 model StockLocation {
-  id        String   @id @default(cuid())
-  code      String
+  id          String   @id @default(cuid())
+  code        String
   warehouseId String
-  zone      String?
-  isActive  Boolean  @default(true)
-  isBlocked Boolean  @default(false)
-  tenantKey String   @default("geleoteka")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  zone        String?
+  isActive    Boolean  @default(true)
+  isBlocked   Boolean  @default(false)
+  tenantKey   String   @default("geleoteka")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   warehouse Warehouse @relation(fields: [warehouseId], references: [id])
 
@@ -1287,23 +1298,23 @@ enum StockCountClassification {
 }
 
 model StockCountSession {
-  id             String           @id @default(cuid())
-  status         StockCountStatus @default(OPEN)
-  scope          StockCountScope
-  scopeValue     String? // display label (zone name / comma codes / category ref)
+  id              String           @id @default(cuid())
+  status          StockCountStatus @default(OPEN)
+  scope           StockCountScope
+  scopeValue      String? // display label (zone name / comma codes / category ref)
   // Resolved scope, persisted so the post-time drift query can enumerate the
   // FULL live scoped bin map (a new bin with no count line still counts as drift).
   // FULL scope = both arrays empty + scope=FULL meaning "all tenant bins".
-  scopeLocations String[]
-  scopePartIds   String[]
-  note           String?
+  scopeLocations  String[]
+  scopePartIds    String[]
+  note            String?
   createdByUserId String?
-  postedByUserId String?
-  postedAt       DateTime?
-  warehouseId    String
-  tenantKey      String           @default("geleoteka")
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  postedByUserId  String?
+  postedAt        DateTime?
+  warehouseId     String
+  tenantKey       String           @default("geleoteka")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
   lines     StockCountLine[]
@@ -1392,29 +1403,29 @@ model PartOrderItem {
 // ============================================
 
 model RentalBooking {
-  id             String              @id @default(cuid())
+  id            String              @id @default(cuid())
   // Human-readable RB-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
   // inserts always carry a value.
-  bookingNumber  String?             @unique
-  vehicleId    String // Was carId — now references Vehicle
-  userId       String?
-  status       RentalBookingStatus @default(BOOKED)
-  startDate    DateTime
-  endDate      DateTime
+  bookingNumber String?             @unique
+  vehicleId     String // Was carId — now references Vehicle
+  userId        String?
+  status        RentalBookingStatus @default(BOOKED)
+  startDate     DateTime
+  endDate       DateTime
   // Rental cost is NOT denormalized here — it lives on the deal's active
   // estimate (RENTAL_DAY line) and Deal.total. Read it via the deal.
-  contactName  String
-  contactPhone String
-  contactEmail String
-  notes        String?
+  contactName   String
+  contactPhone  String
+  contactEmail  String
+  notes         String?
   // One-shot claim secret for guest checkouts. Mirrors RepairOrder.claimToken
   // and PartOrder.claimToken — lets a guest who just booked a rental set a
   // password and merge into the soft-account created at submit time. Cleared
   // (set to NULL) once the guest claims the account.
-  claimToken   String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  claimToken    String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   // Deal+Fulfillment: NOT NULL after the backfill (scripts/backfill-fulfillment-deals.ts)
   // guaranteed every row carries a dealId.
@@ -1446,17 +1457,17 @@ model RentalBooking {
 /// never revoke a technician's access, and a departing technician does not
 /// silently vanish from the site.
 model TeamMember {
-  id               String   @id @default(cuid())
-  name             String
-  role             String?
-  bio              String?
-  photoUrl         String?
-  yearsExperience  Int?
-  certifications   String[]
-  isActive         Boolean  @default(true)
-  sortOrder        Int      @default(0)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  role            String?
+  bio             String?
+  photoUrl        String?
+  yearsExperience Int?
+  certifications  String[]
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([isActive])
   @@index([sortOrder])
@@ -1481,33 +1492,33 @@ model Vacancy {
 // ============================================
 
 model SupplierOrder {
-  id               String              @id @default(cuid())
-  userId           String // Was supplierId — references User (isSupplier=true)
-  orderNumber      String?
-  orderDate        DateTime
-  status           SupplierOrderStatus @default(DRAFT)
-  itemsCost        Int                 @default(0)
-  shippingCost     Int                 @default(0)
-  customsCost      Int                 @default(0)
-  totalCost        Int                 @default(0)
-  sellingPrice     Int                 @default(0)
-  estimatedProfit  Int                 @default(0)
+  id              String              @id @default(cuid())
+  userId          String // Was supplierId — references User (isSupplier=true)
+  orderNumber     String?
+  orderDate       DateTime
+  status          SupplierOrderStatus @default(DRAFT)
+  itemsCost       Int                 @default(0)
+  shippingCost    Int                 @default(0)
+  customsCost     Int                 @default(0)
+  totalCost       Int                 @default(0)
+  sellingPrice    Int                 @default(0)
+  estimatedProfit Int                 @default(0)
 
   // Landed-cost inputs (nullable — old orders have none). Money results stay in
   // the Int-ruble columns above; fractional inputs are scaled ints.
-  shippingWeightGrams      Int? // effective weight used (server-computed: override ?? auto-from-catalog)
+  shippingWeightGrams       Int? // effective weight used (server-computed: override ?? auto-from-catalog)
   manualWeightOverrideGrams Int? // manager override; null = auto from Part.weightGrams
-  shippingRateUsdCents     Int? // shipping $/kg ×100
-  usdRateKopecks           Int? // USD→RUB rate ×100
-  customsMode              CustomsMode @default(PERCENT_CIF)
-  customsPercentBps        Int? // customs % in basis points (2600 = 26%)
-  cargoRateUsdCents        Int? // cargo $/kg ×100 (CARGO_PER_KG mode)
-  trackingNumber   String?
-  estimatedArrival DateTime?
-  receivedAt       DateTime?
-  notes            String?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  shippingRateUsdCents      Int? // shipping $/kg ×100
+  usdRateKopecks            Int? // USD→RUB rate ×100
+  customsMode               CustomsMode @default(PERCENT_CIF)
+  customsPercentBps         Int? // customs % in basis points (2600 = 26%)
+  cargoRateUsdCents         Int? // cargo $/kg ×100 (CARGO_PER_KG mode)
+  trackingNumber            String?
+  estimatedArrival          DateTime?
+  receivedAt                DateTime?
+  notes                     String?
+  createdAt                 DateTime    @default(now())
+  updatedAt                 DateTime    @updatedAt
 
   supplier User                @relation(fields: [userId], references: [id])
   items    SupplierOrderItem[]
@@ -1518,8 +1529,8 @@ model SupplierOrder {
 }
 
 model SupplierOrderItem {
-  id          String                @id @default(cuid())
-  orderId     String
+  id               String                @id @default(cuid())
+  orderId          String
   type             SupplierOrderItemType @default(PART)
   partId           String?
   description      String
@@ -1649,17 +1660,17 @@ model PartTrim {
 /// Estimate's EstimateLine[] and is the source of truth for total revenue.
 /// See docs/prd/2026-05-10-deal-fulfillment-architecture.md.
 model Deal {
-  id              String              @id @default(cuid())
-  number          String?             @unique
+  id             String            @id @default(cuid())
+  number         String?           @unique
   /// NULL when the customer was erased: the commercial record survives
   /// detached and can be re-attached by hand. See app/actions/crm/customer-erase.ts.
-  customerUserId  String?
-  vehicleId       String? // Optional — parts-only deal may not have one
-  ownerUserId     String? // Sales rep / deal owner
-  stage           DealStage           @default(NEW)
-  channel         DealChannel
-  source          String? // "booking-form" | "parts-cart" | "rentals-form" | "walk-in" | "phone"
-  paymentStatus   DealPaymentStatus   @default(UNPAID)
+  customerUserId String?
+  vehicleId      String? // Optional — parts-only deal may not have one
+  ownerUserId    String? // Sales rep / deal owner
+  stage          DealStage         @default(NEW)
+  channel        DealChannel
+  source         String? // "booking-form" | "parts-cart" | "rentals-form" | "walk-in" | "phone"
+  paymentStatus  DealPaymentStatus @default(UNPAID)
 
   subtotalLabor  Int @default(0)
   subtotalParts  Int @default(0)
@@ -1683,15 +1694,15 @@ model Deal {
   updatedAt DateTime @updatedAt
 
   // Restrict — see RepairOrder.user. A deal carries estimates and money.
-  customer       User?           @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
-  vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  estimates        Estimate[]
-  repairOrders     RepairOrder[]
-  partShipments    PartShipment[]
-  rentalBookings   RentalBooking[]
+  customer          User?              @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
+  vehicle           Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  owner             User?              @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  estimates         Estimate[]
+  repairOrders      RepairOrder[]
+  partShipments     PartShipment[]
+  rentalBookings    RentalBooking[]
   communicationLogs CommunicationLog[]
-  tasks            CrmTask[]
+  tasks             CrmTask[]
 
   @@index([customerUserId])
   @@index([vehicleId])
@@ -2086,4 +2097,139 @@ model AuditLog {
   @@index([tenantKey, actorUserId, createdAt])
   @@index([tenantKey, targetType, targetId])
   @@index([tenantKey, action, createdAt])
+}
+
+// ============================================
+// STAFF NOTIFICATIONS
+// ============================================
+
+/// Durable, channel-neutral signal for employees. Producers write only this
+/// row in their business transaction; routing and external delivery happen
+/// after commit. Event type, priority, source channel and routing status are
+/// strings validated by the closed TypeScript catalog in
+/// lib/staff-notifications/types.ts so extending the catalog stays additive.
+model StaffNotificationEvent {
+  id                    String    @id @default(cuid())
+  tenantKey             String    @default("geleoteka")
+  type                  String
+  priority              String
+  /// Inbound CRM channel (EMAIL_INBOUND, WHATSAPP_INBOUND, ...). Null for
+  /// events that do not originate from a customer communication.
+  channel               String?
+  dedupeKey             String
+  sourceType            String
+  sourceId              String
+  relatedCustomerUserId String?
+  relatedDealId         String?
+  relatedTaskId         String?
+  targetUserId          String?
+  fallbackPermission    String?
+  summary               String
+  actionPath            String
+  routingStatus         String    @default("PENDING")
+  routingAttempts       Int       @default(0)
+  nextRoutingAt         DateTime  @default(now())
+  routedAt              DateTime?
+  lastRoutingError      String?
+  occurredAt            DateTime
+  createdAt             DateTime  @default(now())
+
+  receipts   StaffNotificationReceipt[]
+  deliveries StaffNotificationDelivery[]
+
+  @@unique([tenantKey, id])
+  @@unique([tenantKey, dedupeKey])
+  @@index([tenantKey, routingStatus, nextRoutingAt], map: "StaffNotificationEvent_routing_due_idx")
+  @@index([tenantKey, occurredAt])
+  @@index([tenantKey, type, occurredAt])
+  @@index([tenantKey, sourceType, sourceId])
+}
+
+/// Per-employee read state. Reading a notification never mutates the CRM task
+/// or the underlying CommunicationLog.
+model StaffNotificationReceipt {
+  id        String    @id @default(cuid())
+  tenantKey String    @default("geleoteka")
+  eventId   String
+  userId    String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  event StaffNotificationEvent @relation(fields: [tenantKey, eventId], references: [tenantKey, id], onDelete: Cascade)
+
+  @@unique([tenantKey, eventId, userId], map: "StaffNotificationReceipt_tenant_event_user_key")
+  @@index([tenantKey, userId, readAt, createdAt], map: "StaffNotificationReceipt_user_read_created_idx")
+}
+
+/// One attempt stream for one event/channel/destination tuple. destinationKey
+/// is an internal adapter key (for Telegram it will be TelegramDestination.id),
+/// never an address accepted from a browser.
+model StaffNotificationDelivery {
+  id                String                          @id @default(cuid())
+  tenantKey         String                          @default("geleoteka")
+  eventId           String
+  channel           String
+  destinationKey    String
+  status            StaffNotificationDeliveryStatus @default(PENDING)
+  attempts          Int                             @default(0)
+  nextAttemptAt     DateTime                        @default(now())
+  leaseOwner        String?
+  leaseUntil        DateTime?
+  providerMessageId String?
+  lastErrorCode     String?
+  sentAt            DateTime?
+
+  event StaffNotificationEvent @relation(fields: [tenantKey, eventId], references: [tenantKey, id], onDelete: Cascade)
+
+  @@unique([tenantKey, eventId, channel, destinationKey], map: "StaffNotificationDelivery_tenant_event_channel_dest_key")
+  @@index([tenantKey, status, nextAttemptAt], map: "StaffNotificationDelivery_status_due_idx")
+  @@index([tenantKey, leaseUntil])
+}
+
+/// A Telegram address verified by the webhook flow implemented in Story 4.
+/// kind stays a TS-validated string so adapter policy can evolve additively.
+model TelegramDestination {
+  id             String    @id @default(cuid())
+  tenantKey      String    @default("geleoteka")
+  kind           String
+  userId         String?
+  chatId         String
+  telegramUserId String?
+  label          String?
+  isActive       Boolean   @default(true)
+  verifiedAt     DateTime
+  disabledAt     DateTime?
+
+  @@unique([tenantKey, chatId])
+  @@unique([tenantKey, userId, kind])
+  @@index([tenantKey, kind, isActive])
+}
+
+/// Short-lived one-time Telegram link token. Only tokenHash is persisted;
+/// generation and claiming deliberately belong to Story 4.
+model TelegramLinkToken {
+  id              String    @id @default(cuid())
+  tenantKey       String    @default("geleoteka")
+  userId          String?
+  purpose         String
+  tokenHash       String
+  expiresAt       DateTime
+  usedAt          DateTime?
+  createdByUserId String
+  createdAt       DateTime  @default(now())
+
+  @@unique([tenantKey, tokenHash])
+  @@index([tenantKey, expiresAt, usedAt])
+}
+
+/// Idempotency receipt for Telegram update_id. The webhook itself is Story 4;
+/// this table is inert until then.
+model TelegramUpdateReceipt {
+  id          String   @id @default(cuid())
+  tenantKey   String   @default("geleoteka")
+  updateId    String
+  processedAt DateTime @default(now())
+
+  @@unique([tenantKey, updateId])
+  @@index([tenantKey, processedAt])
 }
