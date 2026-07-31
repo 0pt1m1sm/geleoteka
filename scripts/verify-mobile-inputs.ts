@@ -65,6 +65,20 @@ const MARKUP = `
       </div>
     </div>
   </div>
+
+  <!-- Часы работы: четыре колонки в одной строке — самое узкое место на телефоне. -->
+  <div class="card" data-card="hours">
+    <div class="grid grid-cols-[minmax(4rem,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 sm:gap-x-3 gap-y-1 items-center">
+      <span class="text-xs">День</span>
+      <span class="text-xs justify-self-center">Работаем</span>
+      <span class="text-xs">С</span>
+      <span class="text-xs">До</span>
+      <label class="text-sm">Понедельник</label>
+      <input type="checkbox" class="justify-self-center" />
+      <input class="input w-full max-w-28" type="time" value="10:00" data-field="hours-open" />
+      <input class="input w-full max-w-28" type="time" value="19:00" data-field="hours-close" />
+    </div>
+  </div>
 </main>`;
 
 interface Overflow {
@@ -86,12 +100,11 @@ async function measure(css: string, breakFix: boolean): Promise<{ page: number; 
     await page.setContent(`<style>${css}</style>${undo}${MARKUP}`, { waitUntil: "load" });
 
     const result = await page.evaluate(() => {
-      const card = document.querySelector(".card") as HTMLElement;
-      const cardBox = card.getBoundingClientRect();
-      const cardStyle = getComputedStyle(card);
-      const innerRight = cardBox.right - parseFloat(cardStyle.paddingRight);
       const fields = [...document.querySelectorAll("[data-field]")].map((el) => {
-        const input = el.querySelector("input") as HTMLInputElement;
+        const input = (el.tagName === "INPUT" ? el : el.querySelector("input")) as HTMLInputElement;
+        const card = input.closest(".card") as HTMLElement;
+        const cardStyle = getComputedStyle(card);
+        const innerRight = card.getBoundingClientRect().right - parseFloat(cardStyle.paddingRight);
         const r = input.getBoundingClientRect();
         return {
           field: (el as HTMLElement).dataset.field ?? "?",

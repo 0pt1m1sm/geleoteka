@@ -83,7 +83,10 @@ function WeekEditor({ byDay }: { byDay: Map<number, WorkingHoursRow> }): React.R
 
   return (
     <form action={formAction}>
-      <div className="grid grid-cols-[minmax(7rem,1fr)_auto_auto_auto] gap-x-3 gap-y-1 items-center">
+      {/* Колонки времени должны СЖИМАТЬСЯ: при auto каждая брала свои 7rem, и
+          на телефоне «До» уезжало за карточку — 7rem + чекбокс + 7rem + 7rem с
+          отступами не помещаются в 350px. */}
+      <div className="grid grid-cols-[minmax(4rem,1fr)_auto_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 sm:gap-x-3 gap-y-1 items-center">
         <span className="text-xs text-[var(--foreground-muted)]">День</span>
         <span className="text-xs text-[var(--foreground-muted)] justify-self-center">Работаем</span>
         <span className="text-xs text-[var(--foreground-muted)]">С</span>
@@ -138,7 +141,7 @@ function WeekdayRow({
         name={`openTime-${day}`}
         defaultValue={minutesToLabel(row.openMinute)}
         disabled={!isOpen}
-        className="input w-28 disabled:opacity-40"
+        className="input w-full max-w-28 disabled:opacity-40"
         aria-label={`${label}: время открытия`}
       />
       <input
@@ -146,7 +149,7 @@ function WeekdayRow({
         name={`closeTime-${day}`}
         defaultValue={minutesToLabel(row.closeMinute)}
         disabled={!isOpen}
-        className="input w-28 disabled:opacity-40"
+        className="input w-full max-w-28 disabled:opacity-40"
         aria-label={`${label}: время закрытия`}
       />
     </>
@@ -163,8 +166,8 @@ function ExceptionForm(): React.ReactElement {
         <input type="checkbox" name="isClosed" defaultChecked />
         Выходной
       </label>
-      <Input label="С" name="openTime" type="time" className="w-28" />
-      <Input label="До" name="closeTime" type="time" className="w-28" />
+      <Input label="С" name="openTime" type="time" className="w-full max-w-28" />
+      <Input label="До" name="closeTime" type="time" className="w-full max-w-28" />
       <Input label="Причина" name="reason" placeholder="Праздник" className="w-48" />
       <Button type="submit" isLoading={isPending} disabled={isPending}>
         Добавить
