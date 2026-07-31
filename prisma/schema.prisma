@@ -187,6 +187,9 @@ enum InboxMessageStatus {
   ASSIGNED
   SPAM
   ARCHIVED
+  /// Корзина: письмо убрано с глаз, но не стёрто — его можно вернуть.
+  /// Ящик остаётся перепиской сервиса, поэтому «удалить» это статус, а не DELETE.
+  DELETED
 }
 
 /// Audit log of every POST to /api/email/inbound — successful or not.

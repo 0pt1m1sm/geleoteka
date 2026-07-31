@@ -293,3 +293,47 @@ function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/**
+ * В корзину и обратно.
+ *
+ * Ровно то же, что архив, но по смыслу: архив — «разобрано и сохранено»,
+ * корзина — «это мусор». Строки не удаляются: ящик остаётся перепиской
+ * сервиса, а вернуть ошибочно убранное письмо должно быть можно.
+ */
+export async function deleteInboxMessage(
+  inboxMessageId: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  try {
+    await db.inboxMessage.update({
+      where: { id: inboxMessageId },
+      data: { status: "DELETED" },
+    });
+  } catch (err) {
+    console.error("[INBOX] deleteInboxMessage", err);
+    return { error: "Не удалось обновить статус" };
+  }
+  revalidatePath("/admin/crm/inbox");
+  revalidatePath(`/admin/crm/inbox/${inboxMessageId}`);
+  return { error: null };
+}
+
+/** Вернуть письмо в очередь разбора. */
+export async function restoreInboxMessage(
+  inboxMessageId: string,
+): Promise<{ error: string | null }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+  try {
+    await db.inboxMessage.update({
+      where: { id: inboxMessageId },
+      data: { status: "PENDING" },
+    });
+  } catch (err) {
+    console.error("[INBOX] restoreInboxMessage", err);
+    return { error: "Не удалось обновить статус" };
+  }
+  revalidatePath("/admin/crm/inbox");
+  revalidatePath(`/admin/crm/inbox/${inboxMessageId}`);
+  return { error: null };
+}

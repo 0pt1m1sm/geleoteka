@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
+import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -15,6 +16,7 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: "PENDING", label: "Pending" },
   { key: "ARCHIVED", label: "Архив" },
   { key: "SPAM", label: "Спам" },
+  { key: "DELETED", label: "Удалённые" },
 ];
 
 interface InboxRow {
@@ -119,10 +121,10 @@ export default async function InboxPage({ searchParams }: Props) {
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
             {rows.map((row) => (
-              <li key={row.id}>
+              <li key={row.id} className="flex items-start">
                 <Link
                   href={`/admin/crm/inbox/${row.id}`}
-                  className="row-clickable flex items-start gap-4 px-4 py-3"
+                  className="row-clickable flex-1 min-w-0 flex items-start gap-4 px-4 py-3"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate flex items-center gap-2">
@@ -155,6 +157,9 @@ export default async function InboxPage({ searchParams }: Props) {
                     {formatDateTime(row.receivedAt)}
                   </div>
                 </Link>
+                {/* Разбор из списка: иначе очередь чистится только по одному
+                    письму за заход в карточку и обратно. */}
+                <InboxRowActions inboxMessageId={row.id} status={status} />
               </li>
             ))}
           </ul>
