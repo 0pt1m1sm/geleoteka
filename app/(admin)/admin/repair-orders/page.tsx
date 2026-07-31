@@ -9,6 +9,7 @@ import { formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
 import { Card, PageHeader } from "@/components/ui";
+import { customerName } from "@/lib/crm/customer-display";
 
 const VALID_STATUSES = new Set(Object.keys(REPAIR_ORDER_STATUS_LABELS));
 
@@ -62,7 +63,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
       ) : (
         <div className="space-y-3">
           {repairOrders.map((ro: Record<string, unknown>) => {
-            const user = ro.user as { name: string; phone: string };
+            const user = ro.user as { name: string; phone: string } | null;
             const vehicle = ro.vehicle as { model: string; year: number; vin: string | null; plate: string | null };
             const jobs = ro.jobLines as Array<{ description: string; status: string }>;
             const master = ro.master as { name: string } | null;
@@ -71,13 +72,19 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0 space-y-2">
                     <div>
-                      <Link
-                        href={`/admin/repair-orders/${ro.id as string}`}
-                        className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                      >
-                        {user.name}
-                      </Link>
-                      {user.phone && (
+                      {user ? (
+                        <Link
+                          href={`/admin/repair-orders/${ro.id as string}`}
+                          className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                        >
+                          {user.name}
+                        </Link>
+                      ) : (
+                        <span className="font-medium text-[var(--foreground-muted)] italic">
+                          {customerName(user)}
+                        </span>
+                      )}
+                      {user?.phone && (
                         <a
                           href={`tel:${user.phone}`}
                           className="block text-xs text-[var(--foreground-muted)] hover:text-[var(--color-accent)] font-mono active:opacity-70 transition-opacity"
@@ -133,7 +140,7 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                     {isAdmin && (
                       <DeleteRepairOrderButton
                         repairOrderId={ro.id as string}
-                        customerName={user.name}
+                        customerName={customerName(user)}
                       />
                     )}
                   </div>

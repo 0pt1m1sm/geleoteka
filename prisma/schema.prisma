@@ -657,7 +657,8 @@ model Service {
 model RepairOrder {
   id           String            @id @default(cuid())
   roNumber     String?           @unique // Human-friendly sequential number
-  userId       String // Customer
+  /// NULL when the customer was erased — the service record is kept, detached.
+  userId       String? // Customer
   vehicleId    String
   masterUserId String? // Assigned technician
   trimId       String? // Captured from booking picker; null for older flows or "Не уверен"
@@ -696,7 +697,7 @@ model RepairOrder {
   // Restrict, not Cascade: deleting a person must never be a command to delete
   // their service history. Cascades stay INSIDE the aggregate (RepairOrder →
   // JobLine/Slot), where they mean "this order's own parts".
-  user    User         @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Restrict)
+  user    User?        @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Restrict)
   vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
   trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
@@ -1618,7 +1619,9 @@ model PartTrim {
 model Deal {
   id              String              @id @default(cuid())
   number          String?             @unique
-  customerUserId  String
+  /// NULL when the customer was erased: the commercial record survives
+  /// detached and can be re-attached by hand. See app/actions/crm/customer-erase.ts.
+  customerUserId  String?
   vehicleId       String? // Optional — parts-only deal may not have one
   ownerUserId     String? // Sales rep / deal owner
   stage           DealStage           @default(NEW)
@@ -1648,7 +1651,7 @@ model Deal {
   updatedAt DateTime @updatedAt
 
   // Restrict — see RepairOrder.user. A deal carries estimates and money.
-  customer       User            @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
+  customer       User?           @relation("DealCustomer", fields: [customerUserId], references: [id], onDelete: Restrict)
   vehicle        Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   owner          User?           @relation("DealOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   estimates        Estimate[]

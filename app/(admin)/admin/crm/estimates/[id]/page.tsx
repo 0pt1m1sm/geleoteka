@@ -15,6 +15,7 @@ import { EstimateLineEditor } from "@/components/crm/EstimateLineEditor";
 import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
 import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
 import { getEstimateChain } from "@/lib/crm/estimate-chain";
+import { customerName } from "@/lib/crm/customer-display";
 
 interface EstimateDetail {
   id: string;
@@ -39,7 +40,7 @@ interface EstimateDetail {
     id: string;
     number: string | null;
     channel: string;
-    customer: { id: string; name: string; phone: string };
+    customer: { id: string; name: string; phone: string } | null;
     vehicle: { make: string; model: string; year: number } | null;
   };
   preparedBy: { id: string; name: string } | null;
@@ -149,7 +150,7 @@ export default async function EstimateDetailPage({ params }: Props) {
 
       <PageHeader
         eyebrow={`Смета${estimate.number ? ` ${estimate.number}` : ""} · ${ESTIMATE_STAGE_LABELS[estimate.stage] ?? estimate.stage}`}
-        title={estimate.deal.customer.name}
+        title={customerName(estimate.deal.customer)}
         description={
           estimate.deal.vehicle
             ? `${estimate.deal.vehicle.make} ${estimate.deal.vehicle.model} ${estimate.deal.vehicle.year}`
@@ -322,21 +323,27 @@ export default async function EstimateDetailPage({ params }: Props) {
             <div className="mt-3 text-xs text-[var(--foreground-muted)] space-y-1">
               <div>
                 Клиент:{" "}
-                <Link
-                  href={`/admin/customers/${estimate.deal.customer.id}`}
-                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                >
-                  {estimate.deal.customer.name}
-                </Link>
+                {estimate.deal.customer ? (
+                  <Link
+                    href={`/admin/customers/${estimate.deal.customer.id}`}
+                    className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                  >
+                    {estimate.deal.customer.name}
+                  </Link>
+                ) : (
+                  <span className="italic">{customerName(estimate.deal.customer)}</span>
+                )}
               </div>
-              <div>
-                <a
-                  href={`tel:${estimate.deal.customer.phone}`}
-                  className="font-mono hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                >
-                  {estimate.deal.customer.phone}
-                </a>
-              </div>
+              {estimate.deal.customer ? (
+                <div>
+                  <a
+                    href={`tel:${estimate.deal.customer.phone}`}
+                    className="font-mono hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                  >
+                    {estimate.deal.customer.phone}
+                  </a>
+                </div>
+              ) : null}
             </div>
           </Card>
 

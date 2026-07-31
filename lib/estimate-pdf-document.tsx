@@ -10,6 +10,7 @@ import {
   Rect,
 } from "@react-pdf/renderer";
 import { DEAL_LINE_TYPE_LABELS } from "@/lib/deal-stage-labels";
+import { DELETED_CUSTOMER_LABEL } from "@/lib/crm/customer-display";
 
 // formatPrice uses ₽ which isn't in the shipped Manrope Cyrillic
 // subset; fallback to "руб." inside the PDF only. Also enforces
@@ -48,7 +49,7 @@ export interface EstimatePdfData {
   tax: number;
   taxRate: number;
   total: number;
-  customer: { name: string; phone: string; email: string };
+  customer: { name: string; phone: string; email: string } | null;
   vehicle: {
     make: string;
     model: string;
@@ -663,13 +664,21 @@ export function EstimatePdfDocument({
         <View style={styles.parties}>
           <View style={styles.partyCol}>
             <Text style={styles.partyLabel}>Заказчик</Text>
-            <Text style={styles.partyName}>{estimate.customer.name}</Text>
-            {estimate.customer.phone ? (
+            <Text
+              style={
+                estimate.customer
+                  ? styles.partyName
+                  : [styles.partyName, { color: INK_MUTED }]
+              }
+            >
+              {estimate.customer ? estimate.customer.name : DELETED_CUSTOMER_LABEL}
+            </Text>
+            {estimate.customer?.phone ? (
               <Text style={styles.partyDetail}>
                 {formatPhonePdf(estimate.customer.phone)}
               </Text>
             ) : null}
-            {estimate.customer.email ? (
+            {estimate.customer?.email ? (
               <Text style={styles.partyEmail} wrap={false}>{estimate.customer.email}</Text>
             ) : null}
           </View>
@@ -921,7 +930,13 @@ function SignatureFooter({
       </View>
       <View style={styles.sigCol}>
         <Text style={styles.sigLabel}>Заказчик</Text>
-        <Text style={styles.sigName}>{estimate.customer.name}</Text>
+        <Text
+          style={
+            estimate.customer ? styles.sigName : [styles.sigName, { color: INK_MUTED }]
+          }
+        >
+          {estimate.customer ? estimate.customer.name : DELETED_CUSTOMER_LABEL}
+        </Text>
         <Text style={styles.sigLine}>Подпись</Text>
       </View>
     </View>

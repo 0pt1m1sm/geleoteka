@@ -16,6 +16,7 @@ import { WorkPhotosManager } from "@/components/admin/WorkPhotosManager";
 import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsForm";
 import { RescheduleForm } from "@/components/admin/RescheduleForm";
 import { getApprovedWorksCost } from "@/lib/crm/approved-estimate";
+import { customerName } from "@/lib/crm/customer-display";
 
 interface RepairOrderDetail {
   id: string;
@@ -30,7 +31,7 @@ interface RepairOrderDetail {
   promisedAt: Date | null;
   masterUserId: string | null;
   dealId: string;
-  user: { id: string; name: string; phone: string; email: string };
+  user: { id: string; name: string; phone: string; email: string } | null;
   vehicle: { model: string | null; year: number | null; vin: string | null };
   jobLines: Array<{
     id: string;
@@ -222,24 +223,32 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
           <Card>
             <h3 className="font-semibold mb-3">Клиент</h3>
             <div className="text-sm space-y-1">
-              <Link
-                href={`/admin/customers/${ro.user.id}`}
-                className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-              >
-                {ro.user.name}
-              </Link>
-              <p className="text-xs text-[var(--foreground-muted)]">
-                <a href={`tel:${ro.user.phone}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
-                  {ro.user.phone}
-                </a>
-                {" · "}
-                <a
-                  href={`mailto:${ro.user.email}`}
-                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                >
-                  {ro.user.email}
-                </a>
-              </p>
+              {ro.user ? (
+                <>
+                  <Link
+                    href={`/admin/customers/${ro.user.id}`}
+                    className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                  >
+                    {ro.user.name}
+                  </Link>
+                  <p className="text-xs text-[var(--foreground-muted)]">
+                    <a href={`tel:${ro.user.phone}`} className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity">
+                      {ro.user.phone}
+                    </a>
+                    {" · "}
+                    <a
+                      href={`mailto:${ro.user.email}`}
+                      className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                    >
+                      {ro.user.email}
+                    </a>
+                  </p>
+                </>
+              ) : (
+                <span className="font-medium text-[var(--foreground-muted)] italic">
+                  {customerName(ro.user)}
+                </span>
+              )}
             </div>
             {ro.vehicle.vin && (
               <p className="mt-3 text-xs text-[var(--foreground-muted)] font-mono">

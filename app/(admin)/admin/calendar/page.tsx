@@ -7,6 +7,7 @@ import { AdminCalendar } from "@/components/admin/AdminCalendar";
 import { ScheduleManager } from "@/components/admin/ScheduleManager";
 import { PageHeader } from "@/components/ui";
 import { formatForDatetimeLocalInput } from "@/lib/timezone";
+import { customerName } from "@/lib/crm/customer-display";
 
 export default async function CalendarPage() {
   const session = await getSession();
@@ -67,14 +68,15 @@ export default async function CalendarPage() {
     const wall = formatForDatetimeLocalInput(ro.dateTime as Date); // YYYY-MM-DDTHH:mm
     const [date, time] = wall.split("T");
     const [h, m] = time.split(":").map(Number);
+    const user = ro.user as { name: string; phone: string } | null;
     return {
       id: ro.id as string,
       date,
       minute: h * 60 + m,
       time,
       status: ro.status as string,
-      clientName: (ro.user as Record<string, string>).name,
-      clientPhone: (ro.user as Record<string, string>).phone,
+      clientName: customerName(user),
+      clientPhone: user?.phone ?? "",
       vehicleModel: (ro.vehicle as Record<string, string>).model,
       masterName: (ro.master as Record<string, string> | null)?.name ?? null,
       jobs: (ro.jobLines as Array<{ description: string }>).map((j) => j.description),

@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { customerName } from "@/lib/crm/customer-display";
 
 /**
  * Сметы — REPORT-only list. Estimates are child entities of Deals; they
@@ -42,7 +43,7 @@ interface EstimateRow {
     id: string;
     number: string | null;
     channel: string;
-    customer: { name: string };
+    customer: { name: string } | null;
     vehicle: { make: string; model: string } | null;
   };
 }
@@ -111,8 +112,10 @@ export default async function AdminEstimatesListPage({ searchParams }: Props) {
                 href={`/admin/crm/estimates/${est.id}`}
                 className="row-clickable flex-1 min-w-0 -mx-2 px-2 py-1 rounded"
               >
-                <div className="font-medium truncate">
-                  {est.deal.customer.name}
+                <div
+                  className={`font-medium truncate ${est.deal.customer ? "" : "text-[var(--foreground-muted)] italic"}`}
+                >
+                  {customerName(est.deal.customer)}
                   {est.deal.vehicle
                     ? ` · ${est.deal.vehicle.make} ${est.deal.vehicle.model}`
                     : ""}

@@ -13,6 +13,7 @@ import { EstimatesSection } from "@/components/crm/EstimatesSection";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
+import { customerName } from "@/lib/crm/customer-display";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -33,7 +34,7 @@ interface DealDetail {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
-  customer: { id: string; name: string; phone: string; email: string };
+  customer: { id: string; name: string; phone: string; email: string } | null;
   vehicle: { id: string; make: string; model: string; year: number; vin: string | null } | null;
   owner: { id: string; name: string } | null;
   repairOrders: Array<{ id: string; roNumber: string | null; status: string; dateTime: Date }>;
@@ -181,7 +182,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
     <div>
       <PageHeader
         eyebrow={`Сделка${deal.number ? ` ${deal.number}` : ""}`}
-        title={deal.customer.name}
+        title={customerName(deal.customer)}
         description={`${DEAL_CHANNEL_LABELS[deal.channel] ?? deal.channel} · ${formatDateTime(deal.createdAt)}`}
         actions={
           <Link href="/admin/crm/deals" className="back-link">
@@ -240,35 +241,44 @@ export default async function CrmDealDetailPage({ params }: Props) {
           </Card>
 
           <Card>
-            <CommunicationLogger
-              customerUserId={deal.customer.id}
-              dealId={deal.id}
-              customerEmail={deal.customer.email}
-              initialEntries={deal.communicationLogs.map((e) => ({
-                id: e.id,
-                channel: e.channel,
-                outcome: e.outcome,
-                body: e.body,
-                durationSec: e.durationSec,
-                createdAt: e.createdAt,
-                author: e.author,
-                deal: e.deal,
-                subject: e.subject,
-                resendEmailId: e.resendEmailId,
-                emailMessageId: e.emailMessageId,
-                readAt: e.readAt,
-                attachments: Array.isArray(e.attachments)
-                  ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)
-                  : [],
-              }))}
-            />
+            {deal.customer ? (
+              <CommunicationLogger
+                customerUserId={deal.customer.id}
+                dealId={deal.id}
+                customerEmail={deal.customer.email}
+                initialEntries={deal.communicationLogs.map((e) => ({
+                  id: e.id,
+                  channel: e.channel,
+                  outcome: e.outcome,
+                  body: e.body,
+                  durationSec: e.durationSec,
+                  createdAt: e.createdAt,
+                  author: e.author,
+                  deal: e.deal,
+                  subject: e.subject,
+                  resendEmailId: e.resendEmailId,
+                  emailMessageId: e.emailMessageId,
+                  readAt: e.readAt,
+                  attachments: Array.isArray(e.attachments)
+                    ? (e.attachments as Array<{ id: string; filename: string; content_type?: string }>)
+                    : [],
+                }))}
+              />
+            ) : (
+              <>
+                <h3 className="font-semibold mb-2">История общения</h3>
+                <p className="text-sm text-[var(--foreground-muted)] italic">
+                  Клиент удалён — история общения недоступна.
+                </p>
+              </>
+            )}
           </Card>
 
           <Card>
             <CrmTaskList
               tasks={deal.tasks}
               nowMs={new Date().valueOf()}
-              customerUserId={deal.customer.id}
+              customerUserId={deal.customer?.id}
               dealId={deal.id}
             />
           </Card>
@@ -322,26 +332,34 @@ export default async function CrmDealDetailPage({ params }: Props) {
           <Card>
             <h3 className="font-semibold mb-2">Клиент</h3>
             <div className="text-sm space-y-1">
-              <Link
-                href={`/admin/customers/${deal.customer.id}`}
-                className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-              >
-                {deal.customer.name}
-              </Link>
-              <div className="text-xs text-[var(--foreground-muted)] flex flex-col gap-0.5 [overflow-wrap:anywhere]">
-                <a
-                  href={`tel:${deal.customer.phone}`}
-                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                >
-                  {deal.customer.phone}
-                </a>
-                <a
-                  href={`mailto:${deal.customer.email}`}
-                  className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
-                >
-                  {deal.customer.email}
-                </a>
-              </div>
+              {deal.customer ? (
+                <>
+                  <Link
+                    href={`/admin/customers/${deal.customer.id}`}
+                    className="font-medium hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                  >
+                    {deal.customer.name}
+                  </Link>
+                  <div className="text-xs text-[var(--foreground-muted)] flex flex-col gap-0.5 [overflow-wrap:anywhere]">
+                    <a
+                      href={`tel:${deal.customer.phone}`}
+                      className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                    >
+                      {deal.customer.phone}
+                    </a>
+                    <a
+                      href={`mailto:${deal.customer.email}`}
+                      className="hover:text-[var(--color-accent)] active:opacity-70 transition-opacity"
+                    >
+                      {deal.customer.email}
+                    </a>
+                  </div>
+                </>
+              ) : (
+                <span className="font-medium text-[var(--foreground-muted)] italic">
+                  {customerName(deal.customer)}
+                </span>
+              )}
             </div>
             {deal.vehicle ? (
               <div className="mt-3 text-xs text-[var(--foreground-muted)]">

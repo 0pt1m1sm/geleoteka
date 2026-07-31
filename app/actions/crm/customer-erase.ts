@@ -94,12 +94,22 @@ export async function exportCustomerSnapshot(
 ): Promise<Ok<{ snapshot: CustomerSnapshot; token: string }> | Fail> {
   await requireRole(["ADMIN"]);
 
+  // EXPLICIT select, never `include`. Prisma returns every scalar column with
+  // `include`, which put the customer's bcrypt `passwordHash` — plus their role
+  // and internal flags — into a JSON file downloaded onto an operator's laptop.
+  // A privacy export must carry only what the person is entitled to receive.
   const customer = (await db.user.findUnique({
     where: { id: userId },
-    include: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      phone: true,
+      createdAt: true,
+      referralSource: true,
       customerProfile: true,
-      contacts: true,
-      customerNotes: true,
+      contacts: { select: { id: true, type: true, value: true, label: true } },
+      customerNotes: { select: { id: true, body: true, createdAt: true } },
     },
   })) as Record<string, unknown> | null;
   if (!customer) return { ok: false, error: "Клиент не найден" };
@@ -168,6 +178,17 @@ export async function eraseCustomer(
   if (target.permissionRole === "ADMIN") {
     return { ok: false, error: "Нельзя стереть администратора — сначала снимите роль" };
   }
+  // This flow understands a CUSTOMER's data — which of their records survive,
+  // which go. A manager, master or supplier has other links entirely (owned
+  // tasks, authored logs, supplier orders), so erasing one through here would
+  // take out records this code never considered. The field was read but never
+  // checked, leaving that reachable by calling the action directly.
+  if (!target.isCustomer) {
+    return {
+      ok: false,
+      error: "Это не клиент. Сотрудников и поставщиков через это действие удалять нельзя.",
+    };
+  }
 
   const expected = (target.email ?? target.phone ?? "").trim().toLowerCase();
   if (!expected) return { ok: false, error: "У клиента нет email или телефона — подтвердить невозможно" };
@@ -179,6 +200,16 @@ export async function eraseCustomer(
   // the counts differ and we stop rather than destroy something unseen.
   const counts = await countAttached(userId);
   const hasData = Object.values(counts).some((n) => n > 0);
+
+  // Every address this person is known by — the login address plus any verified
+  // alias — so their mail is found however it reached us.
+  const aliasRows = (await db.customerContact.findMany({
+    where: { userId, type: "EMAIL" },
+    select: { value: true },
+  })) as Array<{ value: string }>;
+  const addresses = [target.email, ...aliasRows.map((a) => a.value)]
+    .filter((a): a is string => typeof a === "string" && a.length > 0)
+    .map((a) => a.toLowerCase());
 
   // A preview token is enough for an empty record — there is nothing to export.
   // Anything with data demands the `exported` token, so the copy really was
@@ -198,16 +229,60 @@ export async function eraseCustomer(
 
   await db.$transaction(
     async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
-      // Order matters: children before parents, and RepairOrder before Deal
-      // because an order points at its deal. The aggregate-internal cascades
-      // (RepairOrder → JobLine/Slot, Deal → Estimate → EstimateLine) still do
-      // their part, so only these four roots are named here.
+      // The commercial and service record is DETACHED, not destroyed. A deal
+      // still totals and a repair order still documents what was done to a car;
+      // both are needed for accounting and warranty long after a person asks to
+      // be removed, and an erase that turns out to have hit the wrong duplicate
+      // can be undone by re-attaching them.
+      // Revoke the guest links FIRST. `Deal.claimToken` is not just a read
+      // capability: customer-estimates.ts accepts it to APPROVE or DECLINE an
+      // estimate, so a link mailed to someone we are erasing would otherwise let
+      // them keep changing a deal that no longer has an owner.
+      await tx.deal.updateMany({
+        where: { customerUserId: userId },
+        data: { customerUserId: null, claimToken: null },
+      });
+      await tx.repairOrder.updateMany({
+        where: { userId },
+        data: { userId: null, claimToken: null },
+      });
+
+      // A car that has been through the shop is DETACHED, not deleted.
+      // `RepairOrder.vehicleId` is ON DELETE CASCADE, so deleting the car would
+      // take the repair orders we just preserved with it — silently undoing the
+      // whole point of detaching. The service record needs the car it describes.
+      await tx.vehicle.updateMany({
+        where: { ownerUserId: userId, repairOrders: { some: {} } },
+        data: { ownerUserId: null },
+      });
+      // Cars with no service history are pure profile data and can go.
+      await tx.vehicle.deleteMany({
+        where: { ownerUserId: userId, repairOrders: { none: {} } },
+      });
+      // Personal data does NOT survive. Deleting CommunicationLog alone was not
+      // enough: the mail itself lives in EmailMessage / InboxMessage keyed by
+      // address, so the person's name, address, subject, body and attachment
+      // metadata stayed behind while the UI claimed the correspondence was gone.
+      // Those are matched by every address we know for them.
+      if (addresses.length > 0) {
+        await tx.emailMessage.deleteMany({
+          where: {
+            OR: [
+              { fromEmail: { in: addresses } },
+              { toEmails: { hasSome: addresses } },
+              { ccEmails: { hasSome: addresses } },
+            ],
+          },
+        });
+        await tx.inboxMessage.deleteMany({
+          where: {
+            OR: [{ fromEmail: { in: addresses } }, { toEmail: { in: addresses } }],
+          },
+        });
+      }
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });
-      await tx.repairOrder.deleteMany({ where: { userId } });
-      await tx.deal.deleteMany({ where: { customerUserId: userId } });
-      await tx.vehicle.deleteMany({ where: { ownerUserId: userId } });
-      // Everything else hanging off the person (profile, contacts, notes, tags,
-      // notifications, loyalty) is ON DELETE CASCADE and goes with this row.
+      // Profile, contacts, notes, tags, notifications and loyalty hang off the
+      // row by ON DELETE CASCADE and go with it.
       await tx.user.delete({ where: { id: userId } });
     },
   );

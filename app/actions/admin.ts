@@ -53,8 +53,16 @@ export async function updateRepairOrderStatus(
     include: { user: { select: { id: true, phone: true } } },
   });
 
-  if (repairOrder) {
-    const user = (repairOrder as Record<string, unknown>).user as { id: string; phone: string };
+  // `user` is null when the customer was erased and the order kept, detached.
+  // Staff still move such an order through its statuses to close out paperwork;
+  // there is simply nobody left to notify, and `Notification.userId` is not
+  // nullable, so both the notification and the SMS are skipped rather than
+  // throwing or texting an empty number.
+  const user = repairOrder
+    ? (((repairOrder as Record<string, unknown>).user as { id: string; phone: string } | null) ?? null)
+    : null;
+
+  if (user) {
     const label = REPAIR_ORDER_STATUS_LABELS[newStatus] ?? newStatus;
 
     await db.notification.create({
@@ -186,8 +194,9 @@ export async function addJobLines(
     select: { userId: true },
   });
 
-  if (repairOrder) {
-    const ro = repairOrder as { userId: string };
+  // Detached order → nobody to notify; see updateRepairOrderStatus above.
+  const ro = repairOrder as { userId: string | null } | null;
+  if (ro?.userId) {
     await db.notification.create({
       data: {
         userId: ro.userId,

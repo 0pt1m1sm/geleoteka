@@ -19,11 +19,12 @@ interface Props {
   redirectTo?: string;
 }
 
-const LABELS: Record<string, string> = {
-  repairOrders: "заказ-наряды",
-  deals: "сделки",
-  communications: "переписка",
-  vehicles: "автомобили",
+/** What actually happens to each kind of record — see customer-erase.ts. */
+const OUTCOME: Record<string, { label: string; kept: boolean }> = {
+  deals: { label: "сделки", kept: true },
+  repairOrders: { label: "заказ-наряды", kept: true },
+  communications: { label: "переписка", kept: false },
+  vehicles: { label: "автомобили", kept: false },
 };
 
 /**
@@ -134,7 +135,9 @@ export function EraseCustomerPanel({
     );
   }
 
-  const attached = Object.entries(counts).filter(([, n]) => n > 0);
+  const attached = Object.entries(counts).filter(([key, n]) => n > 0 && OUTCOME[key] !== undefined);
+  const kept = attached.filter(([key]) => OUTCOME[key].kept);
+  const removed = attached.filter(([key]) => !OUTCOME[key].kept);
   const canErase =
     typed.trim().toLowerCase() === confirmPhrase.toLowerCase() &&
     (!needsExport || exported) &&
@@ -150,17 +153,41 @@ export function EraseCustomerPanel({
         </p>
       ) : (
         <>
-          <p className="text-xs text-[var(--foreground-muted)]">Вместе с записью удалится:</p>
-          <ul className="text-xs list-disc pl-5 space-y-0.5">
-            {attached.map(([key, n]) => (
-              <li key={key}>
-                {LABELS[key] ?? key}: <strong>{n}</strong>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-[var(--foreground-muted)]">
-            Восстановить из системы будет нельзя — только из выгруженного файла.
-          </p>
+          {kept.length > 0 ? (
+            <div>
+              <p className="text-xs text-[var(--foreground-muted)]">
+                Сохранится в базе, но открепится от клиента:
+              </p>
+              <ul className="text-xs list-disc pl-5 space-y-0.5 mt-0.5">
+                {kept.map(([key, n]) => (
+                  <li key={key}>
+                    {OUTCOME[key].label}: <strong>{n}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                Эти записи останутся для бухгалтерии и гарантии; при необходимости их можно
+                привязать к другому клиенту вручную.
+              </p>
+            </div>
+          ) : null}
+
+          {removed.length > 0 ? (
+            <div>
+              <p className="text-xs text-[var(--foreground-muted)]">Удалится безвозвратно:</p>
+              <ul className="text-xs list-disc pl-5 space-y-0.5 mt-0.5">
+                {removed.map(([key, n]) => (
+                  <li key={key}>
+                    {OUTCOME[key].label}: <strong>{n}</strong>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                Вместе с самой карточкой, заметками и контактами. Вернуть можно будет только из
+                выгруженного файла.
+              </p>
+            </div>
+          ) : null}
         </>
       )}
 
