@@ -14,7 +14,6 @@ import {
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { WorkPhotosManager } from "@/components/admin/WorkPhotosManager";
 import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsForm";
-import { RescheduleForm } from "@/components/admin/RescheduleForm";
 import { getApprovedWorksCost } from "@/lib/crm/approved-estimate";
 import { customerName } from "@/lib/crm/customer-display";
 import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
@@ -191,6 +190,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
                   notes: ro.notes ?? "",
                   mileageIn: ro.mileageIn?.toString() ?? "",
                   mileageOut: ro.mileageOut?.toString() ?? "",
+                  dateTime: formatForDatetimeLocalInput(ro.dateTime),
                   promisedAt: formatForDatetimeLocalInput(ro.promisedAt),
                   masterUserId: ro.masterUserId ?? "",
                 }}
@@ -199,21 +199,6 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
             </div>
           </details>
 
-          <details className="card group">
-            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
-              <span className="text-lg font-semibold">Перенос записи</span>
-              <span className="text-xs text-[var(--foreground-muted)]">
-                {formatDateTime(ro.dateTime)}
-              </span>
-            </summary>
-            <div className="mt-4">
-              <RescheduleForm
-                repairOrderId={ro.id}
-                initialDateTime={formatForDatetimeLocalInput(ro.dateTime)}
-                disabled={ro.status === "CANCELLED"}
-              />
-            </div>
-          </details>
 
           <details className="card group">
             <summary className="cursor-pointer list-none flex items-center justify-between gap-3 select-none">
