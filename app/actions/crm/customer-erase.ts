@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 /**
  * Erasing a customer together with their entire history.
@@ -150,10 +152,30 @@ export async function exportCustomerSnapshot(
   };
 }
 
+/**
+ * Erase a customer.
+ *
+ * `deleteRelated` is the operator's explicit choice, defaulting to false:
+ *
+ *   false — personal data goes, the commercial record stays, detached. Right
+ *           for a real customer: the revenue was the shop's, the repair order
+ *           documents work on a car that may be sold, and both are kept by law
+ *           for years. Deleting them would change last year's takings.
+ *   true  — everything goes, including deals, estimates, orders and bookings.
+ *           Right for a mistake: a duplicate, a test row, a lead that went
+ *           nowhere. Stock reservations are released first.
+ *
+ * An earlier version decided this automatically ("keep if there are deals"),
+ * which was both unpredictable for the operator and wrong in practice: every
+ * deal gets an estimate the moment it is created (`createDeal` makes both in
+ * one transaction), so "has an estimate" says nothing about whether the deal
+ * ever mattered.
+ */
 export async function eraseCustomer(
   userId: string,
   confirmation: string,
   token: string,
+  options: { deleteRelated?: boolean } = {},
 ): Promise<Ok<{ erased: Record<string, number> }> | Fail> {
   const session = await requireRole(["ADMIN"]);
 
@@ -239,51 +261,65 @@ export async function eraseCustomer(
     };
   }
 
+  const deleteRelated = options.deleteRelated === true;
+
   await db.$transaction(
     async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
-      // The commercial and service record is DETACHED, not destroyed. A deal
-      // still totals and a repair order still documents what was done to a car;
-      // both are needed for accounting and warranty long after a person asks to
-      // be removed, and an erase that turns out to have hit the wrong duplicate
-      // can be undone by re-attaching them.
-      // Revoke the guest links FIRST. `Deal.claimToken` is not just a read
-      // capability: customer-estimates.ts accepts it to APPROVE or DECLINE an
-      // estimate, so a link mailed to someone we are erasing would otherwise let
-      // them keep changing a deal that no longer has an owner.
+      // Revoke the guest links FIRST, on either branch. `Deal.claimToken` is not
+      // just a read capability: customer-estimates.ts accepts it to APPROVE or
+      // DECLINE an estimate, so a link mailed to someone being erased would
+      // otherwise let them keep acting on the deal.
       await tx.deal.updateMany({
         where: { customerUserId: userId },
-        data: { customerUserId: null, claimToken: null },
+        data: { claimToken: null },
       });
-      await tx.repairOrder.updateMany({
-        where: { userId },
-        data: { userId: null, claimToken: null },
-      });
+      await tx.repairOrder.updateMany({ where: { userId }, data: { claimToken: null } });
 
-      // A car that has been through the shop is DETACHED, not deleted.
-      // `RepairOrder.vehicleId` is ON DELETE CASCADE, so deleting the car would
-      // take the repair orders we just preserved with it — silently undoing the
-      // whole point of detaching. The service record needs the car it describes.
-      await tx.vehicle.updateMany({
-        where: { ownerUserId: userId, repairOrders: { some: {} } },
-        data: { ownerUserId: null },
-      });
-      // Cars with nothing attached are pure profile data and can go. The guard
-      // checks rentals and deals too, not just repair orders: a car can carry a
-      // rental contract or be the subject of a deal without ever having been
-      // serviced, and deleting it would take that record with it.
-      await tx.vehicle.deleteMany({
-        where: {
-          ownerUserId: userId,
-          repairOrders: { none: {} },
-          rentalBookings: { none: {} },
-          deals: { none: {} },
-        },
-      });
-      // Anything left keeps its history and simply loses its owner.
-      await tx.vehicle.updateMany({
-        where: { ownerUserId: userId },
-        data: { ownerUserId: null },
-      });
+      if (deleteRelated) {
+        // Everything goes. Release the stock holds first — they are keyed by a
+        // string, not a foreign key, so no cascade can free them and the
+        // reserved quantity would stay inflated forever.
+        const estimates = (await tx.estimate.findMany({
+          where: { deal: { customerUserId: userId } },
+          select: { id: true },
+        })) as Array<{ id: string }>;
+        for (const est of estimates) {
+          await releasePartLinesForEstimate(tx, est.id, actorId(session));
+        }
+        // Deleting the deals cascades their estimates, repair orders, job lines,
+        // slots, work photos, shipments and bookings.
+        await tx.deal.deleteMany({ where: { customerUserId: userId } });
+        // Repair orders created outside a deal, if any, have no parent to take
+        // them; remove them explicitly before their cars.
+        await tx.repairOrder.deleteMany({ where: { userId } });
+        // Cars last: `RepairOrder.vehicleId` is RESTRICT, so this only succeeds
+        // once the orders above are gone.
+        await tx.vehicle.deleteMany({ where: { ownerUserId: userId } });
+      } else {
+        // The commercial and service record is DETACHED, not destroyed. A deal
+        // still totals and a repair order still documents work on a car that may
+        // be sold; both are kept for accounting and warranty long after a person
+        // asks to be removed.
+        await tx.deal.updateMany({
+          where: { customerUserId: userId },
+          data: { customerUserId: null },
+        });
+        await tx.repairOrder.updateMany({ where: { userId }, data: { userId: null } });
+        // Cars with nothing attached are pure profile data and can go; the rest
+        // keep their history and simply lose their owner.
+        await tx.vehicle.deleteMany({
+          where: {
+            ownerUserId: userId,
+            repairOrders: { none: {} },
+            rentalBookings: { none: {} },
+            deals: { none: {} },
+          },
+        });
+        await tx.vehicle.updateMany({
+          where: { ownerUserId: userId },
+          data: { ownerUserId: null },
+        });
+      }
       // Personal data does NOT survive. Deleting CommunicationLog alone was not
       // enough: the mail itself lives in EmailMessage / InboxMessage keyed by
       // address, so the person's name, address, subject, body and attachment

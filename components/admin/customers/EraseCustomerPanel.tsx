@@ -51,6 +51,10 @@ export function EraseCustomerPanel({
   const [needsExport, setNeedsExport] = useState(false);
   const [exported, setExported] = useState(false);
   const [typed, setTyped] = useState("");
+  // Default OFF: keeping the commercial record is the safe answer for a real
+  // customer. Ticking it is for a mistake — a duplicate or a lead that went
+  // nowhere — and the operator says so explicitly rather than the code guessing.
+  const [deleteRelated, setDeleteRelated] = useState(false);
 
   async function handleOpen(): Promise<void> {
     setError(null);
@@ -103,7 +107,7 @@ export function EraseCustomerPanel({
     setError(null);
     setBusy("erase");
     try {
-      const res = await eraseCustomer(customerUserId, typed, token);
+      const res = await eraseCustomer(customerUserId, typed, token, { deleteRelated });
       if (!res.ok) {
         setError(res.error);
         return;
@@ -156,7 +160,9 @@ export function EraseCustomerPanel({
           {kept.length > 0 ? (
             <div>
               <p className="text-xs text-[var(--foreground-muted)]">
-                Сохранится в базе, но открепится от клиента:
+                {deleteRelated
+                  ? "Будет удалено вместе с клиентом:"
+                  : "Сохранится в базе, но открепится от клиента:"}
               </p>
               <ul className="text-xs list-disc pl-5 space-y-0.5 mt-0.5">
                 {kept.map(([key, n]) => (
@@ -166,9 +172,26 @@ export function EraseCustomerPanel({
                 ))}
               </ul>
               <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
-                Эти записи останутся для бухгалтерии и гарантии; при необходимости их можно
-                привязать к другому клиенту вручную.
+                {deleteRelated
+                  ? "Выручка по этим сделкам исчезнет из отчётов, а работы — из гарантийной истории."
+                  : "Эти записи останутся для бухгалтерии и гарантии; при необходимости их можно привязать к другому клиенту вручную."}
               </p>
+
+              <label className="flex items-start gap-2 text-xs mt-2">
+                <input
+                  type="checkbox"
+                  checked={deleteRelated}
+                  onChange={(e) => setDeleteRelated(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  Удалить и связанные записи (сделки, сметы, заказ-наряды, отгрузки, аренды).
+                  <span className="text-[var(--foreground-muted)]">
+                    {" "}
+                    Для ошибочных и дублирующих записей. Для настоящего клиента оставьте выключенным.
+                  </span>
+                </span>
+              </label>
             </div>
           ) : null}
 

@@ -49,22 +49,53 @@ export function DealStageChanger({
     });
   }
 
+  /**
+   * Two steps, because the answer differs by case. The first attempt deletes a
+   * deal that produced nothing. If the server reports fulfillment, the operator
+   * is told exactly what would go and asked again — deleting a wrongly-entered
+   * deal is legitimate and often faster than fixing every field, so this is a
+   * confirmation rather than a refusal.
+   *
+   * The old copy here said "история работ сохранится", which was false: the
+   * schema cascades, so the repair order and its work went with the deal.
+   */
   async function handleDelete(): Promise<void> {
     const ok = await confirm({
       title: "Удалить сделку",
-      message: "Удалить сделку безвозвратно? Сметы будут удалены, история работ сохранится.",
+      message:
+        "Удалить сделку безвозвратно? Сметы будут удалены, резервы запчастей вернутся на склад.",
       danger: true,
       confirmText: "Удалить",
     });
     if (!ok) return;
+
     startTransition(async () => {
       setError(null);
       const result = await deleteDeal(dealId);
+
       if (result.error) {
-        setError(result.error);
-        toast.error(result.error);
-        return;
+        // Only the fulfillment guard is re-askable; anything else is final.
+        if (!result.error.includes("исполнение")) {
+          setError(result.error);
+          toast.error(result.error);
+          return;
+        }
+        const force = await confirm({
+          title: "По сделке есть работы",
+          message: `${result.error}\n\nУдалить вместе с заказ-нарядами, работами и фотографиями?`,
+          danger: true,
+          confirmText: "Удалить всё",
+        });
+        if (!force) return;
+
+        const forced = await deleteDeal(dealId, { deleteFulfillment: true });
+        if (forced.error) {
+          setError(forced.error);
+          toast.error(forced.error);
+          return;
+        }
       }
+
       toast.success("Сделка удалена");
       nav.push("/admin/crm/deals");
       router.refresh();

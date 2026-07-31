@@ -2,7 +2,9 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
+import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
 import { db } from "@/lib/db";
+import { roleLabel as roleLabelOf } from "@/lib/roles";
 import { Card, PageHeader } from "@/components/ui";
 
 interface UserRow {
@@ -31,17 +33,13 @@ const ROLE_FILTERS: Array<{ value: string; label: string }> = [
   { value: "NONE", label: "Заблокированы" },
 ];
 
-const ROLE_LABEL: Record<string, string> = {
-  ADMIN: "Администратор",
-  MANAGER: "Менеджер",
-  CLIENT: "Клиент",
-  NONE: "Без доступа",
-};
 
 const ROLE_BADGE_CLASS: Record<string, string> = {
   ADMIN: "bg-[var(--color-accent)]/15 text-[var(--color-accent)]",
   MANAGER: "bg-[var(--color-info-bg,rgba(59,130,246,0.12))] text-[var(--color-info,#3b82f6)]",
   CLIENT: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
+  MASTER: "bg-[var(--color-success-bg)] text-[var(--color-success)]",
+  WAREHOUSE_WORKER: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
   NONE: "bg-[var(--color-error-bg)] text-[var(--color-error)]",
 };
 
@@ -50,7 +48,10 @@ interface Props {
 }
 
 export default async function UsersAdminPage({ searchParams }: Props) {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  // Erasing is ADMIN-only (see eraseCustomer), so a manager sees no button
+  // rather than one that always refuses.
+  const viewerIsAdmin = session.permissionRole === "ADMIN";
   const sp = await searchParams;
   const filter = sp.role ?? "all";
   const q = (sp.q ?? "").trim();
@@ -140,7 +141,7 @@ export default async function UsersAdminPage({ searchParams }: Props) {
       ) : (
         <div className="space-y-3">
           {users.map((u) => {
-            const roleLabel = ROLE_LABEL[u.permissionRole] ?? u.permissionRole;
+            const roleLabel = roleLabelOf(u.permissionRole);
             const badgeClass =
               ROLE_BADGE_CLASS[u.permissionRole] ??
               "bg-[var(--background-secondary)] text-[var(--foreground-muted)]";
@@ -148,12 +149,11 @@ export default async function UsersAdminPage({ searchParams }: Props) {
             if (u.isCustomer) flags.push("клиент");
             if (u.isMaster) flags.push("мастер");
             return (
-              <Link
+              <div
                 key={u.id}
-                href={`/admin/users/${u.id}`}
-                className="card card-hover flex items-center justify-between gap-4"
+                className="card flex items-center justify-between gap-4"
               >
-                <div className="flex-1 min-w-0">
+                <Link href={`/admin/users/${u.id}`} className="flex-1 min-w-0 hover:opacity-80">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <p className="font-medium truncate">{u.name}</p>
                     <span className={`badge text-[10px] ${badgeClass}`}>{roleLabel}</span>
@@ -167,8 +167,18 @@ export default async function UsersAdminPage({ searchParams }: Props) {
                     {u.email} · {u.phone}
                     {flags.length > 0 ? ` · ${flags.join(", ")}` : ""}
                   </p>
-                </div>
-              </Link>
+                </Link>
+                {viewerIsAdmin && u.id !== session.id && u.isCustomer ? (
+                  <div className="shrink-0">
+                    <EraseCustomerPanel
+                      customerUserId={u.id}
+                      customerName={u.name}
+                      confirmPhrase={u.email ?? u.phone ?? ""}
+                      redirectTo="/admin/users"
+                    />
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </div>

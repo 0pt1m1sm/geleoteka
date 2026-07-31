@@ -171,24 +171,28 @@ export async function setDealStage(
 /**
  * Delete a deal — only ever a way to remove a mistake, never a way to close one out.
  *
- * Blocked when:
- *   - stage is WON (commercial history; roll back to IN_PROGRESS first);
- *   - the deal has any fulfillment (repair order, parts shipment, rental booking).
+ * WON is blocked outright — roll it back to IN_PROGRESS first.
  *
- * That second guard is new, and the docstring it replaces was actively
- * misleading: it claimed fulfillment rows "keep their dealId column NULL via
- * onDelete: SetNull — work history survives". The schema says `Cascade`. So
- * deleting an in-progress deal destroyed the repair order, its job lines,
- * labor and part lines, its slot, its work photos, the parts shipment and
- * every estimate — while the comment above the button promised the opposite.
- * Rather than quietly keep that behaviour, a deal that produced real work now
- * refuses to be deleted; the operator cancels the order instead.
+ * A deal that produced fulfillment (repair order, shipment, rental) needs
+ * `deleteFulfillment: true`, which the UI asks for with a checkbox that is off
+ * by default. Deleting is a legitimate way to undo a deal entered wrongly —
+ * often faster than editing every field — so this is a confirmation, not a ban.
+ *
+ * The docstring this replaces was actively misleading: it claimed fulfillment
+ * rows "keep their dealId column NULL via onDelete: SetNull — work history
+ * survives". The schema says `Cascade`. Deleting an in-progress deal destroyed
+ * the repair order, its job/labor/part lines, its slot, its work photos, the
+ * shipment and every estimate — while the comment above the live button
+ * promised the opposite.
  *
  * Estimates DO still cascade — an estimate belongs to its deal — but their
  * stock reservations are released first, because those are keyed by a string,
  * not a foreign key, and the database cascade cannot see them.
  */
-export async function deleteDeal(dealId: string): Promise<SetStageResult> {
+export async function deleteDeal(
+  dealId: string,
+  options: { deleteFulfillment?: boolean } = {},
+): Promise<SetStageResult> {
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const deal = (await db.deal.findUnique({
     where: { id: dealId },
@@ -207,10 +211,11 @@ export async function deleteDeal(dealId: string): Promise<SetStageResult> {
 
   const fulfilments =
     deal._count.repairOrders + deal._count.partShipments + deal._count.rentalBookings;
-  if (fulfilments > 0) {
+  if (fulfilments > 0 && options.deleteFulfillment !== true) {
     return {
       error:
-        "По сделке уже есть заказ-наряд, отгрузка или аренда — удаление уничтожило бы историю работ. Отмените исполнение вместо удаления.",
+        `По сделке есть исполнение (${fulfilments}): заказ-наряд, отгрузка или аренда. ` +
+        "Удаление уничтожит и их вместе с работами и фотографиями. Подтвердите галочкой, если сделка заведена ошибочно.",
     };
   }
 
