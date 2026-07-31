@@ -43,7 +43,7 @@ export function EmailBody({
       {showOriginal && html ? (
         <EmailBodyFrame html={html} />
       ) : (
-        <pre className="text-sm whitespace-pre-wrap font-sans">{text}</pre>
+        <pre className="text-sm whitespace-pre-wrap break-words font-sans">{text}</pre>
       )}
 
       {html ? (
