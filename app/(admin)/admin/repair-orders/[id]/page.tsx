@@ -44,6 +44,7 @@ interface RepairOrderDetail {
     laborLines: Array<{ bookHours: number; rate: number }>;
     partLines: Array<{ description: string; qty: number; unitCost: number; unitPrice: number }>;
   }>;
+  createdAt: Date;
   workPhotos: Array<{
     id: string;
     url: string;
@@ -73,6 +74,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
       roNumber: true,
       status: true,
       dateTime: true,
+      createdAt: true,
       total: true,
       concern: true,
       notes: true,
@@ -135,13 +137,20 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
             ? `Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`
             : DETACHED_VEHICLE_LABEL
         }
-        description={`${statusLabel} · ${formatDateTime(ro.dateTime)} · ${formatPrice(worksCost)}`}
+        description={`${statusLabel} · запись ${formatDateTime(ro.dateTime)} · ${formatPrice(worksCost)}`}
         actions={
           <Link href="/admin/repair-orders" className="back-link">
             ← К списку
           </Link>
         }
       />
+
+      {/* Два разных времени, и раньше на странице было видно только одно —
+          неподписанное. Читалось как «когда приняли заявку», хотя это время,
+          на которое клиента ждут. */}
+      <p className="-mt-2 mb-6 text-xs text-[var(--foreground-muted)]">
+        Заявка создана {formatDateTime(ro.createdAt)}
+      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-4">
