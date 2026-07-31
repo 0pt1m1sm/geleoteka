@@ -49,27 +49,32 @@ export function InboxCard(props: InboxCardProps): React.ReactElement {
 
   const body = (
     <div className="px-4 py-3">
-      <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{subject || "(без темы)"}</div>
-          {/* Собеседник сразу под темой, а не в правой колонке: тема и «от кого»
-              читаются одним движением глаз, а справа остаётся только служебное —
-              когда и куда пришло. */}
-          <div className="text-xs text-[var(--foreground-muted)] truncate">{party}</div>
-          {/* Две строки предпросмотра: одна почти ничего не говорит, три
-              превращают список в чтение. */}
-          {preview ? (
-            <p className="mt-0.5 text-sm text-[var(--foreground-muted)] line-clamp-2 break-words">
-              {preview}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="shrink-0 text-right text-xs text-[var(--foreground-muted)]">
-          <div>{time}</div>
-          {folder ? <div className="mt-0.5 truncate max-w-[9rem]">{folder}</div> : null}
-        </div>
+      {/* Строками, а не двумя колонками.
+          Колонки висели каждая на своей сетке: слева тема кеглем крупнее,
+          справа время мелким — и первые строки не совпадали по базовой линии.
+          В строке с общей базовой линией совпадение получается само. */}
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="font-medium truncate min-w-0">{subject || "(без темы)"}</div>
+        <div className="shrink-0 text-xs text-[var(--foreground-muted)]">{time}</div>
       </div>
+
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="text-xs text-[var(--foreground-muted)] truncate min-w-0">{party}</div>
+        {folder ? (
+          <div className="shrink-0 text-xs text-[var(--foreground-muted)] truncate max-w-[10rem]">
+            {folder}
+          </div>
+        ) : null}
+      </div>
+
+      {/* Две строки предпросмотра: одна почти ничего не говорит, три превращают
+          список в чтение. Многоточие ставит сам line-clamp — своё добавлять не
+          надо, иначе оно повисает отдельной строкой. */}
+      {preview ? (
+        <p className="mt-1 text-sm text-[var(--foreground-muted)] line-clamp-2 break-words">
+          {preview}
+        </p>
+      ) : null}
 
       {/* Служебная полоса. Направление здесь, а не у темы: оно уточняет письмо,
           а не называет его. */}
