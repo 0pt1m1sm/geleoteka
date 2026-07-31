@@ -4,7 +4,25 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { db } from "./db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
+/**
+ * Session signing key. Refuses to start without one in production.
+ *
+ * This used to fall back to a literal in this file. Since the repository is
+ * public, an empty or missing `JWT_SECRET` would have silently signed sessions
+ * with a string anyone can read — enough to forge an admin session. A missing
+ * secret is a deployment fault, and the app must not come up pretending
+ * otherwise. Development keeps a fixed key so local work needs no setup.
+ */
+const JWT_SECRET = (() => {
+  const fromEnv = process.env.JWT_SECRET?.trim();
+  if (fromEnv) return fromEnv;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "JWT_SECRET is not set. Refusing to start: sessions would be signed with a publicly known key.",
+    );
+  }
+  return "dev-only-secret-never-used-in-production";
+})();
 const JWT_EXPIRES_IN: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN || "7d") as SignOptions["expiresIn"];
 
 interface JWTPayload {
