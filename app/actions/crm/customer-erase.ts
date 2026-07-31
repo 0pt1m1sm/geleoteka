@@ -133,12 +133,12 @@ export async function exportCustomerSnapshot(
     db.communicationLog.findMany({ where: { customerUserId: userId } }),
   ]);
 
-  const counts = {
-    vehicles: (vehicles as unknown[]).length,
-    repairOrders: (repairOrders as unknown[]).length,
-    deals: (deals as unknown[]).length,
-    communications: (communications as unknown[]).length,
-  };
+  // MUST come from countAttached, not from the lengths above. The token is a
+  // digest of the count KEYS as well as their values, so a snapshot that
+  // counted four things while the erase counted five could never match — which
+  // is exactly what happened when `tasks` was added to one side only, and every
+  // customer with data became undeletable.
+  const counts = await countAttached(userId);
 
   return {
     ok: true,
