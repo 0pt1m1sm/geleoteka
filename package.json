@@ -25,6 +25,7 @@
     "verify-ro-works-cost": "tsx scripts/verify-ro-works-cost.ts",
     "verify-reservation-release": "tsx scripts/verify-reservation-release.ts",
     "verify-mobile-inputs": "tsx scripts/verify-mobile-inputs.ts",
+    "verify-email-frame": "tsx scripts/verify-email-frame.ts",
     "verify-send-estimate": "tsx scripts/verify-send-estimate.ts",
     "verify-resend-receiving-path": "tsx scripts/verify-resend-receiving-path.ts",
     "verify-crm-task-unique": "tsx scripts/verify-crm-task-unique.ts",

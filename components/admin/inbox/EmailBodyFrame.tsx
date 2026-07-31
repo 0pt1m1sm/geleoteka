@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { cssVar, getEffectiveTheme, subscribe } from "@/lib/theme";
 
@@ -23,6 +23,35 @@ import { cssVar, getEffectiveTheme, subscribe } from "@/lib/theme";
  */
 export function EmailBodyFrame({ html }: { html: string }): React.ReactElement {
   const theme = useSyncExternalStore(subscribe, getEffectiveTheme, () => "dark" as const);
+  const ref = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(0);
+
+  /**
+   * Высота меряется СНАРУЖИ.
+   *
+   * Изнутри нельзя: скрипты в песочнице запрещены, и снимать этот запрет ради
+   * измерения — плохая сделка. Поэтому даём allow-same-origin и НЕ даём
+   * allow-scripts: опасна именно пара вместе (документ получил бы и наш
+   * origin, и право исполняться). По отдельности same-origin лишь позволяет
+   * родителю прочитать высоту у документа, который всё равно ничего не
+   * исполняет.
+   */
+  const measure = useCallback(() => {
+    const doc = ref.current?.contentDocument;
+    if (!doc) return;
+    const next = Math.max(doc.documentElement.scrollHeight, doc.body?.scrollHeight ?? 0);
+    if (next > 0) setHeight(next);
+  }, []);
+
+  // Картинки в письме подгружаются позже и меняют высоту: одного замера по
+  // load не хватает, иначе снизу останется пустота или обрежется хвост.
+  useEffect(() => {
+    const doc = ref.current?.contentDocument;
+    if (!doc?.body) return;
+    const observer = new ResizeObserver(() => measure());
+    observer.observe(doc.body);
+    return () => observer.disconnect();
+  }, [measure, html, theme]);
 
   // Цвета берём из самой темы, а не константами: так рамка не разъедется с
   // остальным интерфейсом, когда палитру поправят.
@@ -36,13 +65,15 @@ export function EmailBodyFrame({ html }: { html: string }): React.ReactElement {
   :root { color-scheme: ${theme}; }
   html, body {
     margin: 0;
-    padding: 12px;
+    padding: 0;
     background: ${background};
     color: ${foreground};
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
     word-break: break-word;
+    /* Своей прокрутки у письма быть не должно: высоту задаёт родитель. */
+    overflow: hidden;
   }
   a { color: ${accent}; }
   img { max-width: 100%; height: auto; }
@@ -51,12 +82,17 @@ export function EmailBodyFrame({ html }: { html: string }): React.ReactElement {
 
   return (
     <iframe
-      // Песочница пустая: содержимое письма не должно исполнять скрипты и
-      // ходить в сеть. Это не про тему, но снимать её при правке оформления
-      // нельзя ни при каких обстоятельствах.
-      sandbox=""
+      ref={ref}
+      // allow-same-origin БЕЗ allow-scripts: письмо по-прежнему не исполняет
+      // ничего, но родитель может прочитать его высоту. Добавлять
+      // allow-scripts нельзя ни при каких обстоятельствах — вместе эти два
+      // разрешения отдают чужому HTML наш origin.
+      sandbox="allow-same-origin"
       srcDoc={doc}
-      className="w-full min-h-[400px] border border-[var(--border)] rounded"
+      onLoad={measure}
+      style={height > 0 ? { height } : undefined}
+      className={`w-full block ${height > 0 ? "" : "min-h-[200px]"}`}
+      scrolling="no"
       title="Содержимое письма"
     />
   );
