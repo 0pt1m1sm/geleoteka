@@ -136,20 +136,13 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
             ? `Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`
             : DETACHED_VEHICLE_LABEL
         }
-        description={`${statusLabel} · запись ${formatDateTime(ro.dateTime)} · ${formatPrice(worksCost)}`}
+        description={`${statusLabel} · заявка от ${formatDateTime(ro.createdAt)} · ${formatPrice(worksCost)}`}
         actions={
           <Link href="/admin/repair-orders" className="back-link">
             ← К списку
           </Link>
         }
       />
-
-      {/* Два разных времени, и раньше на странице было видно только одно —
-          неподписанное. Читалось как «когда приняли заявку», хотя это время,
-          на которое клиента ждут. */}
-      <p className="-mt-2 mb-6 text-xs text-[var(--foreground-muted)]">
-        Заявка создана {formatDateTime(ro.createdAt)}
-      </p>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-4">
