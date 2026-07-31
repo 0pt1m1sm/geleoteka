@@ -16,6 +16,7 @@ interface Props {
     notes: string;
     mileageIn: string;
     mileageOut: string;
+    dateTime: string;
     promisedAt: string;
     masterUserId: string;
   };
@@ -78,6 +79,13 @@ export function RepairOrderDetailsForm({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input
+          label="Дата и время записи"
+          name="dateTime"
+          type="datetime-local"
+          defaultValue={initial.dateTime}
+          helperText="Двигает и запись, и занятый слот в календаре. Время вне обычной сетки допустимо, занятое другой записью — нет."
+        />
         <Input
           label="Обещанная дата готовности"
           name="promisedAt"
