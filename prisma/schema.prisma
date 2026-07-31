@@ -659,7 +659,12 @@ model RepairOrder {
   roNumber     String?           @unique // Human-friendly sequential number
   /// NULL when the customer was erased — the service record is kept, detached.
   userId       String? // Customer
-  vehicleId    String
+  // Optional on purpose: the car is a descriptive reference, not the owner of
+  // the work. Jobs, labour, parts and photos hang off this order (and the order
+  // off its deal), so a car can be deleted or replaced freely and the paperwork
+  // simply loses its pointer. Until 2026-07-31 this was required and cascaded —
+  // deleting a car destroyed every order written against it.
+  vehicleId    String?
   masterUserId String? // Assigned technician
   trimId       String? // Captured from booking picker; null for older flows or "Не уверен"
   status       RepairOrderStatus @default(SCHEDULED)
@@ -700,7 +705,7 @@ model RepairOrder {
   user    User?        @relation("RepairOrderCustomer", fields: [userId], references: [id], onDelete: Restrict)
   // Restrict: удаление машины не должно уносить историю её обслуживания.
   // Та же ошибка, что была на Deal/RepairOrder → User (миграция 20260730180000).
-  vehicle Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  vehicle Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
   master  User?        @relation("RepairOrderMaster", fields: [masterUserId], references: [id], onDelete: SetNull)
   trim    VehicleTrim? @relation(fields: [trimId], references: [id], onDelete: SetNull)
   slot    Slot?
@@ -1982,7 +1987,10 @@ model CrmTask {
   kind           CrmTaskKind   @default(GENERIC)
   status         CrmTaskStatus @default(OPEN)
   dueAt          DateTime
-  ownerUserId    String
+  // Nullable so an employee can leave without taking the work with them: the
+  // task survives unassigned and a manager picks it up. Deleting the person
+  // together with their tasks stays possible, but it is an explicit choice.
+  ownerUserId    String?
   customerUserId String?
   dealId         String?
   completedAt    DateTime?
@@ -1991,7 +1999,7 @@ model CrmTask {
 
   // Restrict: очередь задач сотрудника (включая напоминания об оплате) —
   // самостоятельная запись, а не часть профиля.
-  owner    User  @relation("CrmTaskOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  owner    User? @relation("CrmTaskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
   customer User? @relation("CrmTaskCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
   deal     Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
 
@@ -1999,4 +2007,27 @@ model CrmTask {
   @@index([customerUserId])
   @@index([dealId])
   @@index([dueAt])
+}
+
+/// What a role may open, once an admin has edited it.
+///
+/// Absence is meaningful: a role with NO rows here falls back to the code
+/// defaults in lib/permissions.ts, so the table starts empty and the panel
+/// behaves exactly as it did when access was hardcoded. Saving a role writes
+/// every permission in the catalogue, granted or not, so "nothing ticked" is a
+/// real answer rather than an empty set indistinguishable from "never set".
+///
+/// ADMIN is never stored. A role that edits roles must not be able to lock
+/// itself out, so authz.ts short-circuits it before ever reading this table.
+model RolePermission {
+  id         String   @id @default(cuid())
+  tenantKey  String   @default("geleoteka")
+  role       String
+  permission String
+  allowed    Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantKey, role, permission])
+  @@index([tenantKey, role])
 }

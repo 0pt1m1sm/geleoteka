@@ -30,6 +30,28 @@ export function roleLabel(role: string): string {
   return isAllowedRole(role) ? ROLE_LABELS[role] : role;
 }
 
+/**
+ * What the person IS in the business, minus whatever the access-role badge
+ * already says.
+ *
+ * The two are different ideas — `permissionRole` is what they may open,
+ * `isCustomer`/`isMaster` is how the shop deals with them — but they collide
+ * for the common case: a client with the CLIENT role rendered as "Клиент
+ * · клиент", which reads as a mistake. A master with no login still shows
+ * "мастер" next to "Без доступа", because there the flag carries information
+ * the badge cannot.
+ */
+export function entityFlags(
+  user: { isCustomer: boolean; isMaster: boolean },
+  permissionRole: string,
+): string[] {
+  const role = roleLabel(permissionRole).toLowerCase();
+  const flags: string[] = [];
+  if (user.isCustomer) flags.push("Клиент");
+  if (user.isMaster) flags.push("Мастер");
+  return flags.filter((f) => f.toLowerCase() !== role);
+}
+
 export const ROLE_LABELS: Readonly<Record<AllowedRole, string>> = {
   NONE: "Без доступа",
   CLIENT: "Клиент",

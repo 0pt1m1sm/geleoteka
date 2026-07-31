@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate } from "@/lib/utils";
 import { Badge, Card, MetricCard, PageHeader } from "@/components/ui";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 export default async function CabinetDashboard() {
   const session = await getSession();
@@ -71,13 +72,13 @@ export default async function CabinetDashboard() {
       ) : (
         <div className="space-y-4">
           {repairOrders.map((ro: Record<string, unknown>) => {
-            const vehicle = ro.vehicle as { model: string };
+            const vehicle = ro.vehicle as { model: string } | null;
             const jobs = ro.jobLines as Array<{ description: string }>;
             return (
               <Card key={ro.id as string}>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-medium">{vehicle.model}</p>
+                    <p className="font-medium">{vehicle?.model ?? DETACHED_VEHICLE_LABEL}</p>
                     <p className="text-sm text-[var(--foreground-muted)]">
                       {formatDate(ro.dateTime as Date)}
                     </p>

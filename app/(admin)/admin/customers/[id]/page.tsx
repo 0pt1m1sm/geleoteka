@@ -12,14 +12,13 @@ import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm"
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerContactsManager } from "@/components/admin/customers/CustomerContactsManager";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
-import { DeleteCustomerButton } from "@/components/admin/customers/DeleteCustomerButton";
-import { RestoreCustomerButton } from "@/components/admin/customers/RestoreCustomerButton";
-import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
+import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 import { CommunicationLogger } from "@/components/crm/CommunicationLogger";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { CustomerTabs } from "@/components/admin/customers/CustomerTabs";
 import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
 import { DEAL_STAGE_LABELS, DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
+import { DeleteCarButton } from "@/components/shared/DeleteCarButton";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -33,7 +32,13 @@ interface RawCustomer {
   referralSource: string | null;
   isTempPassword: boolean;
   deletedAt: Date | null;
-  vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
+  vehicles: Array<{
+    id: string;
+    model: string;
+    year: number;
+    vin: string | null;
+    _count: { repairOrders: number };
+  }>;
   loyaltyAccount: { points: number } | null;
   customerProfile: {
     blacklisted: boolean;
@@ -72,7 +77,10 @@ export default async function CustomerDetailPage({ params }: Props) {
     db.user.findUnique({
       where: { id },
       include: {
-        vehicles: { where: { ownershipType: "CUSTOMER" } },
+        vehicles: {
+          where: { ownershipType: "CUSTOMER" },
+          include: { _count: { select: { repairOrders: true } } },
+        },
         loyaltyAccount: true,
         customerProfile: true,
         _count: { select: { repairOrders: true } },
@@ -198,6 +206,16 @@ export default async function CustomerDetailPage({ params }: Props) {
               {tag.name}
             </span>
           ))}
+          {session.permissionRole === "ADMIN" ? (
+            <div className="ml-auto">
+              <UserActionsMenu
+                userId={customer.id}
+                userName={customer.name}
+                confirmPhrase={customer.email ?? customer.phone ?? ""}
+                archiving={{ archived: customer.deletedAt !== null }}
+              />
+            </div>
+          ) : null}
         </div>
         <p className="text-[var(--foreground-muted)]">
           {customer.phone} · {customer.email}
@@ -283,39 +301,6 @@ export default async function CustomerDetailPage({ params }: Props) {
                   contacts={customer.contacts}
                 />
 
-                {session.permissionRole === "ADMIN" ? (
-                  <div className="card border-[var(--color-error)]/30">
-                    <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-error)] mb-2">
-                      Опасная зона
-                    </h2>
-                    {customer.deletedAt ? (
-                      <>
-                        <p className="text-sm text-[var(--foreground-muted)] mb-3">
-                          Клиент скрыт из CRM. Восстановление вернёт его в списки.
-                        </p>
-                        <RestoreCustomerButton customerUserId={customer.id} />
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-[var(--foreground-muted)] mb-3">
-                          Скрытие убирает клиента из списков, история сделок и заказ-нарядов
-                          сохраняется — действие обратимо.
-                        </p>
-                        <DeleteCustomerButton
-                          customerUserId={customer.id}
-                          isGuest={customer.isTempPassword}
-                        />
-                        <div className="mt-4 pt-3 border-t border-[var(--border)]">
-                          <EraseCustomerPanel
-                            customerUserId={customer.id}
-                            customerName={customer.name}
-                            confirmPhrase={customer.email ?? customer.phone ?? ""}
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : null}
               </div>
             ),
           },
@@ -326,9 +311,16 @@ export default async function CustomerDetailPage({ params }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {customer.vehicles.map((v) => (
                   <div key={v.id} className="card">
-                    <p className="font-medium">
-                      {v.model}, {v.year}
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">
+                        {v.model}, {v.year}
+                      </p>
+                      <DeleteCarButton
+                        vehicleId={v.id}
+                        label={`${v.model}, ${v.year}`}
+                        repairOrderCount={v._count.repairOrders}
+                      />
+                    </div>
                     {v.vin ? (
                       <p className="text-xs text-[var(--foreground-muted)] font-mono">VIN: {v.vin}</p>
                     ) : null}

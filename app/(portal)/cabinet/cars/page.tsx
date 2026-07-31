@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { Button, Card, PageHeader } from "@/components/ui";
+import { DeleteCarButton } from "@/components/shared/DeleteCarButton";
 
 export default async function CarsPage() {
   const session = await getSession();
@@ -14,6 +15,7 @@ export default async function CarsPage() {
   const cars = await db.vehicle.findMany({
     where: { ownerUserId: session.id, ownershipType: "CUSTOMER" },
     orderBy: { createdAt: "desc" },
+    include: { _count: { select: { repairOrders: true } } },
   });
 
   return (
@@ -41,9 +43,16 @@ export default async function CarsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {cars.map((car: Record<string, unknown>) => (
             <Card key={car.id as string} hover>
-              <h3 className="font-semibold text-lg">
-                Mercedes-Benz {car.model as string}
-              </h3>
+              <div className="flex items-start justify-between gap-2">
+                <h3 className="font-semibold text-lg">
+                  Mercedes-Benz {car.model as string}
+                </h3>
+                <DeleteCarButton
+                  vehicleId={car.id as string}
+                  label={`${car.model as string}, ${car.year as number}`}
+                  repairOrderCount={(car._count as { repairOrders: number }).repairOrders}
+                />
+              </div>
               <p className="text-sm text-[var(--foreground-muted)]">
                 {car.year as number} г. · {((car.mileage as number) || 0).toLocaleString("ru-RU")} км
               </p>

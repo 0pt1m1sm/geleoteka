@@ -30,7 +30,8 @@ interface TaskView {
   status: string;
   dueAt: Date;
   completedAt: Date | null;
-  owner: { id: string; name: string };
+  /** Null once the employee who held it is gone — the task waits to be reassigned. */
+  owner: { id: string; name: string } | null;
   customer: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
 }
@@ -436,7 +437,7 @@ function TaskRow({
             <span>
               {CRM_TASK_KIND_LABELS[task.kind] ?? task.kind}
               {" · "}
-              {task.owner.name}
+              {task.owner?.name ?? "Без исполнителя"}
             </span>
             {task.status !== "OPEN" ? (
               <span className="uppercase tracking-wider text-[10px]">
@@ -453,7 +454,7 @@ function TaskRow({
 
           {/* Mobile-only owner / chips row (since right column is hidden) */}
           <div className="sm:hidden text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3">
-            <span>{task.owner.name}</span>
+            <span>{task.owner?.name ?? "Без исполнителя"}</span>
             {task.status !== "OPEN" ? (
               <span>{CRM_TASK_STATUS_LABELS[task.status] ?? task.status}</span>
             ) : null}

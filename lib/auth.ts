@@ -30,7 +30,7 @@ interface JWTPayload {
   permissionRole: string;
 }
 
-interface SessionUser {
+export interface SessionUser {
   id: string;
   email: string;
   phone: string;

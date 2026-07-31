@@ -3,11 +3,12 @@
 // with the new host's adapter. It is the ONE place allowed to import the host
 // db singleton; the core (lib/wms) never does.
 import { db } from "@/lib/db";
+import { TENANT_KEY } from "@/lib/tenant";
 import type { DbClientPort } from "@/lib/wms/public";
 
 /** Single-tenant discriminator until the WMS is extracted into a multi-tenant
  *  product. Host callers pass this to recordMovement / lookupByCode. */
-export const TENANT_KEY = "geleoteka";
+export { TENANT_KEY };
 
 /** Host display policy: a part is "low stock" when available ≤ this threshold.
  *  Used by the warehouse overview for highlighting (Phase 5 makes it per-item). */

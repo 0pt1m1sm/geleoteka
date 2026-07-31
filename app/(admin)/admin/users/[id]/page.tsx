@@ -4,11 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { roleLabel as roleLabelOf } from "@/lib/roles";
+import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
 import { UserContactsForm } from "@/components/admin/UserContactsForm";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
-import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
+import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 
 interface UserDetail {
   id: string;
@@ -65,13 +65,16 @@ export default async function UserDetailPage({ params }: Props) {
     notFound();
   }
 
-  const flags: string[] = [];
-  if (user.isCustomer) flags.push("Клиент");
-  if (user.isMaster) flags.push("Мастер");
+  const flags = entityFlags(user, user.permissionRole);
 
   const viewerIsAdmin = session.permissionRole === "ADMIN";
   const isSelf = session.id === user.id;
   const roleLabel = roleLabelOf(user.permissionRole);
+  // Mirrors the action's own refusals, so the menu never offers a delete that
+  // would come back as an error: not yourself, not another admin, not a
+  // supplier (SupplierOrder.userId is a required link this flow won't unpick).
+  const canErase =
+    viewerIsAdmin && !isSelf && !user.isSupplier && user.permissionRole !== "ADMIN";
 
   return (
     <div>
@@ -80,9 +83,19 @@ export default async function UserDetailPage({ params }: Props) {
         title={user.name}
         description={flags.length > 0 ? flags.join(" · ") : undefined}
         actions={
-          <Link href="/admin/users" className="back-link">
-            ← К списку
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/users" className="back-link">
+              ← К списку
+            </Link>
+            {canErase ? (
+              <UserActionsMenu
+                userId={user.id}
+                userName={user.name}
+                confirmPhrase={user.email ?? user.phone ?? ""}
+                redirectTo="/admin/users"
+              />
+            ) : null}
+          </div>
         }
       />
 
@@ -126,24 +139,6 @@ export default async function UserDetailPage({ params }: Props) {
               Открыть карточку клиента →
             </Link>
           </p>
-        </div>
-      )}
-
-      {viewerIsAdmin && !isSelf && (
-        <div className="mt-6 card border-[var(--color-error)]/30">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-error)] mb-2">
-            Опасная зона
-          </h2>
-          <p className="text-sm text-[var(--foreground-muted)] mb-3">
-            Стирает персональные данные — карточку, контакты, заметки и ленту общения. Сделки,
-            заказ-наряды и письма в почтовом ящике по умолчанию сохраняются: это записи сервиса,
-            нужные для бухгалтерии и гарантии. Удалить и их можно галочкой. Сначала выгружается копия.
-          </p>
-          <EraseCustomerPanel
-            customerUserId={user.id}
-            customerName={user.name}
-            confirmPhrase={user.email ?? user.phone ?? ""}
-          />
         </div>
       )}
 

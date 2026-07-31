@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import {
@@ -17,6 +17,11 @@ interface Props {
   confirmPhrase: string;
   /** Where to go once the person is gone. */
   redirectTo?: string;
+  /**
+   * Skip the panel's own trigger and load the impact straight away — for when
+   * the decision to delete was already made outside, in the actions menu.
+   */
+  autoOpen?: boolean;
 }
 
 /** What actually happens to each kind of record — see customer-erase.ts. */
@@ -24,6 +29,8 @@ const OUTCOME: Record<string, { label: string; kept: boolean }> = {
   deals: { label: "сделки", kept: true },
   repairOrders: { label: "заказ-наряды", kept: true },
   communications: { label: "лента общения на карточке", kept: false },
+  // Held as an employee: survives unassigned unless the box is ticked.
+  tasks: { label: "задачи в работе", kept: true },
   vehicles: { label: "автомобили", kept: false },
 };
 
@@ -42,6 +49,7 @@ export function EraseCustomerPanel({
   customerName,
   confirmPhrase,
   redirectTo = "/admin/customers",
+  autoOpen = false,
 }: Props): React.ReactElement {
   const nav = useProgressRouter();
   const [busy, setBusy] = useState<null | "impact" | "export" | "erase">(null);
@@ -56,7 +64,7 @@ export function EraseCustomerPanel({
   // nowhere — and the operator says so explicitly rather than the code guessing.
   const [deleteRelated, setDeleteRelated] = useState(false);
 
-  async function handleOpen(): Promise<void> {
+  const handleOpen = useCallback(async (): Promise<void> => {
     setError(null);
     setBusy("impact");
     try {
@@ -71,7 +79,16 @@ export function EraseCustomerPanel({
     } finally {
       setBusy(null);
     }
-  }
+  }, [customerUserId]);
+
+  // Fires once. The impact has to be fetched from the server, so there is no
+  // way to have it at first render; the ref keeps a re-render from asking twice.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (!autoOpen || opened.current) return;
+    opened.current = true;
+    void handleOpen();
+  }, [autoOpen, handleOpen]);
 
   async function handleExport(): Promise<void> {
     setError(null);
@@ -120,6 +137,13 @@ export function EraseCustomerPanel({
   }
 
   if (counts === null) {
+    if (autoOpen) {
+      return (
+        <p className="text-sm text-[var(--foreground-muted)]">
+          {error ?? "Проверяем связанные данные…"}
+        </p>
+      );
+    }
     return (
       <div>
         <button
@@ -177,18 +201,34 @@ export function EraseCustomerPanel({
                   : "Эти записи останутся для бухгалтерии и гарантии; при необходимости их можно привязать к другому клиенту вручную."}
               </p>
 
-              <label className="flex items-start gap-2 text-xs mt-2">
+              {/* The one real decision on this screen, so it looks like one:
+                  boxed, and tinted red once armed so the operator cannot tick
+                  it without noticing that the answer changed. */}
+              <label
+                className={`flex items-start gap-2.5 text-xs mt-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  deleteRelated
+                    ? "border-[var(--color-error)] bg-[var(--color-error-bg)]"
+                    : "border-[var(--border)] bg-[var(--background-secondary)] hover:border-[var(--color-error)]/40"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={deleteRelated}
                   onChange={(e) => setDeleteRelated(e.target.checked)}
-                  className="mt-0.5"
+                  className="mt-0.5 w-4 h-4 shrink-0 accent-[var(--color-error)]"
                 />
                 <span>
-                  Удалить и связанные записи (сделки, сметы, заказ-наряды, отгрузки, аренды, письма).
-                  <span className="text-[var(--foreground-muted)]">
-                    {" "}
-                    Для ошибочных и дублирующих записей. Для настоящего клиента оставьте выключенным.
+                  <span
+                    className={`block font-semibold ${
+                      deleteRelated ? "text-[var(--color-error)]" : ""
+                    }`}
+                  >
+                    Удалить и связанные записи
+                  </span>
+                  <span className="block text-[var(--foreground-muted)] mt-0.5">
+                    Сделки, сметы, заказ-наряды, отгрузки, аренды и письма — у клиента; задачи —
+                    у сотрудника. Для ошибочных и дублирующих записей. Для настоящего клиента или
+                    работающего сотрудника оставьте выключенным.
                   </span>
                 </span>
               </label>

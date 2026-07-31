@@ -80,6 +80,13 @@ export async function resetUserPassword(
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);
+  revalidatePath(`/admin/users/${userId}`);
+  revalidatePath("/admin/users");
+  // The roles page counts holders per role, and the sidebar is built from the
+  // viewer's permissions — both go stale on a role change. Missing these is why
+  // promoting somebody to admin left the roles page showing the old picture.
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin", "layout");
   return { ok: true, tempPassword };
 }
 
@@ -128,6 +135,13 @@ export async function updateUserContacts(
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);
+  revalidatePath(`/admin/users/${userId}`);
+  revalidatePath("/admin/users");
+  // The roles page counts holders per role, and the sidebar is built from the
+  // viewer's permissions — both go stale on a role change. Missing these is why
+  // promoting somebody to admin left the roles page showing the old picture.
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
@@ -178,6 +192,13 @@ export async function changeUserRole(
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);
+  revalidatePath(`/admin/users/${userId}`);
+  revalidatePath("/admin/users");
+  // The roles page counts holders per role, and the sidebar is built from the
+  // viewer's permissions — both go stale on a role change. Missing these is why
+  // promoting somebody to admin left the roles page showing the old picture.
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }
 
@@ -230,5 +251,12 @@ export async function setUserDisabled(
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);
+  revalidatePath(`/admin/users/${userId}`);
+  revalidatePath("/admin/users");
+  // The roles page counts holders per role, and the sidebar is built from the
+  // viewer's permissions — both go stale on a role change. Missing these is why
+  // promoting somebody to admin left the roles page showing the old picture.
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin", "layout");
   return { ok: true };
 }

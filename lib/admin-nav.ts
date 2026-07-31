@@ -24,6 +24,8 @@
  * foundational groups don't need an entry there.
  */
 
+import { permissionForPath } from "@/lib/permissions";
+
 interface AdminNavLink {
   kind: "link";
   href: string;
@@ -115,13 +117,38 @@ export const adminNav: AdminNavEntry[] = [
   },
 ];
 
-/** Scope the nav to a role. WAREHOUSE_WORKER only sees the warehouse section;
- *  all other admin roles see the full nav. */
-export function filterNavForRole(nav: readonly AdminNavEntry[], role: string): AdminNavEntry[] {
-  if (role === "WAREHOUSE_WORKER") {
-    return [{ kind: "link", href: "/admin/warehouse", label: "Склад" }];
+/**
+ * Scope the nav to what the viewer may actually open.
+ *
+ * `granted` of `null` means "everything" — that is ADMIN, who is answered
+ * before any permission lookup happens. Otherwise every link is checked
+ * against the permission its path demands, and a group with nothing left in it
+ * disappears rather than sitting there as an empty heading.
+ *
+ * This replaces a hardcoded special case for WAREHOUSE_WORKER. That role now
+ * reaches the same result through its default permissions, so a warehouse
+ * worker still sees only the warehouse — but an admin can change it.
+ */
+export function filterNavForPermissions(
+  nav: readonly AdminNavEntry[],
+  granted: ReadonlySet<string> | null,
+): AdminNavEntry[] {
+  if (granted === null) return [...nav];
+  const allows = (href: string): boolean => {
+    const needed = permissionForPath(parseHref(href).path);
+    return needed === null || granted.has(needed);
+  };
+
+  const out: AdminNavEntry[] = [];
+  for (const entry of nav) {
+    if (entry.kind === "link") {
+      if (allows(entry.href)) out.push(entry);
+      continue;
+    }
+    const items = entry.items.filter((i) => allows(i.href));
+    if (items.length > 0) out.push({ ...entry, items });
   }
-  return [...nav];
+  return out;
 }
 
 interface HrefSearch {
