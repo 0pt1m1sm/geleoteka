@@ -12,7 +12,20 @@ interface Props {
   searchParams: Promise<{ status?: string }>;
 }
 
+/**
+ * «Все письма» стоит первой и читает другой источник.
+ *
+ * Остальные вкладки — это очередь разбора: в неё попадают только письма от
+ * НЕИЗВЕСТНЫХ отправителей. Письмо от узнанного клиента разбирать не нужно, оно
+ * сразу ложится в его переписку и в очереди не появляется никогда — поэтому
+ * очередь и не отвечала на вопрос «что вообще приходило».
+ *
+ * Отвечает на него EmailMessage: он создаётся ПЕРВЫМ и для каждого письма, а
+ * решение «в переписку клиента или в очередь» принимается уже после. То есть
+ * полный архив всё это время был, не хватало вида поверх него.
+ */
 const STATUS_TABS: Array<{ key: string; label: string }> = [
+  { key: "ALL", label: "Все письма" },
   { key: "PENDING", label: "Pending" },
   { key: "ARCHIVED", label: "Архив" },
   { key: "SPAM", label: "Спам" },
@@ -37,6 +50,19 @@ function attachmentCount(attachments: unknown): number {
 /** Message that landed noticeably before the sync picked it up — i.e. imported
  *  from backlog after downtime. A >10 min gap between the mail's own timestamp
  *  and the row's sync time is the signal. */
+interface AllMailRow {
+  id: string;
+  direction: string;
+  fromEmail: string;
+  fromName: string | null;
+  toEmails: string[];
+  subject: string | null;
+  occurredAt: Date;
+  attachments: unknown;
+  inboxMessages: Array<{ id: string }>;
+  communicationLogs: Array<{ customerUserId: string | null }>;
+}
+
 const BACKLOG_GAP_MS = 10 * 60 * 1000;
 function isBacklog(receivedAt: Date, syncedAt: Date | null | undefined): boolean {
   if (!syncedAt) return false;
@@ -52,8 +78,12 @@ export default async function InboxPage({ searchParams }: Props) {
   const sp = await searchParams;
   const status = STATUS_TABS.find((t) => t.key === (sp.status ?? "PENDING"))?.key ?? "PENDING";
 
+  const showAll = status === "ALL";
+
   const [rows, counts] = (await Promise.all([
-    db.inboxMessage.findMany({
+    showAll
+      ? Promise.resolve([])
+      : db.inboxMessage.findMany({
       where: { status: status as never },
       orderBy: { receivedAt: "desc" },
       take: 50,
@@ -78,12 +108,38 @@ export default async function InboxPage({ searchParams }: Props) {
     counts.map((c) => [c.status, c._count._all]),
   );
 
+  // Архив читается отдельным запросом: у него другой источник, другой порядок
+  // (occurredAt — когда письмо УШЛО или ПРИШЛО, а не когда мы его синхронизировали)
+  // и другое действие по клику.
+  const allMail = showAll
+    ? ((await db.emailMessage.findMany({
+        orderBy: { occurredAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          direction: true,
+          fromEmail: true,
+          fromName: true,
+          toEmails: true,
+          subject: true,
+          occurredAt: true,
+          attachments: true,
+          inboxMessages: { select: { id: true }, take: 1 },
+          communicationLogs: { select: { customerUserId: true }, take: 1 },
+        },
+      })) as AllMailRow[])
+    : [];
+
   return (
     <div>
       <PageHeader
         eyebrow="CRM"
         title="Входящие письма"
-        description="Письма от неизвестных отправителей ожидают разбора"
+        description={
+          showAll
+            ? "Вся почта сервиса — и разобранная, и нет"
+            : "Письма от неизвестных отправителей ожидают разбора"
+        }
       />
 
       <div className="flex gap-1 border-b border-[var(--border)] mb-6" role="tablist">
@@ -113,7 +169,77 @@ export default async function InboxPage({ searchParams }: Props) {
         })}
       </div>
 
-      {rows.length === 0 ? (
+      {showAll ? (
+        allMail.length === 0 ? (
+          <Card>
+            <p className="text-sm text-[var(--foreground-muted)]">Писем нет.</p>
+          </Card>
+        ) : (
+          <Card className="p-0">
+            <ul className="divide-y divide-[var(--border)]">
+              {allMail.map((m) => {
+                const outbound = m.direction === "OUTBOUND";
+                // Собеседник, а не «от кого»: в исходящем интересен адресат.
+                const party = outbound ? (m.toEmails[0] ?? "—") : (m.fromName ?? m.fromEmail);
+                // Куда письмо легло: в очередь разбора или в переписку клиента.
+                const inboxId = m.inboxMessages[0]?.id ?? null;
+                const customerId = m.communicationLogs[0]?.customerUserId ?? null;
+                const href = inboxId
+                  ? `/admin/crm/inbox/${inboxId}`
+                  : customerId
+                    ? `/admin/customers/${customerId}`
+                    : null;
+                const row = (
+                  <div className="flex items-start gap-4 px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium truncate flex items-center gap-2">
+                        <span
+                          className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-accent-muted,#3a3a3a)] text-[var(--foreground-muted)]"
+                          title={outbound ? "Исходящее" : "Входящее"}
+                        >
+                          {outbound ? "→ ИСХ" : "← ВХ"}
+                        </span>
+                        <span className="truncate">{party}</span>
+                        {inboxId ? (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]">
+                            в разборе
+                          </span>
+                        ) : customerId ? null : (
+                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]">
+                            без клиента
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-sm text-[var(--foreground-muted)] truncate">
+                        {m.subject || "(без темы)"}
+                      </div>
+                    </div>
+                    <div className="text-xs text-[var(--foreground-muted)] shrink-0">
+                      {attachmentCount(m.attachments) > 0 ? (
+                        <span className="mr-2">📎 {attachmentCount(m.attachments)}</span>
+                      ) : null}
+                      {formatDateTime(m.occurredAt)}
+                    </div>
+                  </div>
+                );
+                return (
+                  <li key={m.id}>
+                    {/* Письмо, не привязанное ни к очереди, ни к клиенту, открывать
+                        пока некуда — ссылка в никуда хуже её отсутствия. */}
+                    {href ? (
+                      <Link href={href} className="row-clickable block">
+                        {row}
+                      </Link>
+                    ) : (
+                      row
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </Card>
+        )
+      ) : rows.length === 0 ? (
         <Card>
           <p className="text-sm text-[var(--foreground-muted)]">Писем нет.</p>
         </Card>
