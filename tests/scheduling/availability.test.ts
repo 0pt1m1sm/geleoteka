@@ -5,6 +5,7 @@ import {
   labelToMinutes,
   minutesToLabel,
   resolveDayWindow,
+  slotsOverlap,
   type WeeklyHours,
 } from "@/lib/scheduling/availability";
 
@@ -213,5 +214,27 @@ describe("label helpers", () => {
     expect(labelToMinutes("25:00")).toBeNull();
     expect(labelToMinutes("09:70")).toBeNull();
     expect(labelToMinutes("nine")).toBeNull();
+  });
+});
+
+describe("slotsOverlap", () => {
+  // Ровно случай из прода: запись в 13:00 накрывала и 12:00, и 14:00, а
+  // календарь показывал 14:00—16:00 свободным.
+  it("видит пересечение записи, начатой между слотами", () => {
+    expect(slotsOverlap(13 * 60, 12 * 60)).toBe(true);
+    expect(slotsOverlap(14 * 60, 13 * 60)).toBe(true);
+  });
+
+  it("соседние слоты не пересекаются — конец одного это начало другого", () => {
+    expect(slotsOverlap(12 * 60, 14 * 60)).toBe(false);
+    expect(slotsOverlap(14 * 60, 12 * 60)).toBe(false);
+  });
+
+  it("запись пересекается сама с собой", () => {
+    expect(slotsOverlap(10 * 60, 10 * 60)).toBe(true);
+  });
+
+  it("далёкие слоты не пересекаются", () => {
+    expect(slotsOverlap(10 * 60, 16 * 60)).toBe(false);
   });
 });

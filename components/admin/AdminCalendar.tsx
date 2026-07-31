@@ -11,6 +11,7 @@ import {
   labelToMinutes,
   minutesToLabel,
   SLOT_MINUTES,
+  slotsOverlap,
   type DayException,
   type WeeklyHours,
 } from "@/lib/scheduling/availability";
@@ -123,6 +124,58 @@ export function AdminCalendar({
   const gridMinutes = new Set(slots.map((s) => labelToMinutes(s.time)));
   const offGrid = dayOrders.filter((o) => !gridMinutes.has(o.minute));
 
+  // Запись занимает два часа, а не мгновение. Пересечение по интервалу для
+  // блокировок здесь считалось и раньше — для записей его просто не применяли,
+  // поэтому слот 14:00—16:00 показывался свободным, когда его половину уже
+  // занимала запись, начатая в 13:00.
+  interface DayRow {
+    key: string;
+    minute: number;
+    label: string;
+    order?: (typeof dayOrders)[number];
+    blockReason: string | null;
+    note?: string;
+    busyNote?: string;
+  }
+
+  const gridRows: DayRow[] = slots.map((slot) => {
+    const minute = labelToMinutes(slot.time) ?? 0;
+    const order = dayOrders.find((o) => o.minute === minute);
+    const block = dayBlocks.find(
+      (x) => x.range.start < minute + SLOT_MINUTES && x.range.end > minute,
+    );
+    // Чужая запись, накрывающая этот слот. Своя (начатая ровно здесь) уже
+    // показана карточкой — второй раз про неё писать незачем.
+    const covering = order ? undefined : dayOrders.find((o) => slotsOverlap(minute, o.minute));
+    return {
+      key: slot.time,
+      minute,
+      label: `${slot.time} — ${minutesToLabel(minute + SLOT_MINUTES)}`,
+      order,
+      blockReason: block ? block.block.reason ?? "заблокировано" : null,
+      busyNote: covering ? `Занято записью ${covering.time}` : undefined,
+    };
+  });
+
+  // Записи вне сетки раньше дописывались в конец списка, из-за чего 13:00
+  // оказывалась ниже 14:00. День читается по времени, а не по происхождению
+  // записи, поэтому строки идут одним отсортированным списком.
+  const rows: DayRow[] = [
+    ...gridRows,
+    ...offGrid.map((order) => ({
+      key: order.id,
+      minute: order.minute,
+      label: `${order.time} — ${minutesToLabel(order.minute + SLOT_MINUTES)}`,
+      order,
+      blockReason: null,
+      note: "вне графика",
+    })),
+  ].sort((a, b) => a.minute - b.minute);
+
+  // Свободным считается слот, который никем не накрыт, — иначе счётчик обещает
+  // ёмкость, которой нет.
+  const freeCount = gridRows.filter((r) => !r.order && !r.busyNote && !r.blockReason).length;
+
   return (
     <div>
       <div className="flex gap-2 overflow-x-auto pb-4 mb-6">
@@ -171,7 +224,7 @@ export function AdminCalendar({
             ? exception?.isClosed
               ? `Закрыто${exception.reason ? ` — ${exception.reason}` : ""}`
               : "Нерабочий день по графику"
-            : `${dayOrders.length} записей · ${slots.filter((s) => s.available).length} свободно из ${slots.length}`}
+            : `${dayOrders.length} записей · ${freeCount} свободно из ${slots.length}`}
         </p>
 
         {slots.length === 0 && offGrid.length === 0 ? (
@@ -180,29 +233,14 @@ export function AdminCalendar({
           </p>
         ) : (
           <div className="space-y-2">
-            {slots.map((slot) => {
-              const minute = labelToMinutes(slot.time) ?? 0;
-              const order = dayOrders.find((o) => o.minute === minute);
-              const block = dayBlocks.find(
-                (x) => x.range.start < minute + SLOT_MINUTES && x.range.end > minute,
-              );
-              return (
-                <SlotRow
-                  key={slot.time}
-                  label={`${slot.time} — ${minutesToLabel(minute + SLOT_MINUTES)}`}
-                  order={order}
-                  blockReason={block ? block.block.reason ?? "заблокировано" : null}
-                />
-              );
-            })}
-
-            {offGrid.map((order) => (
+            {rows.map((row) => (
               <SlotRow
-                key={order.id}
-                label={`${order.time} — ${minutesToLabel(order.minute + SLOT_MINUTES)}`}
-                order={order}
-                blockReason={null}
-                note="вне графика"
+                key={row.key}
+                label={row.label}
+                order={row.order}
+                blockReason={row.blockReason}
+                note={row.note}
+                busyNote={row.busyNote}
               />
             ))}
           </div>
@@ -217,15 +255,18 @@ function SlotRow({
   order,
   blockReason,
   note,
+  busyNote,
 }: {
   label: string;
   order?: CalendarRepairOrder;
   blockReason: string | null;
   note?: string;
+  /** Слот накрыт чужой записью — свободным он не является. */
+  busyNote?: string;
 }): React.ReactElement {
   const tone = order
     ? "bg-[var(--background-secondary)]"
-    : blockReason
+    : blockReason || busyNote
       ? "bg-[var(--background-secondary)] opacity-60"
       : "border border-dashed border-[var(--border)]";
 
@@ -264,6 +305,8 @@ function SlotRow({
         <div className="flex-1 text-sm text-[var(--foreground-muted)]">
           Заблокировано — {blockReason}
         </div>
+      ) : busyNote ? (
+        <div className="flex-1 text-sm text-[var(--foreground-muted)]">{busyNote}</div>
       ) : (
         <div className="flex-1 text-sm text-[var(--foreground-muted)]">Свободно</div>
       )}
