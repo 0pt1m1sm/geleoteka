@@ -158,36 +158,72 @@ export default async function CrmTasksPage({ searchParams }: Props) {
     <div>
       <PageHeader eyebrow="CRM · Задачи" title="Задачи" />
 
-      <div className="mb-4 flex flex-wrap gap-x-6 gap-y-2">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Диапазон задач">
-          <Chip scope={scope} ownerScope={ownerScope} value="today" label="Сегодня" />
-          <Chip scope={scope} ownerScope={ownerScope} value="overdue" label="Просрочено" />
-          <Chip scope={scope} ownerScope={ownerScope} value="week" label="На неделе" />
-          <Chip scope={scope} ownerScope={ownerScope} value="open" label="Все открытые" />
-          <Chip scope={scope} ownerScope={ownerScope} value="done" label="Выполненные" />
-          <Chip scope={scope} ownerScope={ownerScope} value="all" label="Все" />
+      <div className="mb-4 flex flex-wrap items-end gap-x-6 gap-y-3">
+        <div
+          className="flex min-w-0 max-w-full flex-col gap-1"
+          role="group"
+          aria-labelledby="task-due-filter-label"
+        >
+          <span
+            id="task-due-filter-label"
+            className="text-[10px] font-medium uppercase tracking-wider text-[var(--foreground-muted)]"
+          >
+            Срок
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Chip scope={scope} ownerScope={ownerScope} value="today" label="Сегодня" />
+            <Chip scope={scope} ownerScope={ownerScope} value="overdue" label="Просрочено" />
+            <Chip scope={scope} ownerScope={ownerScope} value="week" label="На неделе" />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Ответственные">
-          <OwnerChip
-            scope={scope}
-            ownerScope={ownerScope}
-            value="mine"
-            label="Мои"
-          />
-          <OwnerChip
-            scope={scope}
-            ownerScope={ownerScope}
-            value="team"
-            label="Команда"
-          />
+        <div
+          className="flex min-w-0 max-w-full flex-col gap-1"
+          role="group"
+          aria-labelledby="task-state-filter-label"
+        >
+          <span
+            id="task-state-filter-label"
+            className="text-[10px] font-medium uppercase tracking-wider text-[var(--foreground-muted)]"
+          >
+            Состояние
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <Chip scope={scope} ownerScope={ownerScope} value="open" label="Все открытые" />
+            <Chip scope={scope} ownerScope={ownerScope} value="done" label="Выполненные" />
+            <Chip scope={scope} ownerScope={ownerScope} value="all" label="Все" />
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Очереди задач">
-          <OwnerChip
-            scope={scope}
-            ownerScope={ownerScope}
-            value="replies"
-            label="Ответы клиентов"
-          />
+        <div
+          className="flex min-w-0 max-w-full flex-col gap-1"
+          role="group"
+          aria-labelledby="task-owner-filter-label"
+        >
+          <span
+            id="task-owner-filter-label"
+            className="text-[10px] font-medium uppercase tracking-wider text-[var(--foreground-muted)]"
+          >
+            Кто
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <OwnerChip
+              scope={scope}
+              ownerScope={ownerScope}
+              value="mine"
+              label="Мои"
+            />
+            <OwnerChip
+              scope={scope}
+              ownerScope={ownerScope}
+              value="team"
+              label="Команда"
+            />
+            <OwnerChip
+              scope={scope}
+              ownerScope={ownerScope}
+              value="replies"
+              label="Ответы клиентов"
+            />
+          </div>
         </div>
       </div>
 
