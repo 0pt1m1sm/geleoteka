@@ -5,7 +5,8 @@ import { ChevronRight } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { formatDate, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { formatDate, formatDateTime, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { SLOT_MINUTES } from "@/lib/scheduling/availability";
 import { StatusChanger } from "@/components/admin/StatusChanger";
 import { CreateRepairOrderDialog } from "@/components/admin/CreateRepairOrderDialog";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
@@ -17,6 +18,13 @@ const VALID_STATUSES = new Set(Object.keys(REPAIR_ORDER_STATUS_LABELS));
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
+}
+
+/** «1 авг. 2026 г., 13:00 — 15:00»: запись занимает слот целиком. */
+function appointmentRange(start: Date): string {
+  const end = new Date(start.getTime() + SLOT_MINUTES * 60_000);
+  const time = (d: Date): string => formatDate(d, { dateStyle: undefined, timeStyle: "short" });
+  return `${formatDateTime(start)} — ${time(end)}`;
 }
 
 export default async function AppointmentsPage({ searchParams }: Props) {
@@ -108,8 +116,10 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                       {vehicle?.vin && <span className="font-mono">VIN {vehicle.vin}</span>}
                     </div>
 
+                    {/* Со временем и до конца слота: список нужен, чтобы понять,
+                        кого ждать ближайшим, а одна дата на это не отвечает. */}
                     <div className="text-xs text-[var(--foreground-muted)]">
-                      {formatDate(ro.dateTime as Date)}
+                      {appointmentRange(ro.dateTime as Date)}
                       {master && ` · Мастер: ${master.name}`}
                     </div>
 
