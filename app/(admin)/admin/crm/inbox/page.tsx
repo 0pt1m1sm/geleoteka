@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
-import { formatDateTime } from "@/lib/utils";
+import { formatDate, formatDateTime } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
 
 interface Props {
@@ -61,6 +61,17 @@ interface AllMailRow {
   attachments: unknown;
   inboxMessages: Array<{ id: string }>;
   communicationLogs: Array<{ customerUserId: string | null }>;
+}
+
+/**
+ * Дата для узкого экрана: без года.
+ *
+ * «30 июл. 2026 г., 19:05» занимало столько, что от имени отправителя
+ * оставалось «Alex Tern…». Год в почтовом ящике почти никогда не нужен —
+ * письма читают свежими.
+ */
+function compactDateTime(d: Date): string {
+  return formatDate(d, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 const BACKLOG_GAP_MS = 10 * 60 * 1000;
@@ -142,7 +153,7 @@ export default async function InboxPage({ searchParams }: Props) {
         }
       />
 
-      <div className="flex gap-1 border-b border-[var(--border)] mb-6" role="tablist">
+      <div className="flex gap-1 border-b border-[var(--border)] mb-6 overflow-x-auto whitespace-nowrap" role="tablist">
         {STATUS_TABS.map((tab) => {
           const isActive = tab.key === status;
           const cnt = countByStatus.get(tab.key) ?? 0;
@@ -213,8 +224,14 @@ export default async function InboxPage({ searchParams }: Props) {
                       <div className="text-sm text-[var(--foreground-muted)] truncate">
                         {m.subject || "(без темы)"}
                       </div>
+                      <div className="sm:hidden mt-1 text-xs text-[var(--foreground-muted)]">
+                        {attachmentCount(m.attachments) > 0 ? (
+                          <span className="mr-2">📎 {attachmentCount(m.attachments)}</span>
+                        ) : null}
+                        {compactDateTime(m.occurredAt)}
+                      </div>
                     </div>
-                    <div className="text-xs text-[var(--foreground-muted)] shrink-0">
+                    <div className="hidden sm:block text-xs text-[var(--foreground-muted)] shrink-0">
                       {attachmentCount(m.attachments) > 0 ? (
                         <span className="mr-2">📎 {attachmentCount(m.attachments)}</span>
                       ) : null}
@@ -247,7 +264,10 @@ export default async function InboxPage({ searchParams }: Props) {
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
             {rows.map((row) => (
-              <li key={row.id} className="flex items-start">
+              {/* На телефоне строка раскладывается в колонку: кнопки в одном
+                  ряду с именем оставляли ему 130px, и отправитель обрезался до
+                  «Alex Tern…». Снизу справа они не мешают ничему. */}
+              <li key={row.id} className="flex flex-col sm:flex-row sm:items-start">
                 <Link
                   href={`/admin/crm/inbox/${row.id}`}
                   className="row-clickable flex-1 min-w-0 flex items-start gap-4 px-4 py-3"
@@ -275,8 +295,16 @@ export default async function InboxPage({ searchParams }: Props) {
                     <div className="text-sm text-[var(--foreground-muted)] truncate">
                       {row.subject || "(без темы)"}
                     </div>
+                    {/* На телефоне дата уходит под тему: в строку она не
+                        помещалась и отъедала имя отправителя. */}
+                    <div className="sm:hidden mt-1 text-xs text-[var(--foreground-muted)]">
+                      {attachmentCount(row.attachments) > 0 ? (
+                        <span className="mr-2">📎 {attachmentCount(row.attachments)}</span>
+                      ) : null}
+                      {compactDateTime(row.receivedAt)}
+                    </div>
                   </div>
-                  <div className="text-xs text-[var(--foreground-muted)] shrink-0">
+                  <div className="hidden sm:block text-xs text-[var(--foreground-muted)] shrink-0">
                     {attachmentCount(row.attachments) > 0 ? (
                       <span className="mr-2">📎 {attachmentCount(row.attachments)}</span>
                     ) : null}
@@ -285,7 +313,9 @@ export default async function InboxPage({ searchParams }: Props) {
                 </Link>
                 {/* Разбор из списка: иначе очередь чистится только по одному
                     письму за заход в карточку и обратно. */}
-                <InboxRowActions inboxMessageId={row.id} status={status} />
+                <div className="self-end sm:self-auto">
+                  <InboxRowActions inboxMessageId={row.id} status={status} />
+                </div>
               </li>
             ))}
           </ul>
