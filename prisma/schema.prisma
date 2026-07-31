@@ -928,8 +928,19 @@ model Notification {
 // as `/api/images/<id>` URLs)
 // ============================================
 
+/// Кому можно отдавать картинку.
+///
+/// PUBLIC по умолчанию: каталог запчастей, аренда и контент сайта — это витрина,
+/// и любое другое значение по умолчанию тихо сломало бы её. PRIVATE ставится
+/// осознанно на загрузке фотоотчёта по заказ-наряду.
+enum ImageVisibility {
+  PUBLIC
+  PRIVATE
+}
+
 model UploadedImage {
   id          String   @id @default(cuid())
+  visibility  ImageVisibility @default(PUBLIC)
   bytes       Bytes
   mimeType    String
   width       Int
@@ -942,6 +953,7 @@ model UploadedImage {
 
   @@index([createdAt])
   @@index([createdById])
+  @@index([visibility])
 }
 
 // ============================================
