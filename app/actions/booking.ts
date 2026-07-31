@@ -2,7 +2,7 @@
 
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
+import { formatDate, isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
   findOrCreateGuestCustomer,
   generateClaimToken,
@@ -158,21 +158,22 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       return ro;
     });
 
+    // Время записи — по часам сервиса, а не по часам сервера: он работает в UTC,
+    // и клиент получал смс на три часа раньше, чем его на самом деле ждут.
+    const bookingDay = formatDate(appointmentDate);
+    const bookingTime = formatDate(appointmentDate, { dateStyle: undefined, timeStyle: "short" });
+
     await db.notification.create({
       data: {
         userId,
         type: "BOOKING_CONFIRMATION",
-        message: `Запись подтверждена на ${appointmentDate.toLocaleDateString("ru-RU")} в ${appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`,
+        message: `Запись подтверждена на ${bookingDay} в ${bookingTime}`,
         metadata: { repairOrderId: repairOrder.id },
       },
     });
 
     const { sendBookingConfirmation } = await import("@/lib/sms");
-    await sendBookingConfirmation(
-      normalizedPhone,
-      appointmentDate.toLocaleDateString("ru-RU"),
-      appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
-    );
+    await sendBookingConfirmation(normalizedPhone, bookingDay, bookingTime);
 
     if (email) {
       const [
@@ -180,7 +181,7 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
         { getCMSText },
       ] = await Promise.all([import("@/lib/email"), import("@/lib/cms")]);
       const address = (await getCMSText("contacts.address")) || "Москва, ул. Примерная, 15";
-      const dateLabel = `${appointmentDate.toLocaleDateString("ru-RU")} в ${appointmentDate.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}`;
+      const dateLabel = `${bookingDay} в ${bookingTime}`;
       const subject = `Geleoteka — запись на ${dateLabel}`;
       const bodyText = `Здравствуйте, ${name}. Записываем ваш ${model} ${year} г. на ${dateLabel} по адресу: ${address}. Услуги: ${services.map((s: { name: string }) => s.name).join(", ")}.`;
       const messageId = generateOutboundMessageId();
