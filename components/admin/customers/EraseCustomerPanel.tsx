@@ -3,7 +3,11 @@
 import { useState } from "react";
 
 import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
-import { eraseCustomer, exportCustomerSnapshot } from "@/app/actions/crm/customer-erase";
+import {
+  eraseCustomer,
+  exportCustomerSnapshot,
+  getEraseImpact,
+} from "@/app/actions/crm/customer-erase";
 import { toast } from "@/lib/ui/toast";
 
 interface Props {
@@ -11,29 +15,58 @@ interface Props {
   customerName: string;
   /** Email or phone — what the operator must retype to confirm. */
   confirmPhrase: string;
+  /** Where to go once the person is gone. */
+  redirectTo?: string;
 }
 
+const LABELS: Record<string, string> = {
+  repairOrders: "заказ-наряды",
+  deals: "сделки",
+  communications: "переписка",
+  vehicles: "автомобили",
+};
+
 /**
- * Full erase: the customer and everything attached to them.
+ * The single delete path: show what goes, confirm, delete.
  *
- * Gated in three ways on purpose. The snapshot must be downloaded first (the
- * erase is refused without the token it returns), the operator retypes the
- * customer's email or phone, and the counts are shown before the button
- * unlocks. Archiving remains the normal action; this is for the cases where
- * data genuinely has to go.
+ * There used to be two — a one-click purge for empty records and a separate
+ * guarded erase for everything else — which made the operator work out which
+ * case they were in before they could act. Now there is one button. The
+ * snapshot step appears only when there is something to lose; an abandoned
+ * registration with nothing attached does not need a downloaded file to prove
+ * it was worthless.
  */
 export function EraseCustomerPanel({
   customerUserId,
   customerName,
   confirmPhrase,
+  redirectTo = "/admin/customers",
 }: Props): React.ReactElement {
   const nav = useProgressRouter();
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<null | "export" | "erase">(null);
+  const [busy, setBusy] = useState<null | "impact" | "export" | "erase">(null);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
   const [counts, setCounts] = useState<Record<string, number> | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [needsExport, setNeedsExport] = useState(false);
+  const [exported, setExported] = useState(false);
   const [typed, setTyped] = useState("");
+
+  async function handleOpen(): Promise<void> {
+    setError(null);
+    setBusy("impact");
+    try {
+      const res = await getEraseImpact(customerUserId);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      setCounts(res.counts);
+      setToken(res.token);
+      setNeedsExport(res.needsExport);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function handleExport(): Promise<void> {
     setError(null);
@@ -44,19 +77,20 @@ export function EraseCustomerPanel({
         setError(res.error);
         return;
       }
-      // Hand the file to the operator before anything is destroyed.
       const blob = new Blob([JSON.stringify(res.snapshot, null, 2)], {
         type: "application/json",
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `customer-${customerUserId}.json`;
+      a.download = `${customerUserId}.json`;
       a.click();
       URL.revokeObjectURL(url);
 
+      // The export token is the one the server will accept when data exists.
       setToken(res.token);
       setCounts(res.snapshot.counts);
+      setExported(true);
       toast.success("Копия данных выгружена");
     } finally {
       setBusy(null);
@@ -73,72 +107,103 @@ export function EraseCustomerPanel({
         setError(res.error);
         return;
       }
-      toast.success("Клиент и его данные удалены");
-      nav.push("/admin/customers");
+      toast.success("Удалено");
+      nav.push(redirectTo);
     } finally {
       setBusy(null);
     }
   }
 
-  if (!open) {
+  if (counts === null) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-xs text-[var(--color-error)] hover:underline"
-      >
-        Удалить клиента и все его данные…
-      </button>
+      <div>
+        <button
+          type="button"
+          onClick={handleOpen}
+          disabled={busy !== null}
+          className="btn btn-secondary text-sm"
+        >
+          {busy === "impact" ? "Проверяем…" : "Удалить безвозвратно"}
+        </button>
+        {error ? (
+          <div className="mt-2 bg-[var(--color-error-bg)] text-[var(--color-error)] px-3 py-2 rounded-lg text-xs">
+            {error}
+          </div>
+        ) : null}
+      </div>
     );
   }
 
+  const attached = Object.entries(counts).filter(([, n]) => n > 0);
+  const canErase =
+    typed.trim().toLowerCase() === confirmPhrase.toLowerCase() &&
+    (!needsExport || exported) &&
+    busy === null;
+
   return (
     <div className="rounded-lg border border-[var(--color-error)]/40 p-3 space-y-3">
-      <p className="text-sm font-medium">Полное удаление «{customerName}»</p>
-      <p className="text-xs text-[var(--foreground-muted)]">
-        Удалит клиента вместе с заказ-нарядами, сделками, сметами, перепиской и автомобилями.
-        Восстановить из системы будет нельзя — только из выгруженного файла. Обычный сценарий —
-        «Скрыть из CRM», он обратим.
-      </p>
+      <p className="text-sm font-medium">Удалить «{customerName}» безвозвратно</p>
 
-      {counts ? (
-        <p className="text-xs">
-          Будет удалено: заказ-наряды — {counts.repairOrders}, сделки — {counts.deals},
-          переписка — {counts.communications}, автомобили — {counts.vehicles}.
+      {attached.length === 0 ? (
+        <p className="text-xs text-[var(--foreground-muted)]">
+          Связанных данных нет — будет удалена только сама запись.
         </p>
+      ) : (
+        <>
+          <p className="text-xs text-[var(--foreground-muted)]">Вместе с записью удалится:</p>
+          <ul className="text-xs list-disc pl-5 space-y-0.5">
+            {attached.map(([key, n]) => (
+              <li key={key}>
+                {LABELS[key] ?? key}: <strong>{n}</strong>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-[var(--foreground-muted)]">
+            Восстановить из системы будет нельзя — только из выгруженного файла.
+          </p>
+        </>
+      )}
+
+      {needsExport ? (
+        <button
+          type="button"
+          onClick={handleExport}
+          disabled={busy !== null}
+          className="btn btn-secondary text-sm"
+        >
+          {busy === "export"
+            ? "Готовим файл…"
+            : exported
+              ? "Копия выгружена ✓"
+              : "Выгрузить копию данных"}
+        </button>
       ) : null}
 
-      <button
-        type="button"
-        onClick={handleExport}
-        disabled={busy !== null}
-        className="btn btn-secondary text-sm"
-      >
-        {busy === "export" ? "Готовим файл…" : "1. Выгрузить копию данных"}
-      </button>
-
-      {token ? (
-        <div className="space-y-2">
-          <label className="block text-xs text-[var(--foreground-muted)]">
-            2. Для подтверждения введите <code className="select-all">{confirmPhrase}</code>
-          </label>
-          <input
-            className="input"
-            value={typed}
-            onChange={(e) => setTyped(e.target.value)}
-            placeholder={confirmPhrase}
-            autoComplete="off"
-          />
-          <button
-            type="button"
-            onClick={handleErase}
-            disabled={busy !== null || typed.trim().toLowerCase() !== confirmPhrase.toLowerCase()}
-            className="btn text-sm bg-[var(--color-error)] text-white disabled:opacity-40"
-          >
-            {busy === "erase" ? "Удаляем…" : "3. Удалить безвозвратно"}
-          </button>
-        </div>
-      ) : null}
+      <div className="space-y-2">
+        <label className="block text-xs text-[var(--foreground-muted)]">
+          Для подтверждения введите <code className="select-all">{confirmPhrase}</code>
+        </label>
+        <input
+          className="input"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          placeholder={confirmPhrase}
+          autoComplete="off"
+        />
+        <button
+          type="button"
+          onClick={handleErase}
+          disabled={!canErase}
+          className="btn text-sm bg-[var(--color-error)] text-white disabled:opacity-40"
+        >
+          {busy === "erase" ? "Удаляем…" : "Удалить"}
+        </button>
+        {needsExport && !exported ? (
+          <p className="text-xs text-[var(--foreground-muted)]">
+            Сначала выгрузите копию — без неё удаление не выполнится.
+          </p>
+        ) : null}
+      </div>
 
       {error ? (
         <div className="bg-[var(--color-error-bg)] text-[var(--color-error)] px-3 py-2 rounded-lg text-xs">
@@ -148,7 +213,13 @@ export function EraseCustomerPanel({
 
       <button
         type="button"
-        onClick={() => setOpen(false)}
+        onClick={() => {
+          setCounts(null);
+          setToken(null);
+          setExported(false);
+          setTyped("");
+          setError(null);
+        }}
         className="text-xs text-[var(--foreground-muted)] hover:underline"
       >
         Отмена
