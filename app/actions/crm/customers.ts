@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { normalizePhone } from "@/lib/utils";
 
@@ -20,18 +21,20 @@ export interface DeleteCustomerResult {
 export async function deleteCustomer(
   customerUserId: string,
 ): Promise<DeleteCustomerResult> {
-  await requireRole(["ADMIN"]);
+  const session = await requireRole(["ADMIN"]);
 
   const target = (await db.user.findUnique({
     where: { id: customerUserId },
     select: {
       id: true,
+      name: true,
       isCustomer: true,
       isTempPassword: true,
       deletedAt: true,
     },
   })) as {
     id: string;
+    name: string;
     isCustomer: boolean;
     isTempPassword: boolean;
     deletedAt: Date | null;
@@ -53,6 +56,14 @@ export async function deleteCustomer(
     data: { deletedAt: new Date() },
   });
 
+  await recordAudit({
+    actor: session,
+    action: "customer.archive",
+    targetType: "User",
+    targetId: customerUserId,
+    targetLabel: target.name,
+  });
+
   revalidatePath("/admin/customers");
   revalidatePath(`/admin/customers/${customerUserId}`);
   return { error: null, hardDeleted: false };
@@ -62,12 +73,12 @@ export async function deleteCustomer(
 export async function restoreCustomer(
   customerUserId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN"]);
+  const session = await requireRole(["ADMIN"]);
 
   const target = (await db.user.findUnique({
     where: { id: customerUserId },
-    select: { id: true, deletedAt: true },
-  })) as { id: string; deletedAt: Date | null } | null;
+    select: { id: true, name: true, deletedAt: true },
+  })) as { id: string; name: string; deletedAt: Date | null } | null;
 
   if (!target) return { error: "Клиент не найден" };
   if (!target.deletedAt) return { error: "Клиент не был удалён" };
@@ -75,6 +86,14 @@ export async function restoreCustomer(
   await db.user.update({
     where: { id: customerUserId },
     data: { deletedAt: null },
+  });
+
+  await recordAudit({
+    actor: session,
+    action: "customer.restore",
+    targetType: "User",
+    targetId: customerUserId,
+    targetLabel: target.name,
   });
 
   revalidatePath("/admin/customers");

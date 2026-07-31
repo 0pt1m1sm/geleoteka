@@ -28,6 +28,7 @@ export const PERMISSIONS = [
   "crm.manage",
   "users.manage",
   "roles.manage",
+  "audit.view",
   "content.manage",
   "site.manage",
   "settings.manage",
@@ -98,6 +99,11 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     detail: "Эта страница. Кто её открывает — может выдать себе что угодно",
     group: "Администрирование",
   },
+  "audit.view": {
+    label: "Журнал действий",
+    detail: "Кто удалял, менял роли и права — и когда",
+    group: "Администрирование",
+  },
   "settings.manage": {
     label: "Настройки",
     detail: "Интеграции, почта, лог входящих webhook-ов",
@@ -148,6 +154,7 @@ export const EDITABLE_ROLES = ["MANAGER", "MASTER", "WAREHOUSE_WORKER"] as const
 const PATH_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/admin/warehouse", "warehouse.manage"],
   ["/admin/roles", "roles.manage"],
+  ["/admin/audit", "audit.view"],
   ["/admin/users", "users.manage"],
   ["/admin/settings", "settings.manage"],
   ["/admin/crm", "crm.manage"],

@@ -94,6 +94,7 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/users", label: "Пользователи" },
       { href: "/admin/roles", label: "Роли" },
+      { href: "/admin/audit", label: "Журнал действий" },
     ],
   },
   {

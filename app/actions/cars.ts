@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { recordAudit } from "@/lib/audit";
 
 interface DeleteVehicleResult {
   error: string | null;
@@ -34,12 +35,18 @@ export async function deleteVehicle(vehicleId: string): Promise<DeleteVehicleRes
       id: true,
       ownerUserId: true,
       ownershipType: true,
+      model: true,
+      year: true,
+      plate: true,
       _count: { select: { repairOrders: true, deals: true, rentalBookings: true } },
     },
   })) as {
     id: string;
     ownerUserId: string | null;
     ownershipType: string;
+    model: string;
+    year: number | null;
+    plate: string | null;
     _count: { repairOrders: number; deals: number; rentalBookings: number };
   } | null;
   if (!vehicle) return { error: "Автомобиль не найден" };
@@ -58,7 +65,24 @@ export async function deleteVehicle(vehicleId: string): Promise<DeleteVehicleRes
     return { error: "По автомобилю есть брони аренды — сначала закройте их." };
   }
 
+  // Named before it is gone — the log has to say WHICH car, and after the
+  // delete there is nothing left to ask.
+  const label = [vehicle.model, vehicle.year, vehicle.plate].filter(Boolean).join(", ");
   await db.vehicle.delete({ where: { id: vehicleId } });
+
+  await recordAudit({
+    actor: session,
+    action: "vehicle.delete",
+    targetType: "Vehicle",
+    targetId: vehicleId,
+    targetLabel: label,
+    // Counts, because this is the number that makes the deletion reviewable:
+    // paperwork kept, link dropped.
+    metadata: {
+      detachedRepairOrders: vehicle._count.repairOrders,
+      detachedDeals: vehicle._count.deals,
+    },
+  });
 
   revalidatePath("/cabinet/cars");
   if (vehicle.ownerUserId) revalidatePath(`/admin/customers/${vehicle.ownerUserId}`);

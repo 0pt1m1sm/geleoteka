@@ -3,6 +3,8 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
+
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
@@ -48,7 +50,7 @@ type Fail = { ok: false; error: string };
 export async function resetUserPassword(
   userId: string,
 ): Promise<Ok<{ tempPassword: string }> | Fail> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const user = (await db.user.findUnique({
     where: { id: userId },
@@ -77,6 +79,14 @@ export async function resetUserPassword(
     user.phone,
     `Geleoteka: Ваш временный пароль ${tempPassword}. Войдите и смените его в личном кабинете.`,
   ).catch((err) => console.error("[reset-password sms]", err));
+
+  await recordAudit({
+    actor: session,
+    action: "user.password_reset",
+    targetType: "User",
+    targetId: userId,
+    targetLabel: user.name,
+  });
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);
@@ -162,8 +172,8 @@ export async function changeUserRole(
 
   const user = (await db.user.findUnique({
     where: { id: userId },
-    select: { permissionRole: true },
-  })) as { permissionRole: string } | null;
+    select: { permissionRole: true, name: true },
+  })) as { permissionRole: string; name: string } | null;
   if (!user) return { ok: false, error: "Пользователь не найден" };
 
   // Last-admin guard: refuse to demote the only ADMIN to anything else.
@@ -188,6 +198,17 @@ export async function changeUserRole(
   await db.user.update({
     where: { id: userId },
     data: { permissionRole: newRole as AllowedRole },
+  });
+
+  // After the guards, not before: a refused demotion is not a role change, and
+  // the log must not claim one happened.
+  await recordAudit({
+    actor: session,
+    action: "user.role_change",
+    targetType: "User",
+    targetId: userId,
+    targetLabel: user.name,
+    metadata: { from: user.permissionRole, to: newRole },
   });
 
   revalidatePath(`/admin/customers/${userId}`);
@@ -218,13 +239,16 @@ export async function setUserDisabled(
     return { ok: false, error: "Нельзя заблокировать свой аккаунт" };
   }
 
+  // Read once, before the branch: the name is needed for the audit entry on
+  // either path, and the block branch needs the role anyway.
+  const target = (await db.user.findUnique({
+    where: { id: userId },
+    select: { name: true, permissionRole: true },
+  })) as { name: string; permissionRole: string } | null;
+  if (!target) return { ok: false, error: "Пользователь не найден" };
+
   if (disabled) {
-    const user = (await db.user.findUnique({
-      where: { id: userId },
-      select: { permissionRole: true },
-    })) as { permissionRole: string } | null;
-    if (!user) return { ok: false, error: "Пользователь не найден" };
-    if (user.permissionRole === "ADMIN") {
+    if (target.permissionRole === "ADMIN") {
       const adminCount = await db.user.count({
         where: { permissionRole: "ADMIN" },
       });
@@ -248,6 +272,17 @@ export async function setUserDisabled(
       data: { permissionRole: "CLIENT" },
     });
   }
+
+  await recordAudit({
+    actor: session,
+    action: "user.block",
+    targetType: "User",
+    targetId: userId,
+    targetLabel: target.name,
+    // Unblocking is the same event with the opposite answer — one action with a
+    // flag reads better in the log than two verbs that must be kept in sync.
+    metadata: { disabled },
+  });
 
   revalidatePath(`/admin/customers/${userId}`);
   revalidatePath(`/admin/team/${userId}`);

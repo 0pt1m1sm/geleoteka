@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
+import { roleLabel } from "@/lib/roles";
 import { db } from "@/lib/db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { EDITABLE_ROLES, PERMISSIONS, isPermission } from "@/lib/permissions";
@@ -24,7 +26,7 @@ interface Result {
  * silently restore access the admin had just removed.
  */
 export async function setRolePermissions(role: string, permissions: string[]): Promise<Result> {
-  await requireRole(["ADMIN"]);
+  const session = await requireRole(["ADMIN"]);
 
   if (!(EDITABLE_ROLES as readonly string[]).includes(role)) {
     return { error: "Права этой роли не редактируются" };
@@ -46,6 +48,17 @@ export async function setRolePermissions(role: string, permissions: string[]): P
     });
   });
 
+  await recordAudit({
+    actor: session,
+    action: "role.permissions_set",
+    targetType: "Role",
+    targetId: role,
+    targetLabel: roleLabel(role),
+    // The whole granted set, not a diff: reading the log should not require
+    // replaying every earlier entry to know what the role could do.
+    metadata: { granted: [...granted].sort() },
+  });
+
   revalidatePath("/admin/roles");
   // The sidebar is built from these, and it is rendered by the admin layout on
   // every page — so the whole section has to be re-rendered, not just this one.
@@ -58,11 +71,18 @@ export async function setRolePermissions(role: string, permissions: string[]): P
  * from an edit that locked people out of something they needed.
  */
 export async function resetRolePermissions(role: string): Promise<Result> {
-  await requireRole(["ADMIN"]);
+  const session = await requireRole(["ADMIN"]);
   if (!(EDITABLE_ROLES as readonly string[]).includes(role)) {
     return { error: "Права этой роли не редактируются" };
   }
   await db.rolePermission.deleteMany({ where: { tenantKey: TENANT_KEY, role } });
+  await recordAudit({
+    actor: session,
+    action: "role.permissions_reset",
+    targetType: "Role",
+    targetId: role,
+    targetLabel: roleLabel(role),
+  });
   revalidatePath("/admin/roles");
   revalidatePath("/admin", "layout");
   return { error: null };
