@@ -245,6 +245,13 @@
   /* Input */
   .input {
     width: 100%;
+    /* iOS даёт date/datetime-local собственную ширину по отформатированному
+       значению («Jul 16, 2026 at 20:00»), а min-width по умолчанию равен auto,
+       то есть этой самой ширине — width:100% её не пересиливает. Поле вылезало
+       за карточку на телефоне и обрезало кнопку календаря краем экрана.
+       Обычным текстовым полям это ничего не меняет: им нечего сжимать. */
+    min-width: 0;
+    max-width: 100%;
     padding: var(--space-3) var(--space-4);
     background: var(--background-secondary);
     border: 1px solid var(--border);
