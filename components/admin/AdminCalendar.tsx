@@ -54,6 +54,8 @@ interface Props {
   blocked: CalendarBlock[];
   /** Today in shop-local time, "YYYY-MM-DD". */
   today: string;
+  /** Сколько машин сервис принимает одновременно (настройка SCHEDULE_CAPACITY). */
+  capacity?: number;
 }
 
 /** Shift a "YYYY-MM-DD" by whole days without touching the browser timezone. */
@@ -90,6 +92,7 @@ export function AdminCalendar({
   exceptions,
   blocked,
   today,
+  capacity = 1,
 }: Props): React.ReactElement {
   const [selected, setSelected] = useState(today);
 
@@ -114,6 +117,7 @@ export function AdminCalendar({
         } satisfies DayException)
       : null,
     bookedMinutes: dayOrders.map((o) => o.minute),
+    capacity,
     blocked: dayBlocks.map((x) => ({ startMinute: x.range.start, endMinute: x.range.end })),
     // Past slots stay visible to staff: yesterday's schedule is still a record.
     nowMinute: null,
@@ -146,7 +150,12 @@ export function AdminCalendar({
     );
     // Чужая запись, накрывающая этот слот. Своя (начатая ровно здесь) уже
     // показана карточкой — второй раз про неё писать незачем.
-    const covering = order ? undefined : dayOrders.find((o) => slotsOverlap(minute, o.minute));
+    // При ёмкости больше одной машины наложение законно, и слот закрывается
+    // только когда занят целиком — тем же счётом, что и в движке.
+    const covering =
+      order || dayOrders.filter((o) => slotsOverlap(minute, o.minute)).length < capacity
+        ? undefined
+        : dayOrders.find((o) => slotsOverlap(minute, o.minute));
     return {
       key: slot.time,
       minute,

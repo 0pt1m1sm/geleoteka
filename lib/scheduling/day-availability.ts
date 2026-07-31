@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { formatForDatetimeLocalInput, parseDatetimeLocalInput } from "@/lib/timezone";
+import { getScheduleCapacity } from "@/lib/settings";
 import {
   computeDaySlots,
   type BlockedRange,
@@ -88,5 +89,16 @@ export async function getDaySlots(dateISO: string, now: Date = new Date()): Prom
 
   const nowMinute = businessDateISO(now) === dateISO ? businessMinutes(now) : null;
 
-  return computeDaySlots({ dayOfWeek, weekly, exception, bookedMinutes, blocked, nowMinute });
+  // Ёмкость — настройка сервиса, а не константа: при одной машине запись в
+  // 13:00 закрывает и 12:00, и 14:00, потому что пост занят целиком.
+  const capacity = await getScheduleCapacity();
+  return computeDaySlots({
+    dayOfWeek,
+    weekly,
+    exception,
+    bookedMinutes,
+    blocked,
+    nowMinute,
+    capacity,
+  });
 }
