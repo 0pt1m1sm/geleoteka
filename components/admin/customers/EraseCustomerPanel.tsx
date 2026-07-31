@@ -23,7 +23,7 @@ interface Props {
 const OUTCOME: Record<string, { label: string; kept: boolean }> = {
   deals: { label: "сделки", kept: true },
   repairOrders: { label: "заказ-наряды", kept: true },
-  communications: { label: "переписка", kept: false },
+  communications: { label: "лента общения на карточке", kept: false },
   vehicles: { label: "автомобили", kept: false },
 };
 
@@ -185,7 +185,7 @@ export function EraseCustomerPanel({
                   className="mt-0.5"
                 />
                 <span>
-                  Удалить и связанные записи (сделки, сметы, заказ-наряды, отгрузки, аренды).
+                  Удалить и связанные записи (сделки, сметы, заказ-наряды, отгрузки, аренды, письма).
                   <span className="text-[var(--foreground-muted)]">
                     {" "}
                     Для ошибочных и дублирующих записей. Для настоящего клиента оставьте выключенным.
@@ -208,6 +208,11 @@ export function EraseCustomerPanel({
               <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
                 Вместе с самой карточкой, заметками и контактами. Вернуть можно будет только из
                 выгруженного файла.
+              </p>
+              <p className="text-xs text-[var(--foreground-muted)] mt-0.5">
+                {deleteRelated
+                  ? "Письма этого клиента тоже будут удалены из почтового ящика CRM. Треды, где были другие адресаты, останутся."
+                  : "Сами письма останутся в почтовом ящике CRM — это переписка сервиса."}
               </p>
             </div>
           ) : null}

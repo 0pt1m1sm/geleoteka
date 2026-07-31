@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isSolelyTheirs } from "@/lib/email/erasure";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
 import { actorId } from "@/lib/wms-host";
 
@@ -152,6 +153,46 @@ export async function exportCustomerSnapshot(
   };
 }
 
+type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * Remove the mail this person is the only outside party to.
+ *
+ * Mail is matched by address, and an address is a shared key: a thread where
+ * they were one of several recipients is somebody else's correspondence too, so
+ * deleting the row would take a supplier's or another customer's conversation
+ * with it. Those stay in the mailbox — the same failure mode as an over-eager
+ * stock release eating another estimate's hold.
+ *
+ * `InboxMessage` needs no such care: it holds one counterparty per row
+ * (`fromEmail` inbound, `toEmail` outbound), so an address match there names
+ * exactly this person.
+ */
+async function deleteMailFor(tx: TxClient, addresses: string[]): Promise<void> {
+  if (addresses.length === 0) return;
+  const known = new Set(addresses);
+
+  const candidates = (await tx.emailMessage.findMany({
+    where: {
+      OR: [
+        { fromEmail: { in: addresses } },
+        { toEmails: { hasSome: addresses } },
+        { ccEmails: { hasSome: addresses } },
+      ],
+    },
+    select: { id: true, fromEmail: true, toEmails: true, ccEmails: true },
+  })) as Array<{ id: string; fromEmail: string; toEmails: string[]; ccEmails: string[] }>;
+
+  const solelyTheirs = candidates.filter((m) => isSolelyTheirs(m, known)).map((m) => m.id);
+
+  if (solelyTheirs.length > 0) {
+    await tx.emailMessage.deleteMany({ where: { id: { in: solelyTheirs } } });
+  }
+  await tx.inboxMessage.deleteMany({
+    where: { OR: [{ fromEmail: { in: addresses } }, { toEmail: { in: addresses } }] },
+  });
+}
+
 /**
  * Erase a customer.
  *
@@ -160,10 +201,16 @@ export async function exportCustomerSnapshot(
  *   false — personal data goes, the commercial record stays, detached. Right
  *           for a real customer: the revenue was the shop's, the repair order
  *           documents work on a car that may be sold, and both are kept by law
- *           for years. Deleting them would change last year's takings.
- *   true  — everything goes, including deals, estimates, orders and bookings.
- *           Right for a mistake: a duplicate, a test row, a lead that went
- *           nowhere. Stock reservations are released first.
+ *           for years. Deleting them would change last year's takings. The mail
+ *           stays in the CRM mailbox for the same reason — it is the shop's own
+ *           correspondence, and an operator looking up a past job expects to
+ *           find the thread that produced it.
+ *   true  — everything goes, including deals, estimates, orders, bookings and
+ *           the mail. Right for a mistake: a duplicate, a test row, a lead that
+ *           went nowhere. Stock reservations are released first.
+ *
+ * Either way the customer CARD goes, and with it the card's own timeline
+ * (`CommunicationLog`), whose FK requires a customer to belong to.
  *
  * An earlier version decided this automatically ("keep if there are deals"),
  * which was both unpredictable for the operator and wrong in practice: every
@@ -320,27 +367,14 @@ export async function eraseCustomer(
           data: { ownerUserId: null },
         });
       }
-      // Personal data does NOT survive. Deleting CommunicationLog alone was not
-      // enough: the mail itself lives in EmailMessage / InboxMessage keyed by
-      // address, so the person's name, address, subject, body and attachment
-      // metadata stayed behind while the UI claimed the correspondence was gone.
-      // Those are matched by every address we know for them.
-      if (addresses.length > 0) {
-        await tx.emailMessage.deleteMany({
-          where: {
-            OR: [
-              { fromEmail: { in: addresses } },
-              { toEmails: { hasSome: addresses } },
-              { ccEmails: { hasSome: addresses } },
-            ],
-          },
-        });
-        await tx.inboxMessage.deleteMany({
-          where: {
-            OR: [{ fromEmail: { in: addresses } }, { toEmail: { in: addresses } }],
-          },
-        });
-      }
+      // The mail itself belongs to the shop's mailbox, not to the customer
+      // card, so it goes only on the branch that removes the commercial record
+      // too. Detaching a real customer leaves the correspondence where an
+      // operator expects to find it — the same reasoning that keeps their deals
+      // and repair orders.
+      if (deleteRelated) await deleteMailFor(tx, addresses);
+      // The card's own timeline always goes: CommunicationLog REQUIRES a
+      // customer (the FK is not nullable), so there is no one left to own it.
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });
       // Profile, contacts, notes, tags, notifications and loyalty hang off the
       // row by ON DELETE CASCADE and go with it.
