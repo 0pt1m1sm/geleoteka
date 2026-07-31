@@ -24,6 +24,13 @@ interface Props {
   triggerLabel?: string;
   /** Modal heading. Default mirrors triggerLabel when set. */
   dialogTitle?: string;
+  /**
+   * Открыто из карточки клиента — клиент уже известен, и выбирать его заново
+   * незачем. Раньше диалог жил только в разделе сделок и всегда требовал поиска,
+   * поэтому завести сделку из карточки было нельзя: приходилось уходить в список
+   * и там искать того, кого только что смотрел.
+   */
+  lockedCustomerId?: string;
 }
 
 const CHANNEL_OPTIONS = [
@@ -47,10 +54,11 @@ export function NewDealDialog({
   customers,
   triggerLabel = "Новая сделка",
   dialogTitle,
+  lockedCustomerId,
 }: Props): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(createDealManually, null);
-  const [customerUserId, setCustomerUserId] = useState("");
+  const [customerUserId, setCustomerUserId] = useState(lockedCustomerId ?? "");
   const [filter, setFilter] = useState("");
 
   const filteredCustomers = filter
@@ -62,7 +70,9 @@ export function NewDealDialog({
 
   function closeDialog(): void {
     setOpen(false);
-    setCustomerUserId("");
+    // Возврат к исходному, а не к пустому: в карточке клиента исходное — это
+    // сам клиент, и сбрасывать его в никуда значило бы сломать следующий заход.
+    setCustomerUserId(lockedCustomerId ?? "");
     setFilter("");
   }
 
@@ -118,14 +128,16 @@ export function NewDealDialog({
                   {selectedCustomer.phone}
                 </div>
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                onClick={() => setCustomerUserId("")}
-              >
-                Сменить
-              </Button>
+              {lockedCustomerId ? null : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setCustomerUserId("")}
+                >
+                  Сменить
+                </Button>
+              )}
             </div>
           ) : (
             <ul className="max-h-64 overflow-y-auto divide-y divide-[var(--border)] border border-[var(--border)] rounded-[var(--radius-lg)]">

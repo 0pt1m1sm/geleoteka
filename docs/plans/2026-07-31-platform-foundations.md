@@ -56,9 +56,9 @@ Account (глобальный) ── AuthIdentity (подтверждённые
 - [x] Story 6: `requirePermission` как фасад авторизации   (Status: VERIFIED, PR #13)
 - [x] Story 0: Проверить прод после PR #13   (Status: VERIFIED)
 - [x] Story 4: Журнал действий администратора   (Status: VERIFIED, PR #15)
-- [ ] Story 3: Приватные фото работ закрыть авторизацией   (Status: PENDING, GATED)
+- [x] Story 3: Приватные фото работ закрыть авторизацией   (Status: VERIFIED, PR #19)
 - [ ] Story 5: Подтверждение email   (Status: PENDING)
-- [ ] Story 7: Создание из контекста — сделка из карточки клиента, заказ-наряд вручную   (Status: PENDING)
+- [→] Story 7: Создание из контекста — сделка из карточки клиента, заказ-наряд вручную   (Status: PENDING)
 - [ ] Story 2: Ресурсная модель расписания   (Status: PENDING, GATED)
 
 ## Implementation Tasks
