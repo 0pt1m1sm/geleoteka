@@ -1,5 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
+import { parseBooleanSetting } from "@/lib/settings-shared";
+import { STAFF_NOTIFICATION_EVENT_CATALOG } from "@/lib/staff-notifications/types";
 
 /**
  * Runtime-mutable settings store. Admin can override env-driven values via
@@ -27,6 +29,10 @@ export interface SettingDescriptor {
   description?: string;
   /** When true, value is hidden by default in the form (passwords / secrets). */
   secret?: boolean;
+  /** Field shape used when Story 4 exposes the Telegram controls. */
+  input?: "text" | "secret" | "boolean" | "select";
+  /** Dark-mode settings are registered but do not change the current page. */
+  visibleInUi?: boolean;
   /** Visual group on the settings page (Russian label). */
   group: string;
 }
@@ -255,6 +261,27 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     description:
       "Сколько машин сервис принимает в одно время. По умолчанию 1: запись занимает слот целиком, и наложение по времени не допускается. Больше 1 имеет смысл, когда постов несколько — но какая машина на каком посту, система пока не различает.",
   },
+
+  // ── Staff notifications / Telegram (Story 2: dark mode) ─────────────
+  // These descriptors are intentionally hidden until the Story 4 settings UI
+  // and adapter land. No row is backfilled; absent and malformed values are
+  // false through getBooleanSetting().
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_ENABLED",
+    label: "Telegram-уведомления включены",
+    description: "Главный рубильник. До Story 4 зарегистрирован, но скрыт и выключен.",
+    input: "boolean",
+    visibleInUi: false,
+  },
+  ...Object.keys(STAFF_NOTIFICATION_EVENT_CATALOG).map((type) => ({
+    group: "Уведомления сотрудников (Telegram)",
+    key: `TELEGRAM_NOTIFY_${type}`,
+    label: `Отправлять ${type}`,
+    description: "Переключатель типа события. Отсутствующее или некорректное значение = false.",
+    input: "boolean" as const,
+    visibleInUi: false,
+  })),
 ];
 
 /**
@@ -296,6 +323,10 @@ export async function getSetting(key: string): Promise<string | null> {
 
   CACHE.set(key, { value, expiresAt: Date.now() + TTL_MS });
   return value;
+}
+
+export async function getBooleanSetting(key: string): Promise<boolean> {
+  return parseBooleanSetting(await getSetting(key));
 }
 
 export function invalidateSetting(key: string): void {

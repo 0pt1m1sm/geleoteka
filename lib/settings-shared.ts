@@ -13,3 +13,8 @@
  * (the upsertSettings action recognises this exact string).
  */
 export const SECRET_PLACEHOLDER = "••••••";
+
+/** Feature switches fail closed: only the canonical value `true` enables one. */
+export function parseBooleanSetting(value: string | null | undefined): boolean {
+  return value?.trim().toLowerCase() === "true";
+}
