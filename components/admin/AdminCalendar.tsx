@@ -1,11 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { format, parseISO } from "date-fns";
 import { ru } from "date-fns/locale";
 
 import { REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
+import { toggleSlotBlock } from "@/app/actions/schedule";
+import { confirm } from "@/lib/ui/confirm";
+import { toast } from "@/lib/ui/toast";
 import {
   computeDaySlots,
   labelToMinutes,
@@ -94,7 +98,46 @@ export function AdminCalendar({
   today,
   capacity = 1,
 }: Props): React.ReactElement {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [selected, setSelected] = useState(today);
+
+  /**
+   * Клик по слоту закрывает или открывает его. Отдельной секции с двумя полями
+   * даты больше нет: слот уже нарисован и знает свои границы, набирать их
+   * вручную незачем.
+   */
+  async function toggleBlock(minute: number, label: string, isBlocked: boolean): Promise<void> {
+    if (isBlocked) {
+      const ok = await confirm({
+        title: "Снять блокировку",
+        message: `Открыть ${label} для записи?`,
+        confirmText: "Открыть",
+      });
+      if (!ok) return;
+    } else {
+      const ok = await confirm({
+        title: "Заблокировать слот",
+        message: `Закрыть ${label}? В это время нельзя будет записаться.`,
+        danger: true,
+        confirmText: "Заблокировать",
+      });
+      if (!ok) return;
+    }
+    // Причина не обязательна — спрашиваем только при блокировке и не мешаем
+    // отказом, если её не ввели: чаще всего важен сам факт закрытия.
+    const reason = isBlocked ? null : (window.prompt("Причина (необязательно):") ?? null);
+
+    startTransition(async () => {
+      const result = await toggleSlotBlock(selected, minute, SLOT_MINUTES, reason);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      toast.success(result.blocked ? "Слот заблокирован" : "Слот открыт");
+      router.refresh();
+    });
+  }
 
   const days = Array.from({ length: 14 }, (_, i) => shiftDate(today, i - 3));
 
@@ -250,6 +293,12 @@ export function AdminCalendar({
                 blockReason={row.blockReason}
                 note={row.note}
                 busyNote={row.busyNote}
+                onToggleBlock={
+                  row.order || row.busyNote
+                    ? undefined
+                    : () => void toggleBlock(row.minute, row.label, row.blockReason !== null)
+                }
+                pending={pending}
               />
             ))}
           </div>
@@ -265,6 +314,8 @@ function SlotRow({
   blockReason,
   note,
   busyNote,
+  onToggleBlock,
+  pending,
 }: {
   label: string;
   order?: CalendarRepairOrder;
@@ -272,6 +323,9 @@ function SlotRow({
   note?: string;
   /** Слот накрыт чужой записью — свободным он не является. */
   busyNote?: string;
+  /** Есть только у слотов, которыми можно управлять: свободных и заблокированных. */
+  onToggleBlock?: () => void;
+  pending?: boolean;
 }): React.ReactElement {
   const tone = order
     ? "bg-[var(--background-secondary)]"
@@ -280,7 +334,7 @@ function SlotRow({
       : "border border-dashed border-[var(--border)]";
 
   return (
-    <div className={`flex items-start gap-4 p-3 rounded-lg ${tone}`}>
+    <div className={`group flex items-start gap-4 p-3 rounded-lg ${tone}`}>
       <div className="w-32 shrink-0 text-sm font-medium tabular-nums">{label}</div>
 
       {order ? (
@@ -310,12 +364,25 @@ function SlotRow({
             </div>
           ) : null}
         </Link>
+      ) : busyNote ? (
+        <div className="flex-1 text-sm text-[var(--foreground-muted)]">{busyNote}</div>
+      ) : onToggleBlock ? (
+        <button
+          type="button"
+          onClick={onToggleBlock}
+          disabled={pending}
+          className="flex-1 text-left text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors disabled:opacity-50"
+          title={blockReason ? "Открыть слот для записи" : "Заблокировать слот"}
+        >
+          {blockReason ? `Заблокировано — ${blockReason}` : "Свободно"}
+          <span className="block text-[10px] opacity-0 group-hover:opacity-100 transition-opacity">
+            {blockReason ? "нажмите, чтобы открыть" : "нажмите, чтобы заблокировать"}
+          </span>
+        </button>
       ) : blockReason ? (
         <div className="flex-1 text-sm text-[var(--foreground-muted)]">
           Заблокировано — {blockReason}
         </div>
-      ) : busyNote ? (
-        <div className="flex-1 text-sm text-[var(--foreground-muted)]">{busyNote}</div>
       ) : (
         <div className="flex-1 text-sm text-[var(--foreground-muted)]">Свободно</div>
       )}
