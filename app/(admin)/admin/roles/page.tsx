@@ -1,96 +1,123 @@
 export const dynamic = "force-dynamic";
 
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { Card, PageHeader } from "@/components/ui";
-import { RolesTable, type RoleRow } from "@/components/admin/RolesTable";
+import { allRolePermissions, rolesUsingDefaults } from "@/lib/authz";
+import { EDITABLE_ROLES, PERMISSIONS, type Permission } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
+import { Card, PageHeader } from "@/components/ui";
+import { RolePermissionsEditor } from "@/components/admin/roles/RolePermissionsEditor";
 
 /**
- * Access control in one place: who holds which role, and what each role opens.
+ * What each role opens, and the place to change it.
  *
- * Roles were previously only reachable one user at a time from a user's detail
- * page, which made "who can actually get into the admin panel?" a question you
- * answered by clicking through every row. ADMIN-only, because changing a role
- * grants access — a MANAGER may not do it (changeUserRole enforces this too).
+ * This page used to list PEOPLE grouped by role, which answered "who is a
+ * manager" — something the users list already answers — while the thing the
+ * page is named after, the rights themselves, lived only in code and could not
+ * be changed without a deploy. Now the rights ARE the page and the holders are
+ * a count beside them.
+ *
+ * ADMIN-only, because editing a role grants access.
  */
 
-const ROLE_MEANING: Readonly<Record<string, string>> = {
-  ADMIN: "Полный доступ, включая настройки и доступы",
-  MANAGER: "Админ-панель: заказы, CRM, клиенты. Без настроек и ролей",
-  MASTER: "Портал мастера — свои заказ-наряды",
-  WAREHOUSE_WORKER: "Только склад",
-  CLIENT: "Личный кабинет клиента",
-  NONE: "Вход запрещён",
+const ROLE_NOTE: Readonly<Record<string, string>> = {
+  ADMIN:
+    "Полный доступ ко всему, включая эту страницу. Не редактируется: иначе администратор мог бы снять с себя право на роли и обратно уже не попал бы.",
+  MANAGER:
+    "Работа с клиентами и заказами. По умолчанию — всё, кроме настроек, контента сайта и этой страницы.",
+  MASTER:
+    "По умолчанию не открывает админ-панель вообще — до сих пор мастеров в неё не пускали. Выдать доступ можно здесь.",
+  WAREHOUSE_WORKER: "По умолчанию только склад.",
 };
-
-/** Staff first — the roles that grant access are the ones worth auditing. */
-const ROLE_ORDER = ["ADMIN", "MANAGER", "MASTER", "WAREHOUSE_WORKER", "CLIENT", "NONE"] as const;
 
 export default async function RolesPage(): Promise<React.ReactElement> {
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.permissionRole !== "ADMIN") redirect("/admin");
 
-  const rows = (await db.user.findMany({
-    where: {
-      deletedAt: null,
-      isSupplier: false,
-      // Customers are the bulk of the table and their role is never in
-      // question; this page is about who has elevated access.
-      permissionRole: { in: ["ADMIN", "MANAGER", "MASTER", "WAREHOUSE_WORKER"] },
-    },
-    orderBy: [{ permissionRole: "asc" }, { name: "asc" }],
-    select: { id: true, name: true, email: true, phone: true, permissionRole: true },
-  })) as Array<{
-    id: string;
-    name: string;
-    email: string | null;
-    phone: string | null;
-    permissionRole: string;
-  }>;
-
-  const counts = new Map<string, number>();
-  for (const r of rows) {
-    counts.set(r.permissionRole, (counts.get(r.permissionRole) ?? 0) + 1);
+  // Counted in JS rather than with groupBy: the aggregate's types do not
+  // survive the db singleton, and the staff table is small enough that the
+  // round-trip is the cost, not the loop.
+  const holders = (await db.user.findMany({
+    where: { deletedAt: null, isSupplier: false },
+    select: { permissionRole: true },
+  })) as Array<{ permissionRole: string }>;
+  const holderCount = new Map<string, number>();
+  for (const h of holders) {
+    holderCount.set(h.permissionRole, (holderCount.get(h.permissionRole) ?? 0) + 1);
   }
 
-  const staff: RoleRow[] = rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    contact: r.email ?? r.phone ?? "—",
-    permissionRole: r.permissionRole,
-    isSelf: r.id === session.id,
-  }));
+  const permissions = await allRolePermissions(EDITABLE_ROLES);
+  const usingDefaults = await rolesUsingDefaults(EDITABLE_ROLES);
 
   return (
     <div>
       <PageHeader
         eyebrow="Доступы"
-        title="Роли"
-        description="Кто и что может делать в системе. Менять роли может только администратор."
+        title="Роли и права"
+        description="Что открывает каждая роль. Изменения действуют сразу — и на меню, и на прямой переход по адресу."
+        actions={
+          <Link href="/admin/users" className="back-link">
+            Пользователи →
+          </Link>
+        }
       />
 
-      <Card className="mb-6">
-        <h2 className="text-sm font-semibold mb-3">Что означает роль</h2>
-        <ul className="space-y-1.5 text-sm">
-          {ROLE_ORDER.map((role) => (
-            <li key={role} className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-medium">{ROLE_LABELS[role] ?? role}</span>
-              <span className="text-[var(--foreground-muted)]">— {ROLE_MEANING[role]}</span>
-              {counts.get(role) ? (
-                <span className="text-xs text-[var(--foreground-muted)]">
-                  ({counts.get(role)})
-                </span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </Card>
+      <div className="space-y-4">
+        <Card>
+          <div className="flex items-baseline justify-between gap-3 mb-1">
+            <h2 className="font-semibold">{ROLE_LABELS.ADMIN}</h2>
+            <span className="text-xs text-[var(--foreground-muted)]">
+              {holderCount.get("ADMIN") ?? 0} чел.
+            </span>
+          </div>
+          <p className="text-sm text-[var(--foreground-muted)]">{ROLE_NOTE.ADMIN}</p>
+        </Card>
 
-      <RolesTable rows={staff} />
+        {EDITABLE_ROLES.map((role) => {
+          const granted = [...(permissions.get(role) ?? new Set<string>())].filter(
+            (p): p is Permission => (PERMISSIONS as readonly string[]).includes(p),
+          );
+          return (
+            <Card key={role}>
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <h2 className="font-semibold">
+                  {ROLE_LABELS[role]}
+                  {usingDefaults.has(role) ? (
+                    <span className="ml-2 badge text-[10px] bg-[var(--background-secondary)] text-[var(--foreground-muted)]">
+                      по умолчанию
+                    </span>
+                  ) : null}
+                </h2>
+                <span className="text-xs text-[var(--foreground-muted)]">
+                  {holderCount.get(role) ?? 0} чел.
+                </span>
+              </div>
+              <p className="text-sm text-[var(--foreground-muted)] mb-4">{ROLE_NOTE[role]}</p>
+              <RolePermissionsEditor
+                role={role}
+                roleLabel={ROLE_LABELS[role]}
+                initial={granted}
+                usingDefaults={usingDefaults.has(role)}
+              />
+            </Card>
+          );
+        })}
+
+        <Card>
+          <h2 className="font-semibold mb-1">
+            {ROLE_LABELS.CLIENT} и {ROLE_LABELS.NONE}
+          </h2>
+          <p className="text-sm text-[var(--foreground-muted)]">
+            Админ-панель не открывают ни при каких правах: «{ROLE_LABELS.CLIENT}» — это вход в
+            личный кабинет, «{ROLE_LABELS.NONE}» — вход закрыт полностью. Сейчас таких{" "}
+            {(holderCount.get("CLIENT") ?? 0) + (holderCount.get("NONE") ?? 0)} чел.
+          </p>
+        </Card>
+      </div>
     </div>
   );
 }

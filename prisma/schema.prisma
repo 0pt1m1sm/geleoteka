@@ -2008,3 +2008,26 @@ model CrmTask {
   @@index([dealId])
   @@index([dueAt])
 }
+
+/// What a role may open, once an admin has edited it.
+///
+/// Absence is meaningful: a role with NO rows here falls back to the code
+/// defaults in lib/permissions.ts, so the table starts empty and the panel
+/// behaves exactly as it did when access was hardcoded. Saving a role writes
+/// every permission in the catalogue, granted or not, so "nothing ticked" is a
+/// real answer rather than an empty set indistinguishable from "never set".
+///
+/// ADMIN is never stored. A role that edits roles must not be able to lock
+/// itself out, so authz.ts short-circuits it before ever reading this table.
+model RolePermission {
+  id         String   @id @default(cuid())
+  tenantKey  String   @default("geleoteka")
+  role       String
+  permission String
+  allowed    Boolean
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([tenantKey, role, permission])
+  @@index([tenantKey, role])
+}

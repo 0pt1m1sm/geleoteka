@@ -9,8 +9,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/auth";
+import { roleHasPermission } from "@/lib/authz";
+import { permissionForPath } from "@/lib/permissions";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Check session
@@ -30,18 +32,19 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Admin routes — MANAGER/ADMIN have full access; WAREHOUSE_WORKER is scoped
-  // to the warehouse section only (its login lands on /admin/warehouse and the
-  // warehouse pages already requireRole it; finer per-page gating stays there).
+  // Admin routes are gated by the section permission the path demands, which an
+  // admin edits on /admin/roles. This replaces a hardcoded "MANAGER/ADMIN see
+  // everything, WAREHOUSE_WORKER sees the warehouse" — the same outcome now
+  // comes from that role's default permissions, so nothing changed on the day
+  // this shipped, but it can be changed without a deploy.
+  //
+  // An unmapped /admin path resolves to `dashboard.view`, so a route nobody
+  // mapped stays closed to whoever could not open the panel before rather than
+  // becoming a hole.
   if (pathname.startsWith("/admin")) {
     const role = payload.permissionRole;
-    const isManagerOrAdmin = role === "MANAGER" || role === "ADMIN";
-    // Segment-boundary match — a plain startsWith would also admit a future
-    // sibling route like /admin/warehouse-reports (security-review hardening).
-    const isWarehouseWorkerOnWarehouse =
-      role === "WAREHOUSE_WORKER" &&
-      (pathname === "/admin/warehouse" || pathname.startsWith("/admin/warehouse/"));
-    if (!isManagerOrAdmin && !isWarehouseWorkerOnWarehouse) {
+    const needed = permissionForPath(pathname);
+    if (needed !== null && !(await roleHasPermission(role, needed))) {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }
