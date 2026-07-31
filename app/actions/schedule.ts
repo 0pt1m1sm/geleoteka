@@ -216,3 +216,47 @@ export async function deleteBlockedInterval(id: string): Promise<void> {
   await db.blockedInterval.delete({ where: { id } });
   revalidateSchedule();
 }
+
+/**
+ * Заблокировать или освободить конкретный слот — клик по нему в календаре.
+ *
+ * Отдельной секции «Блокировка времени» с двумя полями даты больше нет: чтобы
+ * закрыть окно на вторник, менеджер набирал вручную обе границы интервала,
+ * зная сетку наизусть. Слот уже нарисован на экране и знает свои границы —
+ * он и есть естественный орган управления.
+ *
+ * Переключатель, а не две команды: у слота два состояния, и решать, какое
+ * действие применимо, должен код, а не оператор.
+ */
+export async function toggleSlotBlock(
+  date: string,
+  startMinute: number,
+  slotMinutes: number,
+  reason?: string | null,
+): Promise<{ error: string | null; blocked?: boolean; removedRange?: string }> {
+  await requireRole(["ADMIN", "MANAGER"]);
+
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  const label = (m: number): string => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+  const startAt = parseDatetimeLocalInput(`${date}T${label(startMinute)}`);
+  const endAt = parseDatetimeLocalInput(`${date}T${label(startMinute + slotMinutes)}`);
+  if (!startAt || !endAt) return { error: "Некорректный слот" };
+
+  // Полуоткрытые интервалы: блокировка 12:00—14:00 не задевает слот 14:00—16:00.
+  const existing = (await db.blockedInterval.findFirst({
+    where: { startAt: { lt: endAt }, endAt: { gt: startAt } },
+    select: { id: true, startAt: true, endAt: true },
+  })) as { id: string; startAt: Date; endAt: Date } | null;
+
+  if (existing) {
+    await db.blockedInterval.delete({ where: { id: existing.id } });
+    revalidateSchedule();
+    return { error: null, blocked: false };
+  }
+
+  await db.blockedInterval.create({
+    data: { startAt, endAt, reason: reason?.trim() || null },
+  });
+  revalidateSchedule();
+  return { error: null, blocked: true };
+}
