@@ -71,7 +71,13 @@ interface AllMailRow {
  * письма читают свежими.
  */
 function compactDateTime(d: Date): string {
-  return formatDate(d, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return formatDate(d, {
+    dateStyle: undefined,
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const BACKLOG_GAP_MS = 10 * 60 * 1000;
