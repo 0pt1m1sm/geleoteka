@@ -48,7 +48,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.8.0",
     "mailparser": "^3.9.14",
-    "next": "16.2.3",
+    "next": "16.2.11",
     "nodemailer": "^9.0.3",
     "prisma": "^6.19.3",
     "qrcode": "^1.5.4",
