@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { createDeal as createDealPublic } from "@/lib/crm/public/create-deal";
+import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
+import { actorId } from "@/lib/wms-host";
 
 interface DealMutationResult {
   error: string | null;
@@ -167,26 +169,65 @@ export async function setDealStage(
 }
 
 /**
- * Delete a deal. Soft policy:
- *   - WON → blocked (commercial history; rollback to IN_PROGRESS first)
- *   - any other stage → permitted with confirm at the UI
+ * Delete a deal — only ever a way to remove a mistake, never a way to close one out.
  *
- * Cascades: Estimate[] (and their EstimateLine[]) drop via onDelete: Cascade.
- * Fulfillment rows (RepairOrder/PartOrder/RentalBooking) keep their dealId
- * column NULL via onDelete: SetNull — work history survives, the commercial
- * thread is gone.
+ * Blocked when:
+ *   - stage is WON (commercial history; roll back to IN_PROGRESS first);
+ *   - the deal has any fulfillment (repair order, parts shipment, rental booking).
+ *
+ * That second guard is new, and the docstring it replaces was actively
+ * misleading: it claimed fulfillment rows "keep their dealId column NULL via
+ * onDelete: SetNull — work history survives". The schema says `Cascade`. So
+ * deleting an in-progress deal destroyed the repair order, its job lines,
+ * labor and part lines, its slot, its work photos, the parts shipment and
+ * every estimate — while the comment above the button promised the opposite.
+ * Rather than quietly keep that behaviour, a deal that produced real work now
+ * refuses to be deleted; the operator cancels the order instead.
+ *
+ * Estimates DO still cascade — an estimate belongs to its deal — but their
+ * stock reservations are released first, because those are keyed by a string,
+ * not a foreign key, and the database cascade cannot see them.
  */
 export async function deleteDeal(dealId: string): Promise<SetStageResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
   const deal = (await db.deal.findUnique({
     where: { id: dealId },
-    select: { stage: true },
-  })) as { stage: string } | null;
+    select: {
+      stage: true,
+      _count: { select: { repairOrders: true, partShipments: true, rentalBookings: true } },
+    },
+  })) as {
+    stage: string;
+    _count: { repairOrders: number; partShipments: number; rentalBookings: number };
+  } | null;
   if (!deal) return { error: "Сделка не найдена" };
   if (deal.stage === "WON") {
     return { error: "Выигранную сделку нельзя удалить. Сначала откатите её в «В работе»." };
   }
-  await db.deal.delete({ where: { id: dealId } });
+
+  const fulfilments =
+    deal._count.repairOrders + deal._count.partShipments + deal._count.rentalBookings;
+  if (fulfilments > 0) {
+    return {
+      error:
+        "По сделке уже есть заказ-наряд, отгрузка или аренда — удаление уничтожило бы историю работ. Отмените исполнение вместо удаления.",
+    };
+  }
+
+  const estimates = (await db.estimate.findMany({
+    where: { dealId },
+    select: { id: true },
+  })) as Array<{ id: string }>;
+
+  await db.$transaction(async (tx) => {
+    // Reservations are held per estimate line under a string source id; the
+    // cascade below cannot release them, so do it explicitly first.
+    for (const est of estimates) {
+      await releasePartLinesForEstimate(tx, est.id, actorId(session));
+    }
+    await tx.deal.delete({ where: { id: dealId } });
+  });
+
   revalidatePath("/admin/crm/deals");
   return { error: null };
 }

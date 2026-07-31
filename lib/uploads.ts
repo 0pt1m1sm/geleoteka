@@ -26,10 +26,15 @@ export async function deleteOrphanImages(
   for (const url of removedUrls) {
     const id = imageIdFromUrl(url);
     if (!id) continue;
+    // RepairOrderPhoto must be counted too. Without it the refcount worked in
+    // both wrong directions: a deleted repair order stranded its image bytes in
+    // the table forever, and editing a part's photos could delete an image a
+    // work photo still pointed at.
     const rows = await tx.$queryRaw<Array<{ count: bigint }>>`
       SELECT (
         (SELECT count(*) FROM "Part"    WHERE ${url} = ANY("photos"))
       + (SELECT count(*) FROM "Vehicle" WHERE ${url} = ANY("photos"))
+      + (SELECT count(*) FROM "RepairOrderPhoto" WHERE "url" = ${url})
       ) AS count
     `;
     const refs = Number(rows[0]?.count ?? 0);

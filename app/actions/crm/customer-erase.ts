@@ -164,6 +164,7 @@ export async function eraseCustomer(
       email: true,
       phone: true,
       isCustomer: true,
+      isSupplier: true,
       permissionRole: true,
     },
   })) as {
@@ -171,6 +172,7 @@ export async function eraseCustomer(
     email: string | null;
     phone: string | null;
     isCustomer: boolean;
+    isSupplier: boolean;
     permissionRole: string;
   } | null;
   if (!target) return { ok: false, error: "Клиент не найден" };
@@ -187,6 +189,16 @@ export async function eraseCustomer(
     return {
       ok: false,
       error: "Это не клиент. Сотрудников и поставщиков через это действие удалять нельзя.",
+    };
+  }
+  // A person can be flagged both customer and supplier. `SupplierOrder.userId`
+  // is Restrict, so such a row passes every gate above and then dies on a raw
+  // foreign-key error inside the transaction — after the operator has already
+  // exported the snapshot and retyped the address. Refuse readably instead.
+  if (target.isSupplier) {
+    return {
+      ok: false,
+      error: "Этот клиент одновременно поставщик — сначала снимите роль поставщика.",
     };
   }
 
@@ -255,9 +267,22 @@ export async function eraseCustomer(
         where: { ownerUserId: userId, repairOrders: { some: {} } },
         data: { ownerUserId: null },
       });
-      // Cars with no service history are pure profile data and can go.
+      // Cars with nothing attached are pure profile data and can go. The guard
+      // checks rentals and deals too, not just repair orders: a car can carry a
+      // rental contract or be the subject of a deal without ever having been
+      // serviced, and deleting it would take that record with it.
       await tx.vehicle.deleteMany({
-        where: { ownerUserId: userId, repairOrders: { none: {} } },
+        where: {
+          ownerUserId: userId,
+          repairOrders: { none: {} },
+          rentalBookings: { none: {} },
+          deals: { none: {} },
+        },
+      });
+      // Anything left keeps its history and simply loses its owner.
+      await tx.vehicle.updateMany({
+        where: { ownerUserId: userId },
+        data: { ownerUserId: null },
       });
       // Personal data does NOT survive. Deleting CommunicationLog alone was not
       // enough: the mail itself lives in EmailMessage / InboxMessage keyed by

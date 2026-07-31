@@ -406,7 +406,7 @@ export interface DeleteEstimateResult {
  * parent deal — the estimate's own URL 404s the moment delete commits.
  */
 export async function deleteEstimate(estimateId: string): Promise<DeleteEstimateResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
     where: { id: estimateId },
@@ -417,7 +417,16 @@ export async function deleteEstimate(estimateId: string): Promise<DeleteEstimate
     return { error: "Согласованную смету нельзя удалить. Сначала откатите согласование." };
   }
 
-  await db.estimate.delete({ where: { id: estimateId } });
+  // Release the stock holds BEFORE the rows go. A PART line's reservation lives
+  // in StockMovement keyed by the STRING `<lineId>:reserve`, not by a foreign
+  // key, so the `Estimate → EstimateLine` cascade cannot clean it up: deleting
+  // here without releasing left `StockItem.reserved` permanently inflated, with
+  // no row left to explain where the missing availability went.
+  // `deleteEstimateLine` already does this; this path did not.
+  await db.$transaction(async (tx) => {
+    await releasePartLinesForEstimate(tx, estimateId, actorId(session));
+    await tx.estimate.delete({ where: { id: estimateId } });
+  });
 
   revalidatePath(`/admin/crm/deals/${est.dealId}`);
   return { error: null, dealId: est.dealId };
