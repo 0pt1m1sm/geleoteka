@@ -1,8 +1,8 @@
 "use client";
 
 import { useTransition } from "react";
-import { Archive, Ban, RotateCcw, Trash2 } from "lucide-react";
 
+import { ActionsMenu, type ActionsMenuItem } from "@/components/ui";
 import {
   archiveInboxMessage,
   deleteInboxMessage,
@@ -12,26 +12,26 @@ import {
 import { toast } from "@/lib/ui/toast";
 
 /**
- * Разбор письма прямо из списка.
+ * Действия над письмом прямо из списка, за меню «⋯».
  *
- * Раньше убрать письмо из очереди можно было, только открыв его. Шесть тестовых
- * писем — это шесть заходов туда и обратно, поэтому очередь и не разгребалась.
+ * Иконки в ряд занимали место у темы и заставляли гадать, что делает каждая.
+ * Меню называет действия словами и открывается по одному нажатию.
  *
- * Кнопки живут РЯДОМ со ссылкой на письмо, а не внутри неё: вложенные
- * интерактивные элементы недопустимы, да и промахнуться по «в спам», целясь
- * открыть письмо, никто не должен.
+ * Набор зависит от вкладки: в очереди письмо разбирают, в архиве и мусоре его
+ * возвращают. Предлагать «в спам» тому, что уже в спаме, или «в архив» тому,
+ * что уже в архиве, — значит заставлять оператора самому отсеивать бессмыслицу.
  *
- * Удаления здесь нет намеренно — см. archiveInboxMessage: письмо остаётся в
- * ящике сервиса, из очереди уходит только его статус.
+ * Удаления как стирания здесь нет и не будет: ящик это переписка сервиса, а
+ * «в корзину» — статус, из которого письмо возвращается.
  */
 export function InboxRowActions({
   inboxMessageId,
   status,
 }: {
   inboxMessageId: string;
-  /** Текущая вкладка: у разобранного письма другой набор действий. */
+  /** Активная вкладка — она и решает, что с письмом можно сделать. */
   status: string;
-}): React.ReactElement {
+}): React.ReactElement | null {
   const [pending, startTransition] = useTransition();
 
   function run(fn: () => Promise<{ error: string | null }>, done: string): void {
@@ -45,57 +45,45 @@ export function InboxRowActions({
     });
   }
 
-  // Разобранному письму нужен один обратный ход, а не весь набор: предлагать
-  // «в спам» тому, что уже в спаме, незачем.
-  if (status !== "PENDING") {
-    return (
-      <div className="flex items-center gap-1 shrink-0 pr-3 pt-3">
-        <button
-          type="button"
-          onClick={() => run(() => restoreInboxMessage(inboxMessageId), "Вернули в очередь")}
-          disabled={pending}
-          className="btn-icon"
-          title="Вернуть в очередь разбора"
-          aria-label="Вернуть в очередь"
-        >
-          <RotateCcw size={15} />
-        </button>
-      </div>
-    );
-  }
+  const toQueue: ActionsMenuItem = {
+    label: "Вернуть в очередь",
+    onSelect: () => run(() => restoreInboxMessage(inboxMessageId), "Вернули в очередь"),
+  };
+  const toArchive: ActionsMenuItem = {
+    label: "В архив",
+    onSelect: () => run(() => archiveInboxMessage(inboxMessageId), "В архиве"),
+  };
+  const toSpam: ActionsMenuItem = {
+    label: "Отметить спамом",
+    onSelect: () => run(() => markInboxMessageSpam(inboxMessageId), "Отмечено спамом"),
+  };
+  const toTrash: ActionsMenuItem = {
+    label: "В корзину",
+    danger: true,
+    onSelect: () => run(() => deleteInboxMessage(inboxMessageId), "В корзине"),
+  };
 
+  const byTab: Record<string, ActionsMenuItem[]> = {
+    // Очередь разбора: письмо нужно куда-то деть.
+    PENDING: [toArchive, toSpam, toTrash],
+    // Разобрано и сохранено: вернуть к разбору или всё-таки выбросить.
+    ARCHIVED: [toQueue, toTrash],
+    // Мусор: только пути назад.
+    JUNK: [toQueue, toArchive],
+  };
+
+  // «Все письма» — это просмотр архива, включая чужую переписку, уже
+  // привязанную к клиентам. Разбирать письмо надо в его собственной вкладке,
+  // где видно, в каком оно состоянии.
+  const items = byTab[status];
+  if (!items) return null;
+
+  // Блокируем контейнер, а не пункты: ActionsMenu отфильтровывает отключённые,
+  // и при пустом списке исчезает целиком — меню пропадало бы прямо во время
+  // действия, которое сам же оператор и запустил.
   return (
-    <div className="flex items-center gap-1 shrink-0 pr-3 pt-3">
-      <button
-        type="button"
-        onClick={() => run(() => archiveInboxMessage(inboxMessageId), "В архиве")}
-        disabled={pending}
-        className="btn-icon"
-        title="В архив — письмо останется в ящике, но уйдёт из очереди"
-        aria-label="В архив"
-      >
-        <Archive size={15} />
-      </button>
-      <button
-        type="button"
-        onClick={() => run(() => markInboxMessageSpam(inboxMessageId), "Отмечено спамом")}
-        disabled={pending}
-        className="btn-icon text-[var(--color-error)]"
-        title="Спам"
-        aria-label="Спам"
-      >
-        <Ban size={15} />
-      </button>
-      <button
-        type="button"
-        onClick={() => run(() => deleteInboxMessage(inboxMessageId), "В корзине")}
-        disabled={pending}
-        className="btn-icon"
-        title="В корзину — письмо можно вернуть"
-        aria-label="В корзину"
-      >
-        <Trash2 size={15} />
-      </button>
+    <div className={`pr-3 pt-3 ${pending ? "opacity-50 pointer-events-none" : ""}`}>
+      <ActionsMenu items={items} label="Действия" />
     </div>
   );
 }
