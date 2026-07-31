@@ -263,10 +263,10 @@ export default async function InboxPage({ searchParams }: Props) {
       ) : (
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
+            {/* На телефоне строка раскладывается в колонку: кнопки в одном ряду
+                с именем оставляли ему 130px, и отправитель обрезался до
+                «Alex Tern…». Снизу справа они не мешают ничему. */}
             {rows.map((row) => (
-              {/* На телефоне строка раскладывается в колонку: кнопки в одном
-                  ряду с именем оставляли ему 130px, и отправитель обрезался до
-                  «Alex Tern…». Снизу справа они не мешают ничему. */}
               <li key={row.id} className="flex flex-col sm:flex-row sm:items-start">
                 <Link
                   href={`/admin/crm/inbox/${row.id}`}
