@@ -1,3 +1,4 @@
+import type { InboundCommChannel } from "@/lib/crm/inbound-communications";
 import type { EmailIngestTx } from "@/lib/email/db-port";
 import type { EmailAttachmentMeta, ParsedEmail } from "@/lib/email/types";
 
@@ -8,6 +9,7 @@ export interface FollowUpContext {
   customerUserId: string;
   customerName: string;
   dealId: string | null;
+  channel: InboundCommChannel;
   /**
    * The message's own timestamp (Date header / IMAP internal date), NOT the sync
    * time. The follow-up SLA runs from ingestion, but the task body shows this so
@@ -82,6 +84,7 @@ export async function resolveInboundEmail(input: {
         customerUserId: owner.customerUserId,
         customerName: customer?.name ?? "клиент",
         dealId: owner.dealId,
+        channel: "EMAIL_INBOUND",
         messageOccurredAt: parsed.occurredAt,
       },
     };
@@ -109,6 +112,7 @@ export async function resolveInboundEmail(input: {
         customerUserId: customer.id,
         customerName: customer.name,
         dealId,
+        channel: "EMAIL_INBOUND",
         messageOccurredAt: parsed.occurredAt,
       },
     };

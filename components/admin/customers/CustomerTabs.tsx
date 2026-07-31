@@ -19,8 +19,18 @@ export interface CustomerTab {
  * попросту не догадывались. Список всегда показывает, где ты сейчас, и содержит
  * все разделы разом. То же решение и в почтовом ящике — см. `InboxTabs`.
  */
-export function CustomerTabs({ tabs }: { tabs: CustomerTab[] }): React.ReactElement {
-  const [active, setActive] = useState(tabs[0]?.key ?? "");
+export function CustomerTabs({
+  tabs,
+  initialTab,
+}: {
+  tabs: CustomerTab[];
+  initialTab?: string;
+}): React.ReactElement {
+  const [active, setActive] = useState(() =>
+    initialTab && tabs.some((tab) => tab.key === initialTab)
+      ? initialTab
+      : tabs[0]?.key ?? "",
+  );
 
   return (
     <div>

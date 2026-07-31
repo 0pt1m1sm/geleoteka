@@ -339,6 +339,7 @@ describe("follow-up dueAt policy", () => {
 
     expect(ensureFollowUp).toHaveBeenCalledTimes(1);
     expect(captured).not.toBeNull();
+    expect((captured as unknown as FollowUpContext).channel).toBe("EMAIL_INBOUND");
     expect((captured as unknown as FollowUpContext).messageOccurredAt.toISOString()).toBe(
       OCCURRED.toISOString(),
     );
