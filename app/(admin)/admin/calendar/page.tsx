@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { getScheduleCapacity } from "@/lib/settings";
 import { AdminCalendar } from "@/components/admin/AdminCalendar";
 import { ScheduleManager } from "@/components/admin/ScheduleManager";
 import { PageHeader } from "@/components/ui";
@@ -85,6 +86,8 @@ export default async function CalendarPage() {
 
   const todayBusiness = formatForDatetimeLocalInput(new Date()).split("T")[0];
 
+  const capacity = await getScheduleCapacity();
+
   return (
     <div>
       <PageHeader
@@ -93,6 +96,7 @@ export default async function CalendarPage() {
         description="Записи, часы работы, праздники и блокировки времени"
       />
       <AdminCalendar
+        capacity={capacity}
         repairOrders={serialized}
         weekly={weeklyRows}
         exceptions={exceptions}

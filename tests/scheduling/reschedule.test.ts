@@ -79,6 +79,24 @@ class FakeDb implements ReschedulePort {
       const roId = (args.where as { repairOrderId?: string })?.repairOrderId;
       return this.slots.find((s) => s.repairOrderId === roId) ?? null;
     },
+    // Достаточно того, что реально спрашивает движок: чужие слоты в окне
+    // (gt, lt) вокруг нового времени.
+    findMany: async (args: Record<string, unknown>): Promise<DbRow[]> => {
+      const where = args.where as {
+        repairOrderId?: { not?: string };
+        dateTime?: { gt?: Date; lt?: Date };
+      };
+      const exclude = where.repairOrderId?.not;
+      const gt = where.dateTime?.gt;
+      const lt = where.dateTime?.lt;
+      return this.slots.filter((s) => {
+        if (exclude && s.repairOrderId === exclude) return false;
+        const at = s.dateTime as Date;
+        if (gt && !(at > gt)) return false;
+        if (lt && !(at < lt)) return false;
+        return true;
+      });
+    },
     update: async (args: Record<string, unknown>): Promise<DbRow> => {
       if (this.collideOnSlotWrite) throw new PrismaUniqueViolation();
       const roId = (args.where as { repairOrderId?: string })?.repairOrderId;
@@ -108,6 +126,37 @@ describe("applyReschedule", () => {
     expect(db.slots[0].dateTime).toBe(AT_15);
     // One transaction — not two independent writes that could half-apply.
     expect(db.transactionCount).toBe(1);
+  });
+
+  // Слот длится два часа, поэтому 12:00 и 13:00 — это наложение, хотя минуты
+  // старта разные. Уникальность Slot.dateTime такое не ловит.
+  it("отказывает при наложении на чужую запись, а не только при совпадении", async () => {
+    const db = new FakeDb({ withSlot: false });
+    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10 });
+    const at11 = new Date(AT_10.getTime() + 60 * 60_000);
+
+    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 1 });
+
+    expect(out).toEqual({ ok: false, reason: "conflict" });
+  });
+
+  it("при ёмкости 2 наложение разрешено", async () => {
+    const db = new FakeDb({ withSlot: false });
+    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10 });
+    const at11 = new Date(AT_10.getTime() + 60 * 60_000);
+
+    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 2 });
+
+    expect(out).toEqual({ ok: true });
+  });
+
+  it("своя же запись не считается помехой самой себе", async () => {
+    const db = new FakeDb({});
+    const at11 = new Date(AT_10.getTime() + 60 * 60_000);
+
+    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 1 });
+
+    expect(out).toEqual({ ok: true });
   });
 
   it("re-creates the slot when the order has none", async () => {

@@ -90,6 +90,15 @@ export interface ComputeDaySlotsInput {
   exception?: DayException | null;
   /** Booked slot start times, minutes from midnight. */
   bookedMinutes: readonly number[];
+  /**
+   * Сколько машин сервис принимает одновременно. По умолчанию одна.
+   *
+   * Настраивается ключом SCHEDULE_CAPACITY, потому что число постов — свойство
+   * конкретного сервиса, а не константа кода. Пока это ОДНО число на весь день:
+   * какая именно машина стоит на каком посту, модель не знает — это уже
+   * ресурсная модель, она отдельно.
+   */
+  capacity?: number;
   /** Blocked ranges clipped to this day, half-open `[start, end)`. */
   blocked?: readonly BlockedRange[];
   /** Minutes from midnight if this date IS today in business time; else null. */
@@ -154,7 +163,9 @@ export function computeDaySlots(input: ComputeDaySlotsInput): DaySlot[] {
   const window = resolveDayWindow(input);
   if (!window) return [];
 
-  const booked = new Set(input.bookedMinutes);
+  // Занятость считается пересечением, а не совпадением начала: запись в 13:00
+  // держит пост до 15:00 и закрывает слот 14:00, хотя минуты старта разные.
+  const capacity = Math.max(1, Math.trunc(input.capacity ?? 1));
   const blocked = input.blocked ?? [];
   const nowMinute = input.nowMinute ?? null;
 
@@ -167,7 +178,10 @@ export function computeDaySlots(input: ComputeDaySlotsInput): DaySlot[] {
     const isPast = nowMinute !== null && start <= nowMinute;
     slots.push({
       time: minutesToLabel(start),
-      available: !booked.has(start) && !overlapsBlocked && !isPast,
+      available:
+        input.bookedMinutes.filter((m) => slotsOverlap(start, m, slotMinutes)).length < capacity &&
+        !overlapsBlocked &&
+        !isPast,
     });
   }
   return slots;
