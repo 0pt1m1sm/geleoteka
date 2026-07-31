@@ -1,3 +1,5 @@
+import { BUSINESS_TZ } from "./timezone";
+
 /** Format price in Rubles */
 export function formatPrice(amount: number): string {
   return new Intl.NumberFormat("ru-RU", {
@@ -8,7 +10,19 @@ export function formatPrice(amount: number): string {
   }).format(amount);
 }
 
-/** Format date for Russian locale */
+/**
+ * Format date for Russian locale, in the SHOP's timezone.
+ *
+ * Pinned rather than left to the runtime, because the runtime differs by where
+ * the code happens to execute: the server runs in UTC, so a 12:00 appointment
+ * rendered as 09:00 on every server-rendered page, while the very same instant
+ * shown in a `datetime-local` field read 12:00 — that field already went
+ * through `lib/timezone.ts`. One page, two answers, three hours apart.
+ *
+ * A single-location service has one clock: the one on the wall in the shop.
+ * A customer reading the page from another timezone still needs to know when to
+ * bring the car, not what their own watch will say at that moment.
+ */
 export function formatDate(
   date: Date | string,
   options?: Intl.DateTimeFormatOptions
@@ -16,6 +30,7 @@ export function formatDate(
   const d = typeof date === "string" ? new Date(date) : date;
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
+    timeZone: BUSINESS_TZ,
     ...options,
   }).format(d);
 }

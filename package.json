@@ -24,6 +24,7 @@
     "verify-deal-estimate": "tsx scripts/verify-deal-estimate.ts",
     "verify-ro-works-cost": "tsx scripts/verify-ro-works-cost.ts",
     "verify-reservation-release": "tsx scripts/verify-reservation-release.ts",
+    "verify-mobile-inputs": "tsx scripts/verify-mobile-inputs.ts",
     "verify-send-estimate": "tsx scripts/verify-send-estimate.ts",
     "verify-resend-receiving-path": "tsx scripts/verify-resend-receiving-path.ts",
     "verify-crm-task-unique": "tsx scripts/verify-crm-task-unique.ts",
@@ -62,6 +63,7 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",

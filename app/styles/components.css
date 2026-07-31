@@ -280,6 +280,21 @@
     border-color: var(--color-error);
   }
   .input::placeholder { color: var(--foreground-muted); }
+  /* iOS Safari рисует date/time-поля нативным контролом, у которого своя
+     собственная ширина по отформатированному значению — width:100% её не
+     пересиливает, и поле распирало карточку, унося кнопку календаря за край
+     экрана. Снятие нативного оформления возвращает им обычное блочное
+     поведение; нативный пикер по тапу при этом никуда не девается.
+     Проверить это в Playwright нельзя: его WebKit на macOS рисует такие поля
+     по-десктопному и переполнения не даёт — см. scripts/verify-mobile-inputs.ts. */
+  .input[type="date"],
+  .input[type="datetime-local"],
+  .input[type="time"],
+  .input[type="month"],
+  .input[type="week"] {
+    -webkit-appearance: none;
+    appearance: none;
+  }
 
   /* Numeric inputs in dense forms (estimate builder, job-line editor):
      hide the native browser spinner buttons so the value digits aren't
