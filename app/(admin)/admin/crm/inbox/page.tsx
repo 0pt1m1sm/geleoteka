@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatDateTime } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
+import { InboxCard } from "@/components/admin/inbox/InboxCard";
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -28,11 +29,20 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: "ALL", label: "Все письма" },
   { key: "PENDING", label: "Pending" },
   { key: "ARCHIVED", label: "Архив" },
-  { key: "SPAM", label: "Спам" },
-  { key: "DELETED", label: "Удалённые" },
+  // Спам и корзина — два разных решения об одном и том же: письмо не нужно.
+  // Держать под них две вкладки значит тратить место экрана на различие,
+  // которое важно при разборе и почти не важно при просмотре.
+  { key: "JUNK", label: "Спам и удалённые" },
 ];
 
+/** Статусы, попадающие во вкладку. Разделение сохраняется в данных — метка на
+ *  строке говорит, спам это или удалённое. */
+const JUNK_STATUSES = ["SPAM", "DELETED"] as const;
+
 interface InboxRow {
+  status: string;
+  toEmail: string;
+  bodyText: string | null;
   id: string;
   fromEmail: string;
   fromName: string | null;
@@ -57,6 +67,8 @@ interface AllMailRow {
   fromName: string | null;
   toEmails: string[];
   subject: string | null;
+  bodyText: string | null;
+  sourceMailbox: string;
   occurredAt: Date;
   attachments: unknown;
   inboxMessages: Array<{ id: string }>;
@@ -80,6 +92,14 @@ function compactDateTime(d: Date): string {
   });
 }
 
+/** Начало письма одной строкой: переносы и лишние пробелы схлопнуты, иначе
+ *  предпросмотр занимает пол-экрана рваными обрывками. */
+function previewOf(text: string | null): string | null {
+  if (!text) return null;
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > 200 ? `${flat.slice(0, 200)}…` : flat || null;
+}
+
 const BACKLOG_GAP_MS = 10 * 60 * 1000;
 function isBacklog(receivedAt: Date, syncedAt: Date | null | undefined): boolean {
   if (!syncedAt) return false;
@@ -101,14 +121,20 @@ export default async function InboxPage({ searchParams }: Props) {
     showAll
       ? Promise.resolve([])
       : db.inboxMessage.findMany({
-      where: { status: status as never },
+      where:
+        status === "JUNK"
+          ? ({ status: { in: JUNK_STATUSES } } as never)
+          : ({ status } as never),
       orderBy: { receivedAt: "desc" },
       take: 50,
       select: {
         id: true,
+        status: true,
         fromEmail: true,
         fromName: true,
+        toEmail: true,
         subject: true,
+        bodyText: true,
         receivedAt: true,
         attachments: true,
         direction: true,
@@ -139,8 +165,10 @@ export default async function InboxPage({ searchParams }: Props) {
           fromName: true,
           toEmails: true,
           subject: true,
+          bodyText: true,
           occurredAt: true,
           attachments: true,
+          sourceMailbox: true,
           inboxMessages: { select: { id: true }, take: 1 },
           communicationLogs: { select: { customerUserId: true }, take: 1 },
         },
@@ -162,7 +190,10 @@ export default async function InboxPage({ searchParams }: Props) {
       <div className="flex gap-1 border-b border-[var(--border)] mb-6 overflow-x-auto whitespace-nowrap" role="tablist">
         {STATUS_TABS.map((tab) => {
           const isActive = tab.key === status;
-          const cnt = countByStatus.get(tab.key) ?? 0;
+          const cnt =
+            tab.key === "JUNK"
+              ? JUNK_STATUSES.reduce((sum, st) => sum + (countByStatus.get(st) ?? 0), 0)
+              : (countByStatus.get(tab.key) ?? 0);
           return (
             <Link
               key={tab.key}
@@ -177,7 +208,7 @@ export default async function InboxPage({ searchParams }: Props) {
             >
               {tab.label}
               {cnt > 0 ? (
-                <span className="ml-2 inline-flex items-center px-1.5 text-xs rounded bg-[var(--color-accent-muted,#3a3a3a)] text-[var(--foreground)]">
+                <span className="ml-2 inline-flex items-center px-1.5 text-xs rounded bg-[var(--background-secondary)] text-[var(--foreground)]">
                   {cnt}
                 </span>
               ) : null}
@@ -196,66 +227,29 @@ export default async function InboxPage({ searchParams }: Props) {
             <ul className="divide-y divide-[var(--border)]">
               {allMail.map((m) => {
                 const outbound = m.direction === "OUTBOUND";
-                // Собеседник, а не «от кого»: в исходящем интересен адресат.
-                const party = outbound ? (m.toEmails[0] ?? "—") : (m.fromName ?? m.fromEmail);
-                // Куда письмо легло: в очередь разбора или в переписку клиента.
                 const inboxId = m.inboxMessages[0]?.id ?? null;
                 const customerId = m.communicationLogs[0]?.customerUserId ?? null;
-                const href = inboxId
-                  ? `/admin/crm/inbox/${inboxId}`
-                  : customerId
-                    ? `/admin/customers/${customerId}`
-                    : null;
-                const row = (
-                  <div className="flex items-start gap-4 px-4 py-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate flex items-center gap-2">
-                        <span
-                          className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-accent-muted,#3a3a3a)] text-[var(--foreground-muted)]"
-                          title={outbound ? "Исходящее" : "Входящее"}
-                        >
-                          {outbound ? "→ ИСХ" : "← ВХ"}
-                        </span>
-                        <span className="truncate">{party}</span>
-                        {inboxId ? (
-                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]">
-                            в разборе
-                          </span>
-                        ) : customerId ? null : (
-                          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]">
-                            без клиента
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-[var(--foreground-muted)] truncate">
-                        {m.subject || "(без темы)"}
-                      </div>
-                      <div className="sm:hidden mt-1 text-xs text-[var(--foreground-muted)]">
-                        {attachmentCount(m.attachments) > 0 ? (
-                          <span className="mr-2">📎 {attachmentCount(m.attachments)}</span>
-                        ) : null}
-                        {compactDateTime(m.occurredAt)}
-                      </div>
-                    </div>
-                    <div className="hidden sm:block text-xs text-[var(--foreground-muted)] shrink-0">
-                      {attachmentCount(m.attachments) > 0 ? (
-                        <span className="mr-2">📎 {attachmentCount(m.attachments)}</span>
-                      ) : null}
-                      {formatDateTime(m.occurredAt)}
-                    </div>
-                  </div>
-                );
                 return (
                   <li key={m.id}>
-                    {/* Письмо, не привязанное ни к очереди, ни к клиенту, открывать
-                        пока некуда — ссылка в никуда хуже её отсутствия. */}
-                    {href ? (
-                      <Link href={href} className="row-clickable block">
-                        {row}
-                      </Link>
-                    ) : (
-                      row
-                    )}
+                    <InboxCard
+                      // Письмо, не привязанное ни к очереди, ни к клиенту,
+                      // открывать некуда — ссылка в никуда хуже её отсутствия.
+                      href={
+                        inboxId
+                          ? `/admin/crm/inbox/${inboxId}`
+                          : customerId
+                            ? `/admin/customers/${customerId}`
+                            : null
+                      }
+                      subject={m.subject}
+                      preview={previewOf(m.bodyText)}
+                      outbound={outbound}
+                      party={outbound ? (m.toEmails[0] ?? "—") : m.fromEmail}
+                      time={compactDateTime(m.occurredAt)}
+                      folder={m.sourceMailbox}
+                      attachments={attachmentCount(m.attachments)}
+                      marks={inboxId ? ["в разборе"] : customerId ? [] : ["без клиента"]}
+                    />
                   </li>
                 );
               })}
@@ -269,57 +263,33 @@ export default async function InboxPage({ searchParams }: Props) {
       ) : (
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
-            {/* На телефоне строка раскладывается в колонку: кнопки в одном ряду
-                с именем оставляли ему 130px, и отправитель обрезался до
-                «Alex Tern…». Снизу справа они не мешают ничему. */}
             {rows.map((row) => (
-              <li key={row.id} className="flex flex-col sm:flex-row sm:items-start">
-                <Link
-                  href={`/admin/crm/inbox/${row.id}`}
-                  className="row-clickable flex-1 min-w-0 flex items-start gap-4 px-4 py-3"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate flex items-center gap-2">
-                      <span
-                        className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-accent-muted,#3a3a3a)] text-[var(--foreground-muted)]"
-                        title={row.direction === "OUTBOUND" ? "Исходящее (от менеджера)" : "Входящее"}
-                      >
-                        {row.direction === "OUTBOUND" ? "→ ИСХ" : "← ВХ"}
-                      </span>
-                      <span className="truncate">
-                        {row.fromName ? `${row.fromName} <${row.fromEmail}>` : row.fromEmail}
-                      </span>
-                      {isBacklog(row.receivedAt, row.emailMessage?.createdAt) ? (
-                        <span
-                          className="shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]"
-                          title="Письмо получено раньше — синхронизировано позже (backlog)"
-                        >
-                          синхр. позже
-                        </span>
-                      ) : null}
-                    </div>
-                    <div className="text-sm text-[var(--foreground-muted)] truncate">
-                      {row.subject || "(без темы)"}
-                    </div>
-                    {/* На телефоне дата уходит под тему: в строку она не
-                        помещалась и отъедала имя отправителя. */}
-                    <div className="sm:hidden mt-1 text-xs text-[var(--foreground-muted)]">
-                      {attachmentCount(row.attachments) > 0 ? (
-                        <span className="mr-2">📎 {attachmentCount(row.attachments)}</span>
-                      ) : null}
-                      {compactDateTime(row.receivedAt)}
-                    </div>
-                  </div>
-                  <div className="hidden sm:block text-xs text-[var(--foreground-muted)] shrink-0">
-                    {attachmentCount(row.attachments) > 0 ? (
-                      <span className="mr-2">📎 {attachmentCount(row.attachments)}</span>
-                    ) : null}
-                    {formatDateTime(row.receivedAt)}
-                  </div>
-                </Link>
+              <li key={row.id} className="flex items-start">
+                <div className="flex-1 min-w-0">
+                  <InboxCard
+                    href={`/admin/crm/inbox/${row.id}`}
+                    subject={row.subject}
+                    preview={previewOf(row.bodyText)}
+                    outbound={row.direction === "OUTBOUND"}
+                    party={row.direction === "OUTBOUND" ? row.toEmail : row.fromEmail}
+                    time={compactDateTime(row.receivedAt)}
+                    folder={row.toEmail}
+                    attachments={attachmentCount(row.attachments)}
+                    marks={[
+                      // Во вкладке «Спам и удалённые» лежат оба статуса, и
+                      // отличить их можно только меткой.
+                      ...(status === "JUNK"
+                        ? [row.status === "SPAM" ? "спам" : "удалено"]
+                        : []),
+                      ...(isBacklog(row.receivedAt, row.emailMessage?.createdAt)
+                        ? ["синхр. позже"]
+                        : []),
+                    ]}
+                  />
+                </div>
                 {/* Разбор из списка: иначе очередь чистится только по одному
                     письму за заход в карточку и обратно. */}
-                <div className="self-end sm:self-auto">
+                <div className="shrink-0">
                   <InboxRowActions inboxMessageId={row.id} status={status} />
                 </div>
               </li>
