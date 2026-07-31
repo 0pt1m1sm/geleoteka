@@ -10,6 +10,7 @@ import { StatusChanger } from "@/components/admin/StatusChanger";
 import { DeleteRepairOrderButton } from "@/components/admin/DeleteRepairOrderButton";
 import { Card, PageHeader } from "@/components/ui";
 import { customerName } from "@/lib/crm/customer-display";
+import { vehicleLabel } from "@/lib/crm/vehicle-display";
 
 const VALID_STATUSES = new Set(Object.keys(REPAIR_ORDER_STATUS_LABELS));
 
@@ -64,7 +65,12 @@ export default async function AppointmentsPage({ searchParams }: Props) {
         <div className="space-y-3">
           {repairOrders.map((ro: Record<string, unknown>) => {
             const user = ro.user as { name: string; phone: string } | null;
-            const vehicle = ro.vehicle as { model: string; year: number; vin: string | null; plate: string | null };
+            const vehicle = ro.vehicle as {
+              model: string;
+              year: number;
+              vin: string | null;
+              plate: string | null;
+            } | null;
             const jobs = ro.jobLines as Array<{ description: string; status: string }>;
             const master = ro.master as { name: string } | null;
             return (
@@ -95,12 +101,9 @@ export default async function AppointmentsPage({ searchParams }: Props) {
                     </div>
 
                     <div className="text-xs text-[var(--foreground-muted)] flex flex-wrap gap-x-3 gap-y-0.5">
-                      <span className="text-[var(--foreground)]">
-                        Mercedes-Benz {vehicle.model}
-                        {vehicle.year ? ` ${vehicle.year}` : ""}
-                      </span>
-                      {vehicle.plate && <span>№ {vehicle.plate}</span>}
-                      {vehicle.vin && <span className="font-mono">VIN {vehicle.vin}</span>}
+                      <span className="text-[var(--foreground)]">{vehicleLabel(vehicle)}</span>
+                      {vehicle?.plate && <span>№ {vehicle.plate}</span>}
+                      {vehicle?.vin && <span className="font-mono">VIN {vehicle.vin}</span>}
                     </div>
 
                     <div className="text-xs text-[var(--foreground-muted)]">

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 export default async function HistoryPage() {
   const session = await getSession();
@@ -31,7 +32,7 @@ export default async function HistoryPage() {
       ) : (
         <div className="space-y-4">
           {repairOrders.map((ro: Record<string, unknown>) => {
-            const vehicle = ro.vehicle as { model: string };
+            const vehicle = ro.vehicle as { model: string } | null;
             const master = ro.master as { name: string } | null;
             const jobs = ro.jobLines as Array<{ description: string }>;
             const total = ro.total as number;
@@ -41,7 +42,7 @@ export default async function HistoryPage() {
                 <div className="flex items-start justify-between gap-4 mb-3">
                   <div>
                     <p className="font-medium">
-                      {vehicle.model} — {formatDate(ro.dateTime as Date)}
+                      {vehicle?.model ?? DETACHED_VEHICLE_LABEL} — {formatDate(ro.dateTime as Date)}
                     </p>
                     {master && (
                       <p className="text-sm text-[var(--foreground-muted)]">

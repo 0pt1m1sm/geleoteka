@@ -17,6 +17,7 @@ import { RepairOrderDetailsForm } from "@/components/admin/RepairOrderDetailsFor
 import { RescheduleForm } from "@/components/admin/RescheduleForm";
 import { getApprovedWorksCost } from "@/lib/crm/approved-estimate";
 import { customerName } from "@/lib/crm/customer-display";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 interface RepairOrderDetail {
   id: string;
@@ -32,7 +33,7 @@ interface RepairOrderDetail {
   masterUserId: string | null;
   dealId: string;
   user: { id: string; name: string; phone: string; email: string } | null;
-  vehicle: { model: string | null; year: number | null; vin: string | null };
+  vehicle: { model: string | null; year: number | null; vin: string | null } | null;
   jobLines: Array<{
     id: string;
     description: string;
@@ -129,7 +130,11 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
     <div>
       <PageHeader
         eyebrow={ro.roNumber ? `№${ro.roNumber}` : "Заказ-наряд"}
-        title={`Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`}
+        title={
+          ro.vehicle
+            ? `Mercedes-Benz ${ro.vehicle.model ?? "—"}${ro.vehicle.year ? `, ${ro.vehicle.year}` : ""}`
+            : DETACHED_VEHICLE_LABEL
+        }
         description={`${statusLabel} · ${formatDateTime(ro.dateTime)} · ${formatPrice(worksCost)}`}
         actions={
           <Link href="/admin/repair-orders" className="back-link">
@@ -250,7 +255,7 @@ export default async function AdminRepairOrderDetailPage({ params }: Props) {
                 </span>
               )}
             </div>
-            {ro.vehicle.vin && (
+            {ro.vehicle?.vin && (
               <p className="mt-3 text-xs text-[var(--foreground-muted)] font-mono">
                 VIN {ro.vehicle.vin}
               </p>

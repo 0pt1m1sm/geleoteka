@@ -11,6 +11,7 @@ import { UpcomingOrdersTable, type UpcomingOrderRow } from "./UpcomingOrdersTabl
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { DEAL_STAGE_LABELS } from "@/lib/deal-stage-labels";
 import { customerName } from "@/lib/crm/customer-display";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 interface OpenDealRow {
   id: string;
@@ -244,13 +245,13 @@ export default async function AdminDashboard() {
         <UpcomingOrdersTable
           rows={upcoming.map((ro: Record<string, unknown>): UpcomingOrderRow => {
             const user = ro.user as { name: string; phone: string | null } | null;
-            const vehicle = ro.vehicle as { model: string };
+            const vehicle = ro.vehicle as { model: string } | null;
             const jobs = ro.jobLines as Array<{ description: string }>;
             return {
               id: ro.id as string,
               customerName: customerName(user),
               customerPhone: user?.phone ?? null,
-              vehicleModel: vehicle.model,
+              vehicleModel: vehicle?.model ?? DETACHED_VEHICLE_LABEL,
               dateTime: (ro.dateTime as Date).toISOString(),
               status: ro.status as string,
               jobs: jobs.map((j) => j.description),

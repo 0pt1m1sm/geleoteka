@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { StatusBoard } from "@/components/portal/StatusBoard";
 import { Card, PageHeader } from "@/components/ui";
 import { WorkPhotosGallery } from "@/components/shared/WorkPhotosGallery";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 interface ActiveRepairOrder {
   id: string;
@@ -24,7 +25,7 @@ interface PhotoEntry {
 
 interface RepairOrderWithPhotos {
   id: string;
-  vehicle: { model: string };
+  vehicle: { model: string } | null;
   workPhotos: PhotoEntry[];
 }
 
@@ -56,7 +57,7 @@ export default async function TrackingPage() {
     id: ro.id,
     status: ro.status,
     dateTime: ro.dateTime.toISOString(),
-    carModel: ro.vehicle.model,
+    carModel: ro.vehicle?.model ?? DETACHED_VEHICLE_LABEL,
     services: ro.jobLines.map((j) => j.description),
   }));
 
@@ -77,7 +78,7 @@ export default async function TrackingPage() {
               {photoSections.map((ro) => (
                 <Card key={ro.id}>
                   <WorkPhotosGallery
-                    title={`Фотоотчёт — ${ro.vehicle.model}`}
+                    title={`Фотоотчёт — ${ro.vehicle?.model ?? DETACHED_VEHICLE_LABEL}`}
                     photos={ro.workPhotos}
                     emptyText={null}
                   />
