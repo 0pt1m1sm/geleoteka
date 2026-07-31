@@ -4,7 +4,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
 import { db } from "@/lib/db";
-import { roleLabel as roleLabelOf } from "@/lib/roles";
+import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { Card, PageHeader } from "@/components/ui";
 
 interface UserRow {
@@ -145,9 +145,7 @@ export default async function UsersAdminPage({ searchParams }: Props) {
             const badgeClass =
               ROLE_BADGE_CLASS[u.permissionRole] ??
               "bg-[var(--background-secondary)] text-[var(--foreground-muted)]";
-            const flags: string[] = [];
-            if (u.isCustomer) flags.push("клиент");
-            if (u.isMaster) flags.push("мастер");
+            const flags = entityFlags(u, u.permissionRole).map((f) => f.toLowerCase());
             return (
               <div
                 key={u.id}
@@ -168,7 +166,12 @@ export default async function UsersAdminPage({ searchParams }: Props) {
                     {flags.length > 0 ? ` · ${flags.join(", ")}` : ""}
                   </p>
                 </Link>
-                {viewerIsAdmin && u.id !== session.id && u.isCustomer ? (
+                {/* Staff too: a master is the same row as a client with another
+                    role. Suppliers and admins are refused by the action itself. */}
+                {viewerIsAdmin &&
+                u.id !== session.id &&
+                !u.isSupplier &&
+                u.permissionRole !== "ADMIN" ? (
                   <div className="shrink-0">
                     <EraseCustomerPanel
                       customerUserId={u.id}

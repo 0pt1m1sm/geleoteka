@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { roleLabel as roleLabelOf } from "@/lib/roles";
+import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
 import { UserContactsForm } from "@/components/admin/UserContactsForm";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
@@ -65,9 +65,7 @@ export default async function UserDetailPage({ params }: Props) {
     notFound();
   }
 
-  const flags: string[] = [];
-  if (user.isCustomer) flags.push("Клиент");
-  if (user.isMaster) flags.push("Мастер");
+  const flags = entityFlags(user, user.permissionRole);
 
   const viewerIsAdmin = session.permissionRole === "ADMIN";
   const isSelf = session.id === user.id;

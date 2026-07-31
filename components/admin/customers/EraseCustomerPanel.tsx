@@ -24,6 +24,8 @@ const OUTCOME: Record<string, { label: string; kept: boolean }> = {
   deals: { label: "сделки", kept: true },
   repairOrders: { label: "заказ-наряды", kept: true },
   communications: { label: "лента общения на карточке", kept: false },
+  // Held as an employee: survives unassigned unless the box is ticked.
+  tasks: { label: "задачи в работе", kept: true },
   vehicles: { label: "автомобили", kept: false },
 };
 
@@ -177,18 +179,34 @@ export function EraseCustomerPanel({
                   : "Эти записи останутся для бухгалтерии и гарантии; при необходимости их можно привязать к другому клиенту вручную."}
               </p>
 
-              <label className="flex items-start gap-2 text-xs mt-2">
+              {/* The one real decision on this screen, so it looks like one:
+                  boxed, and tinted red once armed so the operator cannot tick
+                  it without noticing that the answer changed. */}
+              <label
+                className={`flex items-start gap-2.5 text-xs mt-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  deleteRelated
+                    ? "border-[var(--color-error)] bg-[var(--color-error-bg)]"
+                    : "border-[var(--border)] bg-[var(--background-secondary)] hover:border-[var(--color-error)]/40"
+                }`}
+              >
                 <input
                   type="checkbox"
                   checked={deleteRelated}
                   onChange={(e) => setDeleteRelated(e.target.checked)}
-                  className="mt-0.5"
+                  className="mt-0.5 w-4 h-4 shrink-0 accent-[var(--color-error)]"
                 />
                 <span>
-                  Удалить и связанные записи (сделки, сметы, заказ-наряды, отгрузки, аренды, письма).
-                  <span className="text-[var(--foreground-muted)]">
-                    {" "}
-                    Для ошибочных и дублирующих записей. Для настоящего клиента оставьте выключенным.
+                  <span
+                    className={`block font-semibold ${
+                      deleteRelated ? "text-[var(--color-error)]" : ""
+                    }`}
+                  >
+                    Удалить и связанные записи
+                  </span>
+                  <span className="block text-[var(--foreground-muted)] mt-0.5">
+                    Сделки, сметы, заказ-наряды, отгрузки, аренды и письма — у клиента; задачи —
+                    у сотрудника. Для ошибочных и дублирующих записей. Для настоящего клиента или
+                    работающего сотрудника оставьте выключенным.
                   </span>
                 </span>
               </label>

@@ -1,8 +1,73 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { requireAuth } from "@/lib/auth";
+import { revalidatePath } from "next/cache";
+import { getSession, requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
+
+interface DeleteVehicleResult {
+  error: string | null;
+  /** How much paperwork kept its content but lost the link to this car. */
+  detached?: { repairOrders: number; deals: number };
+}
+
+/**
+ * Delete a customer's car.
+ *
+ * The car is a descriptive reference, not the owner of anything: repair orders
+ * and deals carry their own work, money and photos, and merely point at it. So
+ * deleting one is an ordinary edit — a duplicate entry, a sold car, a typo in
+ * the VIN — and the paperwork keeps every line, its `vehicleId` simply becoming
+ * NULL (see the 20260731140000 migration).
+ *
+ * Fleet cars are a different thing entirely: a rental booking IS a contract for
+ * a specific car, so those are refused here and archived through the rentals
+ * section instead.
+ */
+export async function deleteVehicle(vehicleId: string): Promise<DeleteVehicleResult> {
+  const session = await getSession();
+  if (!session) return { error: "Нужно войти" };
+
+  const vehicle = (await db.vehicle.findUnique({
+    where: { id: vehicleId },
+    select: {
+      id: true,
+      ownerUserId: true,
+      ownershipType: true,
+      _count: { select: { repairOrders: true, deals: true, rentalBookings: true } },
+    },
+  })) as {
+    id: string;
+    ownerUserId: string | null;
+    ownershipType: string;
+    _count: { repairOrders: number; deals: number; rentalBookings: number };
+  } | null;
+  if (!vehicle) return { error: "Автомобиль не найден" };
+
+  const isStaff = session.permissionRole === "ADMIN" || session.permissionRole === "MANAGER";
+  if (!isStaff && vehicle.ownerUserId !== session.id) {
+    return { error: "Это не ваш автомобиль" };
+  }
+
+  if (vehicle.ownershipType !== "CUSTOMER") {
+    return {
+      error: "Это автомобиль парка, а не клиента. Такие снимаются с эксплуатации в разделе аренды.",
+    };
+  }
+  if (vehicle._count.rentalBookings > 0) {
+    return { error: "По автомобилю есть брони аренды — сначала закройте их." };
+  }
+
+  await db.vehicle.delete({ where: { id: vehicleId } });
+
+  revalidatePath("/cabinet/cars");
+  if (vehicle.ownerUserId) revalidatePath(`/admin/customers/${vehicle.ownerUserId}`);
+  revalidatePath("/admin/repair-orders");
+  return {
+    error: null,
+    detached: { repairOrders: vehicle._count.repairOrders, deals: vehicle._count.deals },
+  };
+}
 
 export async function addCar(
   _prevState: { error: string | null } | null,

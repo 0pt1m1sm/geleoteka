@@ -64,13 +64,16 @@ function stateToken(
 }
 
 async function countAttached(userId: string): Promise<Record<string, number>> {
-  const [vehicles, repairOrders, deals, communications] = (await Promise.all([
+  const [vehicles, repairOrders, deals, communications, tasks] = (await Promise.all([
     db.vehicle.count({ where: { ownerUserId: userId } }),
     db.repairOrder.count({ where: { userId } }),
     db.deal.count({ where: { customerUserId: userId } }),
     db.communicationLog.count({ where: { customerUserId: userId } }),
+    // Held as an employee rather than as a client — counted so the panel can
+    // show a master or manager what they actually own.
+    db.crmTask.count({ where: { ownerUserId: userId } }),
   ])) as number[];
-  return { vehicles, repairOrders, deals, communications };
+  return { vehicles, repairOrders, deals, communications, tasks };
 }
 
 /**
@@ -249,17 +252,14 @@ export async function eraseCustomer(
   if (target.permissionRole === "ADMIN") {
     return { ok: false, error: "Нельзя стереть администратора — сначала снимите роль" };
   }
-  // This flow understands a CUSTOMER's data — which of their records survive,
-  // which go. A manager, master or supplier has other links entirely (owned
-  // tasks, authored logs, supplier orders), so erasing one through here would
-  // take out records this code never considered. The field was read but never
-  // checked, leaving that reachable by calling the action directly.
-  if (!target.isCustomer) {
-    return {
-      ok: false,
-      error: "Это не клиент. Сотрудников и поставщиков через это действие удалять нельзя.",
-    };
-  }
+  // Staff go through here too: a master is the same User row as a client, only
+  // with a different role, and refusing them left no way to remove one at all.
+  // What differs is which links they have — an employee owns tasks, authors
+  // logs and is named as master on repair orders — and those are all SetNull or
+  // handled below, so nothing of theirs is destroyed unasked.
+  //
+  // Suppliers stay out: `SupplierOrder.userId` is a required link this flow
+  // does not unpick, so erasing one would fail mid-transaction anyway.
   // A person can be flagged both customer and supplier. `SupplierOrder.userId`
   // is Restrict, so such a row passes every gate above and then dies on a raw
   // foreign-key error inside the transaction — after the operator has already
@@ -322,6 +322,7 @@ export async function eraseCustomer(
       });
       await tx.repairOrder.updateMany({ where: { userId }, data: { claimToken: null } });
 
+      // ── What they held as a CLIENT ─────────────────────────────────────
       if (deleteRelated) {
         // Everything goes. Release the stock holds first — they are keyed by a
         // string, not a foreign key, so no cascade can free them and the
@@ -337,10 +338,8 @@ export async function eraseCustomer(
         // slots, work photos, shipments and bookings.
         await tx.deal.deleteMany({ where: { customerUserId: userId } });
         // Repair orders created outside a deal, if any, have no parent to take
-        // them; remove them explicitly before their cars.
+        // them; remove them explicitly.
         await tx.repairOrder.deleteMany({ where: { userId } });
-        // Cars last: `RepairOrder.vehicleId` is RESTRICT, so this only succeeds
-        // once the orders above are gone.
         await tx.vehicle.deleteMany({ where: { ownerUserId: userId } });
       } else {
         // The commercial and service record is DETACHED, not destroyed. A deal
@@ -367,12 +366,26 @@ export async function eraseCustomer(
           data: { ownerUserId: null },
         });
       }
+      // ── What they held as an EMPLOYEE ──────────────────────────────────
+      // A different set of links entirely, so it gets its own answer. Ticked,
+      // the queue goes with the person. Left alone, the tasks survive
+      // unassigned (the FK is SetNull) and a manager reassigns them — losing
+      // the payment reminders because someone left would be worse than a row
+      // with an empty owner. Everything else they touched — authored logs,
+      // master on an order, technician on a labour line, uploaded photos,
+      // prepared estimates — is SetNull in the schema and simply loses a name.
+      if (deleteRelated) {
+        await tx.crmTask.deleteMany({ where: { ownerUserId: userId } });
+      }
+
       // The mail itself belongs to the shop's mailbox, not to the customer
       // card, so it goes only on the branch that removes the commercial record
       // too. Detaching a real customer leaves the correspondence where an
       // operator expects to find it — the same reasoning that keeps their deals
-      // and repair orders.
-      if (deleteRelated) await deleteMailFor(tx, addresses);
+      // and repair orders. Staff addresses are skipped entirely: mail to and
+      // from a company mailbox is the shop's own correspondence, never one
+      // person's to take away.
+      if (deleteRelated && target.isCustomer) await deleteMailFor(tx, addresses);
       // The card's own timeline always goes: CommunicationLog REQUIRES a
       // customer (the FK is not nullable), so there is no one left to own it.
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });

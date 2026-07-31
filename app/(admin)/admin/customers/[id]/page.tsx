@@ -20,6 +20,7 @@ import { CrmTaskList } from "@/components/crm/CrmTaskList";
 import { CustomerTabs } from "@/components/admin/customers/CustomerTabs";
 import { REFERRAL_SOURCE_LABELS } from "@/lib/crm-labels";
 import { DEAL_STAGE_LABELS, DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
+import { DeleteCarButton } from "@/components/shared/DeleteCarButton";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -33,7 +34,13 @@ interface RawCustomer {
   referralSource: string | null;
   isTempPassword: boolean;
   deletedAt: Date | null;
-  vehicles: Array<{ id: string; model: string; year: number; vin: string | null }>;
+  vehicles: Array<{
+    id: string;
+    model: string;
+    year: number;
+    vin: string | null;
+    _count: { repairOrders: number };
+  }>;
   loyaltyAccount: { points: number } | null;
   customerProfile: {
     blacklisted: boolean;
@@ -72,7 +79,10 @@ export default async function CustomerDetailPage({ params }: Props) {
     db.user.findUnique({
       where: { id },
       include: {
-        vehicles: { where: { ownershipType: "CUSTOMER" } },
+        vehicles: {
+          where: { ownershipType: "CUSTOMER" },
+          include: { _count: { select: { repairOrders: true } } },
+        },
         loyaltyAccount: true,
         customerProfile: true,
         _count: { select: { repairOrders: true } },
@@ -326,9 +336,16 @@ export default async function CustomerDetailPage({ params }: Props) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {customer.vehicles.map((v) => (
                   <div key={v.id} className="card">
-                    <p className="font-medium">
-                      {v.model}, {v.year}
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">
+                        {v.model}, {v.year}
+                      </p>
+                      <DeleteCarButton
+                        vehicleId={v.id}
+                        label={`${v.model}, ${v.year}`}
+                        repairOrderCount={v._count.repairOrders}
+                      />
+                    </div>
                     {v.vin ? (
                       <p className="text-xs text-[var(--foreground-muted)] font-mono">VIN: {v.vin}</p>
                     ) : null}
