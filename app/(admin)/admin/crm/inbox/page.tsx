@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -8,6 +7,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
 import { InboxCard } from "@/components/admin/inbox/InboxCard";
+import { InboxTabs } from "@/components/admin/inbox/InboxTabs";
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -25,14 +25,16 @@ interface Props {
  * решение «в переписку клиента или в очередь» принимается уже после. То есть
  * полный архив всё это время был, не хватало вида поверх него.
  */
-const STATUS_TABS: Array<{ key: string; label: string }> = [
-  { key: "ALL", label: "Все письма" },
-  { key: "PENDING", label: "Pending" },
-  { key: "ARCHIVED", label: "Архив" },
+const STATUS_TABS: Array<{ key: string; short: string; full: string }> = [
+  { key: "ALL", short: "Все", full: "Все письма" },
+  // «Pending» было единственным английским словом среди русских — и ничего не
+  // объясняло: это письма, которые ещё не разобрали.
+  { key: "PENDING", short: "Новые", full: "Новые — ждут разбора" },
+  { key: "ARCHIVED", short: "Архив", full: "Архив — разобранные" },
   // Спам и корзина — два разных решения об одном и том же: письмо не нужно.
   // Держать под них две вкладки значит тратить место экрана на различие,
   // которое важно при разборе и почти не важно при просмотре.
-  { key: "JUNK", label: "Спам и удалённые" },
+  { key: "JUNK", short: "Мусор", full: "Спам и удалённые" },
 ];
 
 /** Статусы, попадающие во вкладку. Разделение сохраняется в данных — метка на
@@ -194,35 +196,18 @@ export default async function InboxPage({ searchParams }: Props) {
         }
       />
 
-      <div className="flex gap-1 border-b border-[var(--border)] mb-6 overflow-x-auto whitespace-nowrap" role="tablist">
-        {STATUS_TABS.map((tab) => {
-          const isActive = tab.key === status;
-          const cnt =
-            tab.key === "JUNK"
+      <InboxTabs
+        active={status}
+        tabs={STATUS_TABS.map((t) => ({
+          key: t.key,
+          short: t.short,
+          full: t.full,
+          count:
+            t.key === "JUNK"
               ? JUNK_STATUSES.reduce((sum, st) => sum + (countByStatus.get(st) ?? 0), 0)
-              : (countByStatus.get(tab.key) ?? 0);
-          return (
-            <Link
-              key={tab.key}
-              href={`/admin/crm/inbox?status=${tab.key}`}
-              className={`px-4 py-2 text-sm font-medium border-b-2 ${
-                isActive
-                  ? "border-[var(--color-accent)] text-[var(--foreground)]"
-                  : "border-transparent text-[var(--foreground-muted)] hover:text-[var(--foreground)]"
-              }`}
-              role="tab"
-              aria-selected={isActive}
-            >
-              {tab.label}
-              {cnt > 0 ? (
-                <span className="ml-2 inline-flex items-center px-1.5 text-xs rounded bg-[var(--background-secondary)] text-[var(--foreground)]">
-                  {cnt}
-                </span>
-              ) : null}
-            </Link>
-          );
-        })}
-      </div>
+              : (countByStatus.get(t.key) ?? 0),
+        }))}
+      />
 
       {showAll ? (
         allMail.length === 0 ? (

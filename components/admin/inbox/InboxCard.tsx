@@ -52,6 +52,10 @@ export function InboxCard(props: InboxCardProps): React.ReactElement {
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           <div className="font-medium truncate">{subject || "(без темы)"}</div>
+          {/* Собеседник сразу под темой, а не в правой колонке: тема и «от кого»
+              читаются одним движением глаз, а справа остаётся только служебное —
+              когда и куда пришло. */}
+          <div className="text-xs text-[var(--foreground-muted)] truncate">{party}</div>
           {/* Две строки предпросмотра: одна почти ничего не говорит, три
               превращают список в чтение. */}
           {preview ? (
