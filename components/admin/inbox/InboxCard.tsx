@@ -31,6 +31,8 @@ export interface InboxCardProps {
   attachments: number;
   /** Метки состояния: «в разборе», «синхр. позже» и подобные. */
   marks?: string[];
+  /** Меню действий. Встаёт в один ряд с метками — см. комментарий у разметки. */
+  actions?: React.ReactNode;
 }
 
 /** Домен отправителя — заготовка под репутацию: по нему её и считают. */
@@ -44,7 +46,8 @@ const CHIP =
   "shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[var(--border)] text-[var(--foreground-muted)]";
 
 export function InboxCard(props: InboxCardProps): React.ReactElement {
-  const { href, subject, preview, outbound, party, time, folder, attachments, marks } = props;
+  const { href, subject, preview, outbound, party, time, folder, attachments, marks, actions } =
+    props;
   const domain = domainOf(party);
 
   const body = (
@@ -77,34 +80,60 @@ export function InboxCard(props: InboxCardProps): React.ReactElement {
       ) : null}
 
       {/* Служебная полоса. Направление здесь, а не у темы: оно уточняет письмо,
-          а не называет его. */}
-      <div className="mt-2 flex items-center gap-1.5 flex-wrap">
-        <span
-          className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--background-secondary)] text-[var(--foreground-muted)]"
-          title={outbound ? "Исходящее (от менеджера)" : "Входящее"}
-        >
-          {outbound ? "→ ИСХ" : "← ВХ"}
-        </span>
-        {attachments > 0 ? <span className={CHIP}>📎 {attachments}</span> : null}
-        {domain ? (
-          // Репутации пока нет — показываем домен, по которому её будут считать.
-          <span className={CHIP} title="Домен отправителя">
-            {domain}
+          а не называет его.
+
+          Меню действий стоит в этой же строке, справа. Оно относится к письму
+          целиком, но зрительно принадлежит служебной полосе — и метки, и «что с
+          этим письмом сделать» это одна мысль. Отдельной строкой ниже кнопка
+          висела сама по себе и растягивала карточку впустую.
+
+          Метки — вложенный контейнер с flex-1: переносятся внутри себя, а
+          кнопка остаётся на своей строке и никогда не срывается вниз. */}
+      <div className="mt-2 flex items-center gap-2">
+        <div className="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+          <span
+            className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-[var(--background-secondary)] text-[var(--foreground-muted)]"
+            title={outbound ? "Исходящее (от менеджера)" : "Входящее"}
+          >
+            {outbound ? "→ ИСХ" : "← ВХ"}
           </span>
+          {attachments > 0 ? <span className={CHIP}>📎 {attachments}</span> : null}
+          {domain ? (
+            // Репутации пока нет — показываем домен, по которому её будут считать.
+            <span className={CHIP} title="Домен отправителя">
+              {domain}
+            </span>
+          ) : null}
+          {marks?.map((m) => (
+            <span key={m} className={CHIP}>
+              {m}
+            </span>
+          ))}
+        </div>
+        {actions ? (
+          // z-10 поднимает кнопку над накладкой-ссылкой (см. ниже), иначе
+          // нажатие на неё открывало бы письмо.
+          <div className="shrink-0 relative z-10">{actions}</div>
         ) : null}
-        {marks?.map((m) => (
-          <span key={m} className={CHIP}>
-            {m}
-          </span>
-        ))}
       </div>
     </div>
   );
 
   if (!href) return <div className="block">{body}</div>;
+
+  // Ссылка — прозрачная накладка поверх строки, а не обёртка вокруг неё.
+  //
+  // Обёртка не годится: кнопка действий оказалась бы ВНУТРИ ссылки — это и
+  // невалидная разметка, и нажатие на неё уводило бы в письмо. Раньше кнопку
+  // приходилось выносить наружу, отдельной строкой снизу, — отсюда и разнобой
+  // уровней.
+  //
+  // Накладка кликабельна целиком, как и раньше, но подсветку наведения несёт
+  // контейнер: будь она на самой накладке, фон лёг бы ПОВЕРХ текста.
   return (
-    <Link href={href} className="row-clickable block">
+    <div className="relative row-clickable">
       {body}
-    </Link>
+      <Link href={href} className="absolute inset-0" aria-label={subject || "Открыть письмо"} />
+    </div>
   );
 }

@@ -267,14 +267,14 @@ export default async function InboxPage({ searchParams }: Props) {
                             ? []
                             : ["без клиента"]
                       }
+                      // Действия и здесь: письмо в общем списке ничем не хуже
+                      // письма во вкладке, а состояние у него своё.
+                      actions={
+                        inbox ? (
+                          <InboxRowActions inboxMessageId={inbox.id} status={inbox.status} />
+                        ) : null
+                      }
                     />
-                    {/* Действия и здесь: письмо в общем списке ничем не хуже
-                        письма во вкладке, а состояние у него своё. */}
-                    {inbox ? (
-                      <div className="flex justify-end">
-                        <InboxRowActions inboxMessageId={inbox.id} status={inbox.status} />
-                      </div>
-                    ) : null}
                   </li>
                 );
               })}
@@ -289,37 +289,28 @@ export default async function InboxPage({ searchParams }: Props) {
         <Card className="p-0">
           <ul className="divide-y divide-[var(--border)]">
             {rows.map((row) => (
-              <li key={row.id} className="flex items-stretch">
-                <div className="flex-1 min-w-0">
-                  <InboxCard
-                    href={`/admin/crm/inbox/${row.id}`}
-                    subject={row.subject}
-                    preview={previewOf(row.bodyText)}
-                    outbound={row.direction === "OUTBOUND"}
-                    party={row.direction === "OUTBOUND" ? row.toEmail : row.fromEmail}
-                    time={compactDateTime(row.receivedAt, now)}
-                    folder={row.toEmail}
-                    attachments={attachmentCount(row.attachments)}
-                    marks={[
-                      // Во вкладке «Спам и удалённые» лежат оба статуса, и
-                      // отличить их можно только меткой.
-                      ...(status === "JUNK"
-                        ? [row.status === "SPAM" ? "спам" : "удалено"]
-                        : []),
-                      ...(isBacklog(row.receivedAt, row.emailMessage?.createdAt)
-                        ? ["синхр. позже"]
-                        : []),
-                    ]}
-                  />
-                </div>
-                {/* Разбор из списка: иначе очередь чистится только по одному
-                    письму за заход в карточку и обратно. */}
-                {/* Меню внизу справа: сверху у строки тема и время, и кнопка
-                    рядом с ними спорила бы с ними за внимание. Внизу она стоит
-                    у служебной полосы, к которой и относится. */}
-                <div className="shrink-0 flex items-end">
-                  <InboxRowActions inboxMessageId={row.id} status={status} />
-                </div>
+              <li key={row.id}>
+                <InboxCard
+                  href={`/admin/crm/inbox/${row.id}`}
+                  subject={row.subject}
+                  preview={previewOf(row.bodyText)}
+                  outbound={row.direction === "OUTBOUND"}
+                  party={row.direction === "OUTBOUND" ? row.toEmail : row.fromEmail}
+                  time={compactDateTime(row.receivedAt, now)}
+                  folder={row.toEmail}
+                  attachments={attachmentCount(row.attachments)}
+                  marks={[
+                    // Во вкладке «Спам и удалённые» лежат оба статуса, и
+                    // отличить их можно только меткой.
+                    ...(status === "JUNK" ? [row.status === "SPAM" ? "спам" : "удалено"] : []),
+                    ...(isBacklog(row.receivedAt, row.emailMessage?.createdAt)
+                      ? ["синхр. позже"]
+                      : []),
+                  ]}
+                  // Разбор из списка: иначе очередь чистится только по одному
+                  // письму за заход в карточку и обратно.
+                  actions={<InboxRowActions inboxMessageId={row.id} status={status} />}
+                />
               </li>
             ))}
           </ul>
