@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { UserContactsForm } from "@/components/admin/UserContactsForm";
 import { UserAdminActions } from "@/components/admin/UserAdminActions";
+import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
 
 interface UserDetail {
   id: string;
@@ -107,6 +108,23 @@ export default async function UserDetailPage({ params }: Props) {
               Открыть карточку клиента →
             </Link>
           </p>
+        </div>
+      )}
+
+      {viewerIsAdmin && !isSelf && (
+        <div className="mt-6 card border-[var(--color-error)]/30">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-error)] mb-2">
+            Опасная зона
+          </h2>
+          <p className="text-sm text-[var(--foreground-muted)] mb-3">
+            Удаление вместе со всеми связанными данными — заказ-нарядами, сделками, сметами,
+            перепиской и автомобилями. Сначала выгружается копия, без неё удаление не выполнится.
+          </p>
+          <EraseCustomerPanel
+            customerUserId={user.id}
+            customerName={user.name}
+            confirmPhrase={user.email ?? user.phone ?? ""}
+          />
         </div>
       )}
 

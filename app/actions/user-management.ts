@@ -52,26 +52,36 @@ export async function getPurgeBlockers(
 ): Promise<Ok<{ blockers: PurgeBlocker[] }> | Fail> {
   await requireRole(["ADMIN"]);
 
-  const [repairOrders, deals, communications, vehicles, tasks, rentals, loyalty] =
+  const [repairOrders, deals, communications, tasks, rentals, loyalty, servicedCars] =
     (await Promise.all([
       db.repairOrder.count({ where: { userId } }),
       db.deal.count({ where: { customerUserId: userId } }),
       db.communicationLog.count({ where: { customerUserId: userId } }),
-      db.vehicle.count({ where: { ownerUserId: userId } }),
       db.crmTask.count({ where: { ownerUserId: userId } }),
       db.rentalBooking.count({ where: { userId } }),
       // Loyalty hangs off LoyaltyAccount, not the user directly.
       db.loyaltyTransaction.count({ where: { account: { userId } } }),
+      // A car is part of the person's profile, not history, so simply owning
+      // one does not block a purge — it is deleted with them. A car that has
+      // been through the shop IS history, and `RepairOrder.vehicleId` cascades,
+      // so deleting it would take those orders (possibly another customer's,
+      // if the car changed hands) with it. That case blocks.
+      db.vehicle.count({
+        where: {
+          ownerUserId: userId,
+          OR: [{ repairOrders: { some: {} } }, { rentalBookings: { some: {} } }],
+        },
+      }),
     ])) as number[];
 
   const blockers: PurgeBlocker[] = [
     { label: "заказ-наряды", count: repairOrders },
     { label: "сделки", count: deals },
     { label: "переписка", count: communications },
-    { label: "автомобили", count: vehicles },
     { label: "задачи", count: tasks },
     { label: "аренды", count: rentals },
     { label: "бонусные операции", count: loyalty },
+    { label: "автомобили с историей обслуживания", count: servicedCars },
   ].filter((b) => b.count > 0);
 
   return { ok: true, blockers };
@@ -114,7 +124,7 @@ export async function purgeEmptyUser(userId: string): Promise<Ok | Fail> {
     const detail = blockersResult.blockers.map((b) => `${b.label}: ${b.count}`).join(", ");
     return {
       ok: false,
-      error: `Нельзя удалить — есть связанные записи (${detail}). Используйте архивирование.`,
+      error: `Здесь удаляются только пустые записи, а у пользователя есть данные (${detail}). Используйте полное удаление с выгрузкой копии.`,
     };
   }
 
