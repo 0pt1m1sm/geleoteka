@@ -1,9 +1,14 @@
 "use client";
 
 import { useTransition } from "react";
-import { Archive, Ban } from "lucide-react";
+import { Archive, Ban, RotateCcw, Trash2 } from "lucide-react";
 
-import { archiveInboxMessage, markInboxMessageSpam } from "@/app/actions/crm/inbox";
+import {
+  archiveInboxMessage,
+  deleteInboxMessage,
+  markInboxMessageSpam,
+  restoreInboxMessage,
+} from "@/app/actions/crm/inbox";
 import { toast } from "@/lib/ui/toast";
 
 /**
@@ -19,7 +24,14 @@ import { toast } from "@/lib/ui/toast";
  * Удаления здесь нет намеренно — см. archiveInboxMessage: письмо остаётся в
  * ящике сервиса, из очереди уходит только его статус.
  */
-export function InboxRowActions({ inboxMessageId }: { inboxMessageId: string }): React.ReactElement {
+export function InboxRowActions({
+  inboxMessageId,
+  status,
+}: {
+  inboxMessageId: string;
+  /** Текущая вкладка: у разобранного письма другой набор действий. */
+  status: string;
+}): React.ReactElement {
   const [pending, startTransition] = useTransition();
 
   function run(fn: () => Promise<{ error: string | null }>, done: string): void {
@@ -31,6 +43,25 @@ export function InboxRowActions({ inboxMessageId }: { inboxMessageId: string }):
       }
       toast.success(done);
     });
+  }
+
+  // Разобранному письму нужен один обратный ход, а не весь набор: предлагать
+  // «в спам» тому, что уже в спаме, незачем.
+  if (status !== "PENDING") {
+    return (
+      <div className="flex items-center gap-1 shrink-0 pr-3 pt-3">
+        <button
+          type="button"
+          onClick={() => run(() => restoreInboxMessage(inboxMessageId), "Вернули в очередь")}
+          disabled={pending}
+          className="btn-icon"
+          title="Вернуть в очередь разбора"
+          aria-label="Вернуть в очередь"
+        >
+          <RotateCcw size={15} />
+        </button>
+      </div>
+    );
   }
 
   return (
@@ -54,6 +85,16 @@ export function InboxRowActions({ inboxMessageId }: { inboxMessageId: string }):
         aria-label="Спам"
       >
         <Ban size={15} />
+      </button>
+      <button
+        type="button"
+        onClick={() => run(() => deleteInboxMessage(inboxMessageId), "В корзине")}
+        disabled={pending}
+        className="btn-icon"
+        title="В корзину — письмо можно вернуть"
+        aria-label="В корзину"
+      >
+        <Trash2 size={15} />
       </button>
     </div>
   );

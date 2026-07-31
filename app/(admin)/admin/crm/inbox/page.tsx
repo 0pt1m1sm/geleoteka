@@ -16,6 +16,7 @@ const STATUS_TABS: Array<{ key: string; label: string }> = [
   { key: "PENDING", label: "Pending" },
   { key: "ARCHIVED", label: "Архив" },
   { key: "SPAM", label: "Спам" },
+  { key: "DELETED", label: "Удалённые" },
 ];
 
 interface InboxRow {
@@ -158,7 +159,7 @@ export default async function InboxPage({ searchParams }: Props) {
                 </Link>
                 {/* Разбор из списка: иначе очередь чистится только по одному
                     письму за заход в карточку и обратно. */}
-                {status === "PENDING" ? <InboxRowActions inboxMessageId={row.id} /> : null}
+                <InboxRowActions inboxMessageId={row.id} status={status} />
               </li>
             ))}
           </ul>
