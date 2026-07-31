@@ -8,6 +8,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
 import { emailAttachmentHref } from "@/lib/email/attachment-url";
 import { InboxActions } from "@/components/admin/inbox/InboxActions";
+import { EmailBodyFrame } from "@/components/admin/inbox/EmailBodyFrame";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -182,12 +183,7 @@ export default async function InboxMessagePage({ params }: Props) {
           <Card>
             <h3 className="font-semibold mb-3">Содержимое</h3>
             {msg.bodyHtml ? (
-              <iframe
-                sandbox=""
-                srcDoc={msg.bodyHtml}
-                className="w-full min-h-[400px] border border-[var(--border)] rounded bg-white"
-                title="Содержимое письма"
-              />
+              <EmailBodyFrame html={msg.bodyHtml} />
             ) : msg.bodyText ? (
               <pre className="text-sm whitespace-pre-wrap font-sans">{msg.bodyText}</pre>
             ) : (
