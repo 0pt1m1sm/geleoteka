@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
-import { EraseCustomerPanel } from "@/components/admin/customers/EraseCustomerPanel";
+import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
 import { db } from "@/lib/db";
 import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { Card, PageHeader } from "@/components/ui";
@@ -173,9 +173,9 @@ export default async function UsersAdminPage({ searchParams }: Props) {
                 !u.isSupplier &&
                 u.permissionRole !== "ADMIN" ? (
                   <div className="shrink-0">
-                    <EraseCustomerPanel
-                      customerUserId={u.id}
-                      customerName={u.name}
+                    <UserActionsMenu
+                      userId={u.id}
+                      userName={u.name}
                       confirmPhrase={u.email ?? u.phone ?? ""}
                       redirectTo="/admin/users"
                     />
