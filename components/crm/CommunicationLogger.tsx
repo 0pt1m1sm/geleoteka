@@ -332,10 +332,11 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
 
   return (
     <li
+      id={`communication-${entry.id}`}
       className={
         isUnread
-          ? "py-3 pl-3 -ml-3 border-l-2 border-[var(--color-accent)] bg-[var(--background-elevated)]/40"
-          : "py-3"
+          ? "py-3 pl-3 -ml-3 scroll-mt-6 border-l-2 border-[var(--color-accent)] bg-[var(--background-elevated)]/40"
+          : "py-3 scroll-mt-6"
       }
     >
       <div className="flex items-start gap-3">

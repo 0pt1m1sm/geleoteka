@@ -76,6 +76,46 @@ export async function completeCrmTask(id: string): Promise<TaskResult> {
   return { error: null, id };
 }
 
+export async function claimCrmTask(id: string): Promise<TaskResult> {
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  const existing = (await db.crmTask.findUnique({
+    where: { id },
+    select: {
+      status: true,
+      ownerUserId: true,
+      customerUserId: true,
+      dealId: true,
+    },
+  })) as {
+    status: string;
+    ownerUserId: string | null;
+    customerUserId: string | null;
+    dealId: string | null;
+  } | null;
+
+  if (!existing) return { error: "Задача не найдена" };
+  if (existing.status !== "OPEN") {
+    return { error: "Взять можно только открытую задачу" };
+  }
+  if (existing.ownerUserId === session.id) return { error: null, id };
+  if (existing.ownerUserId !== null) {
+    return { error: "Задача уже назначена другому сотруднику" };
+  }
+
+  // The owner predicate is the concurrency guard: if two managers claim the
+  // same row, only the first update can match ownerUserId=null.
+  const claimed = (await db.crmTask.updateMany({
+    where: { id, status: "OPEN", ownerUserId: null },
+    data: { ownerUserId: session.id },
+  })) as { count: number };
+  if (claimed.count !== 1) {
+    return { error: "Задачу уже взял другой сотрудник или её статус изменился" };
+  }
+
+  revalidateTaskPaths(existing);
+  return { error: null, id };
+}
+
 export async function reopenCrmTask(id: string): Promise<TaskResult> {
   await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.crmTask.findUnique({

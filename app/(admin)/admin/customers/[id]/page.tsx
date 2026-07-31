@@ -23,6 +23,10 @@ import { DeleteCarButton } from "@/components/shared/DeleteCarButton";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{
+    tab?: string | string[];
+    message?: string | string[];
+  }>;
 }
 
 interface RawCustomer {
@@ -64,18 +68,21 @@ interface RawCustomer {
   contacts: Array<{ id: string; type: "EMAIL" | "PHONE"; value: string }>;
 }
 
-export default async function CustomerDetailPage({ params }: Props) {
+export default async function CustomerDetailPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
   const { id } = await params;
+  const query = await searchParams;
+  const initialTab = typeof query.tab === "string" ? query.tab : undefined;
+  const messageId = typeof query.message === "string" ? query.message : undefined;
 
   // NOTE: readAt is flipped by the CommunicationLogger client component AFTER
   // first paint (useEffect → markRepliesRead). Calling it server-side here
   // would flip readAt before the snapshot loads, killing the unread styling.
 
-  const [customerRaw, availableTags, commLogs, tasks, deals] = await Promise.all([
+  const [customerRaw, availableTags, commLogs, tasks, deals, anchoredCommLog] = await Promise.all([
     db.user.findUnique({
       where: { id },
       include: {
@@ -167,6 +174,26 @@ export default async function CustomerDetailPage({ params }: Props) {
         tasks: Array<{ id: string; dueAt: Date }>;
       }>
     >,
+    messageId
+      ? db.communicationLog.findFirst({
+          where: { id: messageId, customerUserId: id },
+          select: {
+            id: true,
+            channel: true,
+            outcome: true,
+            body: true,
+            durationSec: true,
+            createdAt: true,
+            author: { select: { id: true, name: true } },
+            deal: { select: { id: true, number: true } },
+            subject: true,
+            resendEmailId: true,
+            emailMessageId: true,
+            attachments: true,
+            readAt: true,
+          },
+        })
+      : Promise.resolve(null),
   ]);
   const nowMs = new Date().valueOf();
 
@@ -181,6 +208,11 @@ export default async function CustomerDetailPage({ params }: Props) {
   const lastTouchAt = customer.customerProfile?.lastTouchAt ?? null;
   const firstSeenAt = customer.customerProfile?.firstSeenAt ?? null;
   const source = customer.customerProfile?.source ?? null;
+  const visibleCommLogs = anchoredCommLog && !commLogs.some((entry) => entry.id === anchoredCommLog.id)
+    ? [...commLogs, anchoredCommLog].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      )
+    : commLogs;
 
   const timelineNotes: TimelineNote[] = customer.customerNotes.map((n) => ({
     id: n.id,
@@ -258,6 +290,7 @@ export default async function CustomerDetailPage({ params }: Props) {
       </div>
 
       <CustomerTabs
+        initialTab={initialTab}
         tabs={[
           {
             key: "overview",
@@ -433,7 +466,7 @@ export default async function CustomerDetailPage({ params }: Props) {
                   <CommunicationLogger
                     customerUserId={customer.id}
                     customerEmail={customer.email}
-                    initialEntries={commLogs.map((e) => ({
+                    initialEntries={visibleCommLogs.map((e) => ({
                       id: e.id,
                       channel: e.channel,
                       outcome: e.outcome,

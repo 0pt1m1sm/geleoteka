@@ -1,5 +1,7 @@
 /** Russian labels for CRM Phase 3 / 4 enums. */
 
+import { isInboundCommChannel } from "@/lib/crm/inbound-communications";
+
 // Visible channels in dropdown — listed in pairs by medium. Legacy values
 // (WHATSAPP / TELEGRAM / EMAIL без направления) остаются в enum для аудита
 // старых строк, но не показываются в выборе нового сообщения.
@@ -47,14 +49,6 @@ const EMAIL_CHANNELS = new Set(["EMAIL", "EMAIL_INBOUND", "EMAIL_OUTBOUND"]);
 export function isEmailChannel(channel: string): boolean {
   return EMAIL_CHANNELS.has(channel);
 }
-const INBOUND_CHANNELS = new Set([
-  "PHONE_INBOUND",
-  "SMS_INBOUND",
-  "EMAIL_INBOUND",
-  "WHATSAPP_INBOUND",
-  "TELEGRAM_INBOUND",
-  "MAX_INBOUND",
-]);
 const OUTBOUND_CHANNELS = new Set([
   "PHONE_OUTBOUND",
   "SMS_OUTBOUND",
@@ -70,7 +64,7 @@ export function isOutboundEmailChannel(channel: string): boolean {
   return channel === "EMAIL_OUTBOUND";
 }
 export function isInboundChannel(channel: string): boolean {
-  return INBOUND_CHANNELS.has(channel);
+  return isInboundCommChannel(channel);
 }
 export function isOutboundChannel(channel: string): boolean {
   return OUTBOUND_CHANNELS.has(channel);

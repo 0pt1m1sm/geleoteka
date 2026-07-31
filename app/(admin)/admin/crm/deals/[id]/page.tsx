@@ -17,6 +17,7 @@ import { customerName } from "@/lib/crm/customer-display";
 
 interface Props {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ message?: string | string[] }>;
 }
 
 interface DealDetail {
@@ -72,18 +73,20 @@ interface DealDetail {
     status: string;
     dueAt: Date;
     completedAt: Date | null;
-    owner: { id: string; name: string };
+    owner: { id: string; name: string } | null;
     customer: { id: string; name: string } | null;
     deal: { id: string; number: string | null } | null;
   }>;
 }
 
-export default async function CrmDealDetailPage({ params }: Props) {
+export default async function CrmDealDetailPage({ params, searchParams }: Props) {
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");
   }
   const { id } = await params;
+  const query = await searchParams;
+  const messageId = typeof query.message === "string" ? query.message : undefined;
 
   const deal = (await db.deal.findUnique({
     where: { id },
@@ -169,6 +172,32 @@ export default async function CrmDealDetailPage({ params }: Props) {
   })) as DealDetail | null;
   if (!deal) notFound();
 
+  const anchoredCommLog = messageId && !deal.communicationLogs.some((entry) => entry.id === messageId)
+    ? (await db.communicationLog.findFirst({
+        where: { id: messageId, dealId: id },
+        select: {
+          id: true,
+          channel: true,
+          outcome: true,
+          body: true,
+          durationSec: true,
+          createdAt: true,
+          author: { select: { id: true, name: true } },
+          deal: { select: { id: true, number: true } },
+          subject: true,
+          resendEmailId: true,
+          emailMessageId: true,
+          attachments: true,
+          readAt: true,
+        },
+      }) as DealDetail["communicationLogs"][number] | null)
+    : null;
+  const visibleCommunicationLogs = anchoredCommLog
+    ? [...deal.communicationLogs, anchoredCommLog].sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      )
+    : deal.communicationLogs;
+
   // NOTE: readAt is flipped by the CommunicationLogger client component
   // AFTER first paint, NOT here — otherwise the unread visual treatment
   // never renders.
@@ -246,7 +275,7 @@ export default async function CrmDealDetailPage({ params }: Props) {
                 customerUserId={deal.customer.id}
                 dealId={deal.id}
                 customerEmail={deal.customer.email}
-                initialEntries={deal.communicationLogs.map((e) => ({
+                initialEntries={visibleCommunicationLogs.map((e) => ({
                   id: e.id,
                   channel: e.channel,
                   outcome: e.outcome,

@@ -3,10 +3,11 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Plus, RotateCcw, X } from "lucide-react";
+import { CheckCircle2, Plus, RotateCcw, UserPlus, X } from "lucide-react";
 import { Alert, Button, Input, Textarea } from "@/components/ui";
 import {
   cancelCrmTask,
+  claimCrmTask,
   completeCrmTask,
   createCrmTask,
   reopenCrmTask,
@@ -18,6 +19,7 @@ import {
   CRM_TASK_KIND_LABELS,
   CRM_TASK_STATUS_LABELS,
 } from "@/lib/crm-labels";
+import { inboundCommunicationCopy } from "@/lib/crm/inbound-communications";
 import { toast } from "@/lib/ui/toast";
 import { confirm } from "@/lib/ui/confirm";
 import { formatDateTime } from "@/lib/utils";
@@ -34,6 +36,8 @@ interface TaskView {
   owner: { id: string; name: string } | null;
   customer: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
+  /** Resolved at render time until Story 3 adds a durable task → log FK. */
+  latestInboundCommunication?: { id: string; channel: string } | null;
 }
 
 interface Props {
@@ -417,6 +421,11 @@ function TaskRow({
                 {task.body}
               </p>
             ) : null}
+            {task.latestInboundCommunication ? (
+              <span className="inline-block mt-1.5 text-xs font-medium text-[var(--color-accent)]">
+                {inboundCommunicationCopy(task.latestInboundCommunication.channel).openAction} →
+              </span>
+            ) : null}
             {error ? (
               <div className="text-xs text-[var(--color-error)] mt-1">{error}</div>
             ) : null}
@@ -464,42 +473,58 @@ function TaskRow({
         </div>
       </TaskBodyLink>
 
-      {isOpen ? (
-        <button
-          type="button"
-          onClick={async () => {
-            const ok = await confirm({
-              message: "Отменить задачу?",
-              danger: true,
-              confirmText: "Отменить задачу",
-              cancelText: "Не отменять",
-            });
-            if (!ok) return;
-            run(() => cancelCrmTask(task.id), "Задача отменена");
-          }}
-          disabled={pending}
-          data-loading={pending || undefined}
-          aria-busy={pending || undefined}
-          className="btn-icon shrink-0 absolute top-3 right-0 z-[1] sm:static"
-          aria-label="Отменить задачу"
-          title="Отменить"
-        >
-          <X size={14} />
-        </button>
-      ) : task.status === "CANCELLED" ? (
-        <button
-          type="button"
-          onClick={() => run(() => reopenCrmTask(task.id), "Задача восстановлена")}
-          disabled={pending}
-          data-loading={pending || undefined}
-          aria-busy={pending || undefined}
-          className="btn-icon shrink-0 absolute top-3 right-0 z-[1] sm:static"
-          aria-label="Восстановить"
-          title="Восстановить"
-        >
-          <RotateCcw size={14} />
-        </button>
-      ) : null}
+      <div className="shrink-0 flex items-center gap-1 self-start relative z-[1]">
+        {isOpen && !task.owner ? (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            leftIcon={<UserPlus size={14} />}
+            onClick={() => run(() => claimCrmTask(task.id), "Задача назначена вам")}
+            disabled={pending}
+            isLoading={pending}
+          >
+            Взять себе
+          </Button>
+        ) : null}
+
+        {isOpen ? (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await confirm({
+                message: "Отменить задачу?",
+                danger: true,
+                confirmText: "Отменить задачу",
+                cancelText: "Не отменять",
+              });
+              if (!ok) return;
+              run(() => cancelCrmTask(task.id), "Задача отменена");
+            }}
+            disabled={pending}
+            data-loading={pending || undefined}
+            aria-busy={pending || undefined}
+            className="btn-icon shrink-0"
+            aria-label="Отменить задачу"
+            title="Отменить"
+          >
+            <X size={14} />
+          </button>
+        ) : task.status === "CANCELLED" ? (
+          <button
+            type="button"
+            onClick={() => run(() => reopenCrmTask(task.id), "Задача восстановлена")}
+            disabled={pending}
+            data-loading={pending || undefined}
+            aria-busy={pending || undefined}
+            className="btn-icon shrink-0"
+            aria-label="Восстановить"
+            title="Восстановить"
+          >
+            <RotateCcw size={14} />
+          </button>
+        ) : null}
+      </div>
     </li>
   );
 }
@@ -519,11 +544,17 @@ function TaskBodyLink({
   showLinks: boolean;
   children: React.ReactNode;
 }): React.ReactElement {
-  const target = task.deal
-    ? `/admin/crm/deals/${task.deal.id}`
-    : task.customer
-      ? `/admin/customers/${task.customer.id}`
-      : null;
+  const inbound = task.latestInboundCommunication;
+  const anchor = inbound ? `communication-${encodeURIComponent(inbound.id)}` : null;
+  const target = inbound && task.deal
+    ? `/admin/crm/deals/${task.deal.id}?message=${encodeURIComponent(inbound.id)}#${anchor}`
+    : inbound && task.customer
+      ? `/admin/customers/${task.customer.id}?tab=communications&message=${encodeURIComponent(inbound.id)}#${anchor}`
+      : task.deal
+        ? `/admin/crm/deals/${task.deal.id}`
+        : task.customer
+          ? `/admin/customers/${task.customer.id}`
+          : null;
 
   if (!target) {
     return <div className="flex-1 min-w-0">{children}</div>;
@@ -533,7 +564,9 @@ function TaskBodyLink({
       href={target}
       className="row-clickable flex-1 min-w-0 -mx-2 px-2 py-1 rounded"
       aria-label={
-        showLinks && task.deal
+        inbound
+          ? inboundCommunicationCopy(inbound.channel).openAction
+          : showLinks && task.deal
           ? `Открыть сделку ${task.deal.number ?? ""}`.trim()
           : showLinks && task.customer
             ? `Открыть карточку клиента ${task.customer.name}`

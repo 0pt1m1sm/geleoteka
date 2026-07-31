@@ -6,8 +6,9 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
+import { INBOUND_COMM_CHANNELS } from "@/lib/crm/inbound-communications";
 
-interface TaskRow {
+interface StoredTaskRow {
   id: string;
   title: string;
   body: string | null;
@@ -15,9 +16,19 @@ interface TaskRow {
   status: string;
   dueAt: Date;
   completedAt: Date | null;
-  owner: { id: string; name: string };
+  ownerUserId: string | null;
+  customerUserId: string | null;
+  dealId: string | null;
+  owner: { id: string; name: string } | null;
   customer: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
+}
+
+interface InboundCommunicationRow {
+  id: string;
+  customerUserId: string;
+  dealId: string | null;
+  channel: string;
 }
 
 interface Props {
@@ -34,8 +45,14 @@ export default async function CrmTasksPage({ searchParams }: Props) {
   // Default scope is "open" (all my open tasks regardless of due date) so a
   // freshly created task with a future due date is immediately visible.
   // Use the "Сегодня" / "Просрочено" / "На неделе" chips to narrow down.
-  const scope = scopeParam ?? "open";
-  const ownerScope = ownerParam ?? "mine";
+  const scope = ["today", "overdue", "week", "open", "done", "all"].includes(
+    scopeParam ?? "",
+  )
+    ? (scopeParam as string)
+    : "open";
+  const ownerScope = ["mine", "team", "replies"].includes(ownerParam ?? "")
+    ? (ownerParam as string)
+    : "mine";
 
   const now = new Date();
   const startToday = new Date(now);
@@ -48,6 +65,10 @@ export default async function CrmTasksPage({ searchParams }: Props) {
   const where: Record<string, unknown> = {};
   if (ownerScope === "mine") {
     where.ownerUserId = session.id;
+  } else if (ownerScope === "replies") {
+    // Deliberately no owner predicate: this is the shared queue, including
+    // replies assigned to colleagues and replies with ownerUserId=null.
+    where.kind = "FOLLOW_UP";
   }
 
   if (scope === "overdue") {
@@ -66,7 +87,7 @@ export default async function CrmTasksPage({ searchParams }: Props) {
   }
   // "all" leaves filter empty (all statuses, all dues)
 
-  const tasks = (await db.crmTask.findMany({
+  const storedTasks = (await db.crmTask.findMany({
     where,
     orderBy: [{ status: "asc" }, { dueAt: "asc" }],
     take: 200,
@@ -78,11 +99,60 @@ export default async function CrmTasksPage({ searchParams }: Props) {
       status: true,
       dueAt: true,
       completedAt: true,
+      ownerUserId: true,
+      customerUserId: true,
+      dealId: true,
       owner: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true } },
       deal: { select: { id: true, number: true } },
     },
-  })) as TaskRow[];
+  })) as StoredTaskRow[];
+
+  // CrmTask deliberately has no message FK until Story 3. Resolve the current
+  // OPEN reply task to the newest inbound CommunicationLog for the same exact
+  // (customerUserId, dealId) pair. `dealId: null` is a real pair, not a reason
+  // to drop the task from navigation.
+  const pairs = new Map<string, { customerUserId: string; dealId: string | null }>();
+  for (const task of storedTasks) {
+    if (task.kind !== "FOLLOW_UP" || task.status !== "OPEN" || !task.customerUserId) continue;
+    pairs.set(communicationPairKey(task.customerUserId, task.dealId), {
+      customerUserId: task.customerUserId,
+      dealId: task.dealId,
+    });
+  }
+
+  const pairValues = Array.from(pairs.values());
+  const latestInboundRows = pairValues.length > 0
+    ? (await db.communicationLog.findMany({
+        where: {
+          channel: { in: [...INBOUND_COMM_CHANNELS] },
+          OR: pairValues,
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        distinct: ["customerUserId", "dealId"],
+        select: {
+          id: true,
+          customerUserId: true,
+          dealId: true,
+          channel: true,
+        },
+      }) as InboundCommunicationRow[])
+    : [];
+
+  const latestInboundByPair = new Map(
+    latestInboundRows.map((entry) => [
+      communicationPairKey(entry.customerUserId, entry.dealId),
+      { id: entry.id, channel: entry.channel },
+    ]),
+  );
+
+  const tasks = storedTasks.map((task) => ({
+    ...task,
+    latestInboundCommunication:
+      task.kind === "FOLLOW_UP" && task.status === "OPEN" && task.customerUserId
+        ? latestInboundByPair.get(communicationPairKey(task.customerUserId, task.dealId)) ?? null
+        : null,
+  }));
 
   return (
     <div>
@@ -108,6 +178,12 @@ export default async function CrmTasksPage({ searchParams }: Props) {
           value="team"
           label="Команда"
         />
+        <OwnerChip
+          scope={scope}
+          ownerScope={ownerScope}
+          value="replies"
+          label="Ответы клиентов"
+        />
       </div>
 
       <Card>
@@ -115,6 +191,10 @@ export default async function CrmTasksPage({ searchParams }: Props) {
       </Card>
     </div>
   );
+}
+
+function communicationPairKey(customerUserId: string, dealId: string | null): string {
+  return `${customerUserId}\u0000${dealId ?? ""}`;
 }
 
 function Chip({
