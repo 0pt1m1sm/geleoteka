@@ -18,6 +18,22 @@
 /** Slot length. Two hours, matching the labels the UI renders ("09:00 — 11:00"). */
 export const SLOT_MINUTES = 120;
 
+/**
+ * Пересекаются ли две записи, начатые в эти минуты дня.
+ *
+ * Запись занимает слот целиком, а не мгновение своего начала: в 13:00 машина
+ * стоит на посту до 15:00 и мешает и записи в 12:00, и слоту в 14:00. Модель
+ * хранения этого не знает — `Slot.dateTime` уникален по МОМЕНТУ, — поэтому
+ * правило живёт здесь и применяется на отображении.
+ */
+export function slotsOverlap(
+  aStartMinute: number,
+  bStartMinute: number,
+  slotMinutes: number = SLOT_MINUTES,
+): boolean {
+  return aStartMinute < bStartMinute + slotMinutes && bStartMinute < aStartMinute + slotMinutes;
+}
+
 /** Default opening for a weekday, used when nothing is configured. */
 export const DEFAULT_OPEN_MINUTE = 10 * 60;
 export const DEFAULT_CLOSE_MINUTE = 20 * 60;
