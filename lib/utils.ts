@@ -28,8 +28,24 @@ export function formatDate(
   options?: Intl.DateTimeFormatOptions
 ): string {
   const d = typeof date === "string" ? new Date(date) : date;
+  // dateStyle несовместим с покомпонентными настройками: Intl бросает
+  // «Invalid option», а не игнорирует лишнее. Значение по умолчанию поэтому
+  // применяется, только если вызывающий не задал ни свой стиль, ни компоненты —
+  // иначе удобный дефолт превращается в ловушку, роняющую страницу целиком.
+  const hasOwnShape =
+    options !== undefined &&
+    ("dateStyle" in options ||
+      "timeStyle" in options ||
+      "year" in options ||
+      "month" in options ||
+      "day" in options ||
+      "weekday" in options ||
+      "hour" in options ||
+      "minute" in options ||
+      "second" in options);
+
   return new Intl.DateTimeFormat("ru-RU", {
-    dateStyle: "medium",
+    ...(hasOwnShape ? {} : { dateStyle: "medium" as const }),
     timeZone: BUSINESS_TZ,
     ...options,
   }).format(d);
