@@ -1,7 +1,7 @@
 # Уведомления сотрудников и Telegram Implementation Plan
 
 Created: 2026-07-31
-Status: IN_PROGRESS
+Status: COMPLETE
 Mode: auto
 Iterations: 0
 Type: Feature
@@ -169,12 +169,12 @@ email, госномер, VIN, имя файла вложения, причина
 
 ## Progress Tracking
 
-- [ ] Story 1: Видимость в CRM без миграций (Status: PENDING)
-- [ ] Story 2: Схема и ядро в dark mode (Status: PENDING)
-- [ ] Story 3: Письмо → durable event → лента (Status: PENDING)
-- [ ] Story 4: Telegram-адаптер и привязка (Status: PENDING)
-- [ ] Story 5: Остальные события P0/P1 (Status: PENDING)
-- [ ] Story 6: Просрочки и эксплуатация (Status: PENDING)
+- [x] Story 1: Видимость в CRM без миграций (Status: DONE — PR #43, 19a1b81)
+- [x] Story 2: Схема и ядро в dark mode (Status: DONE — PR #44, 4fac11a)
+- [x] Story 3: Письмо → durable event → лента (Status: DONE — PR #46, fe700a6)
+- [x] Story 4: Telegram-адаптер и привязка (Status: DONE — PR #47, 9e513af)
+- [x] Story 5: Остальные события P0/P1 (Status: DONE — PR #48, 42f4323)
+- [x] Story 6: Просрочки и эксплуатация (Status: DONE — PR #49, 88fb72e)
 
 ## Implementation Tasks
 
