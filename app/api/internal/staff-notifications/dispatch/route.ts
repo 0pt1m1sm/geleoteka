@@ -17,6 +17,11 @@ import {
   projectPendingStaffNotificationEvents,
   type StaffNotificationProjectorDb,
 } from "@/lib/staff-notifications/projectors/inbound-customer-message";
+import {
+  cancelActiveStaffNotificationDeliveries,
+  cancelStaffNotificationDeliveriesBefore,
+  type StaffNotificationOperationsDb,
+} from "@/lib/staff-notifications/operations";
 
 export const dynamic = "force-dynamic";
 
@@ -44,13 +49,27 @@ export async function POST(request: Request): Promise<NextResponse> {
       25,
     );
     const telegram = await loadTelegramRuntimeConfig();
+    const operations = db as unknown as StaffNotificationOperationsDb;
+    if (!telegram.enabled && telegram.reason === "invalid-config") {
+      return NextResponse.json(
+        { error: "telegram configuration invalid", projected },
+        { status: 503 },
+      );
+    }
     if (!telegram.enabled || telegram.enabledEventTypes.size === 0) {
+      const cancelled = await cancelActiveStaffNotificationDeliveries(operations);
       return NextResponse.json({
         skipped: true,
-        reason: "disabled",
+        reason: telegram.enabled ? "no-event-types" : "disabled",
         projected,
+        cancelled,
       });
     }
+
+    const historicalCancelled = await cancelStaffNotificationDeliveriesBefore(
+      operations,
+      telegram.enabledAt,
+    );
 
     // leaseStaffNotificationDeliveries commits its short transaction before it
     // returns; every adapter HTTP call below therefore runs outside DB locks.
@@ -68,6 +87,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({
       ok: true,
       projected,
+      historicalCancelled,
       leased: deliveries.length,
       ...counts,
     });

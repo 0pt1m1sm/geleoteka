@@ -32,6 +32,10 @@ export default async function StaffNotificationsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "notifications.view"))) redirect("/");
+  const canManage = await roleHasPermission(
+    session.permissionRole,
+    "notifications.manage",
+  );
 
   const receipts = (await db.staffNotificationReceipt.findMany({
     where: { tenantKey: TENANT_KEY, userId: session.id },
@@ -65,6 +69,14 @@ export default async function StaffNotificationsPage() {
             <Link href="/admin/notifications/telegram" className="btn btn-secondary text-sm">
               Telegram
             </Link>
+            {canManage ? (
+              <Link
+                href="/admin/notifications/operations"
+                className="btn btn-secondary text-sm"
+              >
+                Эксплуатация
+              </Link>
+            ) : null}
             {unreadCount > 0 ? (
               <form action={markAllStaffNotificationsRead}>
                 <button type="submit" className="btn btn-secondary text-sm">

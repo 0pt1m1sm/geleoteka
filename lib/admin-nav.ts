@@ -81,6 +81,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "CRM",
     items: [
       { href: "/admin/notifications", label: "Уведомления" },
+      { href: "/admin/notifications/operations", label: "Эксплуатация уведомлений" },
       { href: "/admin/crm/deals", label: "Сделки" },
       { href: "/admin/crm/estimates", label: "Сметы" },
       { href: "/admin/crm/tasks?scope=open&owner=mine", label: "Задачи" },

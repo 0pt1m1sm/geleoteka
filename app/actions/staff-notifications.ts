@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/feed";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { createTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
+import { requeueDeadStaffNotificationDelivery } from "@/lib/staff-notifications/operations";
 import { TENANT_KEY } from "@/lib/tenant";
 
 export interface CreateTelegramLinkState {
@@ -57,6 +58,56 @@ export async function revokePersonalTelegramLink(): Promise<void> {
 export async function revokeSharedTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.manage");
   await revokeTelegramDestinations({ kind: "SHARED", userId: null }, session);
+}
+
+export async function retryStaffNotificationDelivery(
+  deliveryId: string,
+): Promise<void> {
+  const session = await requirePermission("notifications.manage");
+  await db.$transaction(async (tx) => {
+    const delivery = (await tx.staffNotificationDelivery.findFirst({
+      where: {
+        tenantKey: TENANT_KEY,
+        id: deliveryId,
+        status: "DEAD",
+      },
+      select: {
+        id: true,
+        channel: true,
+        attempts: true,
+        lastErrorCode: true,
+      },
+    })) as {
+      id: string;
+      channel: string;
+      attempts: number;
+      lastErrorCode: string | null;
+    } | null;
+    if (!delivery) return;
+
+    const requeued = await requeueDeadStaffNotificationDelivery(
+      tx,
+      delivery.id,
+    );
+    if (!requeued) return;
+
+    await recordAudit(
+      {
+        actor: session,
+        action: "staff_notification.delivery_retry",
+        targetType: "StaffNotificationDelivery",
+        targetId: delivery.id,
+        targetLabel: "Доставка уведомления",
+        metadata: {
+          channel: delivery.channel,
+          previousAttempts: delivery.attempts,
+          previousErrorCode: delivery.lastErrorCode,
+        },
+      },
+      tx,
+    );
+  });
+  revalidatePath("/admin/notifications/operations");
 }
 
 async function createLink(

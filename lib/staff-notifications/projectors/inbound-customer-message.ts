@@ -114,6 +114,7 @@ const ROUTABLE_EVENT_SOURCE_TYPES = {
   PARTS_ORDER_CREATED: "PartOrder",
   RENTAL_BOOKING_CREATED: "RentalBooking",
   INBOUND_MESSAGE_UNRESOLVED: "InboxMessage",
+  CRM_TASK_OVERDUE: "CrmTask",
 } as const satisfies Partial<Record<StaffNotificationType, string>>;
 
 const ROUTABLE_EVENT_TYPES = Object.keys(
@@ -396,7 +397,9 @@ async function routeProjectedStaffNotification(
     selectedRecipients[0] === event.targetUserId;
   const telegramConfig = await loadTelegramRoutingConfig(tx);
   const destinations =
-    telegramConfig.enabled && telegramConfig.enabledEventTypes.has(eventType)
+    telegramConfig.enabled &&
+    event.occurredAt >= telegramConfig.enabledAt &&
+    telegramConfig.enabledEventTypes.has(eventType)
       ? await loadDestinations(
           tx,
           usesPersonalTarget,

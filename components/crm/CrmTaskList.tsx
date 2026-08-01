@@ -369,6 +369,7 @@ function TaskRow({
 
   return (
     <li
+      id={`task-${task.id}`}
       className="py-3 relative flex items-start gap-3 transition-opacity duration-300"
       data-done={showDoneStyling || undefined}
     >

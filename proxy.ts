@@ -60,6 +60,6 @@ export const config = {
   // The Telegram webhook and staff dispatcher deliberately stay outside this
   // session-auth matcher: each route fails closed on its own server secret.
   // /api/integrations/telegram/webhook and
-  // /api/internal/staff-notifications/dispatch must never be added here.
+  // /api/internal/staff-notifications/{dispatch,maintenance} must never be added here.
   matcher: ["/cabinet/:path*", "/admin/:path*", "/profile"],
 };

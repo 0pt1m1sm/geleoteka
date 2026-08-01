@@ -6,6 +6,7 @@ import {
   normalizeTelegramRoutingMode,
   normalizeTelegramWebhookSecret,
 } from "@/lib/staff-notifications/channels/telegram/config-values";
+import { parseStaffNotificationRetentionDays } from "@/lib/staff-notifications/operations-config-values";
 
 export type SettingValidationResult =
   | { ok: true; value: string }
@@ -50,6 +51,12 @@ export function validateSettingValue(
   if (descriptor.key === "TELEGRAM_ROUTING_MODE") {
     const normalized = normalizeTelegramRoutingMode(value);
     return normalized ? { ok: true, value: normalized } : invalid(descriptor);
+  }
+  if (descriptor.key === "STAFF_NOTIFICATION_RETENTION_DAYS") {
+    const days = parseStaffNotificationRetentionDays(value);
+    return days === null
+      ? invalid(descriptor)
+      : { ok: true, value: String(days) };
   }
 
   return { ok: true, value };

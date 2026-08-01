@@ -15,6 +15,7 @@ const DISPATCH_SECRET_RE = /^[\x21-\x7e]{32,256}$/;
 
 export const TELEGRAM_CORE_SETTING_KEYS = [
   "TELEGRAM_ENABLED",
+  "TELEGRAM_ENABLED_AT",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_BOT_USERNAME",
   "TELEGRAM_WEBHOOK_SECRET",
@@ -39,6 +40,7 @@ export type TelegramRuntimeConfig =
     }
   | {
       enabled: true;
+      enabledAt: Date;
       botToken: string;
       botUsername: string;
       webhookSecret: string;
@@ -64,6 +66,7 @@ export function resolveTelegramRuntimeConfig(
     return { enabled: false, reason: "disabled", enabledEventTypes };
   }
 
+  const enabledAt = normalizeTelegramEnabledAt(values.TELEGRAM_ENABLED_AT);
   const botToken = normalizeTelegramBotToken(values.TELEGRAM_BOT_TOKEN);
   const botUsername = normalizeTelegramBotUsername(values.TELEGRAM_BOT_USERNAME);
   const webhookSecret = normalizeTelegramWebhookSecret(
@@ -73,6 +76,7 @@ export function resolveTelegramRuntimeConfig(
   const applicationOrigin = normalizeApplicationOrigin(applicationUrl);
 
   if (
+    !enabledAt ||
     !botToken ||
     !botUsername ||
     !webhookSecret ||
@@ -84,6 +88,7 @@ export function resolveTelegramRuntimeConfig(
 
   return {
     enabled: true,
+    enabledAt,
     botToken,
     botUsername,
     webhookSecret,
@@ -91,6 +96,18 @@ export function resolveTelegramRuntimeConfig(
     applicationOrigin,
     enabledEventTypes,
   };
+}
+
+export function normalizeTelegramEnabledAt(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(normalized)) {
+    return null;
+  }
+  const parsed = new Date(normalized);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === normalized
+    ? parsed
+    : null;
 }
 
 export function normalizeTelegramBotToken(value: unknown): string | null {
@@ -144,4 +161,3 @@ function normalizeApplicationOrigin(value: string): string | null {
   if (url.pathname !== "/") return null;
   return url.origin;
 }
-

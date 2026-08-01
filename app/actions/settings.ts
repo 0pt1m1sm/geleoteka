@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/authz";
 import { getSetting, invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
-import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
+import { parseBooleanSetting, SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 import { sendEmail, resolveEmailFrom } from "@/lib/email/send";
 import { normalizeTransportName } from "@/lib/email/transport";
 import { validateSettingValue } from "@/lib/settings-validation";
+import { cancelActiveStaffNotificationDeliveries } from "@/lib/staff-notifications/operations";
 
 export interface UpsertSettingsResult {
   error: string | null;
@@ -58,6 +59,16 @@ export async function upsertSettings(
     changes.push({ key, value: validated.value });
   }
 
+  const telegramEnabledChange = changes.find(
+    (change) => change.key === "TELEGRAM_ENABLED",
+  );
+  const telegramEnabledAfter = telegramEnabledChange
+    ? parseBooleanSetting(
+        telegramEnabledChange.value ?? process.env.TELEGRAM_ENABLED ?? null,
+      )
+    : null;
+  const telegramEnabledAt = new Date();
+
   await db.$transaction(async (tx) => {
     for (const change of changes) {
       if (change.value === null) {
@@ -70,12 +81,28 @@ export async function upsertSettings(
         });
       }
     }
+    if (telegramEnabledAfter === true) {
+      await tx.setting.upsert({
+        where: { key: "TELEGRAM_ENABLED_AT" },
+        create: {
+          key: "TELEGRAM_ENABLED_AT",
+          value: telegramEnabledAt.toISOString(),
+          updatedByUserId: session.id,
+        },
+        // Saving another field in the same card must not move the cutover.
+        update: {},
+      });
+    } else if (telegramEnabledAfter === false) {
+      await tx.setting.deleteMany({ where: { key: "TELEGRAM_ENABLED_AT" } });
+      await cancelActiveStaffNotificationDeliveries(tx, "CHANNEL_DISABLED");
+    }
   });
 
   const savedKeys = changes.map((change) => change.key);
   for (const key of savedKeys) {
     invalidateSetting(key);
   }
+  if (telegramEnabledAfter !== null) invalidateSetting("TELEGRAM_ENABLED_AT");
 
   revalidatePath("/admin/settings/integrations");
   return { ok: true, error: null, savedKeys };

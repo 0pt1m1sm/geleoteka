@@ -42,14 +42,19 @@ jobs:
           fi
           # A handful of bounded batches per tick drains bursts without one long request.
           for i in $(seq 1 6); do
-            code=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$URL" \
-              -H "Authorization: Bearer $SECRET" --max-time 45 || echo 000)
+            code=$(curl -sS -o /tmp/resp.json -w '%{http_code}' -X POST "$URL" \
+              -H "Authorization: Bearer $SECRET" --max-time 45 || true)
+            [ -n "$code" ] || code=000
             echo "batch $i → HTTP $code"
+            if [ "$code" = "000" ]; then
+              echo "network interruption; stopping this tick without marking an application failure" >&2
+              exit 0
+            fi
             if [ "$code" != "200" ]; then
-              # 401/503/000 are configuration/availability issues — stop early, next
-              # tick retries. Body is intentionally terse (no secrets server-side).
-              echo "non-200; stopping this tick" >&2
-              [ "$code" = "000" ] && exit 0 || exit 0
+              # 401/403/500/503 are definite application/configuration failures.
+              # They must make the workflow red instead of hiding a stopped queue.
+              echo "mail-sync endpoint rejected or failed; failing workflow" >&2
+              exit 1
             fi
             sleep 6
           done

@@ -56,6 +56,12 @@ async function sendTelegramNotification(
   if (!config.enabled || !config.enabledEventTypes.has(payload.type)) {
     return { outcome: "retry" as const, errorCode: "TELEGRAM_DISABLED" };
   }
+  if (payload.occurredAt < config.enabledAt) {
+    return {
+      outcome: "dead" as const,
+      errorCode: "EVENT_BEFORE_CHANNEL_CUTOVER",
+    };
+  }
 
   const destination = (await dependencies.db.telegramDestination.findUnique({
     where: { tenantKey_id: { tenantKey: TENANT_KEY, id: destinationKey } },

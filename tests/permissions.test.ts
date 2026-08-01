@@ -20,6 +20,9 @@ describe("permissionForPath", () => {
     expect(permissionForPath("/admin/roles")).toBe("roles.manage");
     expect(permissionForPath("/admin/settings/integrations")).toBe("settings.manage");
     expect(permissionForPath("/admin/notifications/telegram")).toBe("notifications.view");
+    expect(permissionForPath("/admin/notifications/operations")).toBe(
+      "notifications.manage",
+    );
   });
 
   // A plain startsWith would hand /admin/warehouse-reports to the warehouse
