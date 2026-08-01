@@ -7,12 +7,13 @@ import { db } from "@/lib/db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate } from "@/lib/utils";
 import { Badge, Card, MetricCard, PageHeader } from "@/components/ui";
 import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
+import { EmailVerificationNotice } from "@/components/cabinet/EmailVerificationNotice";
 
 export default async function CabinetDashboard() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  const [repairOrders, loyalty, vehicleCount] = await Promise.all([
+  const [repairOrders, loyalty, vehicleCount, verificationState] = await Promise.all([
     db.repairOrder.findMany({
       where: {
         userId: session.id,
@@ -29,6 +30,10 @@ export default async function CabinetDashboard() {
     db.vehicle.count({
       where: { ownerUserId: session.id, ownershipType: "CUSTOMER" },
     }),
+    db.user.findUnique({
+      where: { id: session.id },
+      select: { emailVerifiedAt: true },
+    }) as unknown as Promise<{ emailVerifiedAt: Date | null } | null>,
   ]);
 
   return (
@@ -37,6 +42,8 @@ export default async function CabinetDashboard() {
         eyebrow="Кабинет"
         title={`Добро пожаловать, ${session.name}`}
       />
+
+      {verificationState?.emailVerifiedAt ? null : <EmailVerificationNotice />}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <MetricCard

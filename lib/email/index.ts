@@ -2,6 +2,7 @@ export {
   sendBookingConfirmationEmail,
   sendEstimateSentEmail,
   sendRegistrationWelcomeEmail,
+  sendEmailVerificationEmail,
   sendPartOrderConfirmationEmail,
   sendRentalBookingConfirmationEmail,
   type EmailThreadOptions,

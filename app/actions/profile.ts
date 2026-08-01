@@ -6,6 +6,7 @@ import { requireAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { LOCALES, TIME_ZONES } from "@/lib/profile-options";
+import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
 
 interface Result {
   error: string | null;
@@ -60,7 +61,14 @@ export async function updateOwnProfile(
   try {
     await db.user.update({
       where: { id: session.id },
-      data: { name, email, phone: normalizePhone(phoneRaw), timeZone, locale },
+      data: {
+        name,
+        email,
+        phone: normalizePhone(phoneRaw),
+        timeZone,
+        locale,
+        ...resetEmailVerificationOnChange(session.email, email),
+      },
     });
   } catch (err) {
     if (isUniqueViolation(err)) {

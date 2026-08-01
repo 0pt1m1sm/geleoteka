@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
 
 interface SupplierFormData {
   name: string;
@@ -69,12 +70,19 @@ export async function updateSupplier(
   const data = parseSupplierForm(formData);
   if (!data.name) return { error: "Название поставщика обязательно" };
 
+  const current = (await db.user.findUnique({
+    where: { id: supplierUserId },
+    select: { email: true },
+  })) as { email: string } | null;
+  if (!current) return { error: "Поставщик не найден" };
+
   await db.user.update({
     where: { id: supplierUserId },
     data: {
       name: data.name,
       email: data.email,
       phone: data.phone,
+      ...resetEmailVerificationOnChange(current.email, data.email),
       supplierProfile: {
         update: {
           contactName: data.contactName,

@@ -17,6 +17,7 @@ import {
 import { renderBookingConfirmation } from "@/lib/email/templates/booking-confirmation";
 import { renderEstimateSent } from "@/lib/email/templates/estimate-sent";
 import { renderRegistrationWelcome } from "@/lib/email/templates/registration-welcome";
+import { renderEmailVerification } from "@/lib/email/templates/email-verification";
 import { renderPartOrderConfirmation } from "@/lib/email/templates/part-order-confirmation";
 import { renderRentalBookingConfirmation } from "@/lib/email/templates/rental-booking-confirmation";
 
@@ -57,6 +58,11 @@ function scenarioBodies(): Array<{ label: string; subject: string; html: string;
   const registration = renderRegistrationWelcome({
     customerName: "Иван",
     loginUrl: "https://geleoteka.ru/login",
+    verificationUrl: "https://geleoteka.ru/verify-email?token=verification-token",
+  });
+  const emailVerification = renderEmailVerification({
+    customerName: "Иван",
+    verificationUrl: "https://geleoteka.ru/verify-email?token=verification-token",
   });
   const partOrder = renderPartOrderConfirmation({
     customerName: "Иван",
@@ -85,6 +91,7 @@ function scenarioBodies(): Array<{ label: string; subject: string; html: string;
     { label: "booking", ...booking },
     { label: "estimate", ...estimate },
     { label: "registration", ...registration },
+    { label: "email-verification", ...emailVerification },
     { label: "part-order", ...partOrder },
     { label: "rental", ...rental },
     { label: "crm-reply", ...reply },

@@ -10,6 +10,7 @@ import { requireRole } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { sendSms } from "@/lib/sms";
 import { isAllowedRole, type AllowedRole } from "@/lib/roles";
+import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
 
 const NAME_MAX = 120;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -212,10 +213,21 @@ export async function updateUserContacts(
     };
   }
 
+  const current = (await db.user.findUnique({
+    where: { id: userId },
+    select: { email: true },
+  })) as { email: string } | null;
+  if (!current) return { ok: false, error: "Пользователь не найден" };
+
   try {
     await db.user.update({
       where: { id: userId },
-      data: { name, email, phone },
+      data: {
+        name,
+        email,
+        phone,
+        ...resetEmailVerificationOnChange(current.email, email),
+      },
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
