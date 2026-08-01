@@ -63,7 +63,11 @@ export default async function AdminOrdersPage() {
             const user = order.user as Record<string, string> | null;
 
             return (
-              <div key={order.id as string} className="card">
+              <div
+                key={order.id as string}
+                id={`order-${order.id as string}`}
+                className="card"
+              >
                 {/* Order header */}
                 <div className="flex items-start justify-between gap-4 mb-4 pb-4 border-b border-[var(--border)]">
                   <div className="flex-1 min-w-0">

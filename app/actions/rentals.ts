@@ -8,6 +8,8 @@ import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
 import { nextRentalBookingNumber } from "@/lib/crm/public";
+import { publishRentalBookingCreated } from "@/lib/staff-notifications/business-events";
+import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
 
 interface VehicleFormData {
   model: string;
@@ -304,21 +306,39 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
       ],
     });
 
-    const bookingNumber = await nextRentalBookingNumber();
-    const booking = await db.rentalBooking.create({
-      data: {
-        vehicleId: carId,
-        userId: guestResult.userId,
-        dealId: deal.id,
-        startDate: start,
-        endDate: end,
-        contactName,
-        contactPhone: normalizePhone(contactPhone),
-        contactEmail: contactEmail.trim().toLowerCase(),
-        claimToken,
-        notes: notes || null,
-        bookingNumber,
-      },
+    const booking = await db.$transaction(async (tx) => {
+      const bookingNumber = await nextRentalBookingNumber(tx);
+      const created = await tx.rentalBooking.create({
+        data: {
+          vehicleId: carId,
+          userId: guestResult.userId,
+          dealId: deal.id,
+          startDate: start,
+          endDate: end,
+          contactName,
+          contactPhone: normalizePhone(contactPhone),
+          contactEmail: contactEmail.trim().toLowerCase(),
+          claimToken,
+          notes: notes || null,
+          bookingNumber,
+        },
+      });
+      const customer = (await tx.user.findUnique({
+        where: { id: guestResult.userId },
+        select: { name: true },
+      })) as { name: string } | null;
+      await publishRentalBookingCreated(
+        tx as unknown as StaffNotificationPublishTx,
+        {
+          sourceId: created.id,
+          customerUserId: guestResult.userId,
+          customerName: customer?.name ?? "клиент",
+          dealId: deal.id,
+          dealNumber: deal.number,
+          occurredAt: created.createdAt,
+        },
+      );
+      return created;
     });
 
     if (contactEmail) {

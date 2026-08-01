@@ -173,6 +173,26 @@ describe("staff notification router", () => {
     expect(deliveryCreateMany).not.toHaveBeenCalled();
     expect(eventUpdate).toHaveBeenCalledOnce();
   });
+
+  it("does not route PARTS_ORDER_CREATED to staff without parts.manage", () => {
+    expect(
+      selectStaffNotificationRecipients(
+        { targetUserId: null, fallbackPermission: "parts.manage" },
+        [
+          {
+            userId: "crm_manager",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "crm.manage"]),
+          },
+          {
+            userId: "parts_manager",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "parts.manage"]),
+          },
+        ],
+      ),
+    ).toEqual(["parts_manager"]);
+  });
 });
 
 describe("Telegram dark-mode switches", () => {

@@ -49,7 +49,11 @@ export default async function RentalBookingsPage() {
           {bookings.map((b: Record<string, unknown>) => {
             const vehicle = b.vehicle as { model: string };
             return (
-              <div key={b.id as string} className="card">
+              <div
+                key={b.id as string}
+                id={`booking-${b.id as string}`}
+                className="card"
+              >
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="font-medium">

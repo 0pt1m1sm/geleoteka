@@ -7,10 +7,40 @@ import {
   type SafeChannelPayload,
   type StaffNotificationEventRecord,
   type StaffNotificationPriority,
+  type StaffNotificationType,
 } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 
 type QueryArgs = Record<string, unknown>;
+
+const ENTITY_EVENT_IDENTITY = {
+  SERVICE_BOOKING_CREATED: {
+    sourceType: "Booking",
+    dedupePrefix: "service-booking-created",
+  },
+  ESTIMATE_CUSTOMER_APPROVED: {
+    sourceType: "Estimate",
+    dedupePrefix: "estimate-customer-approved",
+  },
+  ESTIMATE_CUSTOMER_DECLINED: {
+    sourceType: "Estimate",
+    dedupePrefix: "estimate-customer-declined",
+  },
+  PARTS_ORDER_CREATED: {
+    sourceType: "PartOrder",
+    dedupePrefix: "parts-order-created",
+  },
+  RENTAL_BOOKING_CREATED: {
+    sourceType: "RentalBooking",
+    dedupePrefix: "rental-booking-created",
+  },
+  INBOUND_MESSAGE_UNRESOLVED: {
+    sourceType: "InboxMessage",
+    dedupePrefix: "inbound-message-unresolved",
+  },
+} as const satisfies Partial<
+  Record<StaffNotificationType, { sourceType: string; dedupePrefix: string }>
+>;
 
 /** The exact delegate available on an open Prisma transaction. */
 export interface StaffNotificationPublishTx {
@@ -96,6 +126,14 @@ export function inboundCustomerMessageDedupeKey(communicationLogId: string): str
   return `inbound-msg:${id}`;
 }
 
+export function staffNotificationEntityDedupeKey(
+  type: keyof typeof ENTITY_EVENT_IDENTITY,
+  sourceId: string,
+): string {
+  const id = requireNonBlank(sourceId, "sourceId");
+  return `${ENTITY_EVENT_IDENTITY[type].dedupePrefix}:${id}`;
+}
+
 export function toSafeChannelPayload(
   event: StaffNotificationEventRecord,
 ): SafeChannelPayload {
@@ -140,6 +178,20 @@ function assertPublishInput(input: PublishStaffNotificationInput): void {
     }
     if (input.dedupeKey !== inboundCustomerMessageDedupeKey(input.sourceId)) {
       throw new Error("INBOUND_CUSTOMER_MESSAGE dedupeKey must be based on CommunicationLog.id");
+    }
+  }
+  const entityIdentity = (
+    ENTITY_EVENT_IDENTITY as Partial<
+      Record<StaffNotificationType, { sourceType: string; dedupePrefix: string }>
+    >
+  )[input.type];
+  if (entityIdentity) {
+    if (input.sourceType !== entityIdentity.sourceType) {
+      throw new Error(`${input.type} must use ${entityIdentity.sourceType} as its source`);
+    }
+    const expectedDedupeKey = `${entityIdentity.dedupePrefix}:${input.sourceId}`;
+    if (input.dedupeKey !== expectedDedupeKey) {
+      throw new Error(`${input.type} dedupeKey must be based on its source entity id`);
     }
   }
   requireNonBlank(input.safeSummary, "safeSummary");

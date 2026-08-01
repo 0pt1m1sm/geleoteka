@@ -14,7 +14,11 @@ import {
   selectStaffNotificationRecipients,
   type StaffNotificationRouterTx,
 } from "@/lib/staff-notifications/router";
-import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
+import {
+  isStaffNotificationType,
+  type StaffNotificationEventRecord,
+  type StaffNotificationType,
+} from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 
 type QueryArgs = Record<string, unknown>;
@@ -49,6 +53,8 @@ export interface InboundCustomerMessageProjectorDb {
     findMany(args: QueryArgs): Promise<unknown>;
   };
 }
+
+export type StaffNotificationProjectorDb = InboundCustomerMessageProjectorDb;
 
 export const STAFF_NOTIFICATION_ROUTING_MAX_ATTEMPTS = 5;
 export const STAFF_NOTIFICATION_ROUTING_RETRY_DELAYS_MS = [
@@ -101,8 +107,21 @@ interface DestinationRow {
   userId: string | null;
 }
 
-export async function projectInboundCustomerMessageEvent(
-  client: InboundCustomerMessageProjectorDb,
+const ROUTABLE_EVENT_SOURCE_TYPES = {
+  SERVICE_BOOKING_CREATED: "Booking",
+  ESTIMATE_CUSTOMER_APPROVED: "Estimate",
+  ESTIMATE_CUSTOMER_DECLINED: "Estimate",
+  PARTS_ORDER_CREATED: "PartOrder",
+  RENTAL_BOOKING_CREATED: "RentalBooking",
+  INBOUND_MESSAGE_UNRESOLVED: "InboxMessage",
+} as const satisfies Partial<Record<StaffNotificationType, string>>;
+
+const ROUTABLE_EVENT_TYPES = Object.keys(
+  ROUTABLE_EVENT_SOURCE_TYPES,
+) as StaffNotificationType[];
+
+export async function projectStaffNotificationEvent(
+  client: StaffNotificationProjectorDb,
   eventId: string,
   now: Date = new Date(),
   dueOnly = false,
@@ -125,12 +144,12 @@ export async function projectInboundCustomerMessageEvent(
       const event = rows[0];
       if (!event) return "already-routed";
 
-      await projectLockedInboundCustomerMessage(tx, event);
+      await projectLockedStaffNotification(tx, event);
       return "projected";
     });
   } catch (error) {
     // The projector transaction has rolled back. Persist retry/dead-letter state
-    // separately so task/receipt failures cannot roll the attempt counter back.
+    // separately so receipt or task failures cannot roll the attempt counter back.
     try {
       await recordProjectionFailure(client, eventId, classifyProjectionFailure(error), now);
     } catch {
@@ -139,6 +158,46 @@ export async function projectInboundCustomerMessageEvent(
     }
     throw error;
   }
+}
+
+export async function projectInboundCustomerMessageEvent(
+  client: InboundCustomerMessageProjectorDb,
+  eventId: string,
+  now: Date = new Date(),
+  dueOnly = false,
+): Promise<"projected" | "already-routed"> {
+  return projectStaffNotificationEvent(client, eventId, now, dueOnly);
+}
+
+/** Route every durable Story 3/5 event that is due, oldest first. */
+export async function projectPendingStaffNotificationEvents(
+  client: StaffNotificationProjectorDb,
+  limit = 25,
+  now: Date = new Date(),
+): Promise<number> {
+  const events = (await client.staffNotificationEvent.findMany({
+    where: {
+      tenantKey: TENANT_KEY,
+      type: { in: ["INBOUND_CUSTOMER_MESSAGE", ...ROUTABLE_EVENT_TYPES] },
+      routingStatus: { in: ["PENDING", "RETRY"] },
+      nextRoutingAt: { lte: now },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: Math.max(1, Math.min(limit, 100)),
+    select: { id: true },
+  })) as Array<{ id: string }>;
+
+  let projected = 0;
+  for (const event of events) {
+    try {
+      if ((await projectStaffNotificationEvent(client, event.id, now, true)) === "projected") {
+        projected += 1;
+      }
+    } catch {
+      // One old event must never reject unrelated durable work in the batch.
+    }
+  }
+  return projected;
 }
 
 /** Process older durable work as well as the event that triggered this pass. */
@@ -267,22 +326,6 @@ export async function projectLockedInboundCustomerMessage(
     relatedTaskId: task.taskId,
     targetUserId: task.ownerUserId,
   };
-  const selectedRecipients = selectStaffNotificationRecipients(projectedEvent, candidates);
-  const usesPersonalTarget =
-    projectedEvent.targetUserId !== null &&
-    selectedRecipients.length === 1 &&
-    selectedRecipients[0] === projectedEvent.targetUserId;
-  const telegramConfig = await loadTelegramRoutingConfig(tx);
-  const destinations =
-    telegramConfig.enabled &&
-    telegramConfig.enabledEventTypes.has("INBOUND_CUSTOMER_MESSAGE")
-      ? await loadDestinations(
-          tx,
-          usesPersonalTarget,
-          usesPersonalTarget ? selectedRecipients[0] : null,
-          telegramConfig.routingMode,
-        )
-      : [];
 
   await tx.staffNotificationEvent.update({
     where: { tenantKey_id: { tenantKey: TENANT_KEY, id: event.id } },
@@ -291,8 +334,79 @@ export async function projectLockedInboundCustomerMessage(
       targetUserId: task.ownerUserId,
     },
   });
+  await routeProjectedStaffNotification(tx, projectedEvent, candidates);
+}
+
+export async function projectLockedStaffNotification(
+  tx: ProjectorTx,
+  event: StaffNotificationEventRecord,
+): Promise<void> {
+  if (event.type === "INBOUND_CUSTOMER_MESSAGE") {
+    await projectLockedInboundCustomerMessage(tx, event);
+    return;
+  }
+  if (!isStaffNotificationType(event.type)) {
+    throw new InboundProjectionError(
+      "INVALID_EVENT",
+      true,
+      `Unknown staff notification event: ${event.id}`,
+    );
+  }
+  const expectedSourceType = (
+    ROUTABLE_EVENT_SOURCE_TYPES as Partial<Record<StaffNotificationType, string>>
+  )[event.type];
+  const inboundUnresolved = event.type === "INBOUND_MESSAGE_UNRESOLVED";
+  if (
+    event.tenantKey !== TENANT_KEY ||
+    !expectedSourceType ||
+    event.sourceType !== expectedSourceType ||
+    !event.sourceId ||
+    (inboundUnresolved &&
+      (!event.channel || !isInboundCommChannel(event.channel))) ||
+    (!inboundUnresolved && event.channel !== null)
+  ) {
+    throw new InboundProjectionError(
+      "INVALID_EVENT",
+      true,
+      `Invalid staff notification event: ${event.id}`,
+    );
+  }
+
+  const candidates = await loadRecipientCandidates(tx);
+  await routeProjectedStaffNotification(tx, event, candidates);
+}
+
+async function routeProjectedStaffNotification(
+  tx: ProjectorTx,
+  event: StaffNotificationEventRecord,
+  candidates: Awaited<ReturnType<typeof loadRecipientCandidates>>,
+): Promise<void> {
+  if (!isStaffNotificationType(event.type)) {
+    throw new InboundProjectionError(
+      "INVALID_EVENT",
+      true,
+      `Unknown staff notification event: ${event.id}`,
+    );
+  }
+  const eventType = event.type;
+  const selectedRecipients = selectStaffNotificationRecipients(event, candidates);
+  const usesPersonalTarget =
+    event.targetUserId !== null &&
+    selectedRecipients.length === 1 &&
+    selectedRecipients[0] === event.targetUserId;
+  const telegramConfig = await loadTelegramRoutingConfig(tx);
+  const destinations =
+    telegramConfig.enabled && telegramConfig.enabledEventTypes.has(eventType)
+      ? await loadDestinations(
+          tx,
+          usesPersonalTarget,
+          usesPersonalTarget ? selectedRecipients[0] : null,
+          telegramConfig.routingMode,
+        )
+      : [];
+
   await routeStaffNotificationEvent(tx, {
-    event: projectedEvent,
+    event,
     candidates,
     destinations,
   });

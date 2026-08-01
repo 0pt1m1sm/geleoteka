@@ -11,6 +11,8 @@ import { createDeal } from "@/lib/crm/public";
 import { nextPartOrderNumber } from "@/lib/crm/public";
 import { consumeStock } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
+import { publishPartsOrderCreated } from "@/lib/staff-notifications/business-events";
+import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -173,6 +175,22 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
           tenantKey: TENANT_KEY,
         });
       }
+
+      const customer = (await tx.user.findUnique({
+        where: { id: guestResult.userId },
+        select: { name: true },
+      })) as { name: string } | null;
+      await publishPartsOrderCreated(
+        tx as unknown as StaffNotificationPublishTx,
+        {
+          sourceId: created.id,
+          customerUserId: guestResult.userId,
+          customerName: customer?.name ?? "клиент",
+          dealId: deal.id,
+          dealNumber: deal.number,
+          occurredAt: created.createdAt,
+        },
+      );
 
       return created;
     });

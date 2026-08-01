@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   projectInboundCustomerMessageEvent,
   projectPendingInboundCustomerMessages,
+  projectStaffNotificationEvent,
   type InboundCustomerMessageProjectorDb,
 } from "@/lib/staff-notifications/projectors/inbound-customer-message";
 import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
@@ -113,6 +114,64 @@ describe("Telegram routing", () => {
     expect(db.staffNotificationDeliveries[0]).toMatchObject({
       channel: "TELEGRAM",
       destinationKey: "shared_1",
+    });
+  });
+
+  it("routes a Story 5 parts event through the same router and shared destination", async () => {
+    const db = new FakeEmailDb();
+    db.users.push({
+      id: "admin_1",
+      name: "Администратор",
+      permissionRole: "ADMIN",
+      deletedAt: null,
+    });
+    db.staffNotificationEvents.push({
+      ...eventRecord(),
+      id: "event_parts",
+      type: "PARTS_ORDER_CREATED",
+      priority: "P1",
+      channel: null,
+      dedupeKey: "parts-order-created:part_order_1",
+      sourceType: "PartOrder",
+      sourceId: "part_order_1",
+      relatedDealId: "deal_1",
+      relatedTaskId: null,
+      targetUserId: null,
+      fallbackPermission: "parts.manage",
+      routingStatus: "PENDING",
+      routingAttempts: 0,
+      nextRoutingAt: NOW,
+      routedAt: null,
+      lastRoutingError: null,
+    });
+    db.telegramDestinations.push({
+      id: "shared_parts",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      isActive: true,
+      disabledAt: null,
+    });
+    for (const [key, value] of Object.entries({
+      TELEGRAM_ENABLED: "true",
+      TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
+      TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
+      TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
+      TELEGRAM_ROUTING_MODE: "PERSONAL_WITH_SHARED_FALLBACK",
+      TELEGRAM_NOTIFY_PARTS_ORDER_CREATED: "true",
+    })) {
+      db.settings.push({ id: `setting_${key}`, key, value });
+    }
+
+    await expect(
+      projectStaffNotificationEvent(projectorDb(db), "event_parts", NOW),
+    ).resolves.toBe("projected");
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationReceipts[0]).toMatchObject({ userId: "admin_1" });
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      channel: "TELEGRAM",
+      destinationKey: "shared_parts",
     });
   });
 });
