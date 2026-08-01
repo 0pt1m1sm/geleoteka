@@ -44,7 +44,7 @@ function customerMessage(messageId: string): Buffer {
 interface Harness {
   db: FakeMailDb;
   port: FakeImapPort;
-  ensureFollowUp: ReturnType<typeof vi.fn>;
+  projectInboundEvents: ReturnType<typeof vi.fn>;
   ingestOrder: string[];
   deps: SyncDeps;
   config: (owner?: string) => SyncConfig;
@@ -55,7 +55,7 @@ function harness(): Harness {
   db.users.push({ id: "user_c", email: "client@test.ru", name: "Иван Клиент", isCustomer: true });
 
   const port = new FakeImapPort();
-  const ensureFollowUp = vi.fn(async () => ({ taskId: "t", created: true }));
+  const projectInboundEvents = vi.fn(async () => undefined);
   const ingestOrder: string[] = [];
 
   const isOurAddress = (email: string): boolean => OURS.has(email.toLowerCase());
@@ -77,7 +77,7 @@ function harness(): Harness {
     mapper,
     ingest: async (parsed) => {
       ingestOrder.push(parsed.rfcMessageId);
-      return ingestEmail(parsed, { client: db, ensureFollowUp });
+      return ingestEmail(parsed, { client: db, projectInboundEvents });
     },
     now: () => NOW,
     sleep: async () => {},
@@ -91,7 +91,7 @@ function harness(): Harness {
     maxMapAttempts: 2,
   });
 
-  return { db, port, ensureFollowUp, ingestOrder, deps, config };
+  return { db, port, projectInboundEvents, ingestOrder, deps, config };
 }
 
 describe("syncSource — replay safety", () => {
@@ -116,8 +116,8 @@ describe("syncSource — replay safety", () => {
     expect(h.db.emailMessages).toHaveLength(1);
     expect(h.db.communicationLogs).toHaveLength(1);
     expect(cursor(h).lastUid).toBe(1n);
-    // The follow-up was raised once, on the genuine first ingest only.
-    expect(h.ensureFollowUp).toHaveBeenCalledTimes(1);
+    // Transport replay may retry projection, but the durable event is singular.
+    expect(h.db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("DoD 2: two workers process each source-UID at most once (lease)", async () => {

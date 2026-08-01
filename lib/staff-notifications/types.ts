@@ -128,6 +128,7 @@ export interface StaffNotificationEventRecord {
   summary: string;
   actionPath: string;
   occurredAt: Date;
+  createdAt: Date;
 }
 
 export interface PublishStaffNotificationInput {

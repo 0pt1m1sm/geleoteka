@@ -36,7 +36,7 @@ interface TaskView {
   owner: { id: string; name: string } | null;
   customer: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
-  /** Resolved at render time until Story 3 adds a durable task → log FK. */
+  /** Durable task → newest inbound CommunicationLog relation. */
   latestInboundCommunication?: { id: string; channel: string } | null;
 }
 

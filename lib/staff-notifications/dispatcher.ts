@@ -72,6 +72,7 @@ interface LeasedDeliveryRow {
   summary: string;
   actionPath: string;
   occurredAt: Date;
+  eventCreatedAt: Date;
 }
 
 /**
@@ -157,7 +158,8 @@ export async function leaseStaffNotificationDeliveries(
         e."fallbackPermission",
         e."summary",
         e."actionPath",
-        e."occurredAt"
+        e."occurredAt",
+        e."createdAt" AS "eventCreatedAt"
       FROM claimed c
       INNER JOIN "StaffNotificationEvent" e
         ON e."tenantKey" = c."tenantKey" AND e."id" = c."eventId"
@@ -341,6 +343,7 @@ function toLeasedDelivery(row: LeasedDeliveryRow): LeasedStaffDelivery {
       summary: row.summary,
       actionPath: row.actionPath,
       occurredAt: row.occurredAt,
+      createdAt: row.eventCreatedAt,
     },
   };
 }

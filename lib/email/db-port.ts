@@ -47,6 +47,9 @@ export interface EmailIngestTx {
   mailIdentity: {
     findUnique(args: QueryArgs): Promise<DbRow | null>;
   };
+  staffNotificationEvent: {
+    upsert(args: QueryArgs): Promise<DbRow>;
+  };
 }
 
 export interface TransactionOptions {

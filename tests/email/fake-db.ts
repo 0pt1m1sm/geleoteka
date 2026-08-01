@@ -46,6 +46,14 @@ export class FakeEmailDb implements EmailIngestDb {
   customerContacts: AnyRow[] = [];
   deals: AnyRow[] = [];
   mailIdentities: AnyRow[] = [];
+  staffNotificationEvents: AnyRow[] = [];
+  crmTasks: AnyRow[] = [];
+  staffNotificationReceipts: AnyRow[] = [];
+  staffNotificationDeliveries: AnyRow[] = [];
+
+  /** Forces the projector's source lookup to fail like a transient DB error. */
+  communicationLogFindUniqueError: Error | null = null;
+  communicationLogFindUniqueCalls = 0;
 
   /** Number of transactions opened — proves the write path is atomic, not N writes. */
   transactionCount = 0;
@@ -63,6 +71,10 @@ export class FakeEmailDb implements EmailIngestDb {
       emailMessages: [...this.emailMessages],
       communicationLogs: [...this.communicationLogs],
       inboxMessages: [...this.inboxMessages],
+      staffNotificationEvents: this.staffNotificationEvents.map((row) => ({ ...row })),
+      crmTasks: this.crmTasks.map((row) => ({ ...row })),
+      staffNotificationReceipts: this.staffNotificationReceipts.map((row) => ({ ...row })),
+      staffNotificationDeliveries: this.staffNotificationDeliveries.map((row) => ({ ...row })),
     };
     try {
       return await fn(this);
@@ -71,8 +83,31 @@ export class FakeEmailDb implements EmailIngestDb {
       this.emailMessages = snapshot.emailMessages;
       this.communicationLogs = snapshot.communicationLogs;
       this.inboxMessages = snapshot.inboxMessages;
+      this.staffNotificationEvents = snapshot.staffNotificationEvents;
+      this.crmTasks = snapshot.crmTasks;
+      this.staffNotificationReceipts = snapshot.staffNotificationReceipts;
+      this.staffNotificationDeliveries = snapshot.staffNotificationDeliveries;
       throw err;
     }
+  }
+
+  async $queryRaw<T>(query: TemplateStringsArray, ...values: unknown[]): Promise<T> {
+    const sql = query.join("?");
+    if (sql.includes('FROM "StaffNotificationEvent"')) {
+      const eventId = values[1];
+      const dueOnly = values[2] === true;
+      const now = values[3] instanceof Date ? values[3] : null;
+      const event = this.staffNotificationEvents.find(
+        (row) =>
+          row.tenantKey === values[0] &&
+          row.id === eventId &&
+          ["PENDING", "RETRY"].includes(String(row.routingStatus)) &&
+          (!dueOnly || !now || (row.nextRoutingAt as Date).getTime() <= now.getTime()),
+      );
+      return (event ? [{ ...event }] : []) as T;
+    }
+    if (sql.includes("pg_advisory_xact_lock")) return [{ locked: true }] as T;
+    throw new Error(`FakeEmailDb.$queryRaw: unsupported query: ${sql}`);
   }
 
   emailMessage = {
@@ -122,8 +157,15 @@ export class FakeEmailDb implements EmailIngestDb {
 
   communicationLog = {
     findUnique: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
+      this.communicationLogFindUniqueCalls += 1;
+      if (this.communicationLogFindUniqueError) throw this.communicationLogFindUniqueError;
+      const id = whereField(args, "id");
       const externalId = whereField(args, "externalId");
-      return this.communicationLogs.find((r) => r.externalId === externalId) ?? null;
+      return (
+        this.communicationLogs.find(
+          (r) => (id !== undefined && r.id === id) || (externalId !== undefined && r.externalId === externalId),
+        ) ?? null
+      );
     },
     findFirst: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
       const where = (args.where ?? {}) as Record<string, unknown>;
@@ -164,6 +206,10 @@ export class FakeEmailDb implements EmailIngestDb {
   };
 
   user = {
+    findMany: async (): Promise<AnyRow[]> =>
+      this.users.filter((user) =>
+        !["CLIENT", "NONE"].includes(String(user.permissionRole ?? "CLIENT")),
+      ),
     findFirst: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
       const where = (args.where ?? {}) as Record<string, unknown>;
       const emailClause = where.email as { equals?: string } | string | undefined;
@@ -210,12 +256,139 @@ export class FakeEmailDb implements EmailIngestDb {
         ) ?? null
       );
     },
+    findUnique: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
+      const id = whereField(args, "id");
+      return this.deals.find((deal) => deal.id === id) ?? null;
+    },
+  };
+
+  crmTask = {
+    createMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {
+      const rows = args.data as Array<Record<string, unknown>>;
+      let count = 0;
+      for (const data of rows) {
+        const exists = this.crmTasks.some(
+          (task) =>
+            task.customerUserId === data.customerUserId &&
+            rowEquals(task.dealId, data.dealId) &&
+            task.kind === data.kind &&
+            task.status === data.status,
+        );
+        if (exists) continue;
+        this.crmTasks.push({ id: nextId("task"), ...data });
+        count += 1;
+      }
+      return { count };
+    },
+    findFirst: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      return this.crmTasks.find((task) => matchesWhere(task, where)) ?? null;
+    },
+    findUnique: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
+      const id = whereField(args, "id");
+      return this.crmTasks.find((task) => task.id === id) ?? null;
+    },
+    updateMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const matches = this.crmTasks.filter((task) => matchesWhere(task, where));
+      for (const task of matches) applyData(task, args.data as Record<string, unknown>);
+      return { count: matches.length };
+    },
+  };
+
+  rolePermission = { findMany: async (): Promise<AnyRow[]> => [] };
+  telegramDestination = { findMany: async (): Promise<AnyRow[]> => [] };
+
+  staffNotificationReceipt = {
+    createMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {
+      const rows = args.data as Array<Record<string, unknown>>;
+      this.staffNotificationReceipts.push(
+        ...rows.map((data) => ({ id: nextId("snr"), createdAt: new Date(), ...data })),
+      );
+      return { count: rows.length };
+    },
+  };
+
+  staffNotificationDelivery = {
+    createMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {
+      const rows = args.data as Array<Record<string, unknown>>;
+      this.staffNotificationDeliveries.push(
+        ...rows.map((data) => ({ id: nextId("snd"), status: "PENDING", ...data })),
+      );
+      return { count: rows.length };
+    },
   };
 
   mailIdentity = {
     findUnique: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
       const address = whereField(args, "address");
       return this.mailIdentities.find((m) => m.address === address) ?? null;
+    },
+  };
+
+  staffNotificationEvent = {
+    upsert: async (args: Record<string, unknown>): Promise<AnyRow> => {
+      const where = (args.where ?? {}) as {
+        tenantKey_dedupeKey?: { tenantKey: string; dedupeKey: string };
+      };
+      const key = where.tenantKey_dedupeKey;
+      if (!key) throw new Error("staffNotificationEvent.upsert: compound key missing");
+      const existing = this.staffNotificationEvents.find(
+        (row) => row.tenantKey === key.tenantKey && row.dedupeKey === key.dedupeKey,
+      );
+      if (existing) return existing;
+      const data = args.create as Record<string, unknown>;
+      const row: AnyRow = {
+        id: nextId("sne"),
+        createdAt: new Date(),
+        routingStatus: "PENDING",
+        routingAttempts: 0,
+        nextRoutingAt: new Date(),
+        routedAt: null,
+        lastRoutingError: null,
+        ...data,
+      };
+      this.staffNotificationEvents.push(row);
+      return row;
+    },
+    findMany: async (args: Record<string, unknown>): Promise<AnyRow[]> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const take = Number(args.take ?? this.staffNotificationEvents.length);
+      return this.staffNotificationEvents
+        .filter((event) => matchesWhere(event, where))
+        .sort((left, right) => {
+          const byCreated = (left.createdAt as Date).getTime() - (right.createdAt as Date).getTime();
+          return byCreated || String(left.id).localeCompare(String(right.id));
+        })
+        .slice(0, take)
+        .map((event) => ({ id: event.id }));
+    },
+    findUnique: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const compound = where.tenantKey_id as { tenantKey: string; id: string } | undefined;
+      const id = compound?.id ?? where.id;
+      const tenantKey = compound?.tenantKey ?? where.tenantKey;
+      return (
+        this.staffNotificationEvents.find(
+          (event) => event.id === id && (tenantKey === undefined || event.tenantKey === tenantKey),
+        ) ?? null
+      );
+    },
+    update: async (args: Record<string, unknown>): Promise<AnyRow> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const compound = where.tenantKey_id as { tenantKey: string; id: string } | undefined;
+      const event = this.staffNotificationEvents.find(
+        (row) => row.id === compound?.id && row.tenantKey === compound.tenantKey,
+      );
+      if (!event) throw new Error("staffNotificationEvent.update: row not found");
+      applyData(event, args.data as Record<string, unknown>);
+      return event;
+    },
+    updateMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const matches = this.staffNotificationEvents.filter((event) => matchesWhere(event, where));
+      for (const event of matches) applyData(event, args.data as Record<string, unknown>);
+      return { count: matches.length };
     },
   };
 }
@@ -227,12 +400,26 @@ export class FakeEmailDb implements EmailIngestDb {
  */
 function matchesWhere(row: AnyRow, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([k, v]) => {
-    if (v !== null && typeof v === "object" && "not" in (v as Record<string, unknown>)) {
-      const not = (v as { not: unknown }).not;
-      return !rowEquals(row[k], not) && row[k] !== null && row[k] !== undefined;
+    if (v !== null && typeof v === "object") {
+      const operator = v as Record<string, unknown>;
+      if ("not" in operator) {
+        return !rowEquals(row[k], operator.not) && row[k] !== null && row[k] !== undefined;
+      }
+      if ("in" in operator) return (operator.in as unknown[]).some((item) => rowEquals(row[k], item));
+      if ("lte" in operator) return (row[k] as Date).getTime() <= (operator.lte as Date).getTime();
     }
     return rowEquals(row[k], v);
   });
+}
+
+function applyData(row: AnyRow, data: Record<string, unknown>): void {
+  for (const [key, value] of Object.entries(data)) {
+    if (value !== null && typeof value === "object" && "increment" in (value as Record<string, unknown>)) {
+      row[key] = Number(row[key] ?? 0) + Number((value as { increment: number }).increment);
+    } else {
+      row[key] = value;
+    }
+  }
 }
 
 /** bigint/number/string-tolerant equality — the fake stores whatever it is given. */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface CustomerTab {
   key: string;
@@ -31,6 +31,18 @@ export function CustomerTabs({
       ? initialTab
       : tabs[0]?.key ?? "",
   );
+
+  useEffect(() => {
+    const anchor = decodeURIComponent(window.location.hash.slice(1));
+    if (!anchor.startsWith("communication-")) return;
+    if (!tabs.some((tab) => tab.key === "communications")) return;
+    requestAnimationFrame(() => {
+      setActive("communications");
+      requestAnimationFrame(() => {
+        document.getElementById(anchor)?.scrollIntoView({ block: "center" });
+      });
+    });
+  }, [tabs]);
 
   return (
     <div>

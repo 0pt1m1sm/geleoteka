@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import { ingestEmail, type IngestOptions } from "@/lib/email/ingest";
 import { resolveOutboundEmail } from "@/lib/email/resolve";
-import type { FollowUpContext } from "@/lib/email/resolve";
 import type { EmailIngestTx } from "@/lib/email/db-port";
 import type { ParsedEmail } from "@/lib/email/types";
 import { FakeEmailDb } from "./fake-db";
@@ -83,15 +82,15 @@ function seedDb(): FakeEmailDb {
 
 describe("resolution — outbound (manager mail)", () => {
   let db: FakeEmailDb;
-  let ensureFollowUp: Mock<NonNullable<IngestOptions["ensureFollowUp"]>>;
+  let projectInboundEvents: Mock<NonNullable<IngestOptions["projectInboundEvents"]>>;
 
   beforeEach(() => {
     db = seedDb();
-    ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    projectInboundEvents = vi.fn(async () => undefined);
   });
 
   function run(email: ParsedEmail) {
-    return ingestEmail(email, { client: db, ensureFollowUp });
+    return ingestEmail(email, { client: db, projectInboundEvents });
   }
 
   // Scenario 2 (DoD): a new manager email from a phone lands as EMAIL_OUTBOUND
@@ -118,7 +117,7 @@ describe("resolution — outbound (manager mail)", () => {
     expect(log.authorUserId).toBe("user_manager");
     expect(log.emailMessageId).toBe(db.emailMessages[0].id);
     expect(db.inboxMessages).toHaveLength(0);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   // Author of a shared-box send has no unambiguous manager → authorUserId stays
@@ -137,7 +136,7 @@ describe("resolution — outbound (manager mail)", () => {
     expect(result.kind).toBe("customer");
     expect(db.communicationLogs[0].channel).toBe("EMAIL_OUTBOUND");
     expect(db.communicationLogs[0].authorUserId).toBeNull();
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   // Scenario 4 (DoD): more than one customer among the recipients is genuinely
@@ -162,7 +161,7 @@ describe("resolution — outbound (manager mail)", () => {
     expect(db.inboxMessages).toHaveLength(1);
     expect(db.inboxMessages[0].direction).toBe("OUTBOUND");
     expect(db.inboxMessages[0].status).toBe("PENDING");
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   it("parks an outbound to no known customer as OUTBOUND triage", async () => {
@@ -180,7 +179,7 @@ describe("resolution — outbound (manager mail)", () => {
     expect(db.inboxMessages[0].direction).toBe("OUTBOUND");
     // No alias is invented for the recipient of an unattributed outbound.
     expect(db.customerContacts).toHaveLength(0);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   // A recipient reachable only through a secondary CustomerContact still counts
@@ -210,15 +209,15 @@ describe("resolution — outbound (manager mail)", () => {
 
 describe("resolution — cross-provider threading", () => {
   let db: FakeEmailDb;
-  let ensureFollowUp: Mock<NonNullable<IngestOptions["ensureFollowUp"]>>;
+  let projectInboundEvents: Mock<NonNullable<IngestOptions["projectInboundEvents"]>>;
 
   beforeEach(() => {
     db = seedDb();
-    ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    projectInboundEvents = vi.fn(async () => undefined);
   });
 
   function run(email: ParsedEmail) {
-    return ingestEmail(email, { client: db, ensureFollowUp });
+    return ingestEmail(email, { client: db, projectInboundEvents });
   }
 
   // Scenario 1 (DoD): a transactional send recorded (by the app) as an
@@ -248,7 +247,7 @@ describe("resolution — cross-provider threading", () => {
     expect(created?.channel).toBe("EMAIL_INBOUND");
     expect(created?.customerUserId).toBe("user_customer");
     expect(created?.dealId).toBe("deal_1");
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(projectInboundEvents).toHaveBeenCalledTimes(1);
   });
 
   // The thread anchor also resolves through EmailMessage.rfcMessageId when the
@@ -300,7 +299,7 @@ describe("resolution — cross-provider threading", () => {
       }),
     );
     expect(outbound.kind).toBe("customer");
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
 
     const reply = await run(
       parsed({
@@ -315,7 +314,7 @@ describe("resolution — cross-provider threading", () => {
     const inbound = db.communicationLogs.find((r) => r.channel === "EMAIL_INBOUND");
     expect(inbound?.customerUserId).toBe("user_customer");
     expect(inbound?.dealId).toBe("deal_1");
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(projectInboundEvents).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -326,23 +325,16 @@ describe("follow-up dueAt policy", () => {
   // dueAt from "now" (asserted in verify-auto-task against the real DB).
   it("passes the message's actual date to the follow-up, not the sync time", async () => {
     const db = seedDb();
-    let captured: FollowUpContext | null = null;
-    const ensureFollowUp = vi.fn(async (ctx: FollowUpContext) => {
-      captured = ctx;
-      return { taskId: "t", created: true };
-    });
+    const projectInboundEvents = vi.fn(async () => undefined);
 
     await ingestEmail(
       parsed({ from: { email: CUSTOMER_EMAIL }, rfcMessageId: "<dated@example.test>" }),
-      { client: db, ensureFollowUp },
+      { client: db, projectInboundEvents },
     );
 
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
-    expect(captured).not.toBeNull();
-    expect((captured as unknown as FollowUpContext).channel).toBe("EMAIL_INBOUND");
-    expect((captured as unknown as FollowUpContext).messageOccurredAt.toISOString()).toBe(
-      OCCURRED.toISOString(),
-    );
+    expect(projectInboundEvents).toHaveBeenCalledTimes(1);
+    expect(db.staffNotificationEvents[0].channel).toBe("EMAIL_INBOUND");
+    expect((db.staffNotificationEvents[0].occurredAt as Date).toISOString()).toBe(OCCURRED.toISOString());
   });
 });
 
@@ -357,7 +349,7 @@ describe("manual-link idempotency (canonical dedup)", () => {
   });
 
   function run(email: ParsedEmail) {
-    return ingestEmail(email, { client: db, ensureFollowUp: vi.fn(async () => ({ taskId: "t", created: true })) });
+    return ingestEmail(email, { client: db, projectInboundEvents: vi.fn(async () => undefined) });
   }
 
   it("collapses a re-read outbound to one InboxMessage", async () => {
@@ -437,7 +429,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
   const DELETED_EMAIL = "gone@example.test";
   const DELETED_ALIAS = "gone-alias@example.test";
   let db: FakeEmailDb;
-  let ensureFollowUp: Mock<NonNullable<IngestOptions["ensureFollowUp"]>>;
+  let projectInboundEvents: Mock<NonNullable<IngestOptions["projectInboundEvents"]>>;
 
   beforeEach(() => {
     db = seedDb();
@@ -455,11 +447,11 @@ describe("resolution — soft-deleted customers stay visible", () => {
       userId: "user_deleted",
     });
     db.deals.push({ id: "deal_deleted", customerUserId: "user_deleted", stage: "QUALIFIED" });
-    ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    projectInboundEvents = vi.fn(async () => undefined);
   });
 
   function run(email: ParsedEmail) {
-    return ingestEmail(email, { client: db, ensureFollowUp });
+    return ingestEmail(email, { client: db, projectInboundEvents });
   }
 
   it("parks inbound from a deleted customer's primary email in triage", async () => {
@@ -471,7 +463,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
     expect(result.status).toBe("unresolved");
     expect(db.inboxMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(0);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   it("parks inbound arriving on a deleted customer's alias in triage", async () => {
@@ -481,7 +473,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
 
     expect(result.kind).toBe("inbox");
     expect(db.communicationLogs).toHaveLength(0);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   // The nastiest variant: the thread anchor still points at the deleted
@@ -506,7 +498,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
     expect(result.kind).toBe("inbox");
     // Only the pre-seeded anchor remains — no new hidden row was written.
     expect(db.communicationLogs).toHaveLength(1);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(projectInboundEvents).not.toHaveBeenCalled();
   });
 
   it("parks our own outbound addressed to a deleted customer", async () => {
@@ -535,6 +527,6 @@ describe("resolution — soft-deleted customers stay visible", () => {
     expect(result.kind).toBe("customer");
     expect(db.communicationLogs).toHaveLength(1);
     expect(db.communicationLogs[0].customerUserId).toBe("user_customer");
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(projectInboundEvents).toHaveBeenCalledTimes(1);
   });
 });

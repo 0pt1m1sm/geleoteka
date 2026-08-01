@@ -171,15 +171,15 @@ describe("occurredAt", () => {
 
 describe("ingestEmail", () => {
   let db: FakeEmailDb;
-  let ensureFollowUp: Mock<NonNullable<IngestOptions["ensureFollowUp"]>>;
+  let projectInboundEvents: Mock<NonNullable<IngestOptions["projectInboundEvents"]>>;
 
   beforeEach(() => {
     db = dbWithCustomer();
-    ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    projectInboundEvents = vi.fn(async () => undefined);
   });
 
   function run(email: ParsedEmail) {
-    return ingestEmail(email, { client: db, ensureFollowUp });
+    return ingestEmail(email, { client: db, projectInboundEvents });
   }
 
   it("stores the canonical message and links it to the CRM row it created", async () => {
@@ -188,6 +188,7 @@ describe("ingestEmail", () => {
     expect(result.status).toBe("created");
     expect(db.emailMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
 
     const email = db.emailMessages[0];
     expect(email.rfcMessageId).toBe("<real-1@example.test>");
@@ -250,8 +251,8 @@ describe("ingestEmail", () => {
     expect(viaImap.reason).toBe("rfc-message-id");
     expect(db.emailMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(1);
-    // The duplicate must not raise a second follow-up.
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    // The duplicate retries pending projection but cannot publish a new event.
+    expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("lets the unique constraint win the race when two callers both pre-check clean", async () => {
@@ -263,7 +264,7 @@ describe("ingestEmail", () => {
     expect(racer.status).toBe("duplicate");
     expect(db.emailMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(1);
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("threads a reply onto the original conversation via In-Reply-To", async () => {
@@ -344,7 +345,7 @@ describe("ingestEmail", () => {
     expect(result.kind).toBe("customer");
     expect(db.communicationLogs[0].customerUserId).toBe("user_customer");
     expect(db.communicationLogs[0].dealId).toBe("deal_1");
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("parks an unknown sender in the triage inbox without inventing a task", async () => {
@@ -356,7 +357,7 @@ describe("ingestEmail", () => {
     expect(db.inboxMessages[0].direction).toBe("INBOUND");
     expect(db.inboxMessages[0].resendEmailId).toBeNull();
     expect(db.inboxMessages[0].emailMessageId).toBe(db.emailMessages[0].id);
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(db.staffNotificationEvents).toHaveLength(0);
   });
 
   it("never raises a follow-up for our own outgoing mail", async () => {
@@ -380,17 +381,75 @@ describe("ingestEmail", () => {
 
     expect(result.status).toBe("unresolved");
     expect(db.inboxMessages[0].direction).toBe("OUTBOUND");
-    expect(ensureFollowUp).not.toHaveBeenCalled();
+    expect(db.staffNotificationEvents).toHaveLength(0);
   });
 
-  it("keeps the message when follow-up scheduling fails", async () => {
-    ensureFollowUp.mockRejectedValueOnce(new Error("task subsystem down"));
+  it("keeps a durable PENDING event when projection fails and retries it on replay", async () => {
+    projectInboundEvents.mockRejectedValueOnce(new Error("task subsystem down"));
 
-    const result = await run(parsed());
+    await expect(run(parsed())).rejects.toThrow("task subsystem down");
 
-    expect(result.status).toBe("created");
     expect(db.emailMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
+    expect(db.staffNotificationEvents[0].routingStatus).toBe("PENDING");
+
+    const retry = await run(parsed());
+    expect(retry.status).toBe("duplicate");
+    expect(projectInboundEvents).toHaveBeenCalledTimes(2);
+    expect(db.staffNotificationEvents).toHaveLength(1);
+  });
+
+  it("dead-letters an event whose CommunicationLog vanished without rejecting the next email", async () => {
+    await expect(
+      ingestEmail(parsed(), {
+        client: db,
+        projectInboundEvents: async () => {
+          throw new Error("simulated projector restart");
+        },
+      }),
+    ).rejects.toThrow("simulated projector restart");
+
+    const poisonedEventId = String(db.staffNotificationEvents[0].id);
+    db.communicationLogs = [];
+
+    const next = await ingestEmail(
+      parsed({
+        rfcMessageId: "<real-2@example.test>",
+        source: { ...parsed().source, uid: 502n },
+        occurredAt: new Date("2026-07-14T10:15:00.000Z"),
+      }),
+      { client: db },
+    );
+
+    expect(next.status).toBe("created");
+    expect(db.communicationLogs).toHaveLength(1);
+    expect(db.staffNotificationEvents).toHaveLength(2);
+    expect(db.staffNotificationEvents.find((event) => event.id === poisonedEventId)).toMatchObject({
+      routingStatus: "DEAD",
+      routingAttempts: 1,
+      lastRoutingError: "SOURCE_MISSING",
+    });
+    expect(db.staffNotificationEvents.find((event) => event.id === next.staffNotificationEventId))
+      .toMatchObject({ routingStatus: "ROUTED" });
+  });
+
+  it("publishes a second event for a second customer message", async () => {
+    await run(parsed());
+    await run(
+      parsed({
+        rfcMessageId: "<real-2@example.test>",
+        source: { ...parsed().source, uid: 502n },
+        occurredAt: new Date("2026-07-14T10:15:00.000Z"),
+      }),
+    );
+
+    expect(db.communicationLogs).toHaveLength(2);
+    expect(db.staffNotificationEvents).toHaveLength(2);
+    expect(db.staffNotificationEvents.map((event) => event.dedupeKey)).toEqual([
+      `inbound-msg:${db.communicationLogs[0].id}`,
+      `inbound-msg:${db.communicationLogs[1].id}`,
+    ]);
   });
 
   it("refuses a message with no usable id rather than guessing one", async () => {

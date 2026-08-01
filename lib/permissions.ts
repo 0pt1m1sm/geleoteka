@@ -153,6 +153,7 @@ export const EDITABLE_ROLES = ["MANAGER", "MASTER", "WAREHOUSE_WORKER"] as const
  */
 const PATH_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/admin/warehouse", "warehouse.manage"],
+  ["/admin/notifications", "crm.manage"],
   ["/admin/roles", "roles.manage"],
   ["/admin/audit", "audit.view"],
   ["/admin/users", "users.manage"],

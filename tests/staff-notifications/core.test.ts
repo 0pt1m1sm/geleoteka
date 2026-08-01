@@ -29,13 +29,17 @@ describe("staff notification publish", () => {
         async upsert(rawArgs) {
           const args = rawArgs as {
             where: { tenantKey_dedupeKey: { tenantKey: string; dedupeKey: string } };
-            create: Omit<StaffNotificationEventRecord, "id">;
+            create: Omit<StaffNotificationEventRecord, "id" | "createdAt">;
           };
           const key = `${args.where.tenantKey_dedupeKey.tenantKey}:${args.where.tenantKey_dedupeKey.dedupeKey}`;
           const existing = rows.get(key);
           if (existing) return existing;
           creates += 1;
-          const created = { id: "event_1", ...args.create } as StaffNotificationEventRecord;
+          const created = {
+            id: "event_1",
+            createdAt: OCCURRED_AT,
+            ...args.create,
+          } as StaffNotificationEventRecord;
           rows.set(key, created);
           return created;
         },
@@ -175,5 +179,6 @@ function eventRecord(): StaffNotificationEventRecord {
     summary: "Новое письмо от клиента",
     actionPath: "/admin/crm/deals/1042#communication-1",
     occurredAt: OCCURRED_AT,
+    createdAt: OCCURRED_AT,
   };
 }

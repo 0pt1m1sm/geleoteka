@@ -11,6 +11,12 @@ import {
   isPlausibleEmail,
 } from "@/lib/email";
 import { sendEmail } from "@/lib/email/send";
+import { completeFollowUpAfterReply } from "@/lib/crm/follow-up-reply";
+import { publishInboundCustomerMessage } from "@/lib/staff-notifications/inbound-customer-message";
+import {
+  projectInboundCustomerMessageEvent,
+  type InboundCustomerMessageProjectorDb,
+} from "@/lib/staff-notifications/projectors/inbound-customer-message";
 
 interface InboxActionResult {
   error: string | null;
@@ -46,6 +52,12 @@ export async function linkInboxMessageToCustomer(
     resolvedDealId = openDeal?.id ?? null;
   }
 
+  const customer = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: { email: true, name: true },
+  })) as { email: string; name: string } | null;
+  if (!customer) return { error: "Клиент не найден" };
+
   const msg = (await db.inboxMessage.findUnique({
     where: { id: inboxMessageId },
     select: {
@@ -59,6 +71,7 @@ export async function linkInboxMessageToCustomer(
       fromEmail: true,
       direction: true,
       emailMessageId: true,
+      receivedAt: true,
     },
   })) as
     | {
@@ -72,6 +85,7 @@ export async function linkInboxMessageToCustomer(
         fromEmail: string;
         direction: string;
         emailMessageId: string | null;
+        receivedAt: Date;
       }
     | null;
   if (!msg) return { error: "Сообщение не найдено" };
@@ -92,11 +106,7 @@ export async function linkInboxMessageToCustomer(
   const senderEmail = msg.fromEmail.trim().toLowerCase();
   let shouldAddAlias = false;
   if (!isOutbound && senderEmail) {
-    const customer = (await db.user.findUnique({
-      where: { id: customerUserId },
-      select: { email: true },
-    })) as { email: string } | null;
-    const isPrimary = customer?.email.toLowerCase() === senderEmail;
+    const isPrimary = customer.email.toLowerCase() === senderEmail;
     const existingAlias = isPrimary
       ? true
       : (await db.customerContact.findUnique({
@@ -106,8 +116,9 @@ export async function linkInboxMessageToCustomer(
     shouldAddAlias = !isPrimary && !existingAlias;
   }
 
+  let result: { logId: string; eventId: string | null };
   try {
-    const result = await db.$transaction(async (tx) => {
+    result = await db.$transaction(async (tx) => {
       const log = (await tx.communicationLog.create({
         data: {
           customerUserId,
@@ -123,6 +134,7 @@ export async function linkInboxMessageToCustomer(
           // neutral EmailMessage stay joined after a manual triage.
           emailMessageId: msg.emailMessageId,
           attachments: msg.attachments as never,
+          createdAt: msg.receivedAt,
         },
         select: { id: true },
       })) as { id: string };
@@ -147,13 +159,18 @@ export async function linkInboxMessageToCustomer(
           data: { userId: customerUserId, type: "EMAIL", value: senderEmail },
         });
       }
-      return log.id;
+      const event = !isOutbound
+        ? await publishInboundCustomerMessage(tx, {
+            communicationLogId: log.id,
+            customerUserId,
+            customerName: customer.name,
+            dealId: resolvedDealId,
+            channel: "EMAIL_INBOUND",
+            occurredAt: msg.receivedAt,
+          })
+        : null;
+      return { logId: log.id, eventId: event?.id ?? null };
     });
-
-    revalidatePath("/admin/crm/inbox");
-    revalidatePath(`/admin/customers/${customerUserId}`);
-    if (resolvedDealId) revalidatePath(`/admin/crm/deals/${resolvedDealId}`);
-    return { error: null, communicationLogId: result };
   } catch (err) {
     const code = (err as { code?: string } | null)?.code;
     if (code === "P2002" || (err instanceof Error && err.message === "RACE")) {
@@ -162,6 +179,19 @@ export async function linkInboxMessageToCustomer(
     console.error("[INBOX] linkInboxMessageToCustomer", err);
     return { error: "Не удалось привязать. Попробуйте ещё раз." };
   }
+
+  // The event is already committed. If projection fails, let the action fail
+  // visibly; the event remains PENDING and a later ingest pass retries it.
+  if (result.eventId) {
+    await projectInboundCustomerMessageEvent(
+      db as unknown as InboundCustomerMessageProjectorDb,
+      result.eventId,
+    );
+  }
+  revalidatePath("/admin/crm/inbox");
+  revalidatePath(`/admin/customers/${customerUserId}`);
+  if (resolvedDealId) revalidatePath(`/admin/crm/deals/${resolvedDealId}`);
+  return { error: null, communicationLogId: result.logId };
 }
 
 export async function markInboxMessageSpam(
@@ -244,8 +274,8 @@ export async function sendEmailReply(
       externalId: { not: null },
     },
     orderBy: { createdAt: "desc" },
-    select: { externalId: true, subject: true },
-  })) as { externalId: string | null; subject: string | null } | null;
+    select: { id: true, externalId: true, subject: true },
+  })) as { id: string; externalId: string | null; subject: string | null } | null;
 
   const messageId = generateOutboundMessageId();
   const priorSubject = parent?.subject?.replace(/^\s*Re:\s*/i, "") ?? "Сообщение от Geleoteka";
@@ -279,6 +309,13 @@ export async function sendEmailReply(
     return { error: `Не удалось отправить: ${result.error}` };
   }
   await markOutboundEmailSent(messageId);
+
+  if (parent) {
+    await completeFollowUpAfterReply(db, {
+      customerUserId: input.customerUserId,
+      inboundCommunicationLogId: parent.id,
+    });
+  }
 
   revalidatePath(`/admin/customers/${input.customerUserId}`);
   if (input.dealId) revalidatePath(`/admin/crm/deals/${input.dealId}`);

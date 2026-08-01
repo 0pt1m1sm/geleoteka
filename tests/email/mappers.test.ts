@@ -246,13 +246,13 @@ describe("cross-provider ingest", () => {
 
   it("produces one CRM row for a message that arrives over BOTH transports", async () => {
     const db = dbWithCustomer();
-    const ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    const projectInboundEvents = vi.fn(async () => undefined);
 
     const viaResend = await ingestEmail(
       resendEnvelopeToParsedEmail({ envelope: resendEnvelope(), content: resendContent() }),
-      { client: db, ensureFollowUp },
+      { client: db, projectInboundEvents },
     );
-    const viaImap = await ingestEmail(sameMessageOverImap(), { client: db, ensureFollowUp });
+    const viaImap = await ingestEmail(sameMessageOverImap(), { client: db, projectInboundEvents });
 
     expect(viaResend.status).toBe("created");
     expect(viaImap.status).toBe("duplicate");
@@ -260,23 +260,23 @@ describe("cross-provider ingest", () => {
     expect(db.emailMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(1);
     expect(db.inboxMessages).toHaveLength(0);
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("collapses them in the other arrival order too", async () => {
     const db = dbWithCustomer();
-    const ensureFollowUp = vi.fn(async () => ({ taskId: "task_1", created: true }));
+    const projectInboundEvents = vi.fn(async () => undefined);
 
-    const viaImap = await ingestEmail(sameMessageOverImap(), { client: db, ensureFollowUp });
+    const viaImap = await ingestEmail(sameMessageOverImap(), { client: db, projectInboundEvents });
     const viaResend = await ingestEmail(
       resendEnvelopeToParsedEmail({ envelope: resendEnvelope(), content: resendContent() }),
-      { client: db, ensureFollowUp },
+      { client: db, projectInboundEvents },
     );
 
     expect(viaImap.status).toBe("created");
     expect(viaResend.status).toBe("duplicate");
     expect(db.emailMessages).toHaveLength(1);
-    expect(ensureFollowUp).toHaveBeenCalledTimes(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
   it("agrees on the threading headers regardless of transport", () => {

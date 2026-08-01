@@ -389,6 +389,11 @@ export async function eraseCustomer(
       // from a company mailbox is the shop's own correspondence, never one
       // person's to take away.
       if (deleteRelated && target.isCustomer) await deleteMailFor(tx, addresses);
+      // Staff notification summaries contain the customer's display name. The
+      // event is the aggregate root; deleting it cascades receipts/deliveries.
+      await tx.staffNotificationEvent.deleteMany({
+        where: { relatedCustomerUserId: userId },
+      });
       // The card's own timeline always goes: CommunicationLog REQUIRES a
       // customer (the FK is not nullable), so there is no one left to own it.
       await tx.communicationLog.deleteMany({ where: { customerUserId: userId } });

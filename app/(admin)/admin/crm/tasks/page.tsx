@@ -6,7 +6,6 @@ import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader } from "@/components/ui";
 import { CrmTaskList } from "@/components/crm/CrmTaskList";
-import { INBOUND_COMM_CHANNELS } from "@/lib/crm/inbound-communications";
 
 interface StoredTaskRow {
   id: string;
@@ -22,13 +21,7 @@ interface StoredTaskRow {
   owner: { id: string; name: string } | null;
   customer: { id: string; name: string } | null;
   deal: { id: string; number: string | null } | null;
-}
-
-interface InboundCommunicationRow {
-  id: string;
-  customerUserId: string;
-  dealId: string | null;
-  channel: string;
+  lastInboundCommunication: { id: string; channel: string } | null;
 }
 
 interface Props {
@@ -105,52 +98,15 @@ export default async function CrmTasksPage({ searchParams }: Props) {
       owner: { select: { id: true, name: true } },
       customer: { select: { id: true, name: true } },
       deal: { select: { id: true, number: true } },
+      lastInboundCommunication: { select: { id: true, channel: true } },
     },
   })) as StoredTaskRow[];
-
-  // CrmTask deliberately has no message FK until Story 3. Resolve the current
-  // OPEN reply task to the newest inbound CommunicationLog for the same exact
-  // (customerUserId, dealId) pair. `dealId: null` is a real pair, not a reason
-  // to drop the task from navigation.
-  const pairs = new Map<string, { customerUserId: string; dealId: string | null }>();
-  for (const task of storedTasks) {
-    if (task.kind !== "FOLLOW_UP" || task.status !== "OPEN" || !task.customerUserId) continue;
-    pairs.set(communicationPairKey(task.customerUserId, task.dealId), {
-      customerUserId: task.customerUserId,
-      dealId: task.dealId,
-    });
-  }
-
-  const pairValues = Array.from(pairs.values());
-  const latestInboundRows = pairValues.length > 0
-    ? (await db.communicationLog.findMany({
-        where: {
-          channel: { in: [...INBOUND_COMM_CHANNELS] },
-          OR: pairValues,
-        },
-        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-        distinct: ["customerUserId", "dealId"],
-        select: {
-          id: true,
-          customerUserId: true,
-          dealId: true,
-          channel: true,
-        },
-      }) as InboundCommunicationRow[])
-    : [];
-
-  const latestInboundByPair = new Map(
-    latestInboundRows.map((entry) => [
-      communicationPairKey(entry.customerUserId, entry.dealId),
-      { id: entry.id, channel: entry.channel },
-    ]),
-  );
 
   const tasks = storedTasks.map((task) => ({
     ...task,
     latestInboundCommunication:
-      task.kind === "FOLLOW_UP" && task.status === "OPEN" && task.customerUserId
-        ? latestInboundByPair.get(communicationPairKey(task.customerUserId, task.dealId)) ?? null
+      task.kind === "FOLLOW_UP"
+        ? task.lastInboundCommunication
         : null,
   }));
 
@@ -232,10 +188,6 @@ export default async function CrmTasksPage({ searchParams }: Props) {
       </Card>
     </div>
   );
-}
-
-function communicationPairKey(customerUserId: string, dealId: string | null): string {
-  return `${customerUserId}\u0000${dealId ?? ""}`;
 }
 
 function Chip({
