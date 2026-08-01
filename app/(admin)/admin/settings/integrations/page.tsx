@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
+import { roleHasPermission } from "@/lib/authz";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { KNOWN_SETTINGS, type SettingDescriptor } from "@/lib/settings";
@@ -19,9 +20,8 @@ import { TestSendButton } from "@/components/admin/settings/TestSendButton";
  */
 export default async function IntegrationsSettingsPage() {
   const session = await getSession();
-  if (!session || session.permissionRole !== "ADMIN") {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
+  if (!(await roleHasPermission(session.permissionRole, "settings.manage"))) redirect("/");
 
   const visibleSettings = KNOWN_SETTINGS.filter((setting) => setting.visibleInUi !== false);
 
@@ -31,6 +31,7 @@ export default async function IntegrationsSettingsPage() {
   })) as Array<{ key: string; value: string }>;
 
   const dbKeys = new Set(rows.filter((r) => r.value).map((r) => r.key));
+  const dbValues = new Map(rows.map((row) => [row.key, row.value]));
 
   // Group descriptors by `group` field, preserving definition order.
   const groups = new Map<string, SettingDescriptor[]>();
@@ -42,6 +43,7 @@ export default async function IntegrationsSettingsPage() {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
   const inboundWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/email/inbound`;
+  const telegramWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/integrations/telegram/webhook`;
 
   // Per-group static info rows. Currently only Email (Resend) has one —
   // the webhook URL operator must paste into the Resend dashboard.
@@ -50,6 +52,13 @@ export default async function IntegrationsSettingsPage() {
       {
         label: "URL для Resend webhooks (вставьте в Resend dashboard → Webhooks)",
         value: inboundWebhookUrl,
+        copyable: true,
+      },
+    ],
+    "Уведомления сотрудников (Telegram)": [
+      {
+        label: "Webhook URL для setWebhook (secret_token берётся из настройки ниже)",
+        value: telegramWebhookUrl,
         copyable: true,
       },
     ],
@@ -72,7 +81,17 @@ export default async function IntegrationsSettingsPage() {
               : process.env[envName]?.trim()
                 ? "env"
                 : "none";
-            return { descriptor: s, source };
+            const effectiveValue =
+              source === "db"
+                ? (dbValues.get(s.key) ?? null)
+                : source === "env"
+                  ? (process.env[envName]?.trim() ?? null)
+                  : null;
+            return {
+              descriptor: s,
+              source,
+              value: s.secret || s.input === "secret" ? null : effectiveValue,
+            };
           });
           return (
             <div key={groupName} className="space-y-3">

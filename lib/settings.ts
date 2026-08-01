@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { parseBooleanSetting } from "@/lib/settings-shared";
 import { STAFF_NOTIFICATION_EVENT_CATALOG } from "@/lib/staff-notifications/types";
+import { TELEGRAM_ROUTING_MODES } from "@/lib/staff-notifications/channels/telegram/constants";
 
 /**
  * Runtime-mutable settings store. Admin can override env-driven values via
@@ -31,6 +32,8 @@ export interface SettingDescriptor {
   secret?: boolean;
   /** Field shape used when Story 4 exposes the Telegram controls. */
   input?: "text" | "secret" | "boolean" | "select";
+  /** Closed values for a select input. */
+  options?: ReadonlyArray<{ value: string; label: string }>;
   /** Dark-mode settings are registered but do not change the current page. */
   visibleInUi?: boolean;
   /** Visual group on the settings page (Russian label). */
@@ -262,17 +265,58 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
       "Сколько машин сервис принимает в одно время. По умолчанию 1: запись занимает слот целиком, и наложение по времени не допускается. Больше 1 имеет смысл, когда постов несколько — но какая машина на каком посту, система пока не различает.",
   },
 
-  // ── Staff notifications / Telegram (Story 2: dark mode) ─────────────
-  // These descriptors are intentionally hidden until the Story 4 settings UI
-  // and adapter land. No row is backfilled; absent and malformed values are
-  // false through getBooleanSetting().
+  // ── Staff notifications / Telegram ──────────────────────────────────
   {
     group: "Уведомления сотрудников (Telegram)",
     key: "TELEGRAM_ENABLED",
     label: "Telegram-уведомления включены",
-    description: "Главный рубильник. До Story 4 зарегистрирован, но скрыт и выключен.",
+    description: "Главный рубильник. Включается только при валидных токене, username, webhook-секрете и режиме маршрутизации.",
     input: "boolean",
-    visibleInUi: false,
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_BOT_TOKEN",
+    label: "Bot API token",
+    description: "Секрет от @BotFather. Никогда не попадает в логи и клиентский код.",
+    secret: true,
+    input: "secret",
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_BOT_USERNAME",
+    label: "Username бота",
+    description: "Без символа @, например GeleotekaStaffBot. Используется только для безопасной deep-link привязки.",
+    input: "text",
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_WEBHOOK_SECRET",
+    label: "Webhook secret token",
+    description: "Случайная строка 32–256 символов A-Z, a-z, 0-9, _ или -. То же значение задаётся при setWebhook.",
+    secret: true,
+    input: "secret",
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_ROUTING_MODE",
+    label: "Маршрутизация",
+    description: "Лично владельцу; общий служебный fallback используется только для события без подходящего владельца.",
+    input: "select",
+    options: TELEGRAM_ROUTING_MODES.map((value) => ({
+      value,
+      label:
+        value === "PERSONAL_ONLY"
+          ? "Только личные привязки"
+          : "Лично владельцу, общий fallback",
+    })),
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "STAFF_NOTIFICATION_DISPATCH_SECRET",
+    label: "Секрет диспетчера",
+    description: "Случайный Bearer-секрет не короче 32 символов для внешнего cron.",
+    secret: true,
+    input: "secret",
   },
   ...Object.keys(STAFF_NOTIFICATION_EVENT_CATALOG).map((type) => ({
     group: "Уведомления сотрудников (Telegram)",
@@ -280,7 +324,6 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     label: `Отправлять ${type}`,
     description: "Переключатель типа события. Отсутствующее или некорректное значение = false.",
     input: "boolean" as const,
-    visibleInUi: false,
   })),
 ];
 

@@ -31,7 +31,7 @@ interface ReceiptRow {
 export default async function StaffNotificationsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!(await roleHasPermission(session.permissionRole, "crm.manage"))) redirect("/");
+  if (!(await roleHasPermission(session.permissionRole, "notifications.view"))) redirect("/");
 
   const receipts = (await db.staffNotificationReceipt.findMany({
     where: { tenantKey: TENANT_KEY, userId: session.id },
@@ -61,13 +61,18 @@ export default async function StaffNotificationsPage() {
         title="Уведомления"
         description="Ваша персональная лента. Прочтение сигнала не закрывает задачу ответа."
         actions={
-          unreadCount > 0 ? (
-            <form action={markAllStaffNotificationsRead}>
-              <button type="submit" className="btn btn-secondary text-sm">
-                Прочитать все
-              </button>
-            </form>
-          ) : undefined
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/notifications/telegram" className="btn btn-secondary text-sm">
+              Telegram
+            </Link>
+            {unreadCount > 0 ? (
+              <form action={markAllStaffNotificationsRead}>
+                <button type="submit" className="btn btn-secondary text-sm">
+                  Прочитать все
+                </button>
+              </form>
+            ) : null}
+          </div>
         }
       />
 

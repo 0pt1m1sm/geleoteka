@@ -2,6 +2,7 @@ import type {
   SafeChannelPayload,
   StaffNotificationChannel,
 } from "@/lib/staff-notifications/types";
+import { telegramChannelAdapter } from "@/lib/staff-notifications/channels/telegram";
 
 export type ChannelDeliveryResult =
   | { outcome: "sent"; providerMessageId?: string | null }
@@ -23,6 +24,5 @@ export type StaffNotificationChannelRegistry = Readonly<
   Partial<Record<StaffNotificationChannel, StaffNotificationChannelAdapter>>
 >;
 
-/** Story 2 intentionally ships no adapters. Telegram is registered in Story 4. */
 export const STAFF_NOTIFICATION_CHANNEL_REGISTRY: StaffNotificationChannelRegistry =
-  Object.freeze({});
+  Object.freeze({ TELEGRAM: telegramChannelAdapter });

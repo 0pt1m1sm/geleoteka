@@ -26,6 +26,8 @@ export const PERMISSIONS = [
   "warehouse.manage",
   "rentals.manage",
   "crm.manage",
+  "notifications.view",
+  "notifications.manage",
   "users.manage",
   "roles.manage",
   "audit.view",
@@ -79,6 +81,16 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     detail: "Сделки, сметы, задачи, входящие письма, клиенты",
     group: "Продажи",
   },
+  "notifications.view": {
+    label: "Уведомления",
+    detail: "Своя лента уведомлений и личная привязка Telegram",
+    group: "Работа",
+  },
+  "notifications.manage": {
+    label: "Управление уведомлениями",
+    detail: "Общий Telegram-канал, dead-letter и ручной повтор доставок",
+    group: "Администрирование",
+  },
   "content.manage": {
     label: "Контент сайта",
     detail: "Тексты и блоки публичных страниц",
@@ -126,6 +138,7 @@ export const ROLE_DEFAULTS: Readonly<Record<string, readonly Permission[]>> = {
     "parts.manage",
     "rentals.manage",
     "crm.manage",
+    "notifications.view",
     "site.manage",
     "users.manage",
   ],
@@ -153,7 +166,7 @@ export const EDITABLE_ROLES = ["MANAGER", "MASTER", "WAREHOUSE_WORKER"] as const
  */
 const PATH_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/admin/warehouse", "warehouse.manage"],
-  ["/admin/notifications", "crm.manage"],
+  ["/admin/notifications", "notifications.view"],
   ["/admin/roles", "roles.manage"],
   ["/admin/audit", "audit.view"],
   ["/admin/users", "users.manage"],
@@ -172,6 +185,35 @@ const PATH_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/admin/team", "site.manage"],
   ["/admin/vacancies", "site.manage"],
 ];
+
+export interface StoredPermissionDecision {
+  permission: string;
+  allowed: boolean;
+}
+
+/**
+ * Resolve stored role decisions while remaining forward-compatible with newly
+ * introduced permissions. Older exhaustive rows cannot mention a permission
+ * that did not exist when they were saved, so only those missing keys inherit
+ * the current role default; an explicit false always remains a denial.
+ */
+export function resolveRolePermissions(
+  role: string,
+  rows: readonly StoredPermissionDecision[],
+): Set<string> {
+  const defaults = new Set<string>(ROLE_DEFAULTS[role] ?? []);
+  if (rows.length === 0) return defaults;
+
+  const decisions = new Map(rows.map((row) => [row.permission, row.allowed]));
+  const granted = new Set<string>();
+  for (const permission of PERMISSIONS) {
+    const decision = decisions.get(permission);
+    if (decision === true || (decision === undefined && defaults.has(permission))) {
+      granted.add(permission);
+    }
+  }
+  return granted;
+}
 
 export function permissionForPath(pathname: string): Permission | null {
   if (pathname !== "/admin" && !pathname.startsWith("/admin/")) return null;

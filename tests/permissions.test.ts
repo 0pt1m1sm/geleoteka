@@ -5,6 +5,7 @@ import {
   ROLE_DEFAULTS,
   isPermission,
   permissionForPath,
+  resolveRolePermissions,
 } from "@/lib/permissions";
 import { filterNavForPermissions } from "@/lib/admin-nav";
 import { adminNav } from "@/lib/admin-nav";
@@ -18,6 +19,7 @@ describe("permissionForPath", () => {
     expect(permissionForPath("/admin/customers/abc123")).toBe("crm.manage");
     expect(permissionForPath("/admin/roles")).toBe("roles.manage");
     expect(permissionForPath("/admin/settings/integrations")).toBe("settings.manage");
+    expect(permissionForPath("/admin/notifications/telegram")).toBe("notifications.view");
   });
 
   // A plain startsWith would hand /admin/warehouse-reports to the warehouse
@@ -62,6 +64,8 @@ describe("defaults reproduce the access that was hardcoded", () => {
   it("keeps settings, content and roles away from the manager", () => {
     const granted = new Set<string>(ROLE_DEFAULTS.MANAGER);
     expect(granted.has("crm.manage")).toBe(true);
+    expect(granted.has("notifications.view")).toBe(true);
+    expect(granted.has("notifications.manage")).toBe(false);
     expect(granted.has("users.manage")).toBe(true);
     expect(granted.has("settings.manage")).toBe(false);
     expect(granted.has("content.manage")).toBe(false);
@@ -71,6 +75,21 @@ describe("defaults reproduce the access that was hardcoded", () => {
   // The proxy admitted only MANAGER/ADMIN, so a master had no admin panel.
   it("leaves the master outside the admin panel", () => {
     expect(ROLE_DEFAULTS.MASTER).toEqual([]);
+  });
+});
+
+describe("new permission defaults on previously saved roles", () => {
+  it("inherits a newly introduced default only when no stored decision exists", () => {
+    const legacyRows = [{ permission: "crm.manage", allowed: false }];
+    const granted = resolveRolePermissions("MANAGER", legacyRows);
+    expect(granted.has("crm.manage")).toBe(false);
+    expect(granted.has("notifications.view")).toBe(true);
+
+    const explicitlyDenied = resolveRolePermissions("MANAGER", [
+      ...legacyRows,
+      { permission: "notifications.view", allowed: false },
+    ]);
+    expect(explicitlyDenied.has("notifications.view")).toBe(false);
   });
 });
 

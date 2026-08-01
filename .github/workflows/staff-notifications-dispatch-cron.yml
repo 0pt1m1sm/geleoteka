@@ -1,0 +1,43 @@
+name: staff-notifications-dispatch-cron
+
+# External scheduler only. The app owns no timer and correctness never depends
+# on Next.js after(); each request drains one bounded, DB-leased batch.
+#
+# Required GitHub Actions secret:
+#   STAFF_NOTIFICATION_DISPATCH_SECRET — same value as the production setting.
+# Optional repository variable:
+#   STAFF_NOTIFICATION_DISPATCH_URL
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  group: staff-notifications-dispatch-cron
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Dispatch bounded batches
+        env:
+          SECRET: ${{ secrets.STAFF_NOTIFICATION_DISPATCH_SECRET }}
+          URL: ${{ vars.STAFF_NOTIFICATION_DISPATCH_URL || 'https://geleoteka.ru/api/internal/staff-notifications/dispatch' }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "STAFF_NOTIFICATION_DISPATCH_SECRET is not set." >&2
+            exit 1
+          fi
+          for i in $(seq 1 4); do
+            code=$(curl -s -o /tmp/staff-notification-response.json -w '%{http_code}' \
+              -X POST "$URL" -H "Authorization: Bearer $SECRET" --max-time 40 || echo 000)
+            echo "batch $i → HTTP $code"
+            if [ "$code" != "200" ]; then
+              exit 0
+            fi
+            [ "$i" = "4" ] || sleep 50
+          done
+

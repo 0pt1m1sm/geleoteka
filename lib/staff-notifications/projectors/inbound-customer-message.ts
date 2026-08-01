@@ -3,7 +3,12 @@ import {
   upsertInboundFollowUpTask,
   type InboundFollowUpTx,
 } from "@/lib/crm/inbound-follow-up";
-import { PERMISSIONS, ROLE_DEFAULTS } from "@/lib/permissions";
+import { PERMISSIONS, resolveRolePermissions } from "@/lib/permissions";
+import {
+  TELEGRAM_CORE_SETTING_KEYS,
+  TELEGRAM_EVENT_SETTING_KEYS,
+  resolveTelegramRuntimeConfig,
+} from "@/lib/staff-notifications/channels/telegram/config-values";
 import {
   routeStaffNotificationEvent,
   selectStaffNotificationRecipients,
@@ -31,6 +36,9 @@ interface ProjectorTx extends InboundFollowUpTx, StaffNotificationRouterTx {
     findMany(args: QueryArgs): Promise<unknown>;
   };
   telegramDestination: {
+    findMany(args: QueryArgs): Promise<unknown>;
+  };
+  setting: {
     findMany(args: QueryArgs): Promise<unknown>;
   };
 }
@@ -264,7 +272,17 @@ export async function projectLockedInboundCustomerMessage(
     projectedEvent.targetUserId !== null &&
     selectedRecipients.length === 1 &&
     selectedRecipients[0] === projectedEvent.targetUserId;
-  const destinations = await loadDestinations(tx, usesPersonalTarget);
+  const telegramConfig = await loadTelegramRoutingConfig(tx);
+  const destinations =
+    telegramConfig.enabled &&
+    telegramConfig.enabledEventTypes.has("INBOUND_CUSTOMER_MESSAGE")
+      ? await loadDestinations(
+          tx,
+          usesPersonalTarget,
+          usesPersonalTarget ? selectedRecipients[0] : null,
+          telegramConfig.routingMode,
+        )
+      : [];
 
   await tx.staffNotificationEvent.update({
     where: { tenantKey_id: { tenantKey: TENANT_KEY, id: event.id } },
@@ -359,26 +377,29 @@ async function loadRecipientCandidates(tx: ProjectorTx) {
     const permissions =
       user.permissionRole === "ADMIN"
         ? new Set<string>(PERMISSIONS)
-        : rows.length > 0
-          ? new Set(rows.filter((row) => row.allowed).map((row) => row.permission))
-          : new Set<string>(ROLE_DEFAULTS[user.permissionRole] ?? []);
+        : resolveRolePermissions(user.permissionRole, rows);
     return {
       userId: user.id,
-      // Story 3 exposes the CRM feed to the same staff who can open CRM. Story
-      // 4 adds the independent notifications.view permission and link UI.
-      canViewNotifications: permissions.has("crm.manage"),
+      canViewNotifications: permissions.has("notifications.view"),
       permissions,
     };
   });
 }
 
-async function loadDestinations(tx: ProjectorTx, personalOnly: boolean) {
+async function loadDestinations(
+  tx: ProjectorTx,
+  personalTarget: boolean,
+  targetUserId: string | null,
+  routingMode: "PERSONAL_ONLY" | "PERSONAL_WITH_SHARED_FALLBACK",
+) {
+  if (!personalTarget && routingMode === "PERSONAL_ONLY") return [];
   const rows = (await tx.telegramDestination.findMany({
     where: {
       tenantKey: TENANT_KEY,
       isActive: true,
       disabledAt: null,
-      kind: personalOnly ? "PERSONAL" : { in: ["PERSONAL", "SHARED"] },
+      kind: personalTarget ? "PERSONAL" : "SHARED",
+      userId: personalTarget ? targetUserId : null,
     },
     select: { id: true, kind: true, userId: true },
   })) as DestinationRow[];
@@ -387,4 +408,19 @@ async function loadDestinations(tx: ProjectorTx, personalOnly: boolean) {
     channel: "TELEGRAM" as const,
     destinationKey: row.id,
   }));
+}
+
+async function loadTelegramRoutingConfig(tx: ProjectorTx) {
+  const keys = [...TELEGRAM_CORE_SETTING_KEYS, ...TELEGRAM_EVENT_SETTING_KEYS];
+  const rows = (await tx.setting.findMany({
+    where: { key: { in: keys } },
+    select: { key: true, value: true },
+  })) as Array<{ key: string; value: string }>;
+  const values: Record<string, string | null> = Object.fromEntries(
+    rows.map((row) => [row.key, row.value]),
+  );
+  for (const key of keys) {
+    if (values[key] === undefined) values[key] = process.env[key] ?? null;
+  }
+  return resolveTelegramRuntimeConfig(values);
 }

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Input } from "@/components/ui";
+import { Alert, Button, Input, Select } from "@/components/ui";
 import { upsertSettings } from "@/app/actions/settings";
 import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 import type { SettingDescriptor } from "@/lib/settings";
@@ -11,6 +11,8 @@ interface FieldState {
   descriptor: SettingDescriptor;
   /** Where the active value comes from right now: 'db' | 'env' | 'none'. */
   source: "db" | "env" | "none";
+  /** Effective non-secret value. Secrets are never serialized to this client. */
+  value: string | null;
 }
 
 interface Props {
@@ -49,8 +51,8 @@ export function SettingGroupForm({ groupName, fields, infoRows }: Props): React.
       ) : null}
 
       <div className="space-y-5">
-        {fields.map(({ descriptor: s, source }) => (
-          <SettingField key={s.key} descriptor={s} source={source} />
+        {fields.map(({ descriptor: s, source, value }) => (
+          <SettingField key={s.key} descriptor={s} source={source} value={value} />
         ))}
       </div>
 
@@ -113,9 +115,11 @@ function InfoRow({
 function SettingField({
   descriptor: s,
   source,
+  value,
 }: {
   descriptor: SettingDescriptor;
   source: "db" | "env" | "none";
+  value: string | null;
 }): React.ReactElement {
   // Neutral source labels — "none" is informational, not an error state.
   const sourceLabel =
@@ -128,12 +132,14 @@ function SettingField({
   // For secret fields with an existing value, show placeholder so user
   // sees "set, but hidden" — and pre-fill so unchanged submit is a no-op.
   const isSet = source !== "none";
-  const placeholder = s.secret && isSet
+  const input = s.input ?? (s.secret ? "secret" : "text");
+  const isSecret = input === "secret" || s.secret === true;
+  const placeholder = isSecret && isSet
     ? SECRET_PLACEHOLDER
     : isSet
       ? "значение задано"
       : "(не задано)";
-  const defaultValue = s.secret && isSet ? SECRET_PLACEHOLDER : "";
+  const defaultValue = isSecret && isSet ? SECRET_PLACEHOLDER : value ?? "";
 
   return (
     <div className="space-y-1.5">
@@ -146,14 +152,31 @@ function SettingField({
       {s.description ? (
         <p className="text-xs text-[var(--foreground-muted)]">{s.description}</p>
       ) : null}
-      <Input
-        id={`setting-${s.key}`}
-        name={s.key}
-        type={s.secret ? "password" : "text"}
-        defaultValue={defaultValue}
-        placeholder={placeholder}
-        autoComplete="new-password"
-      />
+      {input === "boolean" ? (
+        <Select id={`setting-${s.key}`} name={s.key} defaultValue={value ?? ""}>
+          <option value="">Не задано (выключено)</option>
+          <option value="true">Включено</option>
+          <option value="false">Выключено</option>
+        </Select>
+      ) : input === "select" ? (
+        <Select id={`setting-${s.key}`} name={s.key} defaultValue={value ?? ""}>
+          <option value="">Не задано (выключено)</option>
+          {(s.options ?? []).map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
+      ) : (
+        <Input
+          id={`setting-${s.key}`}
+          name={s.key}
+          type={isSecret ? "password" : "text"}
+          defaultValue={defaultValue}
+          placeholder={placeholder}
+          autoComplete={isSecret ? "new-password" : "off"}
+        />
+      )}
     </div>
   );
 }
