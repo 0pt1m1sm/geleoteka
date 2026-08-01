@@ -7,8 +7,13 @@ import {
   permissionForPath,
   resolveRolePermissions,
 } from "@/lib/permissions";
-import { filterNavForPermissions } from "@/lib/admin-nav";
-import { adminNav } from "@/lib/admin-nav";
+import {
+  adminNav,
+  filterNavForPermissions,
+  findActiveGroupLabel,
+  findActiveHref,
+  matchesHref,
+} from "@/lib/admin-nav";
 
 describe("permissionForPath", () => {
   it("maps each admin section to its permission", () => {
@@ -116,5 +121,79 @@ describe("filterNavForPermissions", () => {
     const nav = filterNavForPermissions(adminNav, new Set(["users.manage"]));
     const iam = nav.find((e) => e.kind === "group" && e.id === "admin-group-iam");
     expect(iam?.kind === "group" && iam.items.map((i) => i.href)).toEqual(["/admin/users"]);
+  });
+
+  it("scopes the personal feed and delivery queue independently", () => {
+    expect(
+      filterNavForPermissions(adminNav, new Set(["notifications.view"])),
+    ).toEqual([
+      { kind: "link", href: "/admin/notifications", label: "Уведомления" },
+    ]);
+
+    expect(
+      filterNavForPermissions(adminNav, new Set(["notifications.manage"])),
+    ).toEqual([
+      {
+        kind: "group",
+        id: "admin-group-settings",
+        label: "Настройки",
+        items: [
+          {
+            href: "/admin/notifications/operations",
+            label: "Очередь уведомлений",
+          },
+        ],
+      },
+    ]);
+
+    const settingsOnly = filterNavForPermissions(
+      adminNav,
+      new Set(["settings.manage"]),
+    );
+    const settings = settingsOnly.find(
+      (entry) => entry.kind === "group" && entry.id === "admin-group-settings",
+    );
+    expect(
+      settings?.kind === "group" && settings.items.map((item) => item.href),
+    ).toEqual([
+      "/admin/settings/integrations",
+      "/admin/settings/inbound-log",
+    ]);
+  });
+});
+
+describe("notification navigation", () => {
+  it("places the feed after the dashboard and the queue in settings", () => {
+    expect(adminNav.slice(0, 2)).toEqual([
+      { kind: "link", href: "/admin", label: "Дашборд" },
+      { kind: "link", href: "/admin/notifications", label: "Уведомления" },
+    ]);
+
+    const crm = adminNav.find(
+      (entry) => entry.kind === "group" && entry.id === "admin-group-crm",
+    );
+    expect(
+      crm?.kind === "group" &&
+        crm.items.some((item) => item.href.startsWith("/admin/notifications")),
+    ).toBe(false);
+  });
+
+  it("activates only the queue and opens settings on the operations route", () => {
+    const pathname = "/admin/notifications/operations";
+
+    // Both paths match by prefix, so the longest-match selection is essential.
+    expect(matchesHref(pathname, null, "/admin/notifications")).toBe(true);
+    const activeHref = findActiveHref(pathname, null, adminNav);
+    expect(activeHref).toBe("/admin/notifications/operations");
+    expect(findActiveGroupLabel(activeHref, adminNav)).toBe("Настройки");
+
+    const activeItems = adminNav
+      .flatMap((entry) =>
+        entry.kind === "link"
+          ? [entry.href]
+          : entry.items.map((item) => item.href),
+      )
+      .filter((href) => href === activeHref);
+    expect(activeItems).toEqual(["/admin/notifications/operations"]);
   });
 });

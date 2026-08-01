@@ -43,6 +43,7 @@ export type AdminNavEntry = AdminNavLink | AdminNavGroup;
 
 export const adminNav: AdminNavEntry[] = [
   { kind: "link", href: "/admin", label: "Дашборд" },
+  { kind: "link", href: "/admin/notifications", label: "Уведомления" },
   {
     kind: "group",
     id: "admin-group-service",
@@ -80,8 +81,6 @@ export const adminNav: AdminNavEntry[] = [
     id: "admin-group-crm",
     label: "CRM",
     items: [
-      { href: "/admin/notifications", label: "Уведомления" },
-      { href: "/admin/notifications/operations", label: "Эксплуатация уведомлений" },
       { href: "/admin/crm/deals", label: "Сделки" },
       { href: "/admin/crm/estimates", label: "Сметы" },
       { href: "/admin/crm/tasks?scope=open&owner=mine", label: "Задачи" },
@@ -116,6 +115,7 @@ export const adminNav: AdminNavEntry[] = [
     items: [
       { href: "/admin/settings/integrations", label: "Интеграции" },
       { href: "/admin/settings/inbound-log", label: "Лог webhook-ов" },
+      { href: "/admin/notifications/operations", label: "Очередь уведомлений" },
     ],
   },
 ];
