@@ -1,8 +1,8 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { TENANT_KEY } from "@/lib/tenant";
 import { formatForDatetimeLocalInput, parseDatetimeLocalInput } from "@/lib/timezone";
-import { getScheduleCapacity } from "@/lib/settings";
 import {
   computeDaySlots,
   type BlockedRange,
@@ -53,7 +53,7 @@ export async function getDaySlots(dateISO: string, now: Date = new Date()): Prom
     `${dateISO}T00:00:00.000Z`,
   ).getUTCDay();
 
-  const [weeklyRows, exceptionRow, bookedRows, blockedRows] = await Promise.all([
+  const [weeklyRows, exceptionRow, bookedRows, blockedRows, activeBays] = await Promise.all([
     db.workingHours.findMany({
       select: { dayOfWeek: true, isOpen: true, openMinute: true, closeMinute: true },
     }),
@@ -63,20 +63,26 @@ export async function getDaySlots(dateISO: string, now: Date = new Date()): Prom
     }),
     db.slot.findMany({
       where: { dateTime: { gte: bounds.start, lt: bounds.end } },
-      select: { dateTime: true },
+      select: { dateTime: true, bayId: true },
     }),
     db.blockedInterval.findMany({
       where: { startAt: { lt: bounds.end }, endAt: { gt: bounds.start } },
       select: { startAt: true, endAt: true },
+    }),
+    db.serviceBay.findMany({
+      where: { tenantKey: TENANT_KEY, isActive: true },
+      select: { id: true },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
     }),
   ]);
 
   const weekly = weeklyRows as WeeklyHours[];
   const exception = exceptionRow as DayException | null;
 
-  const bookedMinutes = (bookedRows as Array<{ dateTime: Date }>).map((s) =>
-    businessMinutes(s.dateTime),
-  );
+  const booked = (bookedRows as Array<{ dateTime: Date; bayId: string }>).map((slot) => ({
+    startMinute: businessMinutes(slot.dateTime),
+    bayId: slot.bayId,
+  }));
 
   // Clip each block to this day, so a range spanning midnight still masks the
   // right part of today rather than being dropped or wrapping around.
@@ -89,16 +95,13 @@ export async function getDaySlots(dateISO: string, now: Date = new Date()): Prom
 
   const nowMinute = businessDateISO(now) === dateISO ? businessMinutes(now) : null;
 
-  // Ёмкость — настройка сервиса, а не константа: при одной машине запись в
-  // 13:00 закрывает и 12:00, и 14:00, потому что пост занят целиком.
-  const capacity = await getScheduleCapacity();
   return computeDaySlots({
     dayOfWeek,
     weekly,
     exception,
-    bookedMinutes,
+    activeBayIds: (activeBays as Array<{ id: string }>).map((bay) => bay.id),
+    booked,
     blocked,
     nowMinute,
-    capacity,
   });
 }

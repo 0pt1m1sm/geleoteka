@@ -26,6 +26,11 @@ const MON_FRI_9_19: WeeklyHours[] = [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
 
 const MONDAY = 1;
 const SUNDAY = 0;
+const BAY_1 = "bay-1";
+
+function noBookings(): { activeBayIds: string[]; booked: [] } {
+  return { activeBayIds: [BAY_1], booked: [] };
+}
 
 function times(slots: { time: string }[]): string[] {
   return slots.map((s) => s.time);
@@ -39,7 +44,7 @@ describe("computeDaySlots — the grid", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [],
+      ...noBookings(),
     });
 
     expect(times(slots)).toEqual(["09:00", "11:00", "13:00", "15:00", "17:00"]);
@@ -48,7 +53,7 @@ describe("computeDaySlots — the grid", () => {
 
   it("offers nothing on a closed weekday", () => {
     expect(
-      computeDaySlots({ dayOfWeek: SUNDAY, weekly: MON_FRI_9_19, bookedMinutes: [] }),
+      computeDaySlots({ dayOfWeek: SUNDAY, weekly: MON_FRI_9_19, ...noBookings() }),
     ).toEqual([]);
   });
 
@@ -57,7 +62,7 @@ describe("computeDaySlots — the grid", () => {
       w.dayOfWeek === MONDAY ? { ...w, openMinute: 10 * 60, closeMinute: 16 * 60 } : w,
     );
 
-    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly, bookedMinutes: [] });
+    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly, ...noBookings() });
 
     expect(times(slots)).toEqual(["10:00", "12:00", "14:00"]);
   });
@@ -67,7 +72,7 @@ describe("computeDaySlots — the grid", () => {
       w.dayOfWeek === MONDAY ? { ...w, closeMinute: 18 * 60 } : w,
     );
 
-    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly, bookedMinutes: [] });
+    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly, ...noBookings() });
 
     // 17:00 would end at 19:00, past an 18:00 close.
     expect(times(slots)).toEqual(["09:00", "11:00", "13:00", "15:00"]);
@@ -76,18 +81,18 @@ describe("computeDaySlots — the grid", () => {
   it("falls back to the shop's real hours when no weekly row is configured", () => {
     // An unseeded install must offer what the contacts page promises —
     // Пн–Пт 10:00–20:00 — not some other invented window.
-    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly: [], bookedMinutes: [] });
+    const slots = computeDaySlots({ dayOfWeek: MONDAY, weekly: [], ...noBookings() });
 
     expect(times(slots)).toEqual(["10:00", "12:00", "14:00", "16:00", "18:00"]);
   });
 
   it("falls back to a short Saturday and a closed Sunday", () => {
-    expect(times(computeDaySlots({ dayOfWeek: 6, weekly: [], bookedMinutes: [] }))).toEqual([
+    expect(times(computeDaySlots({ dayOfWeek: 6, weekly: [], ...noBookings() }))).toEqual([
       "10:00",
       "12:00",
       "14:00",
     ]);
-    expect(computeDaySlots({ dayOfWeek: SUNDAY, weekly: [], bookedMinutes: [] })).toEqual([]);
+    expect(computeDaySlots({ dayOfWeek: SUNDAY, weekly: [], ...noBookings() })).toEqual([]);
   });
 });
 
@@ -96,7 +101,8 @@ describe("computeDaySlots — what makes a slot unavailable", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [13 * 60],
+      activeBayIds: [BAY_1],
+      booked: [{ startMinute: 13 * 60, bayId: BAY_1 }],
     });
 
     expect(freeTimes(slots)).toEqual(["09:00", "11:00", "15:00", "17:00"]);
@@ -108,7 +114,7 @@ describe("computeDaySlots — what makes a slot unavailable", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [],
+      ...noBookings(),
       // 12:00–14:00 straddles the 11:00 and 13:00 slots.
       blocked: [{ startMinute: 12 * 60, endMinute: 14 * 60 }],
     });
@@ -120,7 +126,7 @@ describe("computeDaySlots — what makes a slot unavailable", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [],
+      ...noBookings(),
       // Ends exactly when the 11:00 slot starts — half-open, so no clash.
       blocked: [{ startMinute: 9 * 60, endMinute: 11 * 60 }],
     });
@@ -132,7 +138,7 @@ describe("computeDaySlots — what makes a slot unavailable", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [],
+      ...noBookings(),
       nowMinute: 13 * 60 + 5,
     });
 
@@ -143,11 +149,43 @@ describe("computeDaySlots — what makes a slot unavailable", () => {
     const slots = computeDaySlots({
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
-      bookedMinutes: [],
+      ...noBookings(),
       nowMinute: null,
     });
 
     expect(freeTimes(slots)).toHaveLength(5);
+  });
+
+  it("keeps a time free exactly while an active bay is free", () => {
+    const oneOccupied = computeDaySlots({
+      dayOfWeek: MONDAY,
+      weekly: MON_FRI_9_19,
+      activeBayIds: [BAY_1, "bay-2"],
+      booked: [{ startMinute: 13 * 60, bayId: BAY_1 }],
+    });
+    expect(oneOccupied.find((slot) => slot.time === "13:00")?.available).toBe(true);
+
+    const bothOccupied = computeDaySlots({
+      dayOfWeek: MONDAY,
+      weekly: MON_FRI_9_19,
+      activeBayIds: [BAY_1, "bay-2"],
+      booked: [
+        { startMinute: 13 * 60, bayId: BAY_1 },
+        { startMinute: 13 * 60, bayId: "bay-2" },
+      ],
+    });
+    expect(bothOccupied.find((slot) => slot.time === "13:00")?.available).toBe(false);
+  });
+
+  it("does not let a booking on an inactive bay consume active capacity", () => {
+    const slots = computeDaySlots({
+      dayOfWeek: MONDAY,
+      weekly: MON_FRI_9_19,
+      activeBayIds: [BAY_1],
+      booked: [{ startMinute: 13 * 60, bayId: "inactive-bay" }],
+    });
+
+    expect(slots.find((slot) => slot.time === "13:00")?.available).toBe(true);
   });
 });
 
@@ -157,7 +195,7 @@ describe("resolveDayWindow — exceptions and holidays", () => {
       dayOfWeek: MONDAY,
       weekly: MON_FRI_9_19,
       exception: { isClosed: true, openMinute: null, closeMinute: null },
-      bookedMinutes: [],
+      ...noBookings(),
     });
 
     expect(slots).toEqual([]);
@@ -168,7 +206,7 @@ describe("resolveDayWindow — exceptions and holidays", () => {
       dayOfWeek: SUNDAY,
       weekly: MON_FRI_9_19,
       exception: { isClosed: false, openMinute: 10 * 60, closeMinute: 14 * 60 },
-      bookedMinutes: [],
+      ...noBookings(),
     });
 
     expect(times(slots)).toEqual(["10:00", "12:00"]);

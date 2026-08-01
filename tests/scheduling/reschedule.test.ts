@@ -20,7 +20,7 @@ import {
 class PrismaUniqueViolation extends Error {
   code = "P2002";
   constructor() {
-    super("Unique constraint failed on the fields: (`dateTime`)");
+    super("Unique constraint failed on the fields: (`dateTime`,`bayId`)");
     this.name = "PrismaClientKnownRequestError";
   }
 }
@@ -31,17 +31,27 @@ const AT_15 = new Date("2026-08-03T12:00:00.000Z");
 class FakeDb implements ReschedulePort {
   repairOrders: DbRow[] = [];
   slots: DbRow[] = [];
+  bays: Array<{ id: string; isActive: boolean }> = [];
   /** Set to make the next slot write collide, as the unique index would. */
   collideOnSlotWrite = false;
   transactionCount = 0;
 
-  constructor(seed?: { status?: string; withSlot?: boolean }) {
+  constructor(seed?: { status?: string; withSlot?: boolean; bayCount?: number }) {
+    const bayCount = seed?.bayCount ?? 1;
+    this.bays = Array.from({ length: bayCount }, (_, index) => ({
+      id: `bay_${index + 1}`,
+      isActive: true,
+    }));
     if (seed) {
       this.repairOrders.push({ id: "ro_1", status: seed.status ?? "SCHEDULED", dateTime: AT_10 });
       if (seed.withSlot !== false) {
-        this.slots.push({ id: "slot_1", repairOrderId: "ro_1", dateTime: AT_10 });
+        this.slots.push({ id: "slot_1", repairOrderId: "ro_1", dateTime: AT_10, bayId: "bay_1" });
       }
     }
+  }
+
+  async $queryRawUnsafe<T>(): Promise<T> {
+    return this.bays.filter((bay) => bay.isActive).map(({ id }) => ({ id })) as T;
   }
 
   async $transaction<T>(fn: (tx: RescheduleTx) => Promise<T>): Promise<T> {
@@ -83,6 +93,7 @@ class FakeDb implements ReschedulePort {
     // (gt, lt) вокруг нового времени.
     findMany: async (args: Record<string, unknown>): Promise<DbRow[]> => {
       const where = args.where as {
+        bayId?: { in?: string[] };
         repairOrderId?: { not?: string };
         dateTime?: { gt?: Date; lt?: Date };
       };
@@ -90,6 +101,7 @@ class FakeDb implements ReschedulePort {
       const gt = where.dateTime?.gt;
       const lt = where.dateTime?.lt;
       return this.slots.filter((s) => {
+        if (where.bayId?.in && !where.bayId.in.includes(s.bayId as string)) return false;
         if (exclude && s.repairOrderId === exclude) return false;
         const at = s.dateTime as Date;
         if (gt && !(at > gt)) return false;
@@ -130,31 +142,43 @@ describe("applyReschedule", () => {
 
   // Слот длится два часа, поэтому 12:00 и 13:00 — это наложение, хотя минуты
   // старта разные. Уникальность Slot.dateTime такое не ловит.
-  it("отказывает при наложении на чужую запись, а не только при совпадении", async () => {
+  it("при одном посте отказывает при наложении на чужую запись", async () => {
     const db = new FakeDb({ withSlot: false });
-    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10 });
+    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10, bayId: "bay_1" });
     const at11 = new Date(AT_10.getTime() + 60 * 60_000);
 
-    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 1 });
+    const out = await applyReschedule("ro_1", at11, db);
 
     expect(out).toEqual({ ok: false, reason: "conflict" });
   });
 
-  it("при ёмкости 2 наложение разрешено", async () => {
-    const db = new FakeDb({ withSlot: false });
-    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10 });
+  it("при двух постах перенос выбирает свободный пост", async () => {
+    const db = new FakeDb({ withSlot: false, bayCount: 2 });
+    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_10, bayId: "bay_1" });
     const at11 = new Date(AT_10.getTime() + 60 * 60_000);
 
-    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 2 });
+    const out = await applyReschedule("ro_1", at11, db);
 
     expect(out).toEqual({ ok: true });
+    expect(db.slots.find((slot) => slot.repairOrderId === "ro_1")?.bayId).toBe("bay_2");
+  });
+
+  it("не ставит две записи на один пост в одно и то же время", async () => {
+    const db = new FakeDb({ withSlot: false });
+    db.slots.push({ id: "slot_other", repairOrderId: "ro_2", dateTime: AT_15, bayId: "bay_1" });
+
+    const out = await applyReschedule("ro_1", AT_15, db);
+
+    expect(out).toEqual({ ok: false, reason: "conflict" });
+    expect(db.repairOrders[0].dateTime).toBe(AT_10);
+    expect(db.slots).toHaveLength(1);
   });
 
   it("своя же запись не считается помехой самой себе", async () => {
     const db = new FakeDb({});
     const at11 = new Date(AT_10.getTime() + 60 * 60_000);
 
-    const out = await applyReschedule("ro_1", at11, db as never, { capacity: 1 });
+    const out = await applyReschedule("ro_1", at11, db);
 
     expect(out).toEqual({ ok: true });
   });
@@ -166,7 +190,7 @@ describe("applyReschedule", () => {
 
     expect(outcome).toEqual({ ok: true });
     expect(db.slots).toHaveLength(1);
-    expect(db.slots[0]).toMatchObject({ repairOrderId: "ro_1", dateTime: AT_15 });
+    expect(db.slots[0]).toMatchObject({ repairOrderId: "ro_1", dateTime: AT_15, bayId: "bay_1" });
   });
 
   it("reports a conflict instead of double-booking", async () => {

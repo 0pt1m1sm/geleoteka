@@ -7,6 +7,13 @@ import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { createDeal, nextRepairOrderNumber } from "@/lib/crm/public";
+import { parseDatetimeLocalInput } from "@/lib/timezone";
+import {
+  isServiceBayAllocationConflict,
+  reserveServiceBaySlot,
+  SERVICE_BAY_CONFLICT_MESSAGE,
+  type ServiceBayAllocationTx,
+} from "@/lib/scheduling/service-bays";
 
 interface Result {
   error: string | null;
@@ -41,8 +48,8 @@ export async function createRepairOrderManually(
 
   if (!customerUserId) return { error: "Выберите клиента" };
   if (!dateTimeRaw) return { error: "Укажите дату и время" };
-  const dateTime = new Date(dateTimeRaw);
-  if (Number.isNaN(dateTime.valueOf())) return { error: "Некорректные дата и время" };
+  const dateTime = parseDatetimeLocalInput(dateTimeRaw);
+  if (!dateTime) return { error: "Некорректные дата и время" };
 
   const customer = (await db.user.findUnique({
     where: { id: customerUserId },
@@ -86,13 +93,26 @@ export async function createRepairOrderManually(
     dealId = created.id;
   }
 
-  const ro = await db.$transaction(async (tx) => {
-    const roNumber = await nextRepairOrderNumber(tx);
-    return (await tx.repairOrder.create({
-      data: { roNumber, dealId: dealId as string, userId: customerUserId, vehicleId, dateTime, concern },
-      select: { id: true, roNumber: true },
-    })) as { id: string; roNumber: string | null };
-  });
+  let ro: { id: string; roNumber: string | null };
+  try {
+    ro = await db.$transaction(async (tx) => {
+      const roNumber = await nextRepairOrderNumber(tx);
+      const created = (await tx.repairOrder.create({
+        data: { roNumber, dealId: dealId as string, userId: customerUserId, vehicleId, dateTime, concern },
+        select: { id: true, roNumber: true },
+      })) as { id: string; roNumber: string | null };
+      await reserveServiceBaySlot(tx as unknown as ServiceBayAllocationTx, {
+        repairOrderId: created.id,
+        dateTime,
+      });
+      return created;
+    });
+  } catch (error) {
+    if (isServiceBayAllocationConflict(error)) {
+      return { error: SERVICE_BAY_CONFLICT_MESSAGE };
+    }
+    throw error;
+  }
 
   await recordAudit({
     actor: session,

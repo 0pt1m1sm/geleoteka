@@ -1,7 +1,6 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { getScheduleCapacity } from "@/lib/settings";
 import { requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -278,7 +277,6 @@ export async function updateRepairOrderDetails(
       repairOrderId,
       next,
       db as unknown as ReschedulePort,
-      { capacity: await getScheduleCapacity() },
     );
     if (!outcome.ok) {
       switch (outcome.reason) {
