@@ -1,13 +1,17 @@
-import { ensureFollowUpTask } from "@/lib/crm/auto-task";
 import { db } from "@/lib/db";
 import { isUniqueViolation, type EmailIngestDb } from "@/lib/email/db-port";
 import {
   resolveInboundEmail,
   resolveOutboundEmail,
-  type FollowUpContext,
   type ResolveKind,
 } from "@/lib/email/resolve";
 import type { ParsedEmail } from "@/lib/email/types";
+import { publishInboundCustomerMessage } from "@/lib/staff-notifications/inbound-customer-message";
+import {
+  projectInboundCustomerMessageEvent,
+  projectPendingInboundCustomerMessages,
+  type InboundCustomerMessageProjectorDb,
+} from "@/lib/staff-notifications/projectors/inbound-customer-message";
 
 export type { EmailIngestDb, EmailIngestTx } from "@/lib/email/db-port";
 
@@ -26,8 +30,9 @@ export type { EmailIngestDb, EmailIngestTx } from "@/lib/email/db-port";
  *   - **Atomic.** The `EmailMessage` and the CRM row it produces are written in
  *     one transaction. Any network work — fetching the body from Resend,
  *     reading a UID over IMAP — has already happened by the time we get here.
- *   - **Best-effort follow-up.** The task is raised only after the message is
- *     durably stored, and only for genuinely new, known, inbound mail.
+ *   - **Durable follow-up.** A channel-neutral StaffNotificationEvent is
+ *     written in that same transaction for genuinely new, known inbound mail;
+ *     its projector creates the task and recipients only after commit.
  */
 
 export type IngestStatus =
@@ -55,15 +60,18 @@ export interface IngestResult {
   emailMessageId: string | null;
   /** `CommunicationLog.id` or `InboxMessage.id`. */
   id: string | null;
-  /** Whether a follow-up task was actually raised — see `ensureFollowUp`. */
-  followUpScheduled: boolean;
+  /** Durable event published with the CommunicationLog, null when not inbound. */
+  staffNotificationEventId: string | null;
 }
 
 export interface IngestOptions {
   /** Defaults to the Prisma singleton; tests inject an in-memory fake. */
   client?: EmailIngestDb;
-  /** Defaults to the real CRM task upsert. */
-  ensureFollowUp?: (input: FollowUpContext) => Promise<unknown>;
+  /** Test seam; production uses the durable post-commit projector. */
+  projectInboundEvents?: (
+    client: EmailIngestDb,
+    eventId: string | null,
+  ) => Promise<unknown>;
 }
 
 export async function ingestEmail(
@@ -71,7 +79,7 @@ export async function ingestEmail(
   options: IngestOptions = {},
 ): Promise<IngestResult> {
   const client = options.client ?? (db as unknown as EmailIngestDb);
-  const ensureFollowUp = options.ensureFollowUp ?? ensureFollowUpTask;
+  const projectInboundEvents = options.projectInboundEvents ?? projectAfterCommit;
 
   // A blank id means the mapper failed to derive even a synthetic one. Inventing
   // something here would defeat every dedupe guarantee below, so refuse loudly:
@@ -84,6 +92,9 @@ export async function ingestEmail(
 
   const existing = await findExisting(client, parsed);
   if (existing) {
+    // A prior attempt may have committed the message+event and then failed in
+    // projection. Re-reading the transport duplicate is the retry pass.
+    await projectInboundEvents(client, null);
     return {
       status: "duplicate",
       kind: null,
@@ -91,11 +102,16 @@ export async function ingestEmail(
         existing.rfcMessageId === parsed.rfcMessageId ? "rfc-message-id" : "source-uid",
       emailMessageId: existing.id,
       id: null,
-      followUpScheduled: false,
+      staffNotificationEventId: null,
     };
   }
 
-  let outcome: { kind: ResolveKind; id: string; emailMessageId: string; followUp: FollowUpContext | null };
+  let outcome: {
+    kind: ResolveKind;
+    id: string;
+    emailMessageId: string;
+    eventId: string | null;
+  };
   try {
     outcome = await client.$transaction(async (tx) => {
       const email = (await tx.emailMessage.create({
@@ -112,11 +128,21 @@ export async function ingestEmail(
         parsed.direction === "OUTBOUND"
           ? await resolveOutboundEmail({ parsed, client: tx, emailMessageId: email.id })
           : await resolveInboundEmail({ parsed, client: tx, emailMessageId: email.id });
+      const event = resolved.followUp
+        ? await publishInboundCustomerMessage(tx, {
+            communicationLogId: resolved.followUp.communicationLogId,
+            customerUserId: resolved.followUp.customerUserId,
+            customerName: resolved.followUp.customerName,
+            dealId: resolved.followUp.dealId,
+            channel: resolved.followUp.channel,
+            occurredAt: resolved.followUp.messageOccurredAt,
+          })
+        : null;
       return {
         kind: resolved.kind,
         id: resolved.id,
         emailMessageId: email.id,
-        followUp: resolved.followUp,
+        eventId: event?.id ?? null,
       };
     });
   } catch (err) {
@@ -124,30 +150,23 @@ export async function ingestEmail(
     // unique constraint is the real arbiter; treat this exactly like the
     // duplicate we would have detected a moment earlier.
     if (isUniqueViolation(err)) {
+      await projectInboundEvents(client, null);
       return {
         status: "duplicate",
         kind: null,
         reason: "concurrent-insert",
         emailMessageId: null,
         id: null,
-        followUpScheduled: false,
+        staffNotificationEventId: null,
       };
     }
     throw err;
   }
 
-  // Outside the transaction, and deliberately so: a failure in the task
-  // subsystem must never roll back a message we have already accepted. The
-  // mail is the record of truth; the task is a convenience on top of it.
-  let followUpScheduled = false;
-  if (outcome.followUp) {
-    try {
-      await ensureFollowUp(outcome.followUp);
-      followUpScheduled = true;
-    } catch (err) {
-      console.error("[EMAIL INGEST] ensureFollowUpTask failed (email kept)", err);
-    }
-  }
+  // This is deliberately after commit. A projector failure rejects the ingest
+  // pass instead of being logged and forgotten; the committed event remains
+  // PENDING, and the transport replay above retries it idempotently.
+  if (outcome.eventId) await projectInboundEvents(client, outcome.eventId);
 
   return {
     status: outcome.kind === "inbox" ? "unresolved" : "created",
@@ -155,8 +174,17 @@ export async function ingestEmail(
     reason: null,
     emailMessageId: outcome.emailMessageId,
     id: outcome.id,
-    followUpScheduled,
+    staffNotificationEventId: outcome.eventId,
   };
+}
+
+async function projectAfterCommit(
+  client: EmailIngestDb,
+  eventId: string | null,
+): Promise<void> {
+  const projectorDb = client as unknown as InboundCustomerMessageProjectorDb;
+  if (eventId) await projectInboundCustomerMessageEvent(projectorDb, eventId);
+  await projectPendingInboundCustomerMessages(projectorDb);
 }
 
 /**

@@ -4,8 +4,9 @@ import type { EmailAttachmentMeta, ParsedEmail } from "@/lib/email/types";
 
 export type ResolveKind = "thread" | "customer" | "inbox";
 
-/** What the caller needs to raise a follow-up AFTER the message is committed. */
+/** Channel-neutral facts published with the new CommunicationLog. */
 export interface FollowUpContext {
+  communicationLogId: string;
   customerUserId: string;
   customerName: string;
   dealId: string | null;
@@ -25,9 +26,8 @@ export interface ResolveResult {
   id: string;
   /**
    * Non-null only when a NEW inbound message landed on a known customer.
-   * Scheduling is the caller's job and happens outside the transaction, so a
-   * failure in the task subsystem cannot roll back the email itself. Outbound
-   * mail never carries a follow-up.
+   * The caller publishes its durable event before committing. Outbound mail
+   * never carries this context.
    */
   followUp: FollowUpContext | null;
 }
@@ -81,6 +81,7 @@ export async function resolveInboundEmail(input: {
       kind: "thread",
       id: created.id,
       followUp: {
+        communicationLogId: created.id,
         customerUserId: owner.customerUserId,
         customerName: customer?.name ?? "клиент",
         dealId: owner.dealId,
@@ -109,6 +110,7 @@ export async function resolveInboundEmail(input: {
       kind: "customer",
       id: created.id,
       followUp: {
+        communicationLogId: created.id,
         customerUserId: customer.id,
         customerName: customer.name,
         dealId,

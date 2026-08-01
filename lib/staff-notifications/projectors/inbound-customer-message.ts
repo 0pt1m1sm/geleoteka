@@ -1,0 +1,390 @@
+import { isInboundCommChannel } from "@/lib/crm/inbound-communications";
+import {
+  upsertInboundFollowUpTask,
+  type InboundFollowUpTx,
+} from "@/lib/crm/inbound-follow-up";
+import { PERMISSIONS, ROLE_DEFAULTS } from "@/lib/permissions";
+import {
+  routeStaffNotificationEvent,
+  selectStaffNotificationRecipients,
+  type StaffNotificationRouterTx,
+} from "@/lib/staff-notifications/router";
+import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
+import { TENANT_KEY } from "@/lib/tenant";
+
+type QueryArgs = Record<string, unknown>;
+
+interface ProjectorTx extends InboundFollowUpTx, StaffNotificationRouterTx {
+  $queryRaw<T>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
+  staffNotificationEvent: StaffNotificationRouterTx["staffNotificationEvent"] & {
+    update(args: QueryArgs): Promise<unknown>;
+  };
+  communicationLog: InboundFollowUpTx["communicationLog"];
+  user: {
+    findMany(args: QueryArgs): Promise<unknown>;
+    findUnique(args: QueryArgs): Promise<unknown>;
+  };
+  deal: {
+    findUnique(args: QueryArgs): Promise<unknown>;
+  };
+  rolePermission: {
+    findMany(args: QueryArgs): Promise<unknown>;
+  };
+  telegramDestination: {
+    findMany(args: QueryArgs): Promise<unknown>;
+  };
+}
+
+export interface InboundCustomerMessageProjectorDb {
+  $transaction<T>(fn: (tx: ProjectorTx) => Promise<T>): Promise<T>;
+  staffNotificationEvent: {
+    findMany(args: QueryArgs): Promise<unknown>;
+  };
+}
+
+export const STAFF_NOTIFICATION_ROUTING_MAX_ATTEMPTS = 5;
+export const STAFF_NOTIFICATION_ROUTING_RETRY_DELAYS_MS = [
+  60_000,
+  5 * 60_000,
+  15 * 60_000,
+  60 * 60_000,
+] as const;
+
+type ProjectionFailureCode =
+  | "INVALID_EVENT"
+  | "SOURCE_MISSING"
+  | "SOURCE_MISMATCH"
+  | "CUSTOMER_MISSING"
+  | "TRANSIENT_FAILURE";
+
+class InboundProjectionError extends Error {
+  constructor(
+    readonly failureCode: ProjectionFailureCode,
+    readonly permanent: boolean,
+    message: string,
+  ) {
+    super(message);
+    this.name = "InboundProjectionError";
+  }
+}
+
+interface CommunicationSource {
+  id: string;
+  customerUserId: string;
+  dealId: string | null;
+  channel: string;
+  createdAt: Date;
+}
+
+interface StaffUserRow {
+  id: string;
+  permissionRole: string;
+}
+
+interface RolePermissionRow {
+  role: string;
+  permission: string;
+  allowed: boolean;
+}
+
+interface DestinationRow {
+  id: string;
+  kind: string;
+  userId: string | null;
+}
+
+export async function projectInboundCustomerMessageEvent(
+  client: InboundCustomerMessageProjectorDb,
+  eventId: string,
+  now: Date = new Date(),
+  dueOnly = false,
+): Promise<"projected" | "already-routed"> {
+  try {
+    return await client.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<StaffNotificationEventRecord[]>`
+        SELECT
+          "id", "tenantKey", "type", "priority", "channel", "dedupeKey",
+          "sourceType", "sourceId", "relatedCustomerUserId", "relatedDealId",
+          "relatedTaskId", "targetUserId", "fallbackPermission", "summary",
+          "actionPath", "occurredAt", "createdAt"
+        FROM "StaffNotificationEvent"
+        WHERE "tenantKey" = ${TENANT_KEY}
+          AND "id" = ${eventId}
+          AND "routingStatus" IN ('PENDING', 'RETRY')
+          AND (${dueOnly} = FALSE OR "nextRoutingAt" <= ${now})
+        FOR UPDATE
+      `;
+      const event = rows[0];
+      if (!event) return "already-routed";
+
+      await projectLockedInboundCustomerMessage(tx, event);
+      return "projected";
+    });
+  } catch (error) {
+    // The projector transaction has rolled back. Persist retry/dead-letter state
+    // separately so task/receipt failures cannot roll the attempt counter back.
+    try {
+      await recordProjectionFailure(client, eventId, classifyProjectionFailure(error), now);
+    } catch {
+      // Keep the original projection error visible to a direct caller. A later
+      // durable pass can retry if failure accounting itself lost the database.
+    }
+    throw error;
+  }
+}
+
+/** Process older durable work as well as the event that triggered this pass. */
+export async function projectPendingInboundCustomerMessages(
+  client: InboundCustomerMessageProjectorDb,
+  limit = 25,
+  now: Date = new Date(),
+): Promise<number> {
+  const events = (await client.staffNotificationEvent.findMany({
+    where: {
+      tenantKey: TENANT_KEY,
+      type: "INBOUND_CUSTOMER_MESSAGE",
+      routingStatus: { in: ["PENDING", "RETRY"] },
+      nextRoutingAt: { lte: now },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    take: Math.max(1, Math.min(limit, 100)),
+    select: { id: true },
+  })) as Array<{ id: string }>;
+
+  let projected = 0;
+  for (const event of events) {
+    try {
+      if ((await projectInboundCustomerMessageEvent(client, event.id, now, true)) === "projected") {
+        projected += 1;
+      }
+    } catch {
+      // This is background recovery of older durable work. The direct projector
+      // for a newly published event still throws above, but one old event must
+      // never reject unrelated fresh mail.
+    }
+  }
+  return projected;
+}
+
+export async function projectLockedInboundCustomerMessage(
+  tx: ProjectorTx,
+  event: StaffNotificationEventRecord,
+): Promise<void> {
+  if (
+    event.tenantKey !== TENANT_KEY ||
+    event.type !== "INBOUND_CUSTOMER_MESSAGE" ||
+    event.sourceType !== "CommunicationLog" ||
+    !event.relatedCustomerUserId ||
+    !event.channel ||
+    !isInboundCommChannel(event.channel)
+  ) {
+    throw new InboundProjectionError(
+      "INVALID_EVENT",
+      true,
+      `Invalid inbound customer message event: ${event.id}`,
+    );
+  }
+
+  const source = (await tx.communicationLog.findUnique({
+    where: { id: event.sourceId },
+    select: {
+      id: true,
+      customerUserId: true,
+      dealId: true,
+      channel: true,
+      createdAt: true,
+    },
+  })) as CommunicationSource | null;
+  if (!source) {
+    throw new InboundProjectionError(
+      "SOURCE_MISSING",
+      true,
+      `Inbound event source missing: ${event.id}`,
+    );
+  }
+  if (
+    source.customerUserId !== event.relatedCustomerUserId ||
+    source.dealId !== event.relatedDealId ||
+    source.channel !== event.channel
+  ) {
+    throw new InboundProjectionError(
+      "SOURCE_MISMATCH",
+      true,
+      `Inbound event source mismatch: ${event.id}`,
+    );
+  }
+
+  const [customer, deal] = await Promise.all([
+    tx.user.findUnique({
+      where: { id: source.customerUserId },
+      select: { id: true, name: true },
+    }) as Promise<{ id: string; name: string } | null>,
+    source.dealId
+      ? (tx.deal.findUnique({
+          where: { id: source.dealId },
+          select: { id: true, ownerUserId: true },
+        }) as Promise<{ id: string; ownerUserId: string | null } | null>)
+      : Promise.resolve(null),
+  ]);
+  if (!customer) {
+    throw new InboundProjectionError(
+      "CUSTOMER_MISSING",
+      true,
+      `Inbound event customer missing: ${event.id}`,
+    );
+  }
+
+  // Serialize every projector touching the same open-task identity. This keeps
+  // two different inbound events from racing the task's last-message anchor.
+  const pairKey = `${TENANT_KEY}\u0000${source.customerUserId}\u0000${source.dealId ?? ""}`;
+  await tx.$queryRaw<Array<{ locked: unknown }>>`
+    SELECT pg_advisory_xact_lock(hashtextextended(${pairKey}, 0)) AS "locked"
+  `;
+
+  const task = await upsertInboundFollowUpTask(tx, {
+    communicationLogId: source.id,
+    communicationCreatedAt: source.createdAt,
+    customerUserId: source.customerUserId,
+    customerName: customer.name,
+    dealId: source.dealId,
+    ownerUserId: deal?.ownerUserId ?? null,
+    channel: event.channel,
+    messageOccurredAt: event.occurredAt,
+    eventCreatedAt: event.createdAt,
+  });
+
+  const candidates = await loadRecipientCandidates(tx);
+  const projectedEvent: StaffNotificationEventRecord = {
+    ...event,
+    relatedTaskId: task.taskId,
+    targetUserId: task.ownerUserId,
+  };
+  const selectedRecipients = selectStaffNotificationRecipients(projectedEvent, candidates);
+  const usesPersonalTarget =
+    projectedEvent.targetUserId !== null &&
+    selectedRecipients.length === 1 &&
+    selectedRecipients[0] === projectedEvent.targetUserId;
+  const destinations = await loadDestinations(tx, usesPersonalTarget);
+
+  await tx.staffNotificationEvent.update({
+    where: { tenantKey_id: { tenantKey: TENANT_KEY, id: event.id } },
+    data: {
+      relatedTaskId: task.taskId,
+      targetUserId: task.ownerUserId,
+    },
+  });
+  await routeStaffNotificationEvent(tx, {
+    event: projectedEvent,
+    candidates,
+    destinations,
+  });
+}
+
+interface ProjectionFailure {
+  code: ProjectionFailureCode;
+  permanent: boolean;
+}
+
+function classifyProjectionFailure(error: unknown): ProjectionFailure {
+  if (error instanceof InboundProjectionError) {
+    return { code: error.failureCode, permanent: error.permanent };
+  }
+  return { code: "TRANSIENT_FAILURE", permanent: false };
+}
+
+async function recordProjectionFailure(
+  client: InboundCustomerMessageProjectorDb,
+  eventId: string,
+  failure: ProjectionFailure,
+  now: Date,
+): Promise<void> {
+  await client.$transaction(async (tx) => {
+    const rows = await tx.$queryRaw<Array<{ routingAttempts: number }>>`
+      SELECT "routingAttempts"
+      FROM "StaffNotificationEvent"
+      WHERE "tenantKey" = ${TENANT_KEY}
+        AND "id" = ${eventId}
+        AND "routingStatus" IN ('PENDING', 'RETRY')
+      FOR UPDATE
+    `;
+    const event = rows[0];
+    if (!event) return;
+
+    const attempts = event.routingAttempts + 1;
+    const dead = failure.permanent || attempts >= STAFF_NOTIFICATION_ROUTING_MAX_ATTEMPTS;
+    await tx.staffNotificationEvent.update({
+      where: { tenantKey_id: { tenantKey: TENANT_KEY, id: eventId } },
+      data: {
+        routingStatus: dead ? "DEAD" : "RETRY",
+        routingAttempts: { increment: 1 },
+        nextRoutingAt: dead ? now : nextRoutingAttemptAt(attempts, now),
+        lastRoutingError: failure.code,
+      },
+    });
+  });
+}
+
+function nextRoutingAttemptAt(attempts: number, now: Date): Date {
+  const index = Math.max(
+    0,
+    Math.min(attempts - 1, STAFF_NOTIFICATION_ROUTING_RETRY_DELAYS_MS.length - 1),
+  );
+  return new Date(now.getTime() + STAFF_NOTIFICATION_ROUTING_RETRY_DELAYS_MS[index]);
+}
+
+async function loadRecipientCandidates(tx: ProjectorTx) {
+  const users = (await tx.user.findMany({
+    where: {
+      deletedAt: null,
+      permissionRole: { notIn: ["CLIENT", "NONE"] },
+    },
+    select: { id: true, permissionRole: true },
+  })) as StaffUserRow[];
+  const roles = [...new Set(users.map((user) => user.permissionRole).filter((r) => r !== "ADMIN"))];
+  const stored = roles.length
+    ? ((await tx.rolePermission.findMany({
+        where: { tenantKey: TENANT_KEY, role: { in: roles } },
+        select: { role: true, permission: true, allowed: true },
+      })) as RolePermissionRow[])
+    : [];
+  const rowsByRole = new Map<string, RolePermissionRow[]>();
+  for (const row of stored) {
+    const rows = rowsByRole.get(row.role) ?? [];
+    rows.push(row);
+    rowsByRole.set(row.role, rows);
+  }
+
+  return users.map((user) => {
+    const rows = rowsByRole.get(user.permissionRole) ?? [];
+    const permissions =
+      user.permissionRole === "ADMIN"
+        ? new Set<string>(PERMISSIONS)
+        : rows.length > 0
+          ? new Set(rows.filter((row) => row.allowed).map((row) => row.permission))
+          : new Set<string>(ROLE_DEFAULTS[user.permissionRole] ?? []);
+    return {
+      userId: user.id,
+      // Story 3 exposes the CRM feed to the same staff who can open CRM. Story
+      // 4 adds the independent notifications.view permission and link UI.
+      canViewNotifications: permissions.has("crm.manage"),
+      permissions,
+    };
+  });
+}
+
+async function loadDestinations(tx: ProjectorTx, personalOnly: boolean) {
+  const rows = (await tx.telegramDestination.findMany({
+    where: {
+      tenantKey: TENANT_KEY,
+      isActive: true,
+      disabledAt: null,
+      kind: personalOnly ? "PERSONAL" : { in: ["PERSONAL", "SHARED"] },
+    },
+    select: { id: true, kind: true, userId: true },
+  })) as DestinationRow[];
+  return rows.map((row) => ({
+    recipientUserId: row.kind === "PERSONAL" ? row.userId : null,
+    channel: "TELEGRAM" as const,
+    destinationKey: row.id,
+  }));
+}

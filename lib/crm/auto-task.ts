@@ -52,9 +52,9 @@ async function pickTaskOwner(dealId: string | null): Promise<string | null> {
  * 20260518231504_inbound_reply_task_and_badge) — two simultaneous calls
  * cannot both create a task; the loser falls back to the update branch.
  *
- * Called from `lib/email/resolve.ts` after a known-customer inbound reply
- * is persisted, wrapped in try/catch so a task-side failure never breaks
- * inbound delivery.
+ * Kept for maintenance scripts that exercise the historical task-upsert
+ * contract. Live inbound communications use the durable staff-notification
+ * projector in `lib/crm/inbound-follow-up.ts`.
  */
 export async function ensureFollowUpTask(
   input: EnsureFollowUpTaskInput,

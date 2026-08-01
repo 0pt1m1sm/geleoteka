@@ -36,6 +36,7 @@ const EVENT_SELECT = {
   summary: true,
   actionPath: true,
   occurredAt: true,
+  createdAt: true,
 } as const;
 
 /**

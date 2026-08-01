@@ -1826,6 +1826,7 @@ model CommunicationLog {
   deal                Deal?          @relation(fields: [dealId], references: [id], onDelete: SetNull)
   linkedInboxMessages InboxMessage[] @relation("InboxLinkedCommLog")
   emailMessage        EmailMessage?  @relation("CommLogEmailMessage", fields: [emailMessageId], references: [id], onDelete: SetNull)
+  followUpTasks       CrmTask[]      @relation("CrmTaskLastInboundCommunication")
 
   @@index([customerUserId, createdAt])
   @@index([dealId])
@@ -2013,31 +2014,37 @@ model MailIdentity {
 /// to a customer and/or a specific deal so the Customer 360 and Deal
 /// detail pages can show outstanding work.
 model CrmTask {
-  id             String        @id @default(cuid())
-  title          String
-  body           String?
-  kind           CrmTaskKind   @default(GENERIC)
-  status         CrmTaskStatus @default(OPEN)
-  dueAt          DateTime
+  id                   String        @id @default(cuid())
+  title                String
+  body                 String?
+  kind                 CrmTaskKind   @default(GENERIC)
+  status               CrmTaskStatus @default(OPEN)
+  dueAt                DateTime
   // Nullable so an employee can leave without taking the work with them: the
   // task survives unassigned and a manager picks it up. Deleting the person
   // together with their tasks stays possible, but it is an explicit choice.
-  ownerUserId    String?
-  customerUserId String?
-  dealId         String?
-  completedAt    DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  ownerUserId          String?
+  customerUserId       String?
+  dealId               String?
+  /// The newest inbound customer communication covered by this obligation.
+  /// A reply closes the task only with a compare-and-set on this id, so a
+  /// message arriving while the reply is in flight keeps the obligation open.
+  lastInboundCommLogId String?
+  completedAt          DateTime?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 
   // Restrict: очередь задач сотрудника (включая напоминания об оплате) —
   // самостоятельная запись, а не часть профиля.
-  owner    User? @relation("CrmTaskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
-  customer User? @relation("CrmTaskCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
-  deal     Deal? @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  owner                    User?             @relation("CrmTaskOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  customer                 User?             @relation("CrmTaskCustomer", fields: [customerUserId], references: [id], onDelete: SetNull)
+  deal                     Deal?             @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  lastInboundCommunication CommunicationLog? @relation("CrmTaskLastInboundCommunication", fields: [lastInboundCommLogId], references: [id], onDelete: SetNull)
 
   @@index([ownerUserId, status, dueAt])
   @@index([customerUserId])
   @@index([dealId])
+  @@index([lastInboundCommLogId])
   @@index([dueAt])
 }
 
