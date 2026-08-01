@@ -4,7 +4,14 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
+import {
+  confirmPasswordResetCode,
+  type PasswordResetDb,
+} from "@/lib/password-reset/core";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
+
+const INVALID_RESET_CODE_ERROR =
+  "Код неверен или больше не действует. Проверьте код либо запросите новый.";
 
 /** Reset password with SMS code */
 export async function confirmResetPasswordAction(_prevState: { error: string | null } | null, formData: FormData) {
@@ -27,29 +34,20 @@ export async function confirmResetPasswordAction(_prevState: { error: string | n
   const user = await db.user.findUnique({ where: { phone } });
 
   if (!user) {
-    return { error: "Пользователь не найден" };
+    return { error: INVALID_RESET_CODE_ERROR };
   }
 
-  const reset = await db.passwordReset.findFirst({
-    where: {
+  const result = await confirmPasswordResetCode(
+    db as unknown as PasswordResetDb,
+    {
       userId: user.id,
       code,
-      usedAt: null,
-      expiresAt: { gt: new Date() },
+      hashPassword: () => bcrypt.hash(newPassword, 12),
     },
-    orderBy: { createdAt: "desc" },
-  });
-
-  if (!reset) {
-    return { error: "Неверный или просроченный код" };
+  );
+  if (result.status === "invalid") {
+    return { error: INVALID_RESET_CODE_ERROR };
   }
-
-  const passwordHash = await bcrypt.hash(newPassword, 12);
-
-  await db.$transaction([
-    db.user.update({ where: { id: user.id }, data: { passwordHash, isTempPassword: false } }),
-    db.passwordReset.update({ where: { id: reset.id }, data: { usedAt: new Date() } }),
-  ]);
 
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);

@@ -1,6 +1,10 @@
 "use server";
 
 import { db } from "@/lib/db";
+import {
+  issuePasswordResetCode,
+  type PasswordResetDb,
+} from "@/lib/password-reset/core";
 import { sendSms } from "@/lib/sms";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
@@ -26,27 +30,20 @@ export async function requestPasswordResetAction(_prevState: ActionState, formDa
     return { success: true };
   }
 
-  // Анти-флуд: SMS платные и лимитированы оператором — не чаще одного кода
-  // в минуту на аккаунт. Возвращаем error (а не success), чтобы владелец
-  // номера понимал, почему код не пришёл повторно.
-  const recent = (await db.passwordReset.findFirst({
-    where: { userId: user.id, createdAt: { gt: new Date(Date.now() - 60 * 1000) } },
-    select: { id: true },
-  })) as { id: string } | null;
-  if (recent) {
+  const issued = await issuePasswordResetCode(
+    db as unknown as PasswordResetDb,
+    { userId: user.id },
+  );
+  if (issued.status === "rate_limited") {
     return { error: "Код уже отправлен. Повторная отправка — через минуту." };
   }
 
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
-
-  await db.passwordReset.create({
-    data: { userId: user.id, code, expiresAt },
-  });
-
   // Без ключей SMSC уходит в mock (код виден в серверном логе) — флоу
   // остаётся проверяемым до активации интеграции.
-  await sendSms(phone, `Geleoteka: код восстановления пароля ${code}. Действует 15 минут.`);
+  await sendSms(
+    phone,
+    `Geleoteka: код восстановления пароля ${issued.code}. Действует 15 минут.`,
+  );
 
   return { success: true };
 }
