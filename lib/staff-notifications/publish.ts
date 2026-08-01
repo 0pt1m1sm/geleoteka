@@ -134,6 +134,15 @@ export function staffNotificationEntityDedupeKey(
   return `${ENTITY_EVENT_IDENTITY[type].dedupePrefix}:${id}`;
 }
 
+/** A moved due date is a new overdue occurrence; a scanner replay is not. */
+export function crmTaskOverdueDedupeKey(taskId: string, dueAt: Date): string {
+  const id = requireNonBlank(taskId, "taskId");
+  if (!(dueAt instanceof Date) || !Number.isFinite(dueAt.getTime())) {
+    throw new Error("dueAt must be a valid Date");
+  }
+  return `task-overdue:${id}:${dueAt.toISOString()}`;
+}
+
 export function toSafeChannelPayload(
   event: StaffNotificationEventRecord,
 ): SafeChannelPayload {
@@ -178,6 +187,17 @@ function assertPublishInput(input: PublishStaffNotificationInput): void {
     }
     if (input.dedupeKey !== inboundCustomerMessageDedupeKey(input.sourceId)) {
       throw new Error("INBOUND_CUSTOMER_MESSAGE dedupeKey must be based on CommunicationLog.id");
+    }
+  }
+  if (input.type === "CRM_TASK_OVERDUE") {
+    if (input.sourceType !== "CrmTask") {
+      throw new Error("CRM_TASK_OVERDUE must use CrmTask as its source");
+    }
+    if (input.relatedTaskId !== input.sourceId) {
+      throw new Error("CRM_TASK_OVERDUE must reference its source task");
+    }
+    if (input.dedupeKey !== crmTaskOverdueDedupeKey(input.sourceId, input.occurredAt)) {
+      throw new Error("CRM_TASK_OVERDUE dedupeKey must include CrmTask.id and dueAt");
     }
   }
   const entityIdentity = (

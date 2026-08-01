@@ -275,6 +275,14 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
   },
   {
     group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_ENABLED_AT",
+    label: "Момент включения Telegram",
+    description: "Системная отсечка: события до этого момента не доставляются.",
+    input: "text",
+    visibleInUi: false,
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
     key: "TELEGRAM_BOT_TOKEN",
     label: "Bot API token",
     description: "Секрет от @BotFather. Никогда не попадает в логи и клиентский код.",
@@ -317,6 +325,13 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     description: "Случайный Bearer-секрет не короче 32 символов для внешнего cron.",
     secret: true,
     input: "secret",
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
+    key: "STAFF_NOTIFICATION_RETENTION_DAYS",
+    label: "Хранение событий, дней",
+    description: "Целое число 1–3650. Старые события удаляются cron вместе с receipts и deliveries по каскаду.",
+    input: "text",
   },
   ...Object.keys(STAFF_NOTIFICATION_EVENT_CATALOG).map((type) => ({
     group: "Уведомления сотрудников (Telegram)",

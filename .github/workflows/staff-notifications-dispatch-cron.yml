@@ -7,6 +7,7 @@ name: staff-notifications-dispatch-cron
 #   STAFF_NOTIFICATION_DISPATCH_SECRET — same value as the production setting.
 # Optional repository variable:
 #   STAFF_NOTIFICATION_DISPATCH_URL
+#   STAFF_NOTIFICATION_MAINTENANCE_URL
 
 on:
   schedule:
@@ -22,22 +23,42 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Dispatch bounded batches
+      - name: Scan overdue tasks, retain old events, dispatch bounded batches
         env:
           SECRET: ${{ secrets.STAFF_NOTIFICATION_DISPATCH_SECRET }}
-          URL: ${{ vars.STAFF_NOTIFICATION_DISPATCH_URL || 'https://geleoteka.ru/api/internal/staff-notifications/dispatch' }}
+          DISPATCH_URL: ${{ vars.STAFF_NOTIFICATION_DISPATCH_URL || 'https://geleoteka.ru/api/internal/staff-notifications/dispatch' }}
+          MAINTENANCE_URL: ${{ vars.STAFF_NOTIFICATION_MAINTENANCE_URL || 'https://geleoteka.ru/api/internal/staff-notifications/maintenance' }}
         run: |
           if [ -z "$SECRET" ]; then
             echo "STAFF_NOTIFICATION_DISPATCH_SECRET is not set." >&2
             exit 1
           fi
+
+          maintenance_code=$(curl -sS -o /tmp/staff-notification-maintenance-response.json -w '%{http_code}' \
+            -X POST "$MAINTENANCE_URL" -H "Authorization: Bearer $SECRET" --max-time 40 || true)
+          [ -n "$maintenance_code" ] || maintenance_code=000
+          echo "maintenance → HTTP $maintenance_code"
+          if [ "$maintenance_code" = "000" ]; then
+            echo "network interruption; stopping this tick without marking an application failure" >&2
+            exit 0
+          fi
+          if [ "$maintenance_code" != "200" ]; then
+            echo "maintenance endpoint rejected or failed; failing workflow" >&2
+            exit 1
+          fi
+
           for i in $(seq 1 4); do
-            code=$(curl -s -o /tmp/staff-notification-response.json -w '%{http_code}' \
-              -X POST "$URL" -H "Authorization: Bearer $SECRET" --max-time 40 || echo 000)
+            code=$(curl -sS -o /tmp/staff-notification-response.json -w '%{http_code}' \
+              -X POST "$DISPATCH_URL" -H "Authorization: Bearer $SECRET" --max-time 40 || true)
+            [ -n "$code" ] || code=000
             echo "batch $i → HTTP $code"
-            if [ "$code" != "200" ]; then
+            if [ "$code" = "000" ]; then
+              echo "network interruption; stopping this tick without marking an application failure" >&2
               exit 0
+            fi
+            if [ "$code" != "200" ]; then
+              echo "dispatcher rejected or failed; failing workflow" >&2
+              exit 1
             fi
             [ "$i" = "4" ] || sleep 50
           done
-

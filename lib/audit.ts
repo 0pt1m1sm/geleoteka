@@ -37,6 +37,7 @@ export type AuditAction =
   | "role.permissions_reset"
   | "telegram.destination_link"
   | "telegram.destination_unlink"
+  | "staff_notification.delivery_retry"
   | "deal.delete"
   | "estimate.delete"
   | "vehicle.delete"
@@ -54,6 +55,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "role.permissions_reset": "Сброс прав роли к умолчанию",
   "telegram.destination_link": "Привязка Telegram",
   "telegram.destination_unlink": "Отвязка Telegram",
+  "staff_notification.delivery_retry": "Повтор доставки уведомления",
   "deal.delete": "Удаление сделки",
   "estimate.delete": "Удаление сметы",
   "vehicle.delete": "Удаление автомобиля",
@@ -76,7 +78,8 @@ export interface AuditInput {
     | "Vehicle"
     | "Role"
     | "RepairOrder"
-    | "TelegramDestination";
+    | "TelegramDestination"
+    | "StaffNotificationDelivery";
   targetId?: string | null;
   /** How the target was known at the time — a name, a number, a role label. */
   targetLabel?: string | null;

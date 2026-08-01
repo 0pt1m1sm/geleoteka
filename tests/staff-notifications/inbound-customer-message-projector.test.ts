@@ -117,6 +117,51 @@ describe("Telegram routing", () => {
     });
   });
 
+  it("does not deliver an event that occurred before channel enablement", async () => {
+    const db = routableDb("manager_1");
+    db.staffNotificationEvents[0].occurredAt = new Date(NOW.getTime() - 1);
+    db.telegramDestinations.push({
+      id: "personal_1",
+      tenantKey: TENANT_KEY,
+      kind: "PERSONAL",
+      userId: "manager_1",
+      isActive: true,
+      disabledAt: null,
+    });
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationDeliveries).toHaveLength(0);
+    expect(db.staffNotificationEvents[0]).toMatchObject({
+      routingStatus: "ROUTED",
+    });
+  });
+
+  it("routes the internal feed but creates no delivery backlog while Telegram is off", async () => {
+    const db = routableDb("manager_1");
+    const enabled = db.settings.find((row) => row.key === "TELEGRAM_ENABLED");
+    if (!enabled) throw new Error("test Telegram setting missing");
+    enabled.value = "false";
+    db.telegramDestinations.push({
+      id: "personal_1",
+      tenantKey: TENANT_KEY,
+      kind: "PERSONAL",
+      userId: "manager_1",
+      isActive: true,
+      disabledAt: null,
+    });
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationDeliveries).toHaveLength(0);
+  });
+
   it("routes a Story 5 parts event through the same router and shared destination", async () => {
     const db = new FakeEmailDb();
     db.users.push({
@@ -154,6 +199,7 @@ describe("Telegram routing", () => {
     });
     for (const [key, value] of Object.entries({
       TELEGRAM_ENABLED: "true",
+      TELEGRAM_ENABLED_AT: NOW.toISOString(),
       TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
       TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
       TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
@@ -240,6 +286,7 @@ function routableDb(ownerUserId: string | null): FakeEmailDb {
   });
   const settings = {
     TELEGRAM_ENABLED: "true",
+    TELEGRAM_ENABLED_AT: NOW.toISOString(),
     TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
     TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
     TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),

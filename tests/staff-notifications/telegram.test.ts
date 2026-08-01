@@ -39,6 +39,12 @@ describe("Telegram runtime config", () => {
         TELEGRAM_WEBHOOK_SECRET: "short",
       }),
     ).toMatchObject({ enabled: false, reason: "invalid-config" });
+    expect(
+      resolveTelegramRuntimeConfig({
+        ...validSettingValues(),
+        TELEGRAM_ENABLED_AT: "not-a-cutover",
+      }),
+    ).toMatchObject({ enabled: false, reason: "invalid-config" });
   });
 
   it("enables only canonical true event switches", () => {
@@ -89,6 +95,21 @@ describe("setting descriptor validation", () => {
     );
     expect(result).toMatchObject({ ok: false });
     expect(JSON.stringify(result)).not.toContain(malformed);
+  });
+
+  it("accepts only bounded integer retention days", () => {
+    const descriptor = {
+      key: "STAFF_NOTIFICATION_RETENTION_DAYS",
+      label: "Retention",
+      group: "Telegram",
+      input: "text" as const,
+    };
+    expect(validateSettingValue(descriptor, "90")).toEqual({
+      ok: true,
+      value: "90",
+    });
+    expect(validateSettingValue(descriptor, "0")).toMatchObject({ ok: false });
+    expect(validateSettingValue(descriptor, "30.5")).toMatchObject({ ok: false });
   });
 });
 
@@ -181,6 +202,27 @@ describe("Telegram delivery classification", () => {
     await expect(adapter.send("destination_1", safePayload())).resolves.toMatchObject({
       outcome: "retry",
       errorCode: "TELEGRAM_DISABLED",
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("performs no HTTP for an event before the channel cutover", async () => {
+    const destinationDb = adapterDb();
+    const fetchMock = vi.fn<typeof fetch>();
+    const adapter = createTelegramChannelAdapter({
+      db: destinationDb.db,
+      fetch: fetchMock,
+      loadConfig: async () => enabledConfig(),
+    });
+
+    await expect(
+      adapter.send("destination_1", {
+        ...safePayload(),
+        occurredAt: new Date(NOW.getTime() - 1),
+      }),
+    ).resolves.toEqual({
+      outcome: "dead",
+      errorCode: "EVENT_BEFORE_CHANNEL_CUTOVER",
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -295,6 +337,7 @@ describe("Telegram delivery classification", () => {
 function validSettingValues(): Record<string, string> {
   return {
     TELEGRAM_ENABLED: "true",
+    TELEGRAM_ENABLED_AT: NOW.toISOString(),
     TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
     TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
     TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
