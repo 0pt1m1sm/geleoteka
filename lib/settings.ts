@@ -240,15 +240,6 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     secret: true,
   },
 
-  // ── Расписание ───────────────────────────────────────────────────────
-  {
-    group: "Расписание",
-    key: "SCHEDULE_CAPACITY",
-    label: "Одновременных записей",
-    description:
-      "Сколько машин сервис принимает в одно время. По умолчанию 1: запись занимает слот целиком, и наложение по времени не допускается. Больше 1 имеет смысл, когда постов несколько — но какая машина на каком посту, система пока не различает.",
-  },
-
   // ── Staff notifications / Telegram ──────────────────────────────────
   {
     group: "Уведомления сотрудников (Telegram)",
@@ -325,20 +316,6 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     input: "boolean" as const,
   })),
 ];
-
-/**
- * Сколько машин сервис принимает одновременно.
- *
- * Отдельная функция, а не getSetting в месте вызова: значение приходит строкой
- * из таблицы, и каждый потребитель иначе разбирал бы её по-своему. Мусор и
- * ноль трактуются как 1 — расписание, где ёмкость нулевая, не отказывает
- * честно, а молча перестаёт принимать записи.
- */
-export async function getScheduleCapacity(): Promise<number> {
-  const raw = await getSetting("SCHEDULE_CAPACITY");
-  const parsed = Number.parseInt((raw ?? "").trim(), 10);
-  return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
-}
 
 export async function getSetting(key: string): Promise<string | null> {
   const cached = CACHE.get(key);

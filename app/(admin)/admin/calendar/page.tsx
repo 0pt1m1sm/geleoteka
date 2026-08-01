@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getScheduleCapacity } from "@/lib/settings";
+import { TENANT_KEY } from "@/lib/tenant";
 import { AdminCalendar } from "@/components/admin/AdminCalendar";
 import { ScheduleManager } from "@/components/admin/ScheduleManager";
 import { PageHeader } from "@/components/ui";
@@ -50,16 +50,24 @@ export default async function CalendarPage() {
     reason: b.reason,
   }));
 
-  const repairOrders = await db.repairOrder.findMany({
-    where: { status: { notIn: ["CANCELLED"] } },
-    include: {
-      user: { select: { name: true, phone: true } },
-      vehicle: { select: { model: true } },
-      jobLines: { select: { description: true }, orderBy: { sortOrder: "asc" } },
-      master: { select: { name: true } },
-    },
-    orderBy: { dateTime: "asc" },
-  });
+  const [repairOrders, activeBayRows] = await Promise.all([
+    db.repairOrder.findMany({
+      where: { status: { notIn: ["CANCELLED"] } },
+      include: {
+        user: { select: { name: true, phone: true } },
+        vehicle: { select: { model: true } },
+        jobLines: { select: { description: true }, orderBy: { sortOrder: "asc" } },
+        master: { select: { name: true } },
+        slot: { select: { bayId: true, bay: { select: { name: true } } } },
+      },
+      orderBy: { dateTime: "asc" },
+    }),
+    db.serviceBay.findMany({
+      where: { tenantKey: TENANT_KEY, isActive: true },
+      select: { id: true },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    }),
+  ]);
 
   // Every instant is converted to shop wall-clock HERE, once. The calendar is a
   // client component, and the browser's timezone is not necessarily the shop's —
@@ -70,6 +78,7 @@ export default async function CalendarPage() {
     const [date, time] = wall.split("T");
     const [h, m] = time.split(":").map(Number);
     const user = ro.user as { name: string; phone: string } | null;
+    const slot = ro.slot as { bayId: string; bay: { name: string } } | null;
     return {
       id: ro.id as string,
       date,
@@ -80,13 +89,13 @@ export default async function CalendarPage() {
       clientPhone: user?.phone ?? "",
       vehicleModel: (ro.vehicle as Record<string, string>).model,
       masterName: (ro.master as Record<string, string> | null)?.name ?? null,
+      bayId: slot?.bayId ?? null,
+      bayName: slot?.bay.name ?? null,
       jobs: (ro.jobLines as Array<{ description: string }>).map((j) => j.description),
     };
   });
 
   const todayBusiness = formatForDatetimeLocalInput(new Date()).split("T")[0];
-
-  const capacity = await getScheduleCapacity();
 
   return (
     <div>
@@ -96,7 +105,7 @@ export default async function CalendarPage() {
         description="Записи, часы работы, праздники и блокировки времени"
       />
       <AdminCalendar
-        capacity={capacity}
+        activeBayIds={(activeBayRows as Array<{ id: string }>).map((bay) => bay.id)}
         repairOrders={serialized}
         weekly={weeklyRows}
         exceptions={exceptions}

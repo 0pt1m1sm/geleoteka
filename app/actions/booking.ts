@@ -11,6 +11,12 @@ import { createDeal } from "@/lib/crm/public";
 import { nextRepairOrderNumber } from "@/lib/crm/public";
 import { publishServiceBookingCreated } from "@/lib/staff-notifications/business-events";
 import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
+import {
+  isServiceBayAllocationConflict,
+  reserveServiceBaySlot,
+  SERVICE_BAY_CONFLICT_MESSAGE,
+  type ServiceBayAllocationTx,
+} from "@/lib/scheduling/service-bays";
 
 interface BookingInput {
   serviceIds: string[];
@@ -124,9 +130,9 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       notes: notes || null,
     });
 
-    // Slot reservation + RO creation in one transaction. The unique constraint on
-    // Slot.dateTime is what actually prevents concurrent double-booking; if two
-    // requests race, only one slot.create succeeds — the other rolls back its RO.
+    // The server chooses and reserves a physical bay in the same transaction as
+    // the RO. Active bay rows serialize competing allocators; the compound
+    // Slot(dateTime, bayId) unique key is the database collision backstop.
     const repairOrder = await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
       const roNumber = await nextRepairOrderNumber(tx);
       const ro = await tx.repairOrder.create({
@@ -154,8 +160,9 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
           },
         },
       });
-      await tx.slot.create({
-        data: { dateTime: appointmentDate, repairOrderId: ro.id },
+      await reserveServiceBaySlot(tx as unknown as ServiceBayAllocationTx, {
+        dateTime: appointmentDate,
+        repairOrderId: ro.id,
       });
       const customer = (await tx.user.findUnique({
         where: { id: userId },
@@ -254,8 +261,8 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       claimToken,
     };
   } catch (err) {
-    if (err instanceof Error && err.message.includes("Unique constraint")) {
-      return { success: false, error: "Этот слот уже занят. Выберите другое время." };
+    if (isServiceBayAllocationConflict(err)) {
+      return { success: false, error: SERVICE_BAY_CONFLICT_MESSAGE };
     }
     console.error("Booking error:", err);
     return { success: false, error: "Произошла ошибка. Попробуйте позже." };

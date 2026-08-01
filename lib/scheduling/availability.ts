@@ -22,9 +22,9 @@ export const SLOT_MINUTES = 120;
  * Пересекаются ли две записи, начатые в эти минуты дня.
  *
  * Запись занимает слот целиком, а не мгновение своего начала: в 13:00 машина
- * стоит на посту до 15:00 и мешает и записи в 12:00, и слоту в 14:00. Модель
- * хранения этого не знает — `Slot.dateTime` уникален по МОМЕНТУ, — поэтому
- * правило живёт здесь и применяется на отображении.
+ * стоит на посту до 15:00 и мешает этому же посту принять запись и в 12:00, и
+ * в 14:00. Slot хранит ресурс, а эта функция применяет двухчасовой интервал к
+ * его точке старта.
  */
 export function slotsOverlap(
   aStartMinute: number,
@@ -82,23 +82,22 @@ export interface DaySlot {
   available: boolean;
 }
 
+export interface BookedBaySlot {
+  /** Booking start, minutes from midnight in business time. */
+  startMinute: number;
+  bayId: string;
+}
+
 export interface ComputeDaySlotsInput {
   /** 0–6, the weekday of the date being asked about, in business time. */
   dayOfWeek: number;
   weekly: readonly WeeklyHours[];
   /** Overrides the weekly row for this specific date, when one exists. */
   exception?: DayException | null;
-  /** Booked slot start times, minutes from midnight. */
-  bookedMinutes: readonly number[];
-  /**
-   * Сколько машин сервис принимает одновременно. По умолчанию одна.
-   *
-   * Настраивается ключом SCHEDULE_CAPACITY, потому что число постов — свойство
-   * конкретного сервиса, а не константа кода. Пока это ОДНО число на весь день:
-   * какая именно машина стоит на каком посту, модель не знает — это уже
-   * ресурсная модель, она отдельно.
-   */
-  capacity?: number;
+  /** Active physical resources that may receive a new booking. */
+  activeBayIds: readonly string[];
+  /** Existing bookings retain their concrete resource identity. */
+  booked: readonly BookedBaySlot[];
   /** Blocked ranges clipped to this day, half-open `[start, end)`. */
   blocked?: readonly BlockedRange[];
   /** Minutes from midnight if this date IS today in business time; else null. */
@@ -163,9 +162,9 @@ export function computeDaySlots(input: ComputeDaySlotsInput): DaySlot[] {
   const window = resolveDayWindow(input);
   if (!window) return [];
 
-  // Занятость считается пересечением, а не совпадением начала: запись в 13:00
-  // держит пост до 15:00 и закрывает слот 14:00, хотя минуты старта разные.
-  const capacity = Math.max(1, Math.trunc(input.capacity ?? 1));
+  // A time is free while at least one ACTIVE physical bay has no overlapping
+  // booking. Inactive bays and their historical/future bookings do not invent
+  // or consume active capacity.
   const blocked = input.blocked ?? [];
   const nowMinute = input.nowMinute ?? null;
 
@@ -179,7 +178,13 @@ export function computeDaySlots(input: ComputeDaySlotsInput): DaySlot[] {
     slots.push({
       time: minutesToLabel(start),
       available:
-        input.bookedMinutes.filter((m) => slotsOverlap(start, m, slotMinutes)).length < capacity &&
+        input.activeBayIds.some((bayId) =>
+          input.booked.every(
+            (booking) =>
+              booking.bayId !== bayId ||
+              !slotsOverlap(start, booking.startMinute, slotMinutes),
+          ),
+        ) &&
         !overlapsBlocked &&
         !isPast,
     });

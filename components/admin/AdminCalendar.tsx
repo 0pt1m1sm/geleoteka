@@ -15,7 +15,6 @@ import {
   labelToMinutes,
   minutesToLabel,
   SLOT_MINUTES,
-  slotsOverlap,
   type DayException,
   type WeeklyHours,
 } from "@/lib/scheduling/availability";
@@ -32,6 +31,9 @@ interface CalendarRepairOrder {
   clientPhone: string;
   vehicleModel: string;
   masterName: string | null;
+  /** Null only for legacy/non-calendar RepairOrders that have no Slot. */
+  bayId: string | null;
+  bayName: string | null;
   jobs: string[];
 }
 
@@ -58,8 +60,8 @@ interface Props {
   blocked: CalendarBlock[];
   /** Today in shop-local time, "YYYY-MM-DD". */
   today: string;
-  /** Сколько машин сервис принимает одновременно (настройка SCHEDULE_CAPACITY). */
-  capacity?: number;
+  /** Active physical resources; their count and identity define capacity. */
+  activeBayIds: string[];
 }
 
 /** Shift a "YYYY-MM-DD" by whole days without touching the browser timezone. */
@@ -96,7 +98,7 @@ export function AdminCalendar({
   exceptions,
   blocked,
   today,
-  capacity = 1,
+  activeBayIds,
 }: Props): React.ReactElement {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -159,8 +161,10 @@ export function AdminCalendar({
           closeMinute: exception.closeMinute,
         } satisfies DayException)
       : null,
-    bookedMinutes: dayOrders.map((o) => o.minute),
-    capacity,
+    activeBayIds,
+    booked: dayOrders.flatMap((order) =>
+      order.bayId ? [{ startMinute: order.minute, bayId: order.bayId }] : [],
+    ),
     blocked: dayBlocks.map((x) => ({ startMinute: x.range.start, endMinute: x.range.end })),
     // Past slots stay visible to staff: yesterday's schedule is still a record.
     nowMinute: null,
@@ -179,7 +183,7 @@ export function AdminCalendar({
     key: string;
     minute: number;
     label: string;
-    order?: (typeof dayOrders)[number];
+    orders: typeof dayOrders;
     blockReason: string | null;
     note?: string;
     busyNote?: string;
@@ -187,25 +191,20 @@ export function AdminCalendar({
 
   const gridRows: DayRow[] = slots.map((slot) => {
     const minute = labelToMinutes(slot.time) ?? 0;
-    const order = dayOrders.find((o) => o.minute === minute);
+    const orders = dayOrders.filter((order) => order.minute === minute);
     const block = dayBlocks.find(
       (x) => x.range.start < minute + SLOT_MINUTES && x.range.end > minute,
     );
-    // Чужая запись, накрывающая этот слот. Своя (начатая ровно здесь) уже
-    // показана карточкой — второй раз про неё писать незачем.
-    // При ёмкости больше одной машины наложение законно, и слот закрывается
-    // только когда занят целиком — тем же счётом, что и в движке.
-    const covering =
-      order || dayOrders.filter((o) => slotsOverlap(minute, o.minute)).length < capacity
-        ? undefined
-        : dayOrders.find((o) => slotsOverlap(minute, o.minute));
     return {
       key: slot.time,
       minute,
       label: `${slot.time} — ${minutesToLabel(minute + SLOT_MINUTES)}`,
-      order,
+      orders,
       blockReason: block ? block.block.reason ?? "заблокировано" : null,
-      busyNote: covering ? `Занято записью ${covering.time}` : undefined,
+      busyNote:
+        !slot.available && !block && orders.length === 0
+          ? "Все активные посты заняты пересекающимися записями"
+          : undefined,
     };
   });
 
@@ -218,7 +217,7 @@ export function AdminCalendar({
       key: order.id,
       minute: order.minute,
       label: `${order.time} — ${minutesToLabel(order.minute + SLOT_MINUTES)}`,
-      order,
+      orders: [order],
       blockReason: null,
       note: "вне графика",
     })),
@@ -226,7 +225,7 @@ export function AdminCalendar({
 
   // Свободным считается слот, который никем не накрыт, — иначе счётчик обещает
   // ёмкость, которой нет.
-  const freeCount = gridRows.filter((r) => !r.order && !r.busyNote && !r.blockReason).length;
+  const freeCount = slots.filter((slot) => slot.available).length;
 
   return (
     <div>
@@ -238,7 +237,8 @@ export function AdminCalendar({
             dayOfWeek: weekdayOf(day),
             weekly,
             exception: exceptions.find((e) => e.date === day) ?? null,
-            bookedMinutes: [],
+            activeBayIds,
+            booked: [],
           }).length === 0;
           return (
             <button
@@ -276,7 +276,7 @@ export function AdminCalendar({
             ? exception?.isClosed
               ? `Закрыто${exception.reason ? ` — ${exception.reason}` : ""}`
               : "Нерабочий день по графику"
-            : `${dayOrders.length} записей · ${freeCount} свободно из ${slots.length}`}
+            : `${dayOrders.length} записей · ${freeCount} свободно из ${slots.length} · активных постов: ${activeBayIds.length}`}
         </p>
 
         {slots.length === 0 && offGrid.length === 0 ? (
@@ -289,12 +289,12 @@ export function AdminCalendar({
               <SlotRow
                 key={row.key}
                 label={row.label}
-                order={row.order}
+                orders={row.orders}
                 blockReason={row.blockReason}
                 note={row.note}
                 busyNote={row.busyNote}
                 onToggleBlock={
-                  row.order || row.busyNote
+                  row.orders.length > 0 || row.busyNote
                     ? undefined
                     : () => void toggleBlock(row.minute, row.label, row.blockReason !== null)
                 }
@@ -310,7 +310,7 @@ export function AdminCalendar({
 
 function SlotRow({
   label,
-  order,
+  orders,
   blockReason,
   note,
   busyNote,
@@ -318,7 +318,7 @@ function SlotRow({
   pending,
 }: {
   label: string;
-  order?: CalendarRepairOrder;
+  orders: CalendarRepairOrder[];
   blockReason: string | null;
   note?: string;
   /** Слот накрыт чужой записью — свободным он не является. */
@@ -327,7 +327,7 @@ function SlotRow({
   onToggleBlock?: () => void;
   pending?: boolean;
 }): React.ReactElement {
-  const tone = order
+  const tone = orders.length > 0
     ? "bg-[var(--background-secondary)]"
     : blockReason || busyNote
       ? "bg-[var(--background-secondary)] opacity-60"
@@ -337,33 +337,42 @@ function SlotRow({
     <div className={`group flex items-start gap-4 p-3 rounded-lg ${tone}`}>
       <div className="w-32 shrink-0 text-sm font-medium tabular-nums">{label}</div>
 
-      {order ? (
-        <Link href={`/admin/repair-orders/${order.id}`} className="flex-1 min-w-0 hover:opacity-80">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="font-medium truncate">{order.clientName}</span>
-            <span className={`badge text-[10px] status-${order.status.toLowerCase()}`}>
-              {REPAIR_ORDER_STATUS_LABELS[order.status] ?? order.status}
-            </span>
-            {note ? (
-              <span className="badge text-[10px] bg-[var(--color-warning-bg,rgba(245,158,11,0.12))]">
-                {note}
-              </span>
-            ) : null}
-          </div>
-          <p className="text-sm text-[var(--foreground-muted)]">
-            {order.vehicleModel}
-            {order.masterName ? ` · ${order.masterName}` : ""}
-          </p>
-          {order.jobs.length > 0 ? (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {order.jobs.map((j, i) => (
-                <span key={i} className="badge badge-silver text-[10px]">
-                  {j}
+      {orders.length > 0 ? (
+        <div className="flex-1 min-w-0 space-y-3">
+          {orders.map((order) => (
+            <Link
+              key={order.id}
+              href={`/admin/repair-orders/${order.id}`}
+              className="block min-w-0 hover:opacity-80"
+            >
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <span className="font-medium truncate">{order.clientName}</span>
+                <span className={`badge text-[10px] status-${order.status.toLowerCase()}`}>
+                  {REPAIR_ORDER_STATUS_LABELS[order.status] ?? order.status}
                 </span>
-              ))}
-            </div>
-          ) : null}
-        </Link>
+                {order.bayName ? <span className="badge text-[10px]">{order.bayName}</span> : null}
+                {note ? (
+                  <span className="badge text-[10px] bg-[var(--color-warning-bg)] text-[var(--color-warning)]">
+                    {note}
+                  </span>
+                ) : null}
+              </div>
+              <p className="text-sm text-[var(--foreground-muted)]">
+                {order.vehicleModel}
+                {order.masterName ? ` · ${order.masterName}` : ""}
+              </p>
+              {order.jobs.length > 0 ? (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {order.jobs.map((job, index) => (
+                    <span key={index} className="badge badge-silver text-[10px]">
+                      {job}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </Link>
+          ))}
+        </div>
       ) : busyNote ? (
         <div className="flex-1 text-sm text-[var(--foreground-muted)]">{busyNote}</div>
       ) : onToggleBlock ? (

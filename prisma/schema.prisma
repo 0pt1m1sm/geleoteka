@@ -790,19 +790,40 @@ model RepairOrderPhoto {
   @@index([createdAt])
 }
 
-// Slot locking: one row per scheduled time. Non-nullable unique dateTime
-// makes concurrent booking attempts at the same time fail at the DB level.
-// NOTE: single-bay shop assumption — one booking per dateTime across the
-// whole workshop. Multi-bay capacity is out of scope for the redesign;
-// upgrade later by replacing @unique([dateTime]) with @unique([dateTime, bayId])
-// or introducing a capacity counter.
+/// A physical workshop resource. Masters remain a separate assignment on
+/// RepairOrder: a bay answers "where can the car stand?", not "who works on it?".
+/// Active bays are the schedule capacity; there is no second numeric setting
+/// that can drift away from the storage model.
+model ServiceBay {
+  id        String   @id @default(cuid())
+  name      String
+  isActive  Boolean  @default(true)
+  tenantKey String   @default("geleoteka")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  slots Slot[]
+
+  @@unique([tenantKey, name])
+  @@index([tenantKey, isActive, sortOrder])
+}
+
+// Slot locking: one row per scheduled car and physical bay. The compound
+// unique key is the database backstop for concurrent attempts at the same
+// instant: two cars may start together only when they own different bays.
 model Slot {
   id            String   @id @default(cuid())
-  dateTime      DateTime @unique
+  dateTime      DateTime
   repairOrderId String   @unique
+  bayId         String
   createdAt     DateTime @default(now())
 
   repairOrder RepairOrder @relation(fields: [repairOrderId], references: [id], onDelete: Cascade)
+  bay         ServiceBay  @relation(fields: [bayId], references: [id], onDelete: Restrict)
+
+  @@unique([dateTime, bayId])
+  @@index([bayId])
 }
 
 // ─── Schedule configuration ────────────────────────────────────────────────
