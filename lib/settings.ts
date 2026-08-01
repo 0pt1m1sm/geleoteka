@@ -108,8 +108,8 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
 
   // ── Email (Resend — LEGACY, опциональный) ────────────────────────────
   // Работает только при EMAIL_TRANSPORT=resend. Оставлен как переходный
-  // адаптер и будет удалён после катовера на SMTP (план Task 6–7). Входящий
-  // Resend webhook (ниже) пока остаётся единственным рабочим inbound.
+  // адаптер и будет удалён после катовера на SMTP (план Task 6–7).
+  // Приём почты выполняется отдельно через Timeweb IMAP.
   {
     group: "Email (Resend, legacy)",
     key: "RESEND_API_KEY",
@@ -132,22 +132,6 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     description:
       "Используется когда EMAIL_FROM и RESEND_FROM пусты. По умолчанию onboarding@resend.dev — резервный адрес Resend для тестов.",
   },
-  {
-    group: "Email (Resend, legacy)",
-    key: "RESEND_WEBHOOK_SECRET",
-    label: "Webhook signing secret",
-    description:
-      "Resend dashboard → Webhooks → Reveal signing secret. Без неё POST /api/email/inbound в production возвращает 503 (HMAC verify не пройдёт). Формат: whsec_… (base64).",
-    secret: true,
-  },
-  {
-    group: "Email (Resend, legacy)",
-    key: "INBOUND_EMAIL",
-    label: "Адрес входящей почты",
-    description:
-      "Email-адрес на verified-домене, на который Resend будет отправлять webhooks для входящих писем. По умолчанию sales@geleoteka.ru. Остальные адреса (billing@, other@) игнорируются.",
-  },
-
   // ── Email (Timeweb IMAP sync) ────────────────────────────────────────
   // NON-SECRET ONLY. Mailbox passwords live exclusively in env
   // (TIMEWEB_IMAP_PASSWORD / TIMEWEB_IMAP_PASSWORD_<SLUG>) and MUST NOT be
