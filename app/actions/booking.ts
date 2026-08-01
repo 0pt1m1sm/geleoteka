@@ -9,6 +9,8 @@ import {
 } from "@/lib/customer-onboarding";
 import { createDeal } from "@/lib/crm/public";
 import { nextRepairOrderNumber } from "@/lib/crm/public";
+import { publishServiceBookingCreated } from "@/lib/staff-notifications/business-events";
+import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
 
 interface BookingInput {
   serviceIds: string[];
@@ -155,6 +157,21 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       await tx.slot.create({
         data: { dateTime: appointmentDate, repairOrderId: ro.id },
       });
+      const customer = (await tx.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      })) as { name: string } | null;
+      await publishServiceBookingCreated(
+        tx as unknown as StaffNotificationPublishTx,
+        {
+          sourceId: ro.id,
+          customerUserId: userId,
+          customerName: customer?.name ?? "клиент",
+          dealId: deal.id,
+          dealNumber: deal.number,
+          occurredAt: ro.createdAt,
+        },
+      );
       return ro;
     });
 

@@ -6,6 +6,11 @@ import { getSession } from "@/lib/auth";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
 import { dispatchFulfillment } from "@/lib/crm/public";
 import { tokensMatch } from "@/lib/tokens";
+import {
+  publishEstimateCustomerApproved,
+  publishEstimateCustomerDeclined,
+} from "@/lib/staff-notifications/business-events";
+import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
 
 interface Result {
   error: string | null;
@@ -36,9 +41,11 @@ export async function customerApproveEstimate(
       deal: {
         select: {
           id: true,
+          number: true,
           channel: true,
           customerUserId: true,
           vehicleId: true,
+          ownerUserId: true,
           claimToken: true,
           customer: { select: { name: true, phone: true, email: true } },
         },
@@ -52,9 +59,11 @@ export async function customerApproveEstimate(
         total: number;
         deal: {
           id: string;
+          number: string | null;
           channel: string;
           customerUserId: string;
           vehicleId: string | null;
+          ownerUserId: string | null;
           claimToken: string | null;
           customer: { name: string; phone: string; email: string };
         };
@@ -113,6 +122,18 @@ export async function customerApproveEstimate(
       hasRepairOrder: (fresh?.repairOrders.length ?? 0) > 0,
       hasPartShipment: (fresh?.partShipments.length ?? 0) > 0,
     });
+    await publishEstimateCustomerApproved(
+      tx as unknown as StaffNotificationPublishTx,
+      {
+        sourceId: estimateId,
+        customerUserId: est.deal.customerUserId,
+        customerName: est.deal.customer.name,
+        dealId: est.deal.id,
+        dealNumber: est.deal.number,
+        ownerUserId: est.deal.ownerUserId,
+        occurredAt: now,
+      },
+    );
     return false;
   });
   if (raced) return { error: "Смета недоступна для согласования" };
@@ -140,10 +161,31 @@ export async function customerDeclineEstimate(
       id: true,
       stage: true,
       dealId: true,
-      deal: { select: { customerUserId: true, claimToken: true } },
+      deal: {
+        select: {
+          id: true,
+          number: true,
+          customerUserId: true,
+          ownerUserId: true,
+          claimToken: true,
+          customer: { select: { name: true } },
+        },
+      },
     },
   })) as
-    | { id: string; stage: string; dealId: string; deal: { customerUserId: string; claimToken: string | null } }
+    | {
+        id: string;
+        stage: string;
+        dealId: string;
+        deal: {
+          id: string;
+          number: string | null;
+          customerUserId: string | null;
+          ownerUserId: string | null;
+          claimToken: string | null;
+          customer: { name: string } | null;
+        };
+      }
     | null;
 
   if (!est) return { error: "Смета не найдена" };
@@ -163,6 +205,18 @@ export async function customerDeclineEstimate(
     });
     if (won.count === 0) return true;
     await releasePartLinesForEstimate(tx, estimateId, session?.id);
+    await publishEstimateCustomerDeclined(
+      tx as unknown as StaffNotificationPublishTx,
+      {
+        sourceId: estimateId,
+        customerUserId: est.deal.customerUserId,
+        customerName: est.deal.customer?.name ?? "клиент",
+        dealId: est.deal.id,
+        dealNumber: est.deal.number,
+        ownerUserId: est.deal.ownerUserId,
+        occurredAt: now,
+      },
+    );
     return false;
   });
   if (raced) return { error: "Смета недоступна для отклонения" };

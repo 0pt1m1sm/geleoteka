@@ -8,9 +8,9 @@ import {
 import type { ParsedEmail } from "@/lib/email/types";
 import { publishInboundCustomerMessage } from "@/lib/staff-notifications/inbound-customer-message";
 import {
-  projectInboundCustomerMessageEvent,
-  projectPendingInboundCustomerMessages,
-  type InboundCustomerMessageProjectorDb,
+  projectPendingStaffNotificationEvents,
+  projectStaffNotificationEvent,
+  type StaffNotificationProjectorDb,
 } from "@/lib/staff-notifications/projectors/inbound-customer-message";
 
 export type { EmailIngestDb, EmailIngestTx } from "@/lib/email/db-port";
@@ -30,9 +30,10 @@ export type { EmailIngestDb, EmailIngestTx } from "@/lib/email/db-port";
  *   - **Atomic.** The `EmailMessage` and the CRM row it produces are written in
  *     one transaction. Any network work — fetching the body from Resend,
  *     reading a UID over IMAP — has already happened by the time we get here.
- *   - **Durable follow-up.** A channel-neutral StaffNotificationEvent is
- *     written in that same transaction for genuinely new, known inbound mail;
- *     its projector creates the task and recipients only after commit.
+ *   - **Durable signal.** A channel-neutral StaffNotificationEvent is written
+ *     in that same transaction for every genuinely new inbound message. Known
+ *     customers get a follow-up event; unresolved mail gets a triage event.
+ *     Projectors create tasks/recipients only after commit.
  */
 
 export type IngestStatus =
@@ -60,7 +61,7 @@ export interface IngestResult {
   emailMessageId: string | null;
   /** `CommunicationLog.id` or `InboxMessage.id`. */
   id: string | null;
-  /** Durable event published with the CommunicationLog, null when not inbound. */
+  /** Durable inbound event id (CommunicationLog or InboxMessage source). */
   staffNotificationEventId: string | null;
 }
 
@@ -128,7 +129,7 @@ export async function ingestEmail(
         parsed.direction === "OUTBOUND"
           ? await resolveOutboundEmail({ parsed, client: tx, emailMessageId: email.id })
           : await resolveInboundEmail({ parsed, client: tx, emailMessageId: email.id });
-      const event = resolved.followUp
+      const publishedFollowUp = resolved.followUp
         ? await publishInboundCustomerMessage(tx, {
             communicationLogId: resolved.followUp.communicationLogId,
             customerUserId: resolved.followUp.customerUserId,
@@ -142,7 +143,8 @@ export async function ingestEmail(
         kind: resolved.kind,
         id: resolved.id,
         emailMessageId: email.id,
-        eventId: event?.id ?? null,
+        eventId:
+          publishedFollowUp?.id ?? resolved.staffNotificationEventId ?? null,
       };
     });
   } catch (err) {
@@ -182,9 +184,9 @@ async function projectAfterCommit(
   client: EmailIngestDb,
   eventId: string | null,
 ): Promise<void> {
-  const projectorDb = client as unknown as InboundCustomerMessageProjectorDb;
-  if (eventId) await projectInboundCustomerMessageEvent(projectorDb, eventId);
-  await projectPendingInboundCustomerMessages(projectorDb);
+  const projectorDb = client as unknown as StaffNotificationProjectorDb;
+  if (eventId) await projectStaffNotificationEvent(projectorDb, eventId);
+  await projectPendingStaffNotificationEvents(projectorDb);
 }
 
 /**

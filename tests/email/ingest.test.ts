@@ -383,8 +383,16 @@ describe("ingestEmail", () => {
     expect(db.staffNotificationEvents).toHaveLength(1);
   });
 
-  it("parks an unknown sender in the triage inbox without inventing a task", async () => {
-    const result = await run(parsed({ from: { email: "nobody@nowhere.test" } }));
+  it("parks an unknown sender and publishes a PII-safe unresolved event", async () => {
+    const sentinel = "UNRESOLVED-USER-TEXT-SENTINEL";
+    const result = await run(
+      parsed({
+        from: { email: "nobody@nowhere.test" },
+        subject: `Тема ${sentinel}`,
+        bodyText: `Текст заявки ${sentinel}`,
+        bodyHtml: `<p>${sentinel}</p>`,
+      }),
+    );
 
     expect(result.status).toBe("unresolved");
     expect(db.inboxMessages).toHaveLength(1);
@@ -392,6 +400,42 @@ describe("ingestEmail", () => {
     expect(db.inboxMessages[0].direction).toBe("INBOUND");
     expect(db.inboxMessages[0].resendEmailId).toBeNull();
     expect(db.inboxMessages[0].emailMessageId).toBe(db.emailMessages[0].id);
+    expect(db.staffNotificationEvents).toHaveLength(1);
+    expect(db.staffNotificationEvents[0]).toMatchObject({
+      type: "INBOUND_MESSAGE_UNRESOLVED",
+      sourceType: "InboxMessage",
+      sourceId: db.inboxMessages[0].id,
+      dedupeKey: `inbound-message-unresolved:${db.inboxMessages[0].id}`,
+    });
+    expect(
+      JSON.stringify(
+        toSafeChannelPayload(
+          db.staffNotificationEvents[0] as unknown as StaffNotificationEventRecord,
+        ),
+      ),
+    ).not.toContain(sentinel);
+    expect(projectInboundEvents).toHaveBeenCalledOnce();
+  });
+
+  it("dedupes a retried unresolved message to one InboxMessage event", async () => {
+    const email = parsed({ from: { email: "nobody@nowhere.test" } });
+
+    await run(email);
+    await run(email);
+
+    expect(db.inboxMessages).toHaveLength(1);
+    expect(db.staffNotificationEvents).toHaveLength(1);
+  });
+
+  it("rolls back the unresolved InboxMessage when event publication fails", async () => {
+    db.staffNotificationEventUpsertError = new Error("EVENT_WRITE_FAILED");
+
+    await expect(
+      run(parsed({ from: { email: "nobody@nowhere.test" } })),
+    ).rejects.toThrow("EVENT_WRITE_FAILED");
+
+    expect(db.emailMessages).toHaveLength(0);
+    expect(db.inboxMessages).toHaveLength(0);
     expect(db.staffNotificationEvents).toHaveLength(0);
   });
 

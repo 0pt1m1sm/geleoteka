@@ -57,6 +57,9 @@ export class FakeEmailDb implements EmailIngestDb {
   communicationLogFindUniqueError: Error | null = null;
   communicationLogFindUniqueCalls = 0;
 
+  /** Forces event publication to fail so ingest transaction rollback is testable. */
+  staffNotificationEventUpsertError: Error | null = null;
+
   /** Number of transactions opened — proves the write path is atomic, not N writes. */
   transactionCount = 0;
 
@@ -342,6 +345,9 @@ export class FakeEmailDb implements EmailIngestDb {
 
   staffNotificationEvent = {
     upsert: async (args: Record<string, unknown>): Promise<AnyRow> => {
+      if (this.staffNotificationEventUpsertError) {
+        throw this.staffNotificationEventUpsertError;
+      }
       const where = (args.where ?? {}) as {
         tenantKey_dedupeKey?: { tenantKey: string; dedupeKey: string };
       };

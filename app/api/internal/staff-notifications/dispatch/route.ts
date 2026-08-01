@@ -13,6 +13,10 @@ import {
   loadStaffNotificationDispatchSecret,
   loadTelegramRuntimeConfig,
 } from "@/lib/staff-notifications/channels/telegram/config";
+import {
+  projectPendingStaffNotificationEvents,
+  type StaffNotificationProjectorDb,
+} from "@/lib/staff-notifications/projectors/inbound-customer-message";
 
 export const dynamic = "force-dynamic";
 
@@ -30,19 +34,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const telegram = await loadTelegramRuntimeConfig();
-  // Story 4 has exactly one producer. Do not lease its rows merely because a
-  // future event toggle was enabled; a disabled inbound switch must pause the
-  // queue without consuming attempts.
-  if (
-    !telegram.enabled ||
-    !telegram.enabledEventTypes.has("INBOUND_CUSTOMER_MESSAGE")
-  ) {
-    return NextResponse.json({ skipped: true, reason: "disabled" });
-  }
-
   const client = db as unknown as StaffNotificationDispatcherDb;
   try {
+    // Routing is channel-neutral and creates the per-user feed receipts even
+    // when Telegram itself is disabled. The durable event stays the source of
+    // truth; this cron pass is the recovery path for producer-side accelerators.
+    const projected = await projectPendingStaffNotificationEvents(
+      db as unknown as StaffNotificationProjectorDb,
+      25,
+    );
+    const telegram = await loadTelegramRuntimeConfig();
+    if (!telegram.enabled || telegram.enabledEventTypes.size === 0) {
+      return NextResponse.json({
+        skipped: true,
+        reason: "disabled",
+        projected,
+      });
+    }
+
     // leaseStaffNotificationDeliveries commits its short transaction before it
     // returns; every adapter HTTP call below therefore runs outside DB locks.
     const deliveries = await leaseStaffNotificationDeliveries(client, {
@@ -56,7 +65,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (outcome === "lease-lost") counts.leaseLost += 1;
       else counts[outcome] += 1;
     }
-    return NextResponse.json({ ok: true, leased: deliveries.length, ...counts });
+    return NextResponse.json({
+      ok: true,
+      projected,
+      leased: deliveries.length,
+      ...counts,
+    });
   } catch {
     return NextResponse.json({ error: "dispatch failed" }, { status: 500 });
   }

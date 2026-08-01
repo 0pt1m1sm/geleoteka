@@ -1,6 +1,7 @@
 import type { InboundCommChannel } from "@/lib/crm/inbound-communications";
 import type { EmailIngestTx } from "@/lib/email/db-port";
 import type { EmailAttachmentMeta, ParsedEmail } from "@/lib/email/types";
+import { publishInboundMessageUnresolved } from "@/lib/staff-notifications/business-events";
 
 export type ResolveKind = "thread" | "customer" | "inbox";
 
@@ -30,6 +31,8 @@ export interface ResolveResult {
    * never carries this context.
    */
   followUp: FollowUpContext | null;
+  /** Event already published by the resolver itself (unresolved inbound only). */
+  staffNotificationEventId: string | null;
 }
 
 /** The customer/deal a threaded message inherits from its ancestor. */
@@ -80,6 +83,7 @@ export async function resolveInboundEmail(input: {
     return {
       kind: "thread",
       id: created.id,
+      staffNotificationEventId: null,
       followUp: {
         communicationLogId: created.id,
         customerUserId: owner.customerUserId,
@@ -109,6 +113,7 @@ export async function resolveInboundEmail(input: {
     return {
       kind: "customer",
       id: created.id,
+      staffNotificationEventId: null,
       followUp: {
         communicationLogId: created.id,
         customerUserId: customer.id,
@@ -122,7 +127,17 @@ export async function resolveInboundEmail(input: {
 
   // ── 3. Unknown sender ──────────────────────────────────────────────────────
   const inbox = await createUnresolvedInboxMessage({ parsed, client, emailMessageId });
-  return { kind: "inbox", id: inbox.id, followUp: null };
+  const event = await publishInboundMessageUnresolved(client, {
+    inboxMessageId: inbox.id,
+    channel: "EMAIL_INBOUND",
+    occurredAt: parsed.occurredAt,
+  });
+  return {
+    kind: "inbox",
+    id: inbox.id,
+    followUp: null,
+    staffNotificationEventId: event.id,
+  };
 }
 
 /**
@@ -167,7 +182,12 @@ export async function resolveOutboundEmail(input: {
         data: { emailMessageId },
       });
     }
-    return { kind: "thread", id: alreadyLogged.id, followUp: null };
+    return {
+      kind: "thread",
+      id: alreadyLogged.id,
+      followUp: null,
+      staffNotificationEventId: null,
+    };
   }
 
   // ── 1. Thread match ────────────────────────────────────────────────────────
@@ -181,7 +201,12 @@ export async function resolveOutboundEmail(input: {
       },
       select: { id: true },
     })) as { id: string };
-    return { kind: "thread", id: created.id, followUp: null };
+    return {
+      kind: "thread",
+      id: created.id,
+      followUp: null,
+      staffNotificationEventId: null,
+    };
   }
 
   // ── 2. Recipient match — exactly one known customer ─────────────────────────
@@ -197,12 +222,22 @@ export async function resolveOutboundEmail(input: {
       },
       select: { id: true },
     })) as { id: string };
-    return { kind: "customer", id: created.id, followUp: null };
+    return {
+      kind: "customer",
+      id: created.id,
+      followUp: null,
+      staffNotificationEventId: null,
+    };
   }
 
   // ── 3. Ambiguous or unknown recipient ───────────────────────────────────────
   const inbox = await createUnresolvedInboxMessage({ parsed, client, emailMessageId });
-  return { kind: "inbox", id: inbox.id, followUp: null };
+  return {
+    kind: "inbox",
+    id: inbox.id,
+    followUp: null,
+    staffNotificationEventId: null,
+  };
 }
 
 /**

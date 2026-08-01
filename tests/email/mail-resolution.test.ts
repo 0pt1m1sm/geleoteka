@@ -463,7 +463,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
     expect(result.status).toBe("unresolved");
     expect(db.inboxMessages).toHaveLength(1);
     expect(db.communicationLogs).toHaveLength(0);
-    expect(projectInboundEvents).not.toHaveBeenCalled();
+    expect(projectInboundEvents).toHaveBeenCalledOnce();
   });
 
   it("parks inbound arriving on a deleted customer's alias in triage", async () => {
@@ -473,7 +473,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
 
     expect(result.kind).toBe("inbox");
     expect(db.communicationLogs).toHaveLength(0);
-    expect(projectInboundEvents).not.toHaveBeenCalled();
+    expect(projectInboundEvents).toHaveBeenCalledOnce();
   });
 
   // The nastiest variant: the thread anchor still points at the deleted
@@ -498,7 +498,7 @@ describe("resolution — soft-deleted customers stay visible", () => {
     expect(result.kind).toBe("inbox");
     // Only the pre-seeded anchor remains — no new hidden row was written.
     expect(db.communicationLogs).toHaveLength(1);
-    expect(projectInboundEvents).not.toHaveBeenCalled();
+    expect(projectInboundEvents).toHaveBeenCalledOnce();
   });
 
   it("parks our own outbound addressed to a deleted customer", async () => {
