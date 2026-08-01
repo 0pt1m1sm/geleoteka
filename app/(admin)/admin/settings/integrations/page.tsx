@@ -14,9 +14,6 @@ import { TestSendButton } from "@/components/admin/settings/TestSendButton";
  * Integration secrets page — one card per integration (Resend / SMSC /
  * Yandex), single Save button per card. Source indicator on each field
  * shows whether the active value comes from DB, env var, or is missing.
- *
- * The Resend card also surfaces the webhook URL the operator must paste
- * into Resend's dashboard (read-only with copy button).
  */
 export default async function IntegrationsSettingsPage() {
   const session = await getSession();
@@ -42,19 +39,10 @@ export default async function IntegrationsSettingsPage() {
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
-  const inboundWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/email/inbound`;
   const telegramWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/integrations/telegram/webhook`;
 
-  // Per-group static info rows. Currently only Email (Resend) has one —
-  // the webhook URL operator must paste into the Resend dashboard.
+  // Per-group static info rows.
   const groupInfo: Record<string, Array<{ label: string; value: string; copyable?: boolean }>> = {
-    "Email (Resend)": [
-      {
-        label: "URL для Resend webhooks (вставьте в Resend dashboard → Webhooks)",
-        value: inboundWebhookUrl,
-        copyable: true,
-      },
-    ],
     "Уведомления сотрудников (Telegram)": [
       {
         label: "Webhook URL для setWebhook (secret_token берётся из настройки ниже)",
@@ -114,12 +102,6 @@ export default async function IntegrationsSettingsPage() {
                       className="text-[var(--color-accent)] hover:underline"
                     >
                       Синхронизация почты (IMAP) →
-                    </Link>
-                    <Link
-                      href="/admin/settings/inbound-log"
-                      className="text-[var(--color-accent)] hover:underline"
-                    >
-                      Лог входящих webhook-ов (Resend) →
                     </Link>
                   </div>
                 </div>

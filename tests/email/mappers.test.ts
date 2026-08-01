@@ -19,10 +19,9 @@ import {
 import { FakeEmailDb } from "./fake-db";
 
 /**
- * One message, two transports. These tests pin the contract that the CRM sees
- * the same `ParsedEmail` whichever way a message reached us — that is the whole
- * point of the provider-neutral layer, and it is what makes the dual-ingest
- * window during cutover safe.
+ * Legacy Resend mapper compatibility. The public Resend receiver is retired;
+ * these fixtures remain to pin provider-neutral normalization and dedupe for
+ * the offline ingest/resolve verification scripts.
  */
 
 const MESSAGE_ID = "<same-message@example.test>";
@@ -140,7 +139,7 @@ function sameMessageOverImap(): ParsedEmail {
   });
 }
 
-describe("resend envelope → ParsedEmail", () => {
+describe("legacy Resend envelope → ParsedEmail", () => {
   it("maps the envelope and fetched content onto the provider-neutral shape", () => {
     const parsed = resendEnvelopeToParsedEmail({
       envelope: resendEnvelope(),
@@ -231,7 +230,7 @@ describe("resend envelope → ParsedEmail", () => {
   });
 });
 
-describe("cross-provider ingest", () => {
+describe("legacy cross-provider dedupe contract", () => {
   function dbWithCustomer(): FakeEmailDb {
     const db = new FakeEmailDb();
     db.users.push({
