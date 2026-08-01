@@ -5,7 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { formatDate, formatPrice } from "@/lib/utils";
+import { formatDate, formatDateTime, formatPrice } from "@/lib/utils";
 import { getAllCustomerTags } from "@/lib/customer-queries";
 import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
@@ -34,6 +34,7 @@ interface RawCustomer {
   name: string;
   phone: string;
   email: string;
+  emailVerifiedAt: Date | null;
   referralSource: string | null;
   isTempPassword: boolean;
   deletedAt: Date | null;
@@ -270,6 +271,11 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         </div>
         <p className="text-[var(--foreground-muted)]">
           {customer.phone} · {customer.email}
+        </p>
+        <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+          Email: {customer.emailVerifiedAt
+            ? `подтверждён ${formatDateTime(customer.emailVerifiedAt)}`
+            : "не подтверждён"}
         </p>
         {customer.referralSource ? (
           <p className="mt-1 text-xs text-[var(--foreground-muted)]">

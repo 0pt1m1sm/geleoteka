@@ -12,6 +12,10 @@ import {
   type RegistrationWelcomeInput,
 } from "./templates/registration-welcome";
 import {
+  renderEmailVerification,
+  type EmailVerificationInput,
+} from "./templates/email-verification";
+import {
   renderPartOrderConfirmation,
   type PartOrderConfirmationInput,
 } from "./templates/part-order-confirmation";
@@ -96,6 +100,14 @@ export async function sendRegistrationWelcomeEmail(
   thread?: EmailThreadOptions,
 ): Promise<EmailHelperResult> {
   return dispatch("registration-welcome", to, () => renderRegistrationWelcome(input), thread);
+}
+
+export async function sendEmailVerificationEmail(
+  to: string,
+  input: EmailVerificationInput,
+  thread?: EmailThreadOptions,
+): Promise<EmailHelperResult> {
+  return dispatch("email-verification", to, () => renderEmailVerification(input), thread);
 }
 
 export async function sendPartOrderConfirmationEmail(

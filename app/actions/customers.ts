@@ -11,6 +11,7 @@ import {
   normalizeTagName,
   type ColorSlug,
 } from "@/lib/customer-tags";
+import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
 
 const NOTE_MAX = 4000;
 const NAME_MAX = 120;
@@ -156,8 +157,8 @@ export async function updateCustomer(
   // Guard: only edit actual customers, not staff/other accounts (mirrors deleteCustomer).
   const target = (await db.user.findUnique({
     where: { id: customerUserId },
-    select: { isCustomer: true },
-  })) as { isCustomer: boolean } | null;
+    select: { isCustomer: true, email: true },
+  })) as { isCustomer: boolean; email: string } | null;
   if (!target?.isCustomer) return { ok: false, error: "Это не клиент" };
 
   const name = (formData.get("name") as string | null)?.trim() ?? "";
@@ -189,6 +190,7 @@ export async function updateCustomer(
         name,
         email: emailRaw,
         phone,
+        ...resetEmailVerificationOnChange(target.email, emailRaw),
         customerProfile: {
           upsert: {
             create: { blacklisted, notes: profileNotesValue },

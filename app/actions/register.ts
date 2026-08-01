@@ -57,41 +57,23 @@ export async function registerAction(_prevState: { error: string | null } | null
     data: { userId: user.id },
   });
 
-  const {
-    sendRegistrationWelcomeEmail,
-    generateOutboundMessageId,
-    recordOutboundEmail,
-    markOutboundEmailFailed,
-    markOutboundEmailSent,
-    isPlausibleEmail,
-  } = await import("@/lib/email");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
-  const subject = "Geleoteka — добро пожаловать";
-  const bodyText = `Здравствуйте, ${name}. Ваш личный кабинет готов: ${appUrl}/login`;
-  const messageId = generateOutboundMessageId();
-  if (isPlausibleEmail(email)) {
-    await recordOutboundEmail({
-      customerUserId: user.id,
-      subject,
-      body: bodyText,
-      messageId,
-    });
-  }
-  void sendRegistrationWelcomeEmail(
-    email,
-    {
-      customerName: name,
-      loginUrl: `${appUrl}/login`,
-    },
-    { messageId },
-  )
-    .then((result) => {
-      if (!result.success) return markOutboundEmailFailed(messageId, result.error);
-      return markOutboundEmailSent(messageId);
-    })
-    .catch((err) =>
-      markOutboundEmailFailed(messageId, err instanceof Error ? err.message : String(err)),
+  // Token persistence is awaited; provider I/O remains best-effort so a mail
+  // outage never changes the long-standing immediate-login registration flow.
+  try {
+    const { queueEmailVerificationEmail } = await import(
+      "@/lib/email-verification/send"
     );
+    await queueEmailVerificationEmail({
+      userId: user.id,
+      email,
+      customerName: name,
+      reason: "registration",
+    });
+  } catch {
+    // Keep this deliberately detail-free: verification errors must never print
+    // the raw link/token captured by the sending path.
+    console.error("[EMAIL VERIFICATION] registration email could not be queued");
+  }
 
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
