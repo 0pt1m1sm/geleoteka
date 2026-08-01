@@ -10,6 +10,8 @@ import {
   type ParsedEmail,
 } from "@/lib/email/types";
 import { FakeEmailDb } from "./fake-db";
+import { toSafeChannelPayload } from "@/lib/staff-notifications/publish";
+import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
 
 const OCCURRED = new Date("2026-07-14T09:15:00.000Z");
 
@@ -196,6 +198,39 @@ describe("ingestEmail", () => {
     // occurredAt is the message's own timestamp, not "whenever the worker ran".
     expect((email.occurredAt as Date).toISOString()).toBe(OCCURRED.toISOString());
     expect(db.communicationLogs[0].emailMessageId).toBe(email.id);
+  });
+
+  it("never copies a claimToken from subject, body, or rejection reason into delivery-safe data, logs, or errors", async () => {
+    const claimToken = "claimToken-SENTINEL-never-leak";
+    db.deals[0].lostReason = claimToken;
+    db.deals[0].declineReason = claimToken;
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      await run(
+        parsed({
+          subject: `Тема ${claimToken}`,
+          bodyText: `Тело ${claimToken}`,
+          bodyHtml: `<p>${claimToken}</p>`,
+        }),
+      );
+      const event = db.staffNotificationEvents[0] as unknown as StaffNotificationEventRecord;
+      const payload = toSafeChannelPayload(event);
+      const logs = JSON.stringify([...log.mock.calls, ...warn.mock.calls, ...error.mock.calls]);
+
+      expect(JSON.stringify(payload)).not.toContain(claimToken);
+      expect(logs).not.toContain(claimToken);
+      expect(projectInboundEvents).toHaveBeenCalledOnce();
+    } catch (caught) {
+      expect(String(caught)).not.toContain(claimToken);
+      throw caught;
+    } finally {
+      log.mockRestore();
+      warn.mockRestore();
+      error.mockRestore();
+    }
   });
 
   it("writes the message and its CRM row inside a single transaction", async () => {

@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/authz";
 import { getSetting, invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
 import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 import { sendEmail, resolveEmailFrom } from "@/lib/email/send";
 import { normalizeTransportName } from "@/lib/email/transport";
+import { validateSettingValue } from "@/lib/settings-validation";
 
 export interface UpsertSettingsResult {
   error: string | null;
@@ -31,31 +32,49 @@ export async function upsertSettings(
   _prev: UpsertSettingsResult | null,
   formData: FormData,
 ): Promise<UpsertSettingsResult> {
-  const session = await requireRole(["ADMIN"]);
+  const session = await requirePermission("settings.manage");
 
   const knownByKey = new Map(KNOWN_SETTINGS.map((s) => [s.key, s]));
-  const savedKeys: string[] = [];
+  const changes: Array<{ key: string; value: string | null }> = [];
 
   for (const [rawKey, rawValue] of formData.entries()) {
     const key = rawKey.trim();
-    if (!knownByKey.has(key)) continue; // Silently ignore unknown / framework fields.
+    const descriptor = knownByKey.get(key);
+    if (!descriptor) continue; // Silently ignore unknown / framework fields.
     const raw = (rawValue as FormDataEntryValue).toString();
     const value = raw.trim();
+    const input = descriptor.input ?? (descriptor.secret ? "secret" : "text");
 
     // Skip untouched secret fields (input held the masked placeholder).
-    if (value === PLACEHOLDER) continue;
+    if (input === "secret" && value === PLACEHOLDER) continue;
 
     if (value === "") {
-      await db.setting.deleteMany({ where: { key } });
-    } else {
-      await db.setting.upsert({
-        where: { key },
-        create: { key, value, updatedByUserId: session.id },
-        update: { value, updatedByUserId: session.id },
-      });
+      changes.push({ key, value: null });
+      continue;
     }
+
+    const validated = validateSettingValue(descriptor, value);
+    if (!validated.ok) return { ok: false, error: validated.error };
+    changes.push({ key, value: validated.value });
+  }
+
+  await db.$transaction(async (tx) => {
+    for (const change of changes) {
+      if (change.value === null) {
+        await tx.setting.deleteMany({ where: { key: change.key } });
+      } else {
+        await tx.setting.upsert({
+          where: { key: change.key },
+          create: { key: change.key, value: change.value, updatedByUserId: session.id },
+          update: { value: change.value, updatedByUserId: session.id },
+        });
+      }
+    }
+  });
+
+  const savedKeys = changes.map((change) => change.key);
+  for (const key of savedKeys) {
     invalidateSetting(key);
-    savedKeys.push(key);
   }
 
   revalidatePath("/admin/settings/integrations");
@@ -87,7 +106,7 @@ export interface TestSendResult {
  * longer hard-codes "Resend": an SMTP send says SMTP.
  */
 export async function sendTestEmail(): Promise<TestSendResult> {
-  const session = await requireRole(["ADMIN"]);
+  const session = await requirePermission("settings.manage");
 
   const to = session.email;
   if (!to) return { ok: false, detail: "У админа не задан email" };
@@ -165,4 +184,3 @@ export async function sendTestEmail(): Promise<TestSendResult> {
     credentialSource,
   };
 }
-

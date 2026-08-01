@@ -8,6 +8,7 @@ import {
   type StaffNotificationPublishTx,
 } from "@/lib/staff-notifications/publish";
 import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
+import { makeAdminActionUrl } from "@/lib/staff-notifications/safe-action-url";
 
 export interface PublishInboundCustomerMessageInput {
   communicationLogId: string;
@@ -48,8 +49,10 @@ export async function publishInboundCustomerMessage(
     sourceId: communicationLogId,
     relatedCustomerUserId: customerUserId,
     relatedDealId: input.dealId,
-    safeSummary: `${copy.taskLead}: ${customerName}`,
-    actionPath: `${actionBase}#communication-${encodeURIComponent(communicationLogId)}`,
+    safeSummary: `${copy.notificationLead}\n${customerName}`,
+    actionPath: makeAdminActionUrl(
+      `${actionBase}#communication-${encodeURIComponent(communicationLogId)}`,
+    ),
     occurredAt: input.occurredAt,
   });
 }

@@ -57,5 +57,9 @@ export async function proxy(request: NextRequest) {
 // /profile лежит вне обеих групп: профиль есть у всех вошедших, а не только у
 // клиентов или только у сотрудников, — но защищать его всё равно надо.
 export const config = {
+  // The Telegram webhook and staff dispatcher deliberately stay outside this
+  // session-auth matcher: each route fails closed on its own server secret.
+  // /api/integrations/telegram/webhook and
+  // /api/internal/staff-notifications/dispatch must never be added here.
   matcher: ["/cabinet/:path*", "/admin/:path*", "/profile"],
 };

@@ -13,6 +13,7 @@ import {
 } from "@/lib/staff-notifications/safe-action-url";
 import {
   routeStaffNotificationEvent,
+  selectStaffNotificationRecipients,
   type StaffNotificationRouterTx,
 } from "@/lib/staff-notifications/router";
 import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
@@ -118,6 +119,31 @@ describe("safe staff notification action URLs", () => {
 });
 
 describe("staff notification router", () => {
+  it("requires both notifications.view and the event domain permission", () => {
+    expect(
+      selectStaffNotificationRecipients(
+        { targetUserId: "owner", fallbackPermission: "crm.manage" },
+        [
+          {
+            userId: "owner",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view"]),
+          },
+          {
+            userId: "crm_without_feed",
+            canViewNotifications: false,
+            permissions: new Set(["crm.manage"]),
+          },
+          {
+            userId: "eligible_fallback",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "crm.manage"]),
+          },
+        ],
+      ),
+    ).toEqual(["eligible_fallback"]);
+  });
+
   it("creates no receipts or deliveries when there are no recipients", async () => {
     const receiptCreateMany = vi.fn(async () => ({ count: 0 }));
     const deliveryCreateMany = vi.fn(async () => ({ count: 0 }));

@@ -50,6 +50,8 @@ export class FakeEmailDb implements EmailIngestDb {
   crmTasks: AnyRow[] = [];
   staffNotificationReceipts: AnyRow[] = [];
   staffNotificationDeliveries: AnyRow[] = [];
+  settings: AnyRow[] = [];
+  telegramDestinations: AnyRow[] = [];
 
   /** Forces the projector's source lookup to fail like a transient DB error. */
   communicationLogFindUniqueError: Error | null = null;
@@ -297,7 +299,19 @@ export class FakeEmailDb implements EmailIngestDb {
   };
 
   rolePermission = { findMany: async (): Promise<AnyRow[]> => [] };
-  telegramDestination = { findMany: async (): Promise<AnyRow[]> => [] };
+  telegramDestination = {
+    findMany: async (args: Record<string, unknown>): Promise<AnyRow[]> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      return this.telegramDestinations.filter((row) => matchesWhere(row, where));
+    },
+  };
+  setting = {
+    findMany: async (args: Record<string, unknown>): Promise<AnyRow[]> => {
+      const where = (args.where ?? {}) as { key?: { in?: string[] } };
+      const keys = new Set(where.key?.in ?? []);
+      return this.settings.filter((row) => keys.has(String(row.key)));
+    },
+  };
 
   staffNotificationReceipt = {
     createMany: async (args: Record<string, unknown>): Promise<{ count: number }> => {

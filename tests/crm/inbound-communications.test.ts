@@ -34,6 +34,7 @@ describe("inbound CRM communication catalogue", () => {
       taskLead: "Клиент связался с нами",
       eventNoun: "сообщение",
       openAction: "Открыть сообщение",
+      notificationLead: "Новое сообщение от клиента",
     });
   });
 });

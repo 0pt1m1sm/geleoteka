@@ -35,6 +35,8 @@ export type AuditAction =
   | "user.block"
   | "role.permissions_set"
   | "role.permissions_reset"
+  | "telegram.destination_link"
+  | "telegram.destination_unlink"
   | "deal.delete"
   | "estimate.delete"
   | "vehicle.delete"
@@ -50,6 +52,8 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "user.block": "Блокировка доступа",
   "role.permissions_set": "Изменение прав роли",
   "role.permissions_reset": "Сброс прав роли к умолчанию",
+  "telegram.destination_link": "Привязка Telegram",
+  "telegram.destination_unlink": "Отвязка Telegram",
   "deal.delete": "Удаление сделки",
   "estimate.delete": "Удаление сметы",
   "vehicle.delete": "Удаление автомобиля",
@@ -65,7 +69,14 @@ export interface AuditActor {
 export interface AuditInput {
   actor: AuditActor;
   action: AuditAction;
-  targetType: "User" | "Deal" | "Estimate" | "Vehicle" | "Role" | "RepairOrder";
+  targetType:
+    | "User"
+    | "Deal"
+    | "Estimate"
+    | "Vehicle"
+    | "Role"
+    | "RepairOrder"
+    | "TelegramDestination";
   targetId?: string | null;
   /** How the target was known at the time — a name, a number, a role label. */
   targetLabel?: string | null;

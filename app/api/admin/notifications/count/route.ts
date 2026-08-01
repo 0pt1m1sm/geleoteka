@@ -7,7 +7,7 @@ import { TENANT_KEY } from "@/lib/tenant";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
-  const auth = await requireApiPermission("crm.manage");
+  const auth = await requireApiPermission("notifications.view");
   if (!auth.ok) return auth.response;
 
   const unread = await db.staffNotificationReceipt.count({

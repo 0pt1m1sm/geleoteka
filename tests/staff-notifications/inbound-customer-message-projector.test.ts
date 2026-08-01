@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  projectInboundCustomerMessageEvent,
   projectPendingInboundCustomerMessages,
   type InboundCustomerMessageProjectorDb,
 } from "@/lib/staff-notifications/projectors/inbound-customer-message";
@@ -56,6 +57,66 @@ describe("inbound customer message projector retries", () => {
   });
 });
 
+describe("Telegram routing", () => {
+  it("routes an assigned event only to the eligible owner's personal destination", async () => {
+    const db = routableDb("manager_1");
+    db.telegramDestinations.push({
+      id: "personal_1",
+      tenantKey: TENANT_KEY,
+      kind: "PERSONAL",
+      userId: "manager_1",
+      isActive: true,
+      disabledAt: null,
+    });
+    db.telegramDestinations.push({
+      id: "shared_1",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      isActive: true,
+      disabledAt: null,
+    });
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      channel: "TELEGRAM",
+      destinationKey: "personal_1",
+    });
+  });
+
+  it("uses only the shared fallback for an unassigned event", async () => {
+    const db = routableDb(null);
+    db.telegramDestinations.push({
+      id: "personal_1",
+      tenantKey: TENANT_KEY,
+      kind: "PERSONAL",
+      userId: "manager_1",
+      isActive: true,
+      disabledAt: null,
+    });
+    db.telegramDestinations.push({
+      id: "shared_1",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      isActive: true,
+      disabledAt: null,
+    });
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      channel: "TELEGRAM",
+      destinationKey: "shared_1",
+    });
+  });
+});
+
 function projectorDb(db: FakeEmailDb): InboundCustomerMessageProjectorDb {
   return db as unknown as InboundCustomerMessageProjectorDb;
 }
@@ -80,4 +141,54 @@ function eventRecord(): StaffNotificationEventRecord {
     occurredAt: NOW,
     createdAt: NOW,
   };
+}
+
+function routableDb(ownerUserId: string | null): FakeEmailDb {
+  const db = new FakeEmailDb();
+  db.users.push(
+    {
+      id: "customer_1",
+      name: "Клиент",
+      permissionRole: "CLIENT",
+      deletedAt: null,
+    },
+    {
+      id: "manager_1",
+      name: "Менеджер",
+      permissionRole: "MANAGER",
+      deletedAt: null,
+    },
+  );
+  db.deals.push({ id: "deal_1", ownerUserId, customerUserId: "customer_1" });
+  db.communicationLogs.push({
+    id: "comm_1",
+    customerUserId: "customer_1",
+    dealId: "deal_1",
+    channel: "EMAIL_INBOUND",
+    createdAt: NOW,
+  });
+  db.staffNotificationEvents.push({
+    ...eventRecord(),
+    id: "event_route",
+    sourceId: "comm_1",
+    dedupeKey: "inbound-msg:comm_1",
+    relatedDealId: "deal_1",
+    routingStatus: "PENDING",
+    routingAttempts: 0,
+    nextRoutingAt: NOW,
+    routedAt: null,
+    lastRoutingError: null,
+  });
+  const settings = {
+    TELEGRAM_ENABLED: "true",
+    TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
+    TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
+    TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
+    TELEGRAM_ROUTING_MODE: "PERSONAL_WITH_SHARED_FALLBACK",
+    TELEGRAM_NOTIFY_INBOUND_CUSTOMER_MESSAGE: "true",
+  };
+  for (const [key, value] of Object.entries(settings)) {
+    db.settings.push({ id: `setting_${key}`, key, value });
+  }
+  return db;
 }

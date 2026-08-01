@@ -16,7 +16,7 @@ import { redirect } from "next/navigation";
 import { getSession, type SessionUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { TENANT_KEY } from "@/lib/tenant";
-import { ROLE_DEFAULTS, type Permission } from "@/lib/permissions";
+import { resolveRolePermissions, type Permission } from "@/lib/permissions";
 
 interface StoredRow {
   permission: string;
@@ -26,10 +26,9 @@ interface StoredRow {
 /**
  * A role's permissions as currently configured.
  *
- * No rows at all means "never edited", which falls back to the defaults —
- * that is what lets the table ship empty without changing anyone's access. Once
- * a role IS saved, every permission has a row, so an unticked box is a real
- * denial rather than an absence indistinguishable from an unconfigured role.
+ * No rows at all means "never edited". For an edited role, an explicit false
+ * remains a denial; a permission introduced after the last save inherits its
+ * code default until the role editor writes a decision for it.
  */
 export async function rolePermissions(role: string): Promise<Set<string>> {
   if (role === "ADMIN") return new Set<string>(); // callers short-circuit; never consulted
@@ -38,8 +37,7 @@ export async function rolePermissions(role: string): Promise<Set<string>> {
     select: { permission: true, allowed: true },
   })) as StoredRow[];
 
-  if (rows.length === 0) return new Set<string>(ROLE_DEFAULTS[role] ?? []);
-  return new Set<string>(rows.filter((r) => r.allowed).map((r) => r.permission));
+  return resolveRolePermissions(role, rows);
 }
 
 /** Does this role open that section? ADMIN always does. */
@@ -81,10 +79,11 @@ export async function allRolePermissions(roles: readonly string[]): Promise<Map<
     select: { role: true, permission: true, allowed: true },
   })) as Array<StoredRow & { role: string }>;
 
-  const configured = new Map<string, Set<string>>();
+  const configured = new Map<string, StoredRow[]>();
   for (const row of rows) {
-    if (!configured.has(row.role)) configured.set(row.role, new Set<string>());
-    if (row.allowed) configured.get(row.role)!.add(row.permission);
+    const roleRows = configured.get(row.role) ?? [];
+    roleRows.push(row);
+    configured.set(row.role, roleRows);
   }
   // A role with no rows was never edited — show it the defaults it is actually
   // running on, not an empty table that would misreport its access as none.
@@ -93,7 +92,7 @@ export async function allRolePermissions(roles: readonly string[]): Promise<Map<
   for (const role of roles) {
     result.set(
       role,
-      seen.has(role) ? (configured.get(role) ?? new Set<string>()) : new Set<string>(ROLE_DEFAULTS[role] ?? []),
+      resolveRolePermissions(role, seen.has(role) ? (configured.get(role) ?? []) : []),
     );
   }
   return result;
