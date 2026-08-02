@@ -1,7 +1,7 @@
 # Telegram Polling Fixes Implementation Plan
 
 Created: 2026-08-02
-Status: IN_PROGRESS
+Status: VERIFIED
 Mode: auto
 Iterations: 0
 Type: Bugfix
@@ -27,7 +27,7 @@ StockMovement); prisma-клиент из `@/app/generated/prisma/client`; пол
 - [x] Story 6: MINOR-тройка: awaited replies, key на watcher, валидация+secret BASE_URL (№7, №8, №9)   (Status: VERIFIED — break-check: снятие await и secret валит ровно 2 соответствующих теста; 138/138 staff-notifications, tsc чист; №8 — key на LinkStatusWatcher, подтверждено трассировкой)
 - [x] Story 7: Runbook: рецепт релея без утечки токена в логи (№5 BLOCKER, docs)   (Status: VERIFIED — wrangler-only деплой, [observability] enabled=false + invocation_logs=false (синтаксис сверен с docs Cloudflare), ложная фраза заменена честным описанием, шаг проверки в дашборде)
 - [x] Story 8: Остаточное покрытие №10 + полный локальный гейт   (Status: VERIFIED — тесты updates-runtime (2: disabled без сети, сквозная проводка с awaited-ответом), граница ровно-100; гейт: 448/448 vitest, lint ok, build ok, migrate deploy без pending, diff = только исторический GIN-дрейф)
-- [ ] Story 9: Сдача: второй adversarial review codex → PR (merge — только с гейтом владельца)   (Status: PENDING)
+- [x] Story 9: Сдача: второй adversarial review codex → PR (merge — только с гейтом владельца)   (Status: VERIFIED — ревью №2 получено, подтверждённое исправлено вторым коммитом, остатки записаны; PR #63, CI зелёный, merge одобрен владельцем и выполнен squash (a5c975b), ветка удалена)
 
 ## Implementation Tasks
 
