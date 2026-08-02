@@ -48,6 +48,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json().catch(() => null)) as {
     drain?: boolean;
     dispatch?: boolean;
+    /** Сбросить nextAttemptAt застрявших RETRY на «сейчас» (перед dispatch). */
+    nudge?: boolean;
   } | null;
 
   try {
@@ -72,6 +74,17 @@ export async function POST(request: Request): Promise<NextResponse> {
             budgetMs: 25_000,
             maxBatches: 3,
           })
+        : null;
+
+    // Экспоненциальный бэкофф после серии сбоев уводит ретрай на часы; когда
+    // причина сбоев уже исправлена деплоем, ждать нечего — возвращаем
+    // застрявшие RETRY в очередь «сейчас».
+    const nudged =
+      body?.nudge === true
+        ? ((await db.staffNotificationDelivery.updateMany({
+            where: { tenantKey: TENANT_KEY, status: "RETRY" },
+            data: { nextAttemptAt: new Date() },
+          })) as { count: number })
         : null;
 
     // Ручной dispatch-тик: пинок доставкам, когда фоновый воркер мёртв или
@@ -137,10 +150,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         }));
       })(),
     ]);
-    const [recentPolls, recentReplies, activeLinkTokens, destinations] =
+    const [recentPolls, recentReplies, recentNotificationSends, activeLinkTokens, destinations] =
       await Promise.all([
         recentAttempts("UPDATES_POLL"),
         recentAttempts("WEBHOOK_REPLY"),
+        recentAttempts("NOTIFICATION_DELIVERY"),
         db.telegramLinkToken.count({
           where: { tenantKey: TENANT_KEY, usedAt: null, expiresAt: { gt: now } },
         }) as Promise<number>,
@@ -166,7 +180,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       // при живом сайте = воркер мёртв/не стартовал.
       worker: readBackgroundWorkerHeartbeat(),
       drain,
+      nudged,
       dispatch,
+      // Пусто при живом конвейере = отправки падают ДО сети (класс
+      // ADAPTER_EXCEPTION); непусто — виден настоящий сетевой код.
+      recentNotificationSends,
       pollState: pollState
         ? {
             nextOffset: Number(pollState.nextOffset),
@@ -195,7 +213,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 }
 
 async function recentAttempts(
-  operation: "UPDATES_POLL" | "WEBHOOK_REPLY",
+  operation: "UPDATES_POLL" | "WEBHOOK_REPLY" | "NOTIFICATION_DELIVERY",
 ): Promise<Array<Record<string, unknown>>> {
   const rows = (await db.telegramSendAttempt.findMany({
     where: { tenantKey: TENANT_KEY, operation },

@@ -14,6 +14,14 @@ on:
         description: "Прогнать drain прямо сейчас (force, бюджет 25с)"
         type: boolean
         default: true
+      dispatch:
+        description: "Прогнать dispatch-тик доставок"
+        type: boolean
+        default: false
+      nudge:
+        description: "Сбросить nextAttemptAt застрявших RETRY на сейчас"
+        type: boolean
+        default: false
 
 jobs:
   probe:
@@ -25,6 +33,8 @@ jobs:
           SECRET: ${{ secrets.STAFF_NOTIFICATION_DISPATCH_SECRET }}
           URL: ${{ vars.STAFF_NOTIFICATION_DIAGNOSTICS_URL || 'https://geleoteka.ru/api/internal/staff-notifications/diagnostics' }}
           DRAIN: ${{ inputs.drain }}
+          DISPATCH: ${{ inputs.dispatch }}
+          NUDGE: ${{ inputs.nudge }}
         run: |
           if [ -z "$SECRET" ]; then
             echo "STAFF_NOTIFICATION_DISPATCH_SECRET is not set." >&2
@@ -34,7 +44,7 @@ jobs:
             -X POST "$URL" \
             -H "Authorization: Bearer $SECRET" \
             -H "content-type: application/json" \
-            -d "{\"drain\": ${DRAIN:-true}}" --max-time 60 || true)
+            -d "{\"drain\": ${DRAIN:-true}, \"dispatch\": ${DISPATCH:-false}, \"nudge\": ${NUDGE:-false}}" --max-time 60 || true)
           echo "diagnostics → HTTP $code"
           cat /tmp/diagnostics.json || true
           echo
