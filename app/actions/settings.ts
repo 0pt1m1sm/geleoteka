@@ -59,6 +59,12 @@ export async function upsertSettings(
     changes.push({ key, value: validated.value });
   }
 
+  // Чекбоксы шлют пару записей на ключ (скрытое "false" + отмеченное "true");
+  // действует последняя. Дедуп заодно даёт честный счётчик «Сохранено (N)».
+  const lastByKey = new Map(changes.map((change) => [change.key, change]));
+  changes.length = 0;
+  changes.push(...lastByKey.values());
+
   const telegramEnabledChange = changes.find(
     (change) => change.key === "TELEGRAM_ENABLED",
   );

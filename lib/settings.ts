@@ -38,6 +38,11 @@ export interface SettingDescriptor {
   visibleInUi?: boolean;
   /** Visual group on the settings page (Russian label). */
   group: string;
+  /**
+   * Булевы поля с одинаковым compactGroup рисуются одной компактной
+   * чекбокс-сеткой под этим заголовком, а не отдельными блоками с селектом.
+   */
+  compactGroup?: string;
 }
 
 /**
@@ -323,8 +328,8 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     group: "Уведомления сотрудников (Telegram)",
     key: `TELEGRAM_NOTIFY_${type}`,
     label: definition.label,
-    description: "Переключатель типа события. Отсутствующее или некорректное значение = false.",
     input: "boolean" as const,
+    compactGroup: "Типы событий",
   })),
 ];
 
