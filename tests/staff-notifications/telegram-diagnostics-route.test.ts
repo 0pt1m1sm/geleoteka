@@ -19,6 +19,19 @@ vi.mock(
   "@/lib/staff-notifications/channels/telegram/updates-runtime",
   () => ({ drainTelegramUpdatesNow: mocks.drainNow }),
 );
+const dispatchTick = vi.fn(async () => ({ status: "ok", leased: 1, sent: 1 }));
+vi.mock("@/lib/staff-notifications/dispatch-runtime", () => ({
+  runStaffNotificationDispatchTick: () => dispatchTick(),
+}));
+vi.mock("@/lib/staff-notifications/channels/telegram/poll-worker", () => ({
+  readBackgroundWorkerHeartbeat: () => ({
+    startedAt: "2026-08-02T22:00:00.000Z",
+    lastIterationAt: "2026-08-02T22:49:30.000Z",
+    lastStatus: "ok",
+    lastErrorName: null,
+    iterations: 42,
+  }),
+}));
 
 import { POST } from "@/app/api/internal/staff-notifications/diagnostics/route";
 
@@ -177,6 +190,7 @@ describe("telegram diagnostics route", () => {
       errorCode: "TELEGRAM_TIMEOUT",
     });
     expect(payload.destinations).toEqual({ total: 2, active: 2 });
+    expect(payload.worker).toMatchObject({ iterations: 42, lastStatus: "ok" });
     expect(payload.recentEvents[0]).toMatchObject({ type: "MESSAGE_UNPARSED" });
     expect(payload.recentDeliveries[0]).toMatchObject({
       status: "DEAD",

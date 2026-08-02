@@ -15,7 +15,9 @@ import {
   normalizeTelegramEnabledAt,
   normalizeTelegramRoutingMode,
 } from "@/lib/staff-notifications/channels/telegram/config-values";
+import { readBackgroundWorkerHeartbeat } from "@/lib/staff-notifications/channels/telegram/poll-worker";
 import { drainTelegramUpdatesNow } from "@/lib/staff-notifications/channels/telegram/updates-runtime";
+import { runStaffNotificationDispatchTick } from "@/lib/staff-notifications/dispatch-runtime";
 import { TENANT_KEY } from "@/lib/tenant";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +47,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const body = (await request.json().catch(() => null)) as {
     drain?: boolean;
+    dispatch?: boolean;
   } | null;
 
   try {
@@ -70,6 +73,11 @@ export async function POST(request: Request): Promise<NextResponse> {
             maxBatches: 3,
           })
         : null;
+
+    // Ручной dispatch-тик: пинок доставкам, когда фоновый воркер мёртв или
+    // под подозрением. Тот же код, что у воркера и cron-роута.
+    const dispatch =
+      body?.dispatch === true ? await runStaffNotificationDispatchTick() : null;
 
     const pollState = (await db.telegramPollState.findUnique({
       where: { tenantKey: TENANT_KEY },
@@ -154,7 +162,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         : { enabled: false, reason: config.reason },
       fields,
       telegram,
+      // Живость фонового контура: null-времена или старый lastIterationAt
+      // при живом сайте = воркер мёртв/не стартовал.
+      worker: readBackgroundWorkerHeartbeat(),
       drain,
+      dispatch,
       pollState: pollState
         ? {
             nextOffset: Number(pollState.nextOffset),

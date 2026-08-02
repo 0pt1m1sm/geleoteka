@@ -63,6 +63,34 @@ const MAIL_SYNC_EVERY_MS = 60_000;
 
 let started = false;
 
+/**
+ * Heartbeat для диагностики: живёт в памяти процесса, наружу уходит только
+ * безопасная проекция (времена, статус, класс ошибки — никаких данных).
+ */
+const heartbeat = {
+  startedAt: null as Date | null,
+  lastIterationAt: null as Date | null,
+  lastStatus: null as string | null,
+  lastErrorName: null as string | null,
+  iterations: 0,
+};
+
+export function readBackgroundWorkerHeartbeat(): {
+  startedAt: string | null;
+  lastIterationAt: string | null;
+  lastStatus: string | null;
+  lastErrorName: string | null;
+  iterations: number;
+} {
+  return {
+    startedAt: heartbeat.startedAt?.toISOString() ?? null,
+    lastIterationAt: heartbeat.lastIterationAt?.toISOString() ?? null,
+    lastStatus: heartbeat.lastStatus,
+    lastErrorName: heartbeat.lastErrorName,
+    iterations: heartbeat.iterations,
+  };
+}
+
 export function freshBackgroundWorkerState(): BackgroundWorkerState {
   return {
     lastFailureCode: null,
@@ -76,14 +104,28 @@ export function startTelegramPollWorker(jobs: BackgroundWorkerJobs): void {
   // Однократный запуск на процесс (dev-перезагрузки зовут register повторно).
   if (started) return;
   started = true;
+  heartbeat.startedAt = new Date();
   const state = freshBackgroundWorkerState();
   void (async () => {
     for (;;) {
-      const delayMs = await runBackgroundWorkerIteration(
-        jobs,
-        state,
-        Date.now(),
-      );
+      let delayMs = FAILURE_BACKOFF_MS;
+      try {
+        delayMs = await runBackgroundWorkerIteration(jobs, state, Date.now());
+        heartbeat.lastStatus = state.lastFailureCode ?? "ok";
+        heartbeat.lastErrorName = null;
+      } catch (error) {
+        // Итерация сама ловит всё известное; это последний рубеж — цикл
+        // не имеет права умереть молча (уже случалось: воркер замирал, и
+        // доставки стояли без единого следа в диагностике).
+        heartbeat.lastStatus = "loop-exception";
+        heartbeat.lastErrorName =
+          error instanceof Error ? error.constructor.name : typeof error;
+        console.error("background_worker.loop_exception", {
+          name: heartbeat.lastErrorName,
+        });
+      }
+      heartbeat.lastIterationAt = new Date();
+      heartbeat.iterations += 1;
       if (delayMs > 0) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
