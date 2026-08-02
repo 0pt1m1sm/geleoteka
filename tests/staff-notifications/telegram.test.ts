@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -6,10 +9,12 @@ import {
 } from "@/lib/staff-notifications/channels/telegram/adapter";
 import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
 import { resolveTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
+import { TELEGRAM_LINK_TOKEN_TTL_MS } from "@/lib/staff-notifications/channels/telegram/constants";
 import {
   formatTelegramLinkCommand,
   parseTelegramLinkCommand,
 } from "@/lib/staff-notifications/channels/telegram/link-command";
+import { getTelegramLinkPanelCopy } from "@/lib/staff-notifications/channels/telegram/link-copy";
 import {
   createTelegramLinkToken,
   hashTelegramLinkToken,
@@ -174,7 +179,7 @@ describe("setting descriptor validation", () => {
 });
 
 describe("Telegram link tokens", () => {
-  it("stores only SHA-256 of a 32-byte one-time token with a ten-minute TTL", async () => {
+  it("stores only SHA-256 of a 32-byte one-time token with the configured TTL", async () => {
     let created: Record<string, unknown> | null = null;
     const client: TelegramLinkDb = {
       async $transaction(fn) {
@@ -204,9 +209,34 @@ describe("Telegram link tokens", () => {
     expect(parseTelegramLinkCommand(result.manualCommand)).toBe(rawToken);
     expect(created).toMatchObject({
       tokenHash: hashTelegramLinkToken(rawToken!),
-      expiresAt: new Date("2026-08-01T12:10:00.000Z"),
+      expiresAt: result.expiresAt,
     });
+    expect(result.expiresAt.getTime() - NOW.getTime()).toBe(
+      TELEGRAM_LINK_TOKEN_TTL_MS,
+    );
     expect(JSON.stringify(created)).not.toContain(rawToken!);
+  });
+
+  it("derives every interface expiry mention from the token TTL constant", () => {
+    const ttlMinutes = TELEGRAM_LINK_TOKEN_TTL_MS / 60_000;
+    const copies = [
+      getTelegramLinkPanelCopy("PERSONAL"),
+      getTelegramLinkPanelCopy("SHARED"),
+    ];
+
+    expect(Number.isInteger(ttlMinutes)).toBe(true);
+    for (const copy of copies) {
+      expect(copy.buttonLabel).toContain(`${ttlMinutes} минут`);
+      expect(copy.successMessage).toContain(`${ttlMinutes} минут`);
+    }
+
+    for (const relativePath of [
+      "components/admin/notifications/TelegramLinkPanel.tsx",
+      "lib/staff-notifications/channels/telegram/link-copy.ts",
+    ]) {
+      const source = readFileSync(join(process.cwd(), relativePath), "utf8");
+      expect(source).not.toMatch(/\b\d+\s+минут(?:у|ы)?\b/u);
+    }
   });
 
   it("uses Telegram startgroup for a shared destination", async () => {
@@ -735,6 +765,36 @@ describe("Telegram delivery classification", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("records a successful notification send through the channel adapter", async () => {
+    const destinationDb = adapterDb();
+    const adapter = createTelegramChannelAdapter({
+      db: destinationDb.db,
+      fetch: vi.fn(async () =>
+        Response.json({ ok: true, result: { message_id: 42 } }),
+      ),
+      loadConfig: async () => enabledConfig(),
+      monotonicNow: (() => {
+        const values = [100, 225];
+        let index = 0;
+        return () => values[index++]!;
+      })(),
+    });
+
+    await expect(adapter.send("destination_1", safePayload())).resolves.toEqual({
+      outcome: "sent",
+      providerMessageId: "42",
+    });
+    expect(destinationDb.diagnostics).toEqual([
+      expect.objectContaining({
+        operation: "NOTIFICATION_DELIVERY",
+        outcome: "SUCCESS",
+        durationMs: 125,
+        isSlow: false,
+        errorCode: null,
+      }),
+    ]);
+  });
+
   it.each([
     [400, "Bad Request: chat not found", "TELEGRAM_CHAT_NOT_FOUND"],
     [403, "Forbidden: bot was blocked by the user", "TELEGRAM_BOT_BLOCKED"],
@@ -896,8 +956,10 @@ function enabledConfig(): TelegramRuntimeConfig {
 
 function adapterDb() {
   const disable = vi.fn(async () => ({ count: 1 }));
+  const diagnostics: Array<Record<string, unknown>> = [];
   return {
     disable,
+    diagnostics,
     db: {
       telegramDestination: {
         findUnique: async () => ({
@@ -907,6 +969,12 @@ function adapterDb() {
           disabledAt: null,
         }),
         updateMany: disable,
+      },
+      telegramSendAttempt: {
+        create: async (args: Record<string, unknown>) => {
+          diagnostics.push((args as { data: Record<string, unknown> }).data);
+          return {};
+        },
       },
     },
   };
@@ -980,7 +1048,7 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
       tokenHash: hashTelegramLinkToken(rawToken),
       userId: purpose === "PERSONAL" ? "manager_1" : null,
       purpose,
-      expiresAt: new Date("2026-08-01T12:10:00.000Z"),
+      expiresAt: new Date(NOW.getTime() + TELEGRAM_LINK_TOKEN_TTL_MS),
       usedAt: null as Date | null,
       createdByUserId: "manager_1",
     };

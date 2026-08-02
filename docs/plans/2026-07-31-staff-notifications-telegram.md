@@ -272,7 +272,8 @@ email, госномер, VIN, имя файла вложения, причина
 
 **Привязка.** Личное сообщение владельцу; общий служебный чат — fallback для
 неназначенных. Токен привязки: 24–32 случайных байта, хранится ТОЛЬКО SHA-256,
-TTL 10 минут, одноразовый. Deep-link `https://t.me/<bot>?start=<token>`. Webhook
+TTL задаётся `TELEGRAM_LINK_TOKEN_TTL_MS`, одноразовый. Deep-link
+`https://t.me/<bot>?start=<token>`. Webhook
 проверяет `X-Telegram-Bot-Api-Secret-Token`, `update_id` и что чат приватный.
 `chat_id` никогда не принимается из браузера и не показывается в UI обратно.
 
