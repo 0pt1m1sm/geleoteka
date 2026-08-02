@@ -2249,6 +2249,9 @@ model TelegramDestination {
   chatId         String
   telegramUserId String?
   label          String?
+  /// FALLBACK_ONLY preserves the original shared-recipient behavior;
+  /// ALL_EVENTS adds this destination to every enabled Telegram event.
+  deliveryScope  String    @default("FALLBACK_ONLY")
   isActive       Boolean   @default(true)
   verifiedAt     DateTime
   disabledAt     DateTime?

@@ -1,0 +1,2 @@
+ALTER TABLE "TelegramDestination"
+ADD COLUMN "deliveryScope" TEXT NOT NULL DEFAULT 'FALLBACK_ONLY';

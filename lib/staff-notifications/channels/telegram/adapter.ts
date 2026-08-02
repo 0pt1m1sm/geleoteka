@@ -31,7 +31,7 @@ interface TelegramApiResponse {
   ok?: boolean;
   error_code?: number;
   description?: string;
-  parameters?: { retry_after?: number };
+  parameters?: { retry_after?: number; migrate_to_chat_id?: number };
   result?: { message_id?: number | string };
 }
 
@@ -118,6 +118,21 @@ async function sendTelegramNotification(
 
   const status = body?.error_code ?? response.status;
   const description = body?.description?.toLowerCase() ?? "";
+  const migratedChatId = telegramIntegerId(body?.parameters?.migrate_to_chat_id);
+  if (status === 400 && migratedChatId) {
+    await dependencies.db.telegramDestination.updateMany({
+      where: {
+        tenantKey: TENANT_KEY,
+        id: destination.id,
+        chatId: destination.chatId,
+      },
+      data: { chatId: migratedChatId },
+    });
+    return {
+      outcome: "retry" as const,
+      errorCode: "TELEGRAM_CHAT_MIGRATED",
+    };
+  }
   if (status === 429) {
     const retryAfterSeconds = body?.parameters?.retry_after;
     const retryAfterMs =
@@ -158,6 +173,12 @@ async function sendTelegramNotification(
     outcome: "retry" as const,
     errorCode: status === 401 ? "TELEGRAM_AUTH_REJECTED" : "TELEGRAM_REJECTED",
   };
+}
+
+function telegramIntegerId(value: unknown): string | null {
+  return typeof value === "number" && Number.isSafeInteger(value)
+    ? String(value)
+    : null;
 }
 
 async function readTelegramResponse(response: Response): Promise<TelegramApiResponse | null> {

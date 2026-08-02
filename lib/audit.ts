@@ -37,6 +37,7 @@ export type AuditAction =
   | "role.permissions_reset"
   | "telegram.destination_link"
   | "telegram.destination_unlink"
+  | "telegram.destination_scope_change"
   | "staff_notification.delivery_retry"
   | "deal.delete"
   | "estimate.delete"
@@ -55,6 +56,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "role.permissions_reset": "Сброс прав роли к умолчанию",
   "telegram.destination_link": "Привязка Telegram",
   "telegram.destination_unlink": "Отвязка Telegram",
+  "telegram.destination_scope_change": "Изменение потока Telegram",
   "staff_notification.delivery_retry": "Повтор доставки уведомления",
   "deal.delete": "Удаление сделки",
   "estimate.delete": "Удаление сметы",

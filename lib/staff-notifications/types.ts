@@ -5,6 +5,7 @@ export const STAFF_NOTIFICATION_PRIORITIES = ["P0", "P1", "P2"] as const;
 export type StaffNotificationPriority = (typeof STAFF_NOTIFICATION_PRIORITIES)[number];
 
 export interface StaffNotificationEventDefinition {
+  label: string;
   priority: StaffNotificationPriority;
   fallbackPermission: Permission;
   requiresInboundChannel: boolean;
@@ -16,46 +17,55 @@ export interface StaffNotificationEventDefinition {
  */
 export const STAFF_NOTIFICATION_EVENT_CATALOG = {
   INBOUND_CUSTOMER_MESSAGE: {
+    label: "Клиент написал",
     priority: "P0",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: true,
   },
   SERVICE_BOOKING_CREATED: {
+    label: "Новая запись на сервис",
     priority: "P0",
     fallbackPermission: "service.manage",
     requiresInboundChannel: false,
   },
   ESTIMATE_CUSTOMER_APPROVED: {
+    label: "Клиент согласовал смету",
     priority: "P0",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: false,
   },
   ESTIMATE_CUSTOMER_DECLINED: {
+    label: "Клиент отклонил смету",
     priority: "P0",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: false,
   },
   PARTS_ORDER_CREATED: {
+    label: "Заказ запчастей",
     priority: "P1",
     fallbackPermission: "parts.manage",
     requiresInboundChannel: false,
   },
   RENTAL_BOOKING_CREATED: {
+    label: "Бронь аренды",
     priority: "P1",
     fallbackPermission: "rentals.manage",
     requiresInboundChannel: false,
   },
   INBOUND_MESSAGE_UNRESOLVED: {
+    label: "Сообщение не разобрано",
     priority: "P1",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: true,
   },
   CRM_TASK_OVERDUE: {
+    label: "Просроченная задача",
     priority: "P1",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: false,
   },
   STAFF_DELIVERY_DEAD: {
+    label: "Доставка не прошла",
     priority: "P2",
     fallbackPermission: "settings.manage",
     requiresInboundChannel: false,
@@ -94,6 +104,16 @@ export type StaffNotificationRoutingStatus =
 
 export const TELEGRAM_DESTINATION_KINDS = ["PERSONAL", "SHARED"] as const;
 export type TelegramDestinationKind = (typeof TELEGRAM_DESTINATION_KINDS)[number];
+
+export const TELEGRAM_DELIVERY_SCOPES = ["FALLBACK_ONLY", "ALL_EVENTS"] as const;
+export type TelegramDeliveryScope = (typeof TELEGRAM_DELIVERY_SCOPES)[number];
+
+export function isTelegramDeliveryScope(value: unknown): value is TelegramDeliveryScope {
+  return (
+    typeof value === "string" &&
+    (TELEGRAM_DELIVERY_SCOPES as readonly string[]).includes(value)
+  );
+}
 
 export const TELEGRAM_LINK_PURPOSES = ["PERSONAL", "SHARED"] as const;
 export type TelegramLinkPurpose = (typeof TELEGRAM_LINK_PURPOSES)[number];

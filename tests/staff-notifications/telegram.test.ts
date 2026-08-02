@@ -18,13 +18,37 @@ import {
   type StaffNotificationDispatcherDb,
 } from "@/lib/staff-notifications/dispatcher";
 import type { StaffNotificationChannelRegistry } from "@/lib/staff-notifications/channels";
-import type { SafeChannelPayload } from "@/lib/staff-notifications/types";
+import {
+  STAFF_NOTIFICATION_EVENT_CATALOG,
+  type SafeChannelPayload,
+} from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 import { validateSettingValue } from "@/lib/settings-validation";
 
 const NOW = new Date("2026-08-01T12:00:00.000Z");
 
 describe("Telegram runtime config", () => {
+  it("has human-readable labels for every notification category", () => {
+    expect(
+      Object.fromEntries(
+        Object.entries(STAFF_NOTIFICATION_EVENT_CATALOG).map(([type, definition]) => [
+          type,
+          definition.label,
+        ]),
+      ),
+    ).toEqual({
+      INBOUND_CUSTOMER_MESSAGE: "Клиент написал",
+      SERVICE_BOOKING_CREATED: "Новая запись на сервис",
+      ESTIMATE_CUSTOMER_APPROVED: "Клиент согласовал смету",
+      ESTIMATE_CUSTOMER_DECLINED: "Клиент отклонил смету",
+      PARTS_ORDER_CREATED: "Заказ запчастей",
+      RENTAL_BOOKING_CREATED: "Бронь аренды",
+      INBOUND_MESSAGE_UNRESOLVED: "Сообщение не разобрано",
+      CRM_TASK_OVERDUE: "Просроченная задача",
+      STAFF_DELIVERY_DEAD: "Доставка не прошла",
+    });
+  });
+
   it("fails closed when the master flag or any required secret is missing or malformed", () => {
     expect(resolveTelegramRuntimeConfig({})).toMatchObject({ enabled: false });
     expect(
@@ -146,6 +170,31 @@ describe("Telegram link tokens", () => {
     });
     expect(JSON.stringify(created)).not.toContain(rawToken!);
   });
+
+  it("uses Telegram startgroup for a shared destination", async () => {
+    const client: TelegramLinkDb = {
+      async $transaction(fn) {
+        return fn({
+          telegramLinkToken: {
+            updateMany: async () => ({ count: 0 }),
+            create: async () => ({}),
+          },
+        });
+      },
+    };
+
+    const result = await createTelegramLinkToken(client, {
+      purpose: "SHARED",
+      userId: null,
+      createdByUserId: "admin_1",
+      botUsername: "GeleotekaStaffBot",
+      now: NOW,
+    });
+    const url = new URL(result.deepLink);
+
+    expect(url.searchParams.get("start")).toBeNull();
+    expect(url.searchParams.get("startgroup")).toMatch(/^[A-Za-z0-9_-]{43}$/);
+  });
 });
 
 describe("Telegram webhook processing", () => {
@@ -167,7 +216,7 @@ describe("Telegram webhook processing", () => {
     expect(fake.auditWrites).toBe(1);
   });
 
-  it("acknowledges but never links a non-private chat", async () => {
+  it("never links a group with a PERSONAL token", async () => {
     const rawToken = "B".repeat(43);
     const fake = new FakeTelegramWebhookDb(rawToken);
     const update = {
@@ -181,6 +230,53 @@ describe("Telegram webhook processing", () => {
 
     await expect(processTelegramWebhookUpdate(fake, update, NOW)).resolves.toBe("ignored");
     expect(fake.destinations).toHaveLength(0);
+  });
+
+  it("links a supergroup with a SHARED token and keeps fallback scope by default", async () => {
+    const rawToken = "C".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken, "SHARED");
+    const update = {
+      update_id: 9003,
+      message: {
+        text: `/start@GeleotekaStaffBot ${rawToken}`,
+        chat: { id: -100777003, type: "supergroup" },
+        from: { id: 777003, is_bot: false },
+      },
+    };
+
+    await expect(processTelegramWebhookUpdate(fake, update, NOW)).resolves.toBe("linked");
+    expect(fake.destinations).toHaveLength(1);
+    expect(fake.destinations[0]).toMatchObject({
+      kind: "SHARED",
+      userId: null,
+      chatId: "-100777003",
+      deliveryScope: "FALLBACK_ONLY",
+    });
+  });
+
+  it("updates the shared destination on a migrate_to_chat_id service message", async () => {
+    const fake = new FakeTelegramWebhookDb("D".repeat(43), "SHARED");
+    fake.destinations.push({
+      id: "destination_1",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      chatId: "-777004",
+      deliveryScope: "ALL_EVENTS",
+    });
+    const update = {
+      update_id: 9004,
+      message: {
+        chat: { id: -777004, type: "group" },
+        migrate_to_chat_id: -100777004,
+      },
+    };
+
+    await expect(processTelegramWebhookUpdate(fake, update, NOW)).resolves.toBe("migrated");
+    expect(fake.destinations[0]).toMatchObject({
+      chatId: "-100777004",
+      deliveryScope: "ALL_EVENTS",
+    });
   });
 });
 
@@ -299,6 +395,38 @@ describe("Telegram delivery classification", () => {
         }),
       }),
     );
+  });
+
+  it("updates the destination when Bot API returns migrate_to_chat_id", async () => {
+    const destinationDb = adapterDb();
+    const adapter = createTelegramChannelAdapter({
+      db: destinationDb.db,
+      fetch: vi.fn(async () =>
+        Response.json(
+          {
+            ok: false,
+            error_code: 400,
+            description: "Bad Request: group chat was upgraded to a supergroup chat",
+            parameters: { migrate_to_chat_id: -100777005 },
+          },
+          { status: 400 },
+        ),
+      ),
+      loadConfig: async () => enabledConfig(),
+    });
+
+    await expect(adapter.send("destination_1", safePayload())).resolves.toEqual({
+      outcome: "retry",
+      errorCode: "TELEGRAM_CHAT_MIGRATED",
+    });
+    expect(destinationDb.disable).toHaveBeenCalledWith({
+      where: {
+        tenantKey: TENANT_KEY,
+        id: "destination_1",
+        chatId: "777001",
+      },
+      data: { chatId: "-100777005" },
+    });
   });
 
   it("does not copy provider error text into delivery errors or logs", async () => {
@@ -431,13 +559,13 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
   auditWrites = 0;
   private token;
 
-  constructor(rawToken: string) {
+  constructor(rawToken: string, purpose: "PERSONAL" | "SHARED" = "PERSONAL") {
     this.token = {
       id: "link_1",
       tenantKey: TENANT_KEY,
       tokenHash: hashTelegramLinkToken(rawToken),
-      userId: "manager_1",
-      purpose: "PERSONAL",
+      userId: purpose === "PERSONAL" ? "manager_1" : null,
+      purpose,
       expiresAt: new Date("2026-08-01T12:10:00.000Z"),
       usedAt: null as Date | null,
       createdByUserId: "manager_1",
@@ -485,6 +613,17 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
     update: async (args: Record<string, unknown>) => {
       Object.assign(this.destinations[0], args.data as Record<string, unknown>);
       return { id: this.destinations[0].id };
+    },
+    updateMany: async (args: Record<string, unknown>) => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      const rows = this.destinations.filter(
+        (row) =>
+          (where.tenantKey === undefined || row.tenantKey === where.tenantKey) &&
+          (where.kind === undefined || row.kind === where.kind) &&
+          (where.chatId === undefined || row.chatId === where.chatId),
+      );
+      for (const row of rows) Object.assign(row, args.data as Record<string, unknown>);
+      return { count: rows.length };
     },
   };
 

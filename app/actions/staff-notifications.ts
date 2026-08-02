@@ -9,6 +9,10 @@ import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/fee
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { createTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
 import { requeueDeadStaffNotificationDelivery } from "@/lib/staff-notifications/operations";
+import {
+  isTelegramDeliveryScope,
+  type TelegramDeliveryScope,
+} from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 
 export interface CreateTelegramLinkState {
@@ -58,6 +62,60 @@ export async function revokePersonalTelegramLink(): Promise<void> {
 export async function revokeSharedTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.manage");
   await revokeTelegramDestinations({ kind: "SHARED", userId: null }, session);
+}
+
+export async function setSharedTelegramDeliveryScope(
+  destinationId: string,
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission("notifications.manage");
+  const rawScope = formData.get("deliveryScope");
+  if (!destinationId.trim() || !isTelegramDeliveryScope(rawScope)) {
+    throw new Error("Некорректный объём уведомлений");
+  }
+
+  await db.$transaction(async (tx) => {
+    const destination = (await tx.telegramDestination.findFirst({
+      where: {
+        tenantKey: TENANT_KEY,
+        id: destinationId,
+        kind: "SHARED",
+        userId: null,
+        isActive: true,
+        disabledAt: null,
+      },
+      select: { id: true, deliveryScope: true },
+    })) as { id: string; deliveryScope: string } | null;
+    if (!destination || destination.deliveryScope === rawScope) return;
+
+    const updated = await tx.telegramDestination.updateMany({
+      where: {
+        tenantKey: TENANT_KEY,
+        id: destination.id,
+        kind: "SHARED",
+        isActive: true,
+        disabledAt: null,
+      },
+      data: { deliveryScope: rawScope satisfies TelegramDeliveryScope },
+    });
+    if (updated.count !== 1) return;
+
+    await recordAudit(
+      {
+        actor: session,
+        action: "telegram.destination_scope_change",
+        targetType: "TelegramDestination",
+        targetId: destination.id,
+        targetLabel: "Общий получатель",
+        metadata: {
+          previousScope: destination.deliveryScope,
+          deliveryScope: rawScope,
+        },
+      },
+      tx,
+    );
+  });
+  revalidatePath("/admin/notifications/telegram");
 }
 
 export async function retryStaffNotificationDelivery(
@@ -165,7 +223,7 @@ async function revokeTelegramDestinations(
         action: "telegram.destination_unlink",
         targetType: "TelegramDestination",
         targetId: rows[0].id,
-        targetLabel: target.kind === "PERSONAL" ? "Личная привязка" : "Общий fallback",
+        targetLabel: target.kind === "PERSONAL" ? "Личная привязка" : "Общий получатель",
         metadata: { kind: target.kind, count: rows.length },
       },
       tx,

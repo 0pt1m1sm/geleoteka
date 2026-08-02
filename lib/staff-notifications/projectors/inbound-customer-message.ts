@@ -105,6 +105,7 @@ interface DestinationRow {
   id: string;
   kind: string;
   userId: string | null;
+  deliveryScope: string;
 }
 
 const ROUTABLE_EVENT_SOURCE_TYPES = {
@@ -509,22 +510,31 @@ async function loadDestinations(
   targetUserId: string | null,
   routingMode: "PERSONAL_ONLY" | "PERSONAL_WITH_SHARED_FALLBACK",
 ) {
-  if (!personalTarget && routingMode === "PERSONAL_ONLY") return [];
   const rows = (await tx.telegramDestination.findMany({
     where: {
       tenantKey: TENANT_KEY,
       isActive: true,
       disabledAt: null,
-      kind: personalTarget ? "PERSONAL" : "SHARED",
-      userId: personalTarget ? targetUserId : null,
     },
-    select: { id: true, kind: true, userId: true },
+    select: { id: true, kind: true, userId: true, deliveryScope: true },
   })) as DestinationRow[];
-  return rows.map((row) => ({
-    recipientUserId: row.kind === "PERSONAL" ? row.userId : null,
-    channel: "TELEGRAM" as const,
-    destinationKey: row.id,
-  }));
+  return rows
+    .filter((row) => {
+      if (row.kind === "SHARED" && row.deliveryScope === "ALL_EVENTS") {
+        return true;
+      }
+      if (personalTarget) {
+        return row.kind === "PERSONAL" && row.userId === targetUserId;
+      }
+      return (
+        routingMode === "PERSONAL_WITH_SHARED_FALLBACK" && row.kind === "SHARED"
+      );
+    })
+    .map((row) => ({
+      recipientUserId: row.kind === "PERSONAL" ? row.userId : null,
+      channel: "TELEGRAM" as const,
+      destinationKey: row.id,
+    }));
 }
 
 async function loadTelegramRoutingConfig(tx: ProjectorTx) {
