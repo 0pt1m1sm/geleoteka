@@ -1,10 +1,12 @@
 import type { StaffNotificationChannelAdapter } from "@/lib/staff-notifications/channels";
 import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
+import { TELEGRAM_SEND_TIMEOUT_MS } from "@/lib/staff-notifications/channels/telegram/constants";
 import { formatTelegramStaffNotification } from "@/lib/staff-notifications/channels/telegram/format";
 import type { SafeChannelPayload } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 import {
   recordTelegramSendDiagnostic,
+  normalizeTelegramSendDurationMs,
   type TelegramSendDiagnosticsWriteDb,
   type TelegramSendOperation,
 } from "@/lib/staff-notifications/channels/telegram/diagnostics";
@@ -41,8 +43,6 @@ interface TelegramApiResponse {
   result?: { message_id?: number | string };
 }
 
-const REQUEST_TIMEOUT_MS = 10_000;
-
 export interface TelegramTextMessage {
   botToken: string;
   chatId: string;
@@ -51,6 +51,7 @@ export interface TelegramTextMessage {
 
 export type TelegramTextSendResult =
   | { outcome: "network-error" }
+  | { outcome: "timeout" }
   | {
       outcome: "response";
       response: Response;
@@ -59,6 +60,7 @@ export type TelegramTextSendResult =
 
 export type TelegramTextSendErrorCode =
   | "TELEGRAM_NETWORK"
+  | "TELEGRAM_TIMEOUT"
   | "TELEGRAM_CHAT_MIGRATED"
   | "TELEGRAM_RATE_LIMITED"
   | "TELEGRAM_CHAT_NOT_FOUND"
@@ -78,6 +80,9 @@ export type NormalizedTelegramTextSendResult =
       retryAfterMs?: number;
       migratedChatId?: string;
     };
+
+export type TelegramTextSendWithDiagnosticsResult =
+  NormalizedTelegramTextSendResult & { durationMs: number };
 
 export function createTelegramChannelAdapter(
   dependencies: TelegramAdapterDependencies,
@@ -208,6 +213,13 @@ export function normalizeTelegramTextSendResult(
       httpStatus: null,
     };
   }
+  if (sent.outcome === "timeout") {
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_TIMEOUT",
+      httpStatus: null,
+    };
+  }
 
   const { response, body } = sent;
   if (response.ok && body?.ok === true) {
@@ -274,33 +286,48 @@ export async function sendTelegramText(
   message: TelegramTextMessage,
 ): Promise<TelegramTextSendResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    // The Bot API requires the credential in the URL. This URL must never be
-    // logged or surfaced in an exception/error response.
-    const response = await fetchImpl(
-      `https://api.telegram.org/bot${message.botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: message.chatId,
-          text: message.text,
-          protect_content: true,
-          link_preview_options: { is_disabled: true },
-        }),
-        signal: controller.signal,
-      },
-    );
-    const body = await readTelegramResponse(response);
-    if (controller.signal.aborted) {
-      return { outcome: "network-error" };
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const request = (async (): Promise<TelegramTextSendResult> => {
+    try {
+      // The Bot API requires the credential in the URL. This URL must never be
+      // logged or surfaced in an exception/error response.
+      const response = await fetchImpl(
+        `https://api.telegram.org/bot${message.botToken}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            chat_id: message.chatId,
+            text: message.text,
+            protect_content: true,
+            link_preview_options: { is_disabled: true },
+          }),
+          signal: controller.signal,
+        },
+      );
+      const body = await readTelegramResponse(response);
+      if (controller.signal.aborted) return { outcome: "timeout" };
+      return { outcome: "response", response, body };
+    } catch {
+      return controller.signal.aborted
+        ? { outcome: "timeout" }
+        : { outcome: "network-error" };
     }
-    return { outcome: "response", response, body };
-  } catch {
-    return { outcome: "network-error" };
+  })();
+
+  const deadline = new Promise<TelegramTextSendResult>((resolve) => {
+    timeout = setTimeout(() => {
+      controller.abort();
+      resolve({ outcome: "timeout" });
+    }, TELEGRAM_SEND_TIMEOUT_MS);
+  });
+
+  try {
+    // Promise.race is intentional: AbortSignal normally settles fetch, but the
+    // action must still return on time if a transport ignores the signal.
+    return await Promise.race([request, deadline]);
   } finally {
-    clearTimeout(timeout);
+    if (timeout !== undefined) clearTimeout(timeout);
   }
 }
 
@@ -310,7 +337,7 @@ export async function sendTelegramTextWithDiagnostics(options: {
   message: TelegramTextMessage;
   operation: TelegramSendOperation;
   monotonicNow?: () => number;
-}): Promise<NormalizedTelegramTextSendResult> {
+}): Promise<TelegramTextSendWithDiagnosticsResult> {
   const monotonicNow = options.monotonicNow ?? (() => performance.now());
   const startedAt = monotonicNow();
   let normalized: NormalizedTelegramTextSendResult;
@@ -326,13 +353,14 @@ export async function sendTelegramTextWithDiagnostics(options: {
     };
   }
 
+  const durationMs = normalizeTelegramSendDurationMs(monotonicNow() - startedAt);
   await recordTelegramSendDiagnostic(options.client, {
     operation: options.operation,
     outcome: normalized.outcome === "sent" ? "SUCCESS" : "FAILURE",
-    durationMs: monotonicNow() - startedAt,
+    durationMs,
     errorCode: normalized.outcome === "failed" ? normalized.errorCode : null,
   });
-  return normalized;
+  return { ...normalized, durationMs };
 }
 
 function telegramIntegerId(value: unknown): string | null {

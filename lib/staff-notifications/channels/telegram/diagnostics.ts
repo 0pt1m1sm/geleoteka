@@ -7,6 +7,7 @@ export const TELEGRAM_SLOW_SEND_THRESHOLD_MS = 5_000;
 export const TELEGRAM_SEND_OPERATIONS = [
   "NOTIFICATION_DELIVERY",
   "WEBHOOK_REPLY",
+  "TEST_NOTIFICATION",
 ] as const;
 
 export type TelegramSendOperation = (typeof TELEGRAM_SEND_OPERATIONS)[number];
@@ -40,7 +41,7 @@ export async function recordTelegramSendDiagnostic(
   client: TelegramSendDiagnosticsWriteDb,
   diagnostic: TelegramSendDiagnostic,
 ): Promise<void> {
-  const durationMs = normalizeDurationMs(diagnostic.durationMs);
+  const durationMs = normalizeTelegramSendDurationMs(diagnostic.durationMs);
   const data = {
     tenantKey: TENANT_KEY,
     operation: diagnostic.operation,
@@ -75,7 +76,7 @@ export async function retainTelegramSendAttempts(
   return { deletedAttempts: result.count, cutoff };
 }
 
-function normalizeDurationMs(value: number): number {
+export function normalizeTelegramSendDurationMs(value: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;
   return Math.ceil(value);
 }

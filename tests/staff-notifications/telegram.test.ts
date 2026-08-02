@@ -49,6 +49,7 @@ describe("Telegram link commands", () => {
     ["a tab", `/start\t${rawToken}`],
     ["surrounding whitespace", ` \n/start ${rawToken}\t `],
     ["a bot username and line break", `/start@GeleotekaStaffBot\n${rawToken}`],
+    ["a leading bot mention", `@GeleotekaStaffBot /start ${rawToken}`],
   ])("accepts %s between or around the command", (_case, command) => {
     expect(parseTelegramLinkCommand(command)).toBe(rawToken);
   });
@@ -65,6 +66,18 @@ describe("Telegram link commands", () => {
     const receivedCommand = formatTelegramLinkCommand(rawToken).replace(" ", "\n");
 
     expect(parseTelegramLinkCommand(receivedCommand)).toBe(rawToken);
+  });
+
+  it("rejects excessively long input before trimming or parsing it", () => {
+    const command = `/start ${rawToken}${" ".repeat(200)}`;
+    const trimSpy = vi.spyOn(String.prototype, "trim");
+
+    const result = parseTelegramLinkCommand(command);
+    const trimCallCount = trimSpy.mock.calls.length;
+    trimSpy.mockRestore();
+
+    expect(result).toBeNull();
+    expect(trimCallCount).toBe(0);
   });
 });
 
@@ -327,7 +340,7 @@ describe("Telegram webhook processing", () => {
     expect(scheduleReply.mock.calls[0]?.[0].text).not.toContain(String(chatId));
   });
 
-  it("guides a group after a bare /start command with surrounding whitespace", async () => {
+  it("does not reply to a bare /start command in a group", async () => {
     const fake = new FakeTelegramWebhookDb("T".repeat(43));
     const scheduleReply = vi.fn();
 
@@ -347,8 +360,32 @@ describe("Telegram webhook processing", () => {
       ),
     ).resolves.toBe("ignored");
 
+    expect(scheduleReply).not.toHaveBeenCalled();
+  });
+
+  it("guides a group after an explicitly addressed /start command", async () => {
+    const fake = new FakeTelegramWebhookDb("R".repeat(43));
+    const scheduleReply = vi.fn();
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 89972,
+          message: {
+            text: "/start@GeleotekaStaffBot",
+            chat: { id: -777009972, type: "group" },
+            from: { id: 1087968824, is_bot: true },
+            sender_chat: { id: -777009972, type: "group" },
+          },
+        },
+        NOW,
+        scheduleReply,
+      ),
+    ).resolves.toBe("ignored");
+
     expect(scheduleReply).toHaveBeenCalledWith({
-      chatId: "-777009997",
+      chatId: "-777009972",
       text: expect.stringContaining("личный кабинет"),
     });
   });
@@ -480,14 +517,94 @@ describe("Telegram webhook processing", () => {
     });
   });
 
-  it("links a supergroup with a SHARED token and confirms the shared recipient", async () => {
+  it("keeps PERSONAL linking closed to a bot sender", async () => {
+    const rawToken = "P".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken, "PERSONAL");
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 90021,
+          message: {
+            text: `/start@GeleotekaStaffBot ${rawToken}`,
+            chat: { id: 7770021, type: "private" },
+            from: { id: 1087968824, is_bot: true },
+          },
+        },
+        NOW,
+      ),
+    ).resolves.toBe("ignored");
+
+    expect(fake.destinations).toHaveLength(0);
+  });
+
+  it("does not link an anonymous group administrator with a PERSONAL token", async () => {
+    const rawToken = "Q".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken, "PERSONAL");
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 90022,
+          message: {
+            text: `/start@GeleotekaStaffBot ${rawToken}`,
+            chat: { id: -100777022, type: "supergroup" },
+            from: { id: 1087968824, is_bot: true },
+            sender_chat: { id: -100777022, type: "supergroup" },
+          },
+        },
+        NOW,
+      ),
+    ).resolves.toBe("ignored");
+
+    expect(fake.destinations).toHaveLength(0);
+  });
+
+  it("links an anonymous group administrator with a SHARED token", async () => {
+    const rawToken = "H".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken, "SHARED");
+    const scheduleReply = vi.fn();
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 90023,
+          message: {
+            text: `/start@GeleotekaStaffBot ${rawToken}`,
+            chat: { id: -100777023, type: "supergroup" },
+            from: { id: 1087968824, is_bot: true },
+            sender_chat: { id: -100777023, type: "supergroup" },
+          },
+        },
+        NOW,
+        scheduleReply,
+      ),
+    ).resolves.toBe("linked");
+
+    expect(fake.destinations).toHaveLength(1);
+    expect(fake.destinations[0]).toMatchObject({
+      kind: "SHARED",
+      userId: null,
+      chatId: "-100777023",
+      telegramUserId: null,
+    });
+    expect(scheduleReply).toHaveBeenCalledWith({
+      chatId: "-100777023",
+      text: expect.stringContaining("общий получатель"),
+    });
+  });
+
+  it("links a leading-mention command with a SHARED token", async () => {
     const rawToken = "C".repeat(43);
     const fake = new FakeTelegramWebhookDb(rawToken, "SHARED");
     const scheduleReply = vi.fn();
     const update = {
       update_id: 9003,
       message: {
-        text: `/start@GeleotekaStaffBot ${rawToken}`,
+        text: `@GeleotekaStaffBot /start ${rawToken}`,
         chat: { id: -100777003, type: "supergroup" },
         from: { id: 777003, is_bot: false },
       },
@@ -501,6 +618,7 @@ describe("Telegram webhook processing", () => {
       kind: "SHARED",
       userId: null,
       chatId: "-100777003",
+      telegramUserId: null,
       deliveryScope: "FALLBACK_ONLY",
     });
     expect(scheduleReply).toHaveBeenCalledWith({
@@ -716,7 +834,7 @@ describe("Telegram delivery classification", () => {
       });
       await vi.advanceTimersByTimeAsync(10_000);
 
-      await expect(result).resolves.toEqual({ outcome: "network-error" });
+      await expect(result).resolves.toEqual({ outcome: "timeout" });
       expect(requestSignals[0]?.aborted).toBe(true);
     } finally {
       vi.useRealTimers();

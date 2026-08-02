@@ -442,7 +442,9 @@ function TelegramSendState({
 }
 
 function telegramOperationLabel(operation: string): string {
-  return operation === "NOTIFICATION_DELIVERY" ? "Уведомление" : "Ответ бота";
+  if (operation === "NOTIFICATION_DELIVERY") return "Уведомление";
+  if (operation === "TEST_NOTIFICATION") return "Тестовое уведомление";
+  return "Ответ бота";
 }
 
 function formatDuration(durationMs: number): string {

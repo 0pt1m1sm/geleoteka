@@ -8,6 +8,7 @@ import {
   updateOwnStaffNotificationOptOuts,
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
+import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
@@ -166,6 +167,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
                   <p className="text-sm">
                     Telegram привязан {formatDateTime(personalTelegram.verifiedAt)}
                   </p>
+                  <TelegramTestButton purpose="PERSONAL" />
                   <form action={revokePersonalTelegramLink}>
                     <button type="submit" className="btn btn-secondary text-sm">
                       Отвязать

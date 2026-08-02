@@ -2320,3 +2320,13 @@ model TelegramSendAttempt {
 
   @@index([tenantKey, createdAt])
 }
+
+/// One atomic, server-side cooldown per person pressing a Telegram test
+/// button. It stores no Telegram destination or message data.
+model TelegramTestSendThrottle {
+  tenantKey   String   @default("geleoteka")
+  actorUserId String
+  attemptedAt DateTime @default(now())
+
+  @@id([tenantKey, actorUserId])
+}
