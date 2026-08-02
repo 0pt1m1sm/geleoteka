@@ -47,6 +47,16 @@ export const TELEGRAM_POLL_POISON_ATTEMPT_SPACING_MS = 60_000;
  * Single-flight lease: ровно один drain на bot token в каждый момент. Второй
  * параллельный getUpdates глазами Telegram — это 409 «terminated by other
  * getUpdates request», неотличимый по HTTP-коду от 409 «webhook is active».
- * Срок должен с запасом покрывать худший drain (бюджет + сетевые хвосты).
+ * Срок должен с запасом покрывать худший drain: длинный опрос фонового
+ * воркера (до TELEGRAM_POLL_LONG_POLL_SECONDS) плюс обработка и сетевые
+ * хвосты. Продление идёт перед каждым батчем.
  */
-export const TELEGRAM_POLL_LEASE_MS = 30_000;
+export const TELEGRAM_POLL_LEASE_MS = 60_000;
+
+/**
+ * Длинный опрос фонового воркера: запрос висит на стороне Telegram до этого
+ * срока и возвращается мгновенно при появлении апдейта. Панель и cron
+ * по-прежнему используют короткий опрос (timeout=0) — они живут внутри
+ * HTTP-запросов.
+ */
+export const TELEGRAM_POLL_LONG_POLL_SECONDS = 25;

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: {} }));
 vi.mock("@/lib/staff-notifications/dispatcher", () => ({
   leaseStaffNotificationDeliveries: mocks.lease,

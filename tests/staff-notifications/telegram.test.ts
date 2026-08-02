@@ -291,7 +291,9 @@ describe("Telegram link tokens", () => {
 
     expect(url.searchParams.get("start")).toBeNull();
     expect(rawToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    expect(result.manualCommand).toBe(`/start ${rawToken}`);
+    // В группе privacy mode доставляет боту только адресованные команды —
+    // ручная команда для SHARED обязана нести @имя_бота.
+    expect(result.manualCommand).toBe(`/start@GeleotekaStaffBot ${rawToken}`);
     expect(parseTelegramLinkCommand(result.manualCommand)).toBe(rawToken);
   });
 });

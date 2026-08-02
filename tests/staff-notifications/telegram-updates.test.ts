@@ -593,6 +593,61 @@ describe("drainTelegramUpdates", () => {
     expect(db.row?.nextOffset).toBe(101);
   });
 
+  it("длинный опрос: timeout уходит в тело запроса и урезается остатком бюджета", async () => {
+    const db = new FakePollDb();
+    const { fetchImpl, calls } = fetchScript([updatesResponse([9])]);
+    await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(),
+      budgetMs: 45_000,
+      longPollSeconds: 25,
+    });
+    expect(calls[0].body).toMatchObject({ timeout: 25 });
+
+    // Бюджет мал (4с по умолчанию): на длинное ожидание места нет — опрос
+    // деградирует до короткого, а не рвётся собственным таймаутом.
+    const tight = fetchScript([updatesResponse([])]);
+    await drainTelegramUpdates(new FakePollDb(), tight.fetchImpl, {
+      ...baseOptions(),
+      longPollSeconds: 25,
+    });
+    expect(tight.calls[0].body).toMatchObject({ timeout: 0 });
+  });
+
+  it("тихая диагностика: пустой успех не пишется, успех с апдейтами и провалы — пишутся", async () => {
+    const db = new FakePollDb();
+    await drainTelegramUpdates(db, fetchScript([updatesResponse([])]).fetchImpl, {
+      ...baseOptions(),
+      quietDiagnostics: true,
+    });
+    expect(db.diagnostics).toHaveLength(0);
+
+    await drainTelegramUpdates(db, fetchScript([updatesResponse([70])]).fetchImpl, {
+      ...baseOptions(),
+      force: true,
+      quietDiagnostics: true,
+    });
+    expect(db.diagnostics).toHaveLength(1);
+    expect(db.diagnostics[0]).toMatchObject({ outcome: "SUCCESS" });
+
+    await drainTelegramUpdates(
+      db,
+      fetchScript([new Error("socket hang up")]).fetchImpl,
+      { ...baseOptions(), force: true, quietDiagnostics: true },
+    );
+    expect(db.diagnostics).toHaveLength(2);
+    expect(db.diagnostics[1]).toMatchObject({ errorCode: "TELEGRAM_NETWORK" });
+  });
+
+  it("подавление повторного провала: suppressFailureDiagnostic глушит запись", async () => {
+    const db = new FakePollDb();
+    await drainTelegramUpdates(
+      db,
+      fetchScript([new Error("socket hang up")]).fetchImpl,
+      { ...baseOptions(), suppressFailureDiagnostic: true },
+    );
+    expect(db.diagnostics).toHaveLength(0);
+  });
+
   it("never lets a stale drain rewind the offset", async () => {
     const db = new FakePollDb();
     await db.telegramPollState.upsert({

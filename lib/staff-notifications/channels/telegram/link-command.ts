@@ -8,8 +8,19 @@ export interface TelegramStartCommand {
   isBare: boolean;
 }
 
-export function formatTelegramLinkCommand(rawToken: string): string {
-  return `/start ${rawToken}`;
+/**
+ * botUsername адресует команду конкретному боту: в группах privacy mode
+ * доставляет боту только явно адресованные команды (либо все — если бот
+ * писал последним, на что полагаться нельзя). Для личного чата адресация
+ * не нужна и не добавляется.
+ */
+export function formatTelegramLinkCommand(
+  rawToken: string,
+  botUsername?: string,
+): string {
+  return botUsername
+    ? `/start@${botUsername} ${rawToken}`
+    : `/start ${rawToken}`;
 }
 
 export function parseTelegramLinkCommand(command: string): string | null {

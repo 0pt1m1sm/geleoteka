@@ -75,7 +75,10 @@ export async function createTelegramLinkToken(
       input.purpose === "SHARED"
         ? `https://t.me/${input.botUsername}?startgroup=${rawToken}`
         : `https://t.me/${input.botUsername}?start=${rawToken}`,
-    manualCommand: formatTelegramLinkCommand(rawToken),
+    manualCommand: formatTelegramLinkCommand(
+      rawToken,
+      input.purpose === "SHARED" ? input.botUsername : undefined,
+    ),
     expiresAt,
   };
 }
