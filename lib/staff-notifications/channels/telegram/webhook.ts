@@ -43,12 +43,38 @@ export type TelegramWebhookOutcome =
   | "expired-token"
   | "destination-conflict";
 
+export interface TelegramWebhookReply {
+  chatId: string;
+  text: string;
+}
+
+export type TelegramWebhookReplySender = (
+  reply: TelegramWebhookReply,
+) => Promise<unknown>;
+
+interface TelegramWebhookTransactionResult {
+  outcome: TelegramWebhookOutcome;
+  replyText: string | null;
+}
+
+const LINKED_PERSONAL_REPLY =
+  "Привязка выполнена. Сюда будут приходить уведомления.";
+const LINKED_SHARED_REPLY =
+  "Привязка выполнена. Этот чат настроен как общий получатель уведомлений.";
+const INVALID_LINK_REPLY =
+  "Ссылка недействительна. Получите новую ссылку в личном кабинете.";
+const DESTINATION_CONFLICT_REPLY =
+  "Этот чат уже используется для другой привязки.";
+const BARE_START_REPLY =
+  "Для привязки откройте персональную ссылку в личном кабинете — просто нажать Start недостаточно.";
+
 interface ParsedTelegramUpdate {
   updateId: string;
   chatType: string | null;
   chatId: string | null;
   telegramUserId: string | null;
   rawLinkToken: string | null;
+  isBareStart: boolean;
   migrateToChatId: string | null;
 }
 
@@ -78,16 +104,17 @@ export async function processTelegramWebhookUpdate(
   client: TelegramWebhookDb,
   rawUpdate: unknown,
   now = new Date(),
+  sendReply?: TelegramWebhookReplySender,
 ): Promise<TelegramWebhookOutcome> {
   const update = parseTelegramUpdate(rawUpdate);
   if (!update) return "invalid-update";
 
-  return client.$transaction(async (tx) => {
+  const result = await client.$transaction(async (tx) => {
     const receipt = await tx.telegramUpdateReceipt.createMany({
       data: [{ tenantKey: TENANT_KEY, updateId: update.updateId, processedAt: now }],
       skipDuplicates: true,
     });
-    if (receipt.count === 0) return "duplicate";
+    if (receipt.count === 0) return transactionResult("duplicate");
 
     if (update.chatId && update.migrateToChatId) {
       const migrated = await tx.telegramDestination.updateMany({
@@ -98,7 +125,16 @@ export async function processTelegramWebhookUpdate(
         },
         data: { chatId: update.migrateToChatId },
       });
-      return migrated.count > 0 ? "migrated" : "ignored";
+      return transactionResult(migrated.count > 0 ? "migrated" : "ignored");
+    }
+
+    if (
+      update.chatType === "private" &&
+      update.chatId &&
+      update.telegramUserId &&
+      update.isBareStart
+    ) {
+      return transactionResult("ignored", BARE_START_REPLY);
     }
 
     if (
@@ -107,7 +143,7 @@ export async function processTelegramWebhookUpdate(
       !update.telegramUserId ||
       !update.rawLinkToken
     ) {
-      return "ignored";
+      return transactionResult("ignored");
     }
 
     const token = (await tx.telegramLinkToken.findUnique({
@@ -126,19 +162,21 @@ export async function processTelegramWebhookUpdate(
         createdByUserId: true,
       },
     })) as LinkTokenRow | null;
-    if (!token || !isLinkPurpose(token.purpose)) return "invalid-token";
+    if (!token || !isLinkPurpose(token.purpose)) {
+      return transactionResult("invalid-token", INVALID_LINK_REPLY);
+    }
     if (token.usedAt !== null || token.expiresAt.getTime() <= now.getTime()) {
-      return "expired-token";
+      return transactionResult("expired-token", INVALID_LINK_REPLY);
     }
     if (
       (token.purpose === "PERSONAL" && !token.userId) ||
       (token.purpose === "PERSONAL" && token.userId !== token.createdByUserId) ||
       (token.purpose === "SHARED" && token.userId !== null)
     ) {
-      return "invalid-token";
+      return transactionResult("invalid-token", INVALID_LINK_REPLY);
     }
     if (!chatTypeAllowedForPurpose(update.chatType, token.purpose)) {
-      return "ignored";
+      return transactionResult("ignored");
     }
 
     const lockKey = `${TENANT_KEY}\u0000telegram-link\u0000${token.purpose}\u0000${token.userId ?? "shared"}`;
@@ -153,7 +191,10 @@ export async function processTelegramWebhookUpdate(
       select: { id: true, kind: true, userId: true, chatId: true },
     })) as DestinationRow | null;
     if (chatDestination && !sameLinkTarget(chatDestination, token)) {
-      return "destination-conflict";
+      return transactionResult(
+        "destination-conflict",
+        DESTINATION_CONFLICT_REPLY,
+      );
     }
 
     const existing = (await tx.telegramDestination.findFirst({
@@ -170,7 +211,7 @@ export async function processTelegramWebhookUpdate(
       where: { id: token.createdByUserId },
       select: { id: true, name: true, permissionRole: true },
     })) as AuditActorRow | null;
-    if (!actor) return "invalid-token";
+    if (!actor) return transactionResult("invalid-token", INVALID_LINK_REPLY);
 
     const consumed = await tx.telegramLinkToken.updateMany({
       where: {
@@ -181,7 +222,9 @@ export async function processTelegramWebhookUpdate(
       },
       data: { usedAt: now },
     });
-    if (consumed.count !== 1) return "expired-token";
+    if (consumed.count !== 1) {
+      return transactionResult("expired-token", INVALID_LINK_REPLY);
+    }
 
     const destination = existing
       ? ((await tx.telegramDestination.update({
@@ -225,8 +268,31 @@ export async function processTelegramWebhookUpdate(
       },
     });
 
-    return "linked";
+    return transactionResult(
+      "linked",
+      token.purpose === "PERSONAL" ? LINKED_PERSONAL_REPLY : LINKED_SHARED_REPLY,
+    );
   });
+
+  // Prisma resolves the interactive transaction only after commit. Telegram
+  // HTTP therefore runs after all advisory locks have been released.
+  if (result.replyText && update.chatId && sendReply) {
+    try {
+      await sendReply({ chatId: update.chatId, text: result.replyText });
+    } catch {
+      // The link outcome is durable already. A courtesy reply must never turn
+      // the same Telegram update into a retry or roll back a successful link.
+    }
+  }
+
+  return result.outcome;
+}
+
+function transactionResult(
+  outcome: TelegramWebhookOutcome,
+  replyText: string | null = null,
+): TelegramWebhookTransactionResult {
+  return { outcome, replyText };
 }
 
 function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
@@ -240,6 +306,7 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
   const from = objectValue(message?.from);
   const text = typeof message?.text === "string" ? message.text : "";
   const match = text.match(/^\/start(?:@[A-Za-z0-9_]+)? ([A-Za-z0-9_-]{43})$/);
+  const isBareStart = /^\/start(?:@[A-Za-z0-9_]+)?$/.test(text);
 
   return {
     updateId,
@@ -247,6 +314,7 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
     chatId: integerId(chat?.id),
     telegramUserId: from?.is_bot === true ? null : integerId(from?.id),
     rawLinkToken: match?.[1] ?? null,
+    isBareStart,
     migrateToChatId: integerId(message?.migrate_to_chat_id),
   };
 }

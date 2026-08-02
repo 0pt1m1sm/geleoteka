@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createTelegramChannelAdapter } from "@/lib/staff-notifications/channels/telegram/adapter";
+import {
+  createTelegramChannelAdapter,
+  sendTelegramText,
+} from "@/lib/staff-notifications/channels/telegram/adapter";
 import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
 import { resolveTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
 import {
@@ -198,6 +201,120 @@ describe("Telegram link tokens", () => {
 });
 
 describe("Telegram webhook processing", () => {
+  it("guides a private chat after a bare /start command", async () => {
+    const chatId = 777009990;
+    const fake = new FakeTelegramWebhookDb("S".repeat(43));
+    const sendReply = vi.fn(
+      async (reply: { chatId: string; text: string }) => {
+        expect(fake.transactionActive).toBe(false);
+        expect(reply.chatId).toBe(String(chatId));
+      },
+    );
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 8996,
+          message: {
+            text: "/start",
+            chat: { id: chatId, type: "private" },
+            from: { id: chatId, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("ignored");
+
+    expect(sendReply).toHaveBeenCalledWith({
+      chatId: String(chatId),
+      text: expect.stringMatching(/персональную ссылку.*личном кабинете.*Start/),
+    });
+    expect(sendReply.mock.calls[0]?.[0].text).not.toContain(String(chatId));
+  });
+
+  it("does not reply to a bare /start command in a group", async () => {
+    const fake = new FakeTelegramWebhookDb("T".repeat(43));
+    const sendReply = vi.fn(async () => undefined);
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 8997,
+          message: {
+            text: "/start",
+            chat: { id: -777009997, type: "group" },
+            from: { id: 777009997, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("ignored");
+
+    expect(sendReply).not.toHaveBeenCalled();
+  });
+
+  it("does not reply to arbitrary text in a private chat", async () => {
+    const fake = new FakeTelegramWebhookDb("V".repeat(43));
+    const sendReply = vi.fn(async () => undefined);
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 8998,
+          message: {
+            text: "Как подключить уведомления?",
+            chat: { id: 777009998, type: "private" },
+            from: { id: 777009998, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("ignored");
+
+    expect(sendReply).not.toHaveBeenCalled();
+  });
+
+  it("sends a personal-link confirmation to the same chat after commit", async () => {
+    const rawToken = "LINK_TOKEN_SENTINEL".padEnd(43, "X");
+    const chatId = 777009991;
+    const fake = new FakeTelegramWebhookDb(rawToken);
+    const sendReply = vi.fn(
+      async (reply: { chatId: string; text: string }) => {
+        expect(fake.transactionActive).toBe(false);
+        expect(reply.chatId).toBe(String(chatId));
+      },
+    );
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 8999,
+          message: {
+            text: `/start ${rawToken}`,
+            chat: { id: chatId, type: "private" },
+            from: { id: chatId, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("linked");
+
+    expect(sendReply).toHaveBeenCalledOnce();
+    const replyText = sendReply.mock.calls[0]?.[0].text ?? "";
+    expect(replyText).toContain("Привязка выполнена");
+    expect(replyText).toContain("будут приходить уведомления");
+    expect(replyText).not.toContain(rawToken);
+    expect(replyText).not.toContain(String(chatId));
+  });
+
   it("processes a repeated update_id only once", async () => {
     const rawToken = "A".repeat(43);
     const fake = new FakeTelegramWebhookDb(rawToken);
@@ -232,9 +349,10 @@ describe("Telegram webhook processing", () => {
     expect(fake.destinations).toHaveLength(0);
   });
 
-  it("links a supergroup with a SHARED token and keeps fallback scope by default", async () => {
+  it("links a supergroup with a SHARED token and confirms the shared recipient", async () => {
     const rawToken = "C".repeat(43);
     const fake = new FakeTelegramWebhookDb(rawToken, "SHARED");
+    const sendReply = vi.fn(async () => undefined);
     const update = {
       update_id: 9003,
       message: {
@@ -244,7 +362,9 @@ describe("Telegram webhook processing", () => {
       },
     };
 
-    await expect(processTelegramWebhookUpdate(fake, update, NOW)).resolves.toBe("linked");
+    await expect(
+      processTelegramWebhookUpdate(fake, update, NOW, sendReply),
+    ).resolves.toBe("linked");
     expect(fake.destinations).toHaveLength(1);
     expect(fake.destinations[0]).toMatchObject({
       kind: "SHARED",
@@ -252,6 +372,103 @@ describe("Telegram webhook processing", () => {
       chatId: "-100777003",
       deliveryScope: "FALLBACK_ONLY",
     });
+    expect(sendReply).toHaveBeenCalledWith({
+      chatId: "-100777003",
+      text: expect.stringContaining("общий получатель"),
+    });
+  });
+
+  it.each(["expired", "used"] as const)(
+    "uses the same invalid-link reply for an %s token",
+    async (tokenState) => {
+      const rawToken = tokenState === "expired" ? "E".repeat(43) : "U".repeat(43);
+      const fake = new FakeTelegramWebhookDb(rawToken);
+      if (tokenState === "expired") fake.expireToken();
+      else fake.useToken();
+      const sendReply = vi.fn(async () => undefined);
+
+      await expect(
+        processTelegramWebhookUpdate(
+          fake,
+          {
+            update_id: tokenState === "expired" ? 9005 : 9006,
+            message: {
+              text: `/start ${rawToken}`,
+              chat: { id: 777005, type: "private" },
+              from: { id: 777005, is_bot: false },
+            },
+          },
+          NOW,
+          sendReply,
+        ),
+      ).resolves.toBe("expired-token");
+
+      expect(sendReply).toHaveBeenCalledWith({
+        chatId: "777005",
+        text: "Ссылка недействительна. Получите новую ссылку в личном кабинете.",
+      });
+    },
+  );
+
+  it("explains when the chat is already linked to another destination", async () => {
+    const rawToken = "F".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken);
+    fake.destinations.push({
+      id: "destination_other",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      chatId: "777007",
+    });
+    const sendReply = vi.fn(async () => undefined);
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 9007,
+          message: {
+            text: `/start ${rawToken}`,
+            chat: { id: 777007, type: "private" },
+            from: { id: 777007, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("destination-conflict");
+
+    expect(sendReply).toHaveBeenCalledWith({
+      chatId: "777007",
+      text: "Этот чат уже используется для другой привязки.",
+    });
+  });
+
+  it("keeps a committed link when sending the confirmation fails", async () => {
+    const rawToken = "G".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken);
+    const sendReply = vi.fn(async () => {
+      throw new Error("SEND_FAILURE_SENTINEL");
+    });
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 9008,
+          message: {
+            text: `/start ${rawToken}`,
+            chat: { id: 777008, type: "private" },
+            from: { id: 777008, is_bot: false },
+          },
+        },
+        NOW,
+        sendReply,
+      ),
+    ).resolves.toBe("linked");
+
+    expect(fake.destinations).toHaveLength(1);
+    expect(fake.auditWrites).toBe(1);
   });
 
   it("updates the shared destination on a migrate_to_chat_id service message", async () => {
@@ -281,6 +498,36 @@ describe("Telegram webhook processing", () => {
 });
 
 describe("Telegram delivery classification", () => {
+  it("sends plain text through the shared Bot API path without parse mode", async () => {
+    const fetchMock = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) => {
+        void _input;
+        void _init;
+        return Response.json({ ok: true, result: { message_id: 42 } });
+      },
+    );
+
+    await expect(
+      sendTelegramText(fetchMock, {
+        botToken: `123456:${"A".repeat(32)}`,
+        chatId: "777001",
+        text: "Привязка выполнена.",
+      }),
+    ).resolves.toMatchObject({ outcome: "response" });
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const body = JSON.parse(
+      String(fetchMock.mock.calls[0]?.[1]?.body ?? "null"),
+    ) as Record<string, unknown>;
+    expect(body).toMatchObject({
+      chat_id: "777001",
+      text: "Привязка выполнена.",
+      protect_content: true,
+      link_preview_options: { is_disabled: true },
+    });
+    expect(body).not.toHaveProperty("parse_mode");
+  });
+
   it("performs no HTTP when Telegram is disabled or malformed", async () => {
     const destinationDb = adapterDb();
     const fetchMock = vi.fn<typeof fetch>();
@@ -557,6 +804,7 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
   receipts = new Set<string>();
   destinations: Array<Record<string, unknown>> = [];
   auditWrites = 0;
+  transactionActive = false;
   private token;
 
   constructor(rawToken: string, purpose: "PERSONAL" | "SHARED" = "PERSONAL") {
@@ -573,7 +821,20 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
   }
 
   async $transaction<T>(fn: (tx: never) => Promise<T>): Promise<T> {
-    return fn(this as never);
+    this.transactionActive = true;
+    try {
+      return await fn(this as never);
+    } finally {
+      this.transactionActive = false;
+    }
+  }
+
+  expireToken(): void {
+    this.token.expiresAt = NOW;
+  }
+
+  useToken(): void {
+    this.token.usedAt = new Date(NOW.getTime() - 1);
   }
 
   $queryRaw = async <T>(): Promise<T> => [{ locked: true }] as T;

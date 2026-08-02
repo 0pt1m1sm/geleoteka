@@ -6,6 +6,7 @@ import {
   loadTelegramRuntimeConfig,
 } from "@/lib/staff-notifications/channels/telegram/config";
 import { TELEGRAM_WEBHOOK_SECRET_HEADER } from "@/lib/staff-notifications/channels/telegram/constants";
+import { sendTelegramText } from "@/lib/staff-notifications/channels/telegram/adapter";
 import {
   processTelegramWebhookUpdate,
   type TelegramWebhookDb,
@@ -41,6 +42,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     const outcome = await processTelegramWebhookUpdate(
       db as unknown as TelegramWebhookDb,
       update,
+      new Date(),
+      async ({ chatId, text }) => {
+        try {
+          await sendTelegramText(globalThis.fetch, {
+            botToken: config.botToken,
+            chatId,
+            text,
+          });
+        } catch {
+          // Reply delivery is best-effort and must not change webhook status.
+        }
+      },
     );
     if (outcome === "invalid-update") {
       return NextResponse.json({ error: "invalid update" }, { status: 400 });
@@ -50,4 +63,3 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "webhook failed" }, { status: 500 });
   }
 }
-

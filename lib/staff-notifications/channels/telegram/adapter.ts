@@ -37,6 +37,20 @@ interface TelegramApiResponse {
 
 const REQUEST_TIMEOUT_MS = 10_000;
 
+export interface TelegramTextMessage {
+  botToken: string;
+  chatId: string;
+  text: string;
+}
+
+export type TelegramTextSendResult =
+  | { outcome: "network-error" }
+  | {
+      outcome: "response";
+      response: Response;
+      body: TelegramApiResponse | null;
+    };
+
 export function createTelegramChannelAdapter(
   dependencies: TelegramAdapterDependencies,
 ): StaffNotificationChannelAdapter {
@@ -78,33 +92,16 @@ async function sendTelegramNotification(
     return { outcome: "dead" as const, errorCode: "INVALID_SAFE_PAYLOAD" };
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response: Response;
-  try {
-    // The Bot API requires the credential in the URL. This URL must never be
-    // logged or surfaced in an exception/error response.
-    response = await dependencies.fetch(
-      `https://api.telegram.org/bot${config.botToken}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          chat_id: destination.chatId,
-          text,
-          protect_content: true,
-          link_preview_options: { is_disabled: true },
-        }),
-        signal: controller.signal,
-      },
-    );
-  } catch {
+  const sent = await sendTelegramText(dependencies.fetch, {
+    botToken: config.botToken,
+    chatId: destination.chatId,
+    text,
+  });
+  if (sent.outcome === "network-error") {
     return { outcome: "retry" as const, errorCode: "TELEGRAM_NETWORK" };
-  } finally {
-    clearTimeout(timeout);
   }
 
-  const body = await readTelegramResponse(response);
+  const { response, body } = sent;
   if (response.ok && body?.ok === true) {
     const messageId = body.result?.message_id;
     return {
@@ -172,6 +169,43 @@ async function sendTelegramNotification(
   return {
     outcome: "retry" as const,
     errorCode: status === 401 ? "TELEGRAM_AUTH_REJECTED" : "TELEGRAM_REJECTED",
+  };
+}
+
+export async function sendTelegramText(
+  fetchImpl: typeof fetch,
+  message: TelegramTextMessage,
+): Promise<TelegramTextSendResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let response: Response;
+  try {
+    // The Bot API requires the credential in the URL. This URL must never be
+    // logged or surfaced in an exception/error response.
+    response = await fetchImpl(
+      `https://api.telegram.org/bot${message.botToken}/sendMessage`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          chat_id: message.chatId,
+          text: message.text,
+          protect_content: true,
+          link_preview_options: { is_disabled: true },
+        }),
+        signal: controller.signal,
+      },
+    );
+  } catch {
+    return { outcome: "network-error" };
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  return {
+    outcome: "response",
+    response,
+    body: await readTelegramResponse(response),
   };
 }
 
