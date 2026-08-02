@@ -1,7 +1,7 @@
 # CRM Assignment Implementation Plan
 
 Created: 2026-08-02
-Status: IN_PROGRESS
+Status: VERIFIED
 Mode: auto
 Iterations: 0
 Type: Feature
@@ -19,11 +19,11 @@ Telegram-содержимого — в тексте уведомления мо�
 
 ## Progress Tracking
 
-- [ ] Story 1: Селектор ответственного в форме задачи + валидация в экшене   (Status: PENDING)
-- [ ] Story 2: Менеджер клиента (поле, карточка, приоритет в роутинге «Клиент написал»)   (Status: PENDING)
-- [ ] Story 3: Тип уведомления TASK_ASSIGNED «Задача назначена»   (Status: PENDING)
-- [ ] Story 4: Типы «по максимуму»: USER_LOGIN (вход в платформу), TASK_CREATED (новая задача)   (Status: PENDING)
-- [ ] Story 5: Ревизия аудита: все основные действия пишутся в AuditLog   (Status: PENDING)
+- [x] Story 1: Селектор ответственного в форме задачи + валидация в экшене   (Status: VERIFIED — codex + мои RED-тесты валидации; /api/admin/staff; гейт)
+- [x] Story 2: Менеджер клиента (поле, карточка, приоритет в роутинге «Клиент написал»)   (Status: VERIFIED — миграция 20260802234000, diff чист)
+- [x] Story 3: Тип уведомления TASK_ASSIGNED «Задача назначена»   (Status: VERIFIED — targetOnly, себе не шлётся, политика содержимого тестами)
+- [x] Story 4: Типы «по максимуму»: USER_LOGIN (вход в платформу), TASK_CREATED (новая задача)   (Status: VERIFIED — все 4 метода входа через lib/auth-events; verify-fix: сбой аудита не ломает вход)
+- [x] Story 5: Ревизия аудита: все основные действия пишутся в AuditLog   (Status: VERIFIED — таблица ниже; verify-fix типов inbox-статусов)
 
 ## Implementation Tasks
 
@@ -118,3 +118,12 @@ DoD: таблица «действие → пишется» в PR-описани
 | Повтор dead-letter доставки | `staff_notification.delivery_retry` | `app/actions/staff-notifications.ts` | channel, attempts, error code |
 | Удаление сделки / сметы / автомобиля | `deal.delete`, `estimate.delete`, `vehicle.delete` | соответствующие CRM actions | ids, стадия и агрегаты |
 | Создание заказ-наряда | `repairOrder.create` | `app/actions/repair-orders.ts` | customer/deal id и наличие автомобиля |
+
+## Итог интеграции (verify-фаза Claude)
+
+Реализация codex, PR #71 (squash 7a6c720) поверх хотфикса PR #70.
+Verify-находки: (1) сбой аудита ломал вход — recordSuccessfulLogin
+best-effort; (2) два tsc-разлома — «tsc чист» из отчёта codex не
+подтверждался; (3) тест-сирота @/lib/auth-events — модуль реализован;
+(4) классы багов дня (невалидные Prisma-селекторы, NUL в raw SQL) по
+диффу пакета отсутствуют. Гейт: 501 тест / 63 файла, tsc, lint, build.
