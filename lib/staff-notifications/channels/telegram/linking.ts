@@ -4,6 +4,7 @@ import {
   TELEGRAM_LINK_TOKEN_BYTES,
   TELEGRAM_LINK_TOKEN_TTL_MS,
 } from "@/lib/staff-notifications/channels/telegram/constants";
+import { formatTelegramLinkCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
 import type { TelegramLinkPurpose } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 
@@ -30,6 +31,7 @@ export interface TelegramLinkRequest {
 
 export interface TelegramLinkResult {
   deepLink: string;
+  manualCommand: string;
   expiresAt: Date;
 }
 
@@ -73,6 +75,7 @@ export async function createTelegramLinkToken(
       input.purpose === "SHARED"
         ? `https://t.me/${input.botUsername}?startgroup=${rawToken}`
         : `https://t.me/${input.botUsername}?start=${rawToken}`,
+    manualCommand: formatTelegramLinkCommand(rawToken),
     expiresAt,
   };
 }

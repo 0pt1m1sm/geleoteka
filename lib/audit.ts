@@ -38,6 +38,7 @@ export type AuditAction =
   | "telegram.destination_link"
   | "telegram.destination_unlink"
   | "telegram.destination_scope_change"
+  | "telegram.webhook_reply_failed"
   | "staff_notification.delivery_retry"
   | "deal.delete"
   | "estimate.delete"
@@ -57,6 +58,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "telegram.destination_link": "Привязка Telegram",
   "telegram.destination_unlink": "Отвязка Telegram",
   "telegram.destination_scope_change": "Изменение потока Telegram",
+  "telegram.webhook_reply_failed": "Сбой ответа Telegram-бота",
   "staff_notification.delivery_retry": "Повтор доставки уведомления",
   "deal.delete": "Удаление сделки",
   "estimate.delete": "Удаление сметы",

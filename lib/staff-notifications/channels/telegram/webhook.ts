@@ -1,4 +1,6 @@
 import { hashTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
+import { parseTelegramLinkCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
+import type { TelegramTextSendErrorCode } from "@/lib/staff-notifications/channels/telegram/adapter";
 import { roleLabel } from "@/lib/roles";
 import type { TelegramLinkPurpose } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
@@ -31,6 +33,9 @@ interface TelegramWebhookTx {
 
 export interface TelegramWebhookDb {
   $transaction<T>(fn: (tx: TelegramWebhookTx) => Promise<T>): Promise<T>;
+  auditLog: {
+    create(args: QueryArgs): Promise<unknown>;
+  };
 }
 
 export type TelegramWebhookOutcome =
@@ -48,9 +53,18 @@ export interface TelegramWebhookReply {
   text: string;
 }
 
+export interface TelegramWebhookReplyFailure {
+  errorCode: TelegramTextSendErrorCode;
+  httpStatus: number | null;
+}
+
 export type TelegramWebhookReplySender = (
   reply: TelegramWebhookReply,
-) => Promise<unknown>;
+) => Promise<TelegramWebhookReplyFailure | void>;
+
+export type TelegramWebhookReplyScheduler = (
+  reply: TelegramWebhookReply,
+) => void;
 
 interface TelegramWebhookTransactionResult {
   outcome: TelegramWebhookOutcome;
@@ -66,7 +80,7 @@ const INVALID_LINK_REPLY =
 const DESTINATION_CONFLICT_REPLY =
   "Этот чат уже используется для другой привязки.";
 const BARE_START_REPLY =
-  "Для привязки откройте персональную ссылку в личном кабинете — просто нажать Start недостаточно.";
+  "Для привязки вернитесь в личный кабинет: откройте ссылку заново или отправьте боту указанную там команду привязки.";
 
 interface ParsedTelegramUpdate {
   updateId: string;
@@ -74,6 +88,7 @@ interface ParsedTelegramUpdate {
   chatId: string | null;
   telegramUserId: string | null;
   rawLinkToken: string | null;
+  isStartCommand: boolean;
   isBareStart: boolean;
   migrateToChatId: string | null;
 }
@@ -104,7 +119,7 @@ export async function processTelegramWebhookUpdate(
   client: TelegramWebhookDb,
   rawUpdate: unknown,
   now = new Date(),
-  sendReply?: TelegramWebhookReplySender,
+  scheduleReply?: TelegramWebhookReplyScheduler,
 ): Promise<TelegramWebhookOutcome> {
   const update = parseTelegramUpdate(rawUpdate);
   if (!update) return "invalid-update";
@@ -128,13 +143,17 @@ export async function processTelegramWebhookUpdate(
       return transactionResult(migrated.count > 0 ? "migrated" : "ignored");
     }
 
+    if (update.chatId && update.telegramUserId && update.isBareStart) {
+      return transactionResult("ignored", BARE_START_REPLY);
+    }
+
     if (
-      update.chatType === "private" &&
       update.chatId &&
       update.telegramUserId &&
-      update.isBareStart
+      update.isStartCommand &&
+      !update.rawLinkToken
     ) {
-      return transactionResult("ignored", BARE_START_REPLY);
+      return transactionResult("invalid-token", INVALID_LINK_REPLY);
     }
 
     if (
@@ -176,7 +195,7 @@ export async function processTelegramWebhookUpdate(
       return transactionResult("invalid-token", INVALID_LINK_REPLY);
     }
     if (!chatTypeAllowedForPurpose(update.chatType, token.purpose)) {
-      return transactionResult("ignored");
+      return transactionResult("ignored", INVALID_LINK_REPLY);
     }
 
     const lockKey = `${TENANT_KEY}\u0000telegram-link\u0000${token.purpose}\u0000${token.userId ?? "shared"}`;
@@ -274,18 +293,30 @@ export async function processTelegramWebhookUpdate(
     );
   });
 
-  // Prisma resolves the interactive transaction only after commit. Telegram
-  // HTTP therefore runs after all advisory locks have been released.
-  if (result.replyText && update.chatId && sendReply) {
-    try {
-      await sendReply({ chatId: update.chatId, text: result.replyText });
-    } catch {
-      // The link outcome is durable already. A courtesy reply must never turn
-      // the same Telegram update into a retry or roll back a successful link.
-    }
+  // Prisma resolves the interactive transaction only after commit. The route
+  // schedules this reply for post-response delivery; no provider I/O belongs
+  // to the transaction or the webhook response path.
+  if (result.replyText && update.chatId && scheduleReply) {
+    scheduleReply({ chatId: update.chatId, text: result.replyText });
   }
 
   return result.outcome;
+}
+
+export async function deliverTelegramWebhookReply(
+  client: TelegramWebhookDb,
+  reply: TelegramWebhookReply,
+  sendReply: TelegramWebhookReplySender,
+): Promise<void> {
+  let failure: TelegramWebhookReplyFailure | null = null;
+  try {
+    failure = (await sendReply(reply)) ?? null;
+  } catch {
+    failure = { errorCode: "TELEGRAM_NETWORK", httpStatus: null };
+  }
+  if (failure) {
+    await recordTelegramReplyFailure(client, failure);
+  }
 }
 
 function transactionResult(
@@ -305,7 +336,8 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
   const chat = objectValue(message?.chat);
   const from = objectValue(message?.from);
   const text = typeof message?.text === "string" ? message.text : "";
-  const match = text.match(/^\/start(?:@[A-Za-z0-9_]+)? ([A-Za-z0-9_-]{43})$/);
+  const rawLinkToken = parseTelegramLinkCommand(text);
+  const isStartCommand = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s.*)?$/s.test(text);
   const isBareStart = /^\/start(?:@[A-Za-z0-9_]+)?$/.test(text);
 
   return {
@@ -313,10 +345,41 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
     chatType: typeof chat?.type === "string" ? chat.type : null,
     chatId: integerId(chat?.id),
     telegramUserId: from?.is_bot === true ? null : integerId(from?.id),
-    rawLinkToken: match?.[1] ?? null,
+    rawLinkToken,
+    isStartCommand,
     isBareStart,
     migrateToChatId: integerId(message?.migrate_to_chat_id),
   };
+}
+
+async function recordTelegramReplyFailure(
+  client: TelegramWebhookDb,
+  failure: TelegramWebhookReplyFailure,
+): Promise<void> {
+  const metadata = {
+    errorCode: failure.errorCode,
+    httpStatus: failure.httpStatus,
+  };
+  try {
+    await client.auditLog.create({
+      data: {
+        tenantKey: TENANT_KEY,
+        actorUserId: null,
+        actorName: "Система",
+        actorRole: "Система",
+        action: "telegram.webhook_reply_failed",
+        targetType: "TelegramWebhookReply",
+        targetId: null,
+        targetLabel: null,
+        metadata,
+        ip: null,
+      },
+    });
+  } catch {
+    // The durable business outcome and webhook 200 stay independent from the
+    // diagnostic write. This fallback also contains only the safe fields.
+    console.error("telegram.webhook_reply_failed", metadata);
+  }
 }
 
 function objectValue(value: unknown): Record<string, unknown> | null {

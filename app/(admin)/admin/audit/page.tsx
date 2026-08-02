@@ -71,6 +71,10 @@ function summarise(action: string, metadata: unknown): string | null {
       const ro = Number(m.detachedRepairOrders ?? 0);
       return ro > 0 ? `отвязано заказ-нарядов: ${ro}` : null;
     }
+    case "telegram.webhook_reply_failed":
+      return `Код: ${String(m.errorCode ?? "?")} · HTTP: ${
+        m.httpStatus === null ? "нет ответа" : String(m.httpStatus ?? "?")
+      }`;
     default:
       return null;
   }

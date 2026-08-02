@@ -51,6 +51,28 @@ export type TelegramTextSendResult =
       body: TelegramApiResponse | null;
     };
 
+export type TelegramTextSendErrorCode =
+  | "TELEGRAM_NETWORK"
+  | "TELEGRAM_CHAT_MIGRATED"
+  | "TELEGRAM_RATE_LIMITED"
+  | "TELEGRAM_CHAT_NOT_FOUND"
+  | "TELEGRAM_BOT_BLOCKED"
+  | "TELEGRAM_AUTH_REJECTED"
+  | "TELEGRAM_REJECTED";
+
+export type NormalizedTelegramTextSendResult =
+  | {
+      outcome: "sent";
+      providerMessageId: string | null;
+    }
+  | {
+      outcome: "failed";
+      errorCode: TelegramTextSendErrorCode;
+      httpStatus: number | null;
+      retryAfterMs?: number;
+      migratedChatId?: string;
+    };
+
 export function createTelegramChannelAdapter(
   dependencies: TelegramAdapterDependencies,
 ): StaffNotificationChannelAdapter {
@@ -97,57 +119,45 @@ async function sendTelegramNotification(
     chatId: destination.chatId,
     text,
   });
-  if (sent.outcome === "network-error") {
-    return { outcome: "retry" as const, errorCode: "TELEGRAM_NETWORK" };
-  }
-
-  const { response, body } = sent;
-  if (response.ok && body?.ok === true) {
-    const messageId = body.result?.message_id;
+  const normalized = normalizeTelegramTextSendResult(sent);
+  if (normalized.outcome === "sent") {
     return {
       outcome: "sent" as const,
-      providerMessageId:
-        typeof messageId === "number" || typeof messageId === "string"
-          ? String(messageId)
-          : null,
+      providerMessageId: normalized.providerMessageId,
     };
   }
 
-  const status = body?.error_code ?? response.status;
-  const description = body?.description?.toLowerCase() ?? "";
-  const migratedChatId = telegramIntegerId(body?.parameters?.migrate_to_chat_id);
-  if (status === 400 && migratedChatId) {
+  if (
+    normalized.errorCode === "TELEGRAM_CHAT_MIGRATED" &&
+    normalized.migratedChatId
+  ) {
     await dependencies.db.telegramDestination.updateMany({
       where: {
         tenantKey: TENANT_KEY,
         id: destination.id,
         chatId: destination.chatId,
       },
-      data: { chatId: migratedChatId },
+      data: { chatId: normalized.migratedChatId },
     });
     return {
       outcome: "retry" as const,
-      errorCode: "TELEGRAM_CHAT_MIGRATED",
+      errorCode: normalized.errorCode,
     };
   }
-  if (status === 429) {
-    const retryAfterSeconds = body?.parameters?.retry_after;
-    const retryAfterMs =
-      typeof retryAfterSeconds === "number" &&
-      Number.isFinite(retryAfterSeconds) &&
-      retryAfterSeconds > 0
-        ? Math.ceil(retryAfterSeconds * 1000)
-        : undefined;
+  if (normalized.errorCode === "TELEGRAM_RATE_LIMITED") {
     return {
       outcome: "retry" as const,
-      errorCode: "TELEGRAM_RATE_LIMITED",
-      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+      errorCode: normalized.errorCode,
+      ...(normalized.retryAfterMs === undefined
+        ? {}
+        : { retryAfterMs: normalized.retryAfterMs }),
     };
   }
 
-  const chatNotFound = status === 400 && description.includes("chat not found");
-  const botBlocked = status === 403 && description.includes("bot was blocked");
-  if (chatNotFound || botBlocked) {
+  if (
+    normalized.errorCode === "TELEGRAM_CHAT_NOT_FOUND" ||
+    normalized.errorCode === "TELEGRAM_BOT_BLOCKED"
+  ) {
     await dependencies.db.telegramDestination.updateMany({
       where: {
         tenantKey: TENANT_KEY,
@@ -162,13 +172,89 @@ async function sendTelegramNotification(
     });
     return {
       outcome: "dead" as const,
-      errorCode: chatNotFound ? "TELEGRAM_CHAT_NOT_FOUND" : "TELEGRAM_BOT_BLOCKED",
+      errorCode: normalized.errorCode,
     };
   }
 
   return {
     outcome: "retry" as const,
-    errorCode: status === 401 ? "TELEGRAM_AUTH_REJECTED" : "TELEGRAM_REJECTED",
+    errorCode: normalized.errorCode,
+  };
+}
+
+/**
+ * Turn every Bot API result into the same closed, secret-free classification.
+ * Notification delivery and webhook courtesy replies must not invent separate
+ * interpretations of the provider response.
+ */
+export function normalizeTelegramTextSendResult(
+  sent: TelegramTextSendResult,
+): NormalizedTelegramTextSendResult {
+  if (sent.outcome === "network-error") {
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_NETWORK",
+      httpStatus: null,
+    };
+  }
+
+  const { response, body } = sent;
+  if (response.ok && body?.ok === true) {
+    const messageId = body.result?.message_id;
+    return {
+      outcome: "sent",
+      providerMessageId:
+        typeof messageId === "number" || typeof messageId === "string"
+          ? String(messageId)
+          : null,
+    };
+  }
+
+  const providerStatus = body?.error_code ?? response.status;
+  const description = body?.description?.toLowerCase() ?? "";
+  const migratedChatId = telegramIntegerId(body?.parameters?.migrate_to_chat_id);
+  if (providerStatus === 400 && migratedChatId) {
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_CHAT_MIGRATED",
+      httpStatus: response.status,
+      migratedChatId,
+    };
+  }
+  if (providerStatus === 429) {
+    const retryAfterSeconds = body?.parameters?.retry_after;
+    const retryAfterMs =
+      typeof retryAfterSeconds === "number" &&
+      Number.isFinite(retryAfterSeconds) &&
+      retryAfterSeconds > 0
+        ? Math.ceil(retryAfterSeconds * 1000)
+        : undefined;
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_RATE_LIMITED",
+      httpStatus: response.status,
+      ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+    };
+  }
+  if (providerStatus === 400 && description.includes("chat not found")) {
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_CHAT_NOT_FOUND",
+      httpStatus: response.status,
+    };
+  }
+  if (providerStatus === 403 && description.includes("bot was blocked")) {
+    return {
+      outcome: "failed",
+      errorCode: "TELEGRAM_BOT_BLOCKED",
+      httpStatus: response.status,
+    };
+  }
+  return {
+    outcome: "failed",
+    errorCode:
+      providerStatus === 401 ? "TELEGRAM_AUTH_REJECTED" : "TELEGRAM_REJECTED",
+    httpStatus: response.status,
   };
 }
 
@@ -178,11 +264,10 @@ export async function sendTelegramText(
 ): Promise<TelegramTextSendResult> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  let response: Response;
   try {
     // The Bot API requires the credential in the URL. This URL must never be
     // logged or surfaced in an exception/error response.
-    response = await fetchImpl(
+    const response = await fetchImpl(
       `https://api.telegram.org/bot${message.botToken}/sendMessage`,
       {
         method: "POST",
@@ -196,17 +281,16 @@ export async function sendTelegramText(
         signal: controller.signal,
       },
     );
+    const body = await readTelegramResponse(response);
+    if (controller.signal.aborted) {
+      return { outcome: "network-error" };
+    }
+    return { outcome: "response", response, body };
   } catch {
     return { outcome: "network-error" };
   } finally {
     clearTimeout(timeout);
   }
-
-  return {
-    outcome: "response",
-    response,
-    body: await readTelegramResponse(response),
-  };
 }
 
 function telegramIntegerId(value: unknown): string | null {
