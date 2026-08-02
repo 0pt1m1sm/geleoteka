@@ -1,10 +1,10 @@
+import bcrypt from "bcryptjs";
 import { describe, expect, it } from "vitest";
 
 import {
   PASSWORD_RESET_MAX_FAILED_ATTEMPTS,
   PASSWORD_RESET_TTL_MS,
   confirmPasswordResetCode,
-  hashPasswordResetCode,
   issuePasswordResetCode,
   type PasswordResetDb,
   type PasswordResetTx,
@@ -18,7 +18,7 @@ const NEW_PASSWORD_HASH = "new-password-hash";
 interface ResetRow {
   id: string;
   userId: string;
-  codeHash: string;
+  codeVerifier: string;
   failedAttempts: number;
   expiresAt: Date;
   usedAt: Date | null;
@@ -34,7 +34,7 @@ interface UserRow {
 interface ResetWhere {
   id?: string;
   userId?: string;
-  codeHash?: string;
+  codeVerifier?: string;
   usedAt?: null;
   createdAt?: { gt: Date };
   expiresAt?: { gt: Date };
@@ -89,6 +89,18 @@ class FakePasswordResetDb implements PasswordResetDb {
               }
             : null;
         },
+        findMany: async (args: Record<string, unknown>) => {
+          const where = args.where as ResetWhere;
+          return this.resets
+            .filter((row) => this.matches(row, where))
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            .map((row) => ({
+              id: row.id,
+              codeVerifier: row.codeVerifier,
+              createdAt: row.createdAt,
+              failedAttempts: row.failedAttempts,
+            }));
+        },
         updateMany: async (args: Record<string, unknown>) => {
           const where = args.where as ResetWhere;
           const data = args.data as {
@@ -96,7 +108,7 @@ class FakePasswordResetDb implements PasswordResetDb {
             failedAttempts?: number | { increment: number };
           };
 
-          if (where.codeHash !== undefined && data.usedAt !== undefined) {
+          if (where.codeVerifier !== undefined && data.usedAt !== undefined) {
             await this.beforeConfirmationCompareAndSwap?.();
           }
 
@@ -148,7 +160,8 @@ class FakePasswordResetDb implements PasswordResetDb {
     return (
       (where.id === undefined || row.id === where.id) &&
       (where.userId === undefined || row.userId === where.userId) &&
-      (where.codeHash === undefined || row.codeHash === where.codeHash) &&
+      (where.codeVerifier === undefined ||
+        row.codeVerifier === where.codeVerifier) &&
       (where.usedAt === undefined || row.usedAt === where.usedAt) &&
       (where.createdAt === undefined || row.createdAt > where.createdAt.gt) &&
       (where.expiresAt === undefined || row.expiresAt > where.expiresAt.gt) &&
@@ -220,16 +233,19 @@ describe("password reset codes", () => {
     expect(fake.users.get("user_1")?.passwordHash).toBe(ORIGINAL_PASSWORD_HASH);
   });
 
-  it("persists only the SHA-256 digest, never the SMS code", async () => {
+  it("persists only a bcrypt verifier, never the SMS code", async () => {
     const fake = new FakePasswordResetDb();
     const code = await issue(fake);
     const row = fake.resets[0];
 
     expect(code).toMatch(/^\d{6}$/);
-    expect(row?.codeHash).toBe(hashPasswordResetCode(code));
-    expect(row?.codeHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(row?.codeVerifier).toMatch(/^\$2/);
+    expect(row?.codeVerifier).toHaveLength(60);
+    await expect(bcrypt.compare(code, row?.codeVerifier ?? "")).resolves.toBe(
+      true,
+    );
     expect(row).not.toHaveProperty("code");
-    expect(JSON.stringify(fake.resets)).not.toContain(code);
+    expect(Object.values(row ?? {})).not.toContain(code);
   });
 
   it("keeps the valid code unusable after five failed attempts", async () => {

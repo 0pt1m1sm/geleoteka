@@ -579,7 +579,7 @@ model SupplierProfile {
 model PasswordReset {
   id             String    @id @default(cuid())
   userId         String
-  codeHash       String    @db.VarChar(64)
+  codeVerifier   String    @db.VarChar(60)
   failedAttempts Int       @default(0)
   expiresAt      DateTime
   usedAt         DateTime?
@@ -587,8 +587,7 @@ model PasswordReset {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
-  @@index([userId, codeHash])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 /// Short-lived, one-time email verification token. The raw token is delivered

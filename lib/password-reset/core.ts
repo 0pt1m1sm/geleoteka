@@ -1,4 +1,6 @@
-import { createHash, randomInt } from "node:crypto";
+import { randomInt } from "node:crypto";
+
+import bcrypt from "bcryptjs";
 
 export const PASSWORD_RESET_TTL_MS = 15 * 60 * 1000;
 export const PASSWORD_RESET_RESEND_COOLDOWN_MS = 60 * 1000;
@@ -12,9 +14,14 @@ interface PasswordResetRow {
   failedAttempts: number;
 }
 
+interface PasswordResetCandidate extends PasswordResetRow {
+  codeVerifier: string;
+}
+
 export interface PasswordResetTx {
   passwordReset: {
     findFirst(args: QueryArgs): Promise<PasswordResetRow | null>;
+    findMany(args: QueryArgs): Promise<PasswordResetCandidate[]>;
     updateMany(args: QueryArgs): Promise<{ count: number }>;
     create(args: QueryArgs): Promise<unknown>;
   };
@@ -39,7 +46,7 @@ export interface IssuePasswordResetInput {
   now?: Date;
 }
 
-/** Generate six SMS digits and persist only their SHA-256 digest. */
+/** Generate six SMS digits and persist only a cost-12 bcrypt verifier. */
 export async function issuePasswordResetCode(
   client: PasswordResetDb,
   input: IssuePasswordResetInput,
@@ -48,7 +55,6 @@ export async function issuePasswordResetCode(
 
   const now = input.now ?? new Date();
   const code = randomInt(100_000, 1_000_000).toString();
-  const codeHash = hashPasswordResetCode(code);
   const expiresAt = new Date(now.getTime() + PASSWORD_RESET_TTL_MS);
   const cooldownStartedAt = new Date(
     now.getTime() - PASSWORD_RESET_RESEND_COOLDOWN_MS,
@@ -74,6 +80,8 @@ export async function issuePasswordResetCode(
           };
         }
 
+        const codeVerifier = await createPasswordResetCodeVerifier(code);
+
         // Only the newest SMS remains usable, so the attempt budget cannot be
         // multiplied by accumulating several live codes for one account.
         await tx.passwordReset.updateMany({
@@ -83,7 +91,7 @@ export async function issuePasswordResetCode(
         await tx.passwordReset.create({
           data: {
             userId: input.userId,
-            codeHash,
+            codeVerifier,
             failedAttempts: 0,
             expiresAt,
             createdAt: now,
@@ -129,20 +137,31 @@ export async function confirmPasswordResetCode(
   }
 
   const now = input.now ?? new Date();
-  const codeHash = hashPasswordResetCode(input.code);
 
   return client.$transaction(async (tx) => {
-    const reset = await tx.passwordReset.findFirst({
+    const activeResets = await tx.passwordReset.findMany({
       where: {
         userId: input.userId,
-        codeHash,
         usedAt: null,
         expiresAt: { gt: now },
         failedAttempts: { lt: PASSWORD_RESET_MAX_FAILED_ATTEMPTS },
       },
       orderBy: { createdAt: "desc" },
-      select: { id: true, createdAt: true, failedAttempts: true },
+      select: {
+        id: true,
+        codeVerifier: true,
+        createdAt: true,
+        failedAttempts: true,
+      },
     });
+
+    let reset: PasswordResetCandidate | undefined;
+    for (const candidate of activeResets) {
+      if (await bcrypt.compare(input.code, candidate.codeVerifier)) {
+        reset = candidate;
+        break;
+      }
+    }
 
     if (!reset) {
       await recordFailedAttempt(tx, input.userId, now);
@@ -153,7 +172,7 @@ export async function confirmPasswordResetCode(
       where: {
         id: reset.id,
         userId: input.userId,
-        codeHash,
+        codeVerifier: reset.codeVerifier,
         usedAt: null,
         expiresAt: { gt: now },
         failedAttempts: { lt: PASSWORD_RESET_MAX_FAILED_ATTEMPTS },
@@ -175,8 +194,8 @@ export async function confirmPasswordResetCode(
   });
 }
 
-export function hashPasswordResetCode(code: string): string {
-  return createHash("sha256").update(code, "utf8").digest("hex");
+export function createPasswordResetCodeVerifier(code: string): Promise<string> {
+  return bcrypt.hash(code, 12);
 }
 
 async function recordFailedAttempt(
