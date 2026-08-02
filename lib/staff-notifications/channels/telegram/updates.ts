@@ -291,7 +291,17 @@ async function runDrainLoop(
       const updateId = readUpdateId(update);
       try {
         await options.processUpdate(update);
-      } catch {
+      } catch (error) {
+        // Безопасная проекция причины (класс + код Prisma, БЕЗ сообщения —
+        // оно может содержать значения): без этого ядовитый апдейт невидим
+        // в логах и его причину не найти.
+        console.error("telegram.update_processing_failed", {
+          name: error instanceof Error ? error.constructor.name : typeof error,
+          code:
+            typeof (error as { code?: unknown } | null)?.code === "string"
+              ? (error as { code: string }).code
+              : null,
+        });
         // Confirm what we DID process, then surface the failure: advancing
         // past a failed update would silently drop it, and not advancing at
         // all would re-run the already-processed prefix forever.
