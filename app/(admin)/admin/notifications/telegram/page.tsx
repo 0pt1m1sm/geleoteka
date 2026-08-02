@@ -4,7 +4,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import {
-  revokePersonalTelegramLink,
   revokeSharedTelegramLink,
   setSharedTelegramDeliveryScope,
 } from "@/app/actions/staff-notifications";
@@ -26,44 +25,28 @@ interface DestinationStatus {
 export default async function TelegramNotificationsPage() {
   const session = await getSession();
   if (!session) redirect("/login");
-  if (!(await roleHasPermission(session.permissionRole, "notifications.view"))) redirect("/");
+  if (!(await roleHasPermission(session.permissionRole, "notifications.manage"))) redirect("/");
 
-  const canManage = await roleHasPermission(
-    session.permissionRole,
-    "notifications.manage",
-  );
-  const [config, personal, shared] = await Promise.all([
+  const [config, shared] = await Promise.all([
     loadTelegramRuntimeConfig(),
     db.telegramDestination.findFirst({
       where: {
         tenantKey: TENANT_KEY,
-        kind: "PERSONAL",
-        userId: session.id,
+        kind: "SHARED",
+        userId: null,
         isActive: true,
         disabledAt: null,
       },
+      orderBy: { verifiedAt: "desc" },
       select: { id: true, verifiedAt: true, deliveryScope: true },
     }) as Promise<DestinationStatus | null>,
-    canManage
-      ? (db.telegramDestination.findFirst({
-          where: {
-            tenantKey: TENANT_KEY,
-            kind: "SHARED",
-            userId: null,
-            isActive: true,
-            disabledAt: null,
-          },
-          orderBy: { verifiedAt: "desc" },
-          select: { id: true, verifiedAt: true, deliveryScope: true },
-        }) as Promise<DestinationStatus | null>)
-      : Promise.resolve(null),
   ]);
 
   return (
     <div>
       <PageHeader
         eyebrow="Уведомления · Telegram"
-        title="Привязка Telegram"
+        title="Общий получатель"
         description="chat_id приходит только от проверенного webhook и никогда не показывается в интерфейсе."
         actions={
           <Link href="/admin/notifications" className="btn btn-secondary text-sm">
@@ -72,75 +55,52 @@ export default async function TelegramNotificationsPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="max-w-2xl">
         <Card>
-          <h2 className="text-base font-semibold">Личные уведомления</h2>
+          <h2 className="text-base font-semibold">Общие уведомления</h2>
           <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-            Событие назначенной сделки отправляется лично её владельцу, если привязка активна.
+            Рабочая группа может получать только события без подходящего владельца или весь поток, не отменяя личные уведомления менеджеров.
           </p>
+          <Alert variant="info" className="mt-4">
+            В группе имя клиента и номер сделки увидят все участники — в том числе те, кого добавят позже.
+          </Alert>
           <div className="mt-4">
-            {personal ? (
+            {shared ? (
               <div className="space-y-3">
-                <p className="text-sm">Привязано {formatDateTime(personal.verifiedAt)}</p>
-                <form action={revokePersonalTelegramLink}>
+                <p className="text-sm">Привязано {formatDateTime(shared.verifiedAt)}</p>
+                <form
+                  action={setSharedTelegramDeliveryScope.bind(null, shared.id)}
+                  className="space-y-2"
+                >
+                  <label htmlFor="telegram-delivery-scope" className="block text-sm font-medium">
+                    Какие события отправлять
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      id="telegram-delivery-scope"
+                      name="deliveryScope"
+                      defaultValue={shared.deliveryScope}
+                      className="input w-auto"
+                    >
+                      <option value="FALLBACK_ONLY">Только без подходящего владельца</option>
+                      <option value="ALL_EVENTS">Все события</option>
+                    </select>
+                    <button type="submit" className="btn btn-primary text-sm">
+                      Сохранить
+                    </button>
+                  </div>
+                </form>
+                <form action={revokeSharedTelegramLink}>
                   <button type="submit" className="btn btn-secondary text-sm">
                     Отвязать
                   </button>
                 </form>
               </div>
             ) : (
-              <TelegramLinkPanel purpose="PERSONAL" configured={config.enabled} />
+              <TelegramLinkPanel purpose="SHARED" configured={config.enabled} />
             )}
           </div>
         </Card>
-
-        {canManage ? (
-          <Card>
-            <h2 className="text-base font-semibold">Общие уведомления</h2>
-            <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-              Рабочая группа может получать только события без подходящего владельца или весь поток, не отменяя личные уведомления менеджеров.
-            </p>
-            <Alert variant="info" className="mt-4">
-              В группе имя клиента и номер сделки увидят все участники — в том числе те, кого добавят позже.
-            </Alert>
-            <div className="mt-4">
-              {shared ? (
-                <div className="space-y-3">
-                  <p className="text-sm">Привязано {formatDateTime(shared.verifiedAt)}</p>
-                  <form
-                    action={setSharedTelegramDeliveryScope.bind(null, shared.id)}
-                    className="space-y-2"
-                  >
-                    <label htmlFor="telegram-delivery-scope" className="block text-sm font-medium">
-                      Какие события отправлять
-                    </label>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        id="telegram-delivery-scope"
-                        name="deliveryScope"
-                        defaultValue={shared.deliveryScope}
-                        className="input w-auto"
-                      >
-                        <option value="FALLBACK_ONLY">Только без подходящего владельца</option>
-                        <option value="ALL_EVENTS">Все события</option>
-                      </select>
-                      <button type="submit" className="btn btn-primary text-sm">
-                        Сохранить
-                      </button>
-                    </div>
-                  </form>
-                  <form action={revokeSharedTelegramLink}>
-                    <button type="submit" className="btn btn-secondary text-sm">
-                      Отвязать
-                    </button>
-                  </form>
-                </div>
-              ) : (
-                <TelegramLinkPanel purpose="SHARED" configured={config.enabled} />
-              )}
-            </div>
-          </Card>
-        ) : null}
       </div>
     </div>
   );

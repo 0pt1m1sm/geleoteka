@@ -16,6 +16,7 @@ import {
   selectStaffNotificationRecipients,
   type StaffNotificationRouterTx,
 } from "@/lib/staff-notifications/router";
+import { staffNotificationTypesForPermissions } from "@/lib/staff-notifications/preferences";
 import type { StaffNotificationEventRecord } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
 
@@ -119,25 +120,41 @@ describe("safe staff notification action URLs", () => {
 });
 
 describe("staff notification router", () => {
+  it("shows profile categories only for effective notification and domain rights", () => {
+    expect(
+      staffNotificationTypesForPermissions(
+        new Set(["notifications.view", "parts.manage"]),
+      ),
+    ).toEqual(["PARTS_ORDER_CREATED"]);
+    expect(staffNotificationTypesForPermissions(new Set(["parts.manage"]))).toEqual([]);
+  });
+
   it("requires both notifications.view and the event domain permission", () => {
     expect(
       selectStaffNotificationRecipients(
-        { targetUserId: "owner", fallbackPermission: "crm.manage" },
+        {
+          type: "INBOUND_CUSTOMER_MESSAGE",
+          targetUserId: "owner",
+          fallbackPermission: "crm.manage",
+        },
         [
           {
             userId: "owner",
             canViewNotifications: true,
             permissions: new Set(["notifications.view"]),
+            disabledEventTypes: new Set(),
           },
           {
             userId: "crm_without_feed",
             canViewNotifications: false,
             permissions: new Set(["crm.manage"]),
+            disabledEventTypes: new Set(),
           },
           {
             userId: "eligible_fallback",
             canViewNotifications: true,
             permissions: new Set(["notifications.view", "crm.manage"]),
+            disabledEventTypes: new Set(),
           },
         ],
       ),
@@ -177,21 +194,119 @@ describe("staff notification router", () => {
   it("does not route PARTS_ORDER_CREATED to staff without parts.manage", () => {
     expect(
       selectStaffNotificationRecipients(
-        { targetUserId: null, fallbackPermission: "parts.manage" },
+        {
+          type: "PARTS_ORDER_CREATED",
+          targetUserId: null,
+          fallbackPermission: "parts.manage",
+        },
         [
           {
             userId: "crm_manager",
             canViewNotifications: true,
             permissions: new Set(["notifications.view", "crm.manage"]),
+            disabledEventTypes: new Set(),
           },
           {
             userId: "parts_manager",
             canViewNotifications: true,
             permissions: new Set(["notifications.view", "parts.manage"]),
+            disabledEventTypes: new Set(),
           },
         ],
       ),
     ).toEqual(["parts_manager"]);
+  });
+
+  it("lets a personal opt-out suppress one employee without suppressing the others", async () => {
+    const receiptCreateMany = vi.fn(async () => ({ count: 1 }));
+    const deliveryCreateMany = vi.fn(async () => ({ count: 1 }));
+    const client: StaffNotificationRouterTx = {
+      staffNotificationReceipt: { createMany: receiptCreateMany },
+      staffNotificationDelivery: { createMany: deliveryCreateMany },
+      staffNotificationEvent: { update: vi.fn(async () => ({})) },
+    };
+
+    const result = await routeStaffNotificationEvent(client, {
+      event: { ...eventRecord(), targetUserId: null },
+      candidates: [
+        {
+          userId: "manager_opted_out",
+          canViewNotifications: true,
+          permissions: new Set(["notifications.view", "crm.manage"]),
+          disabledEventTypes: new Set(["INBOUND_CUSTOMER_MESSAGE"]),
+        },
+        {
+          userId: "manager_enabled",
+          canViewNotifications: true,
+          permissions: new Set(["notifications.view", "crm.manage"]),
+          disabledEventTypes: new Set(),
+        },
+      ],
+      destinations: [
+        {
+          recipientUserId: "manager_opted_out",
+          channel: "TELEGRAM",
+          destinationKey: "telegram_opted_out",
+        },
+        {
+          recipientUserId: "manager_enabled",
+          channel: "TELEGRAM",
+          destinationKey: "telegram_enabled",
+        },
+      ],
+    });
+
+    expect(result.recipientUserIds).toEqual(["manager_enabled"]);
+    expect(receiptCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ userId: "manager_enabled" })],
+      }),
+    );
+    expect(deliveryCreateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ destinationKey: "telegram_enabled" })],
+      }),
+    );
+  });
+
+  it("cannot use the absence of an opt-out to grant a missing domain permission", () => {
+    expect(
+      selectStaffNotificationRecipients(
+        {
+          type: "PARTS_ORDER_CREATED",
+          targetUserId: "manager_without_parts",
+          fallbackPermission: "parts.manage",
+        },
+        [
+          {
+            userId: "manager_without_parts",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "crm.manage"]),
+            disabledEventTypes: new Set(),
+          },
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("treats no personal setting as enabled", () => {
+    expect(
+      selectStaffNotificationRecipients(
+        {
+          type: "PARTS_ORDER_CREATED",
+          targetUserId: null,
+          fallbackPermission: "parts.manage",
+        },
+        [
+          {
+            userId: "existing_parts_manager",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "parts.manage"]),
+            disabledEventTypes: new Set(),
+          },
+        ],
+      ),
+    ).toEqual(["existing_parts_manager"]);
   });
 });
 

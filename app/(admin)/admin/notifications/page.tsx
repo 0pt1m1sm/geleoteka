@@ -7,28 +7,24 @@ import {
   markAllStaffNotificationsRead,
   markStaffNotificationRead,
 } from "@/app/actions/staff-notifications";
+import { NotificationScopeSwitcher } from "@/components/admin/notifications/NotificationScopeSwitcher";
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
 import { inboundCommunicationCopy } from "@/lib/crm/inbound-communications";
 import { db } from "@/lib/db";
-import { TENANT_KEY } from "@/lib/tenant";
+import {
+  isStaffNotificationFeedScope,
+  loadStaffNotificationFeedPage,
+  type StaffNotificationFeedReader,
+} from "@/lib/staff-notifications/feed";
 import { formatDateTime } from "@/lib/utils";
 
-interface ReceiptRow {
-  eventId: string;
-  readAt: Date | null;
-  createdAt: Date;
-  event: {
-    type: string;
-    channel: string | null;
-    summary: string;
-    actionPath: string;
-    occurredAt: Date;
-  };
-}
-
-export default async function StaffNotificationsPage() {
+export default async function StaffNotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string | string[] }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "notifications.view"))) redirect("/");
@@ -36,38 +32,33 @@ export default async function StaffNotificationsPage() {
     session.permissionRole,
     "notifications.manage",
   );
+  const requestedScope = (await searchParams).scope;
+  const scope = isStaffNotificationFeedScope(requestedScope) ? requestedScope : "mine";
+  if (scope === "all" && !canManage) redirect("/admin/notifications");
 
-  const receipts = (await db.staffNotificationReceipt.findMany({
-    where: { tenantKey: TENANT_KEY, userId: session.id },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: 100,
-    select: {
-      eventId: true,
-      readAt: true,
-      createdAt: true,
-      event: {
-        select: {
-          type: true,
-          channel: true,
-          summary: true,
-          actionPath: true,
-          occurredAt: true,
-        },
-      },
+  const { items, unreadCount } = await loadStaffNotificationFeedPage(
+    db as unknown as StaffNotificationFeedReader,
+    {
+    userId: session.id,
+    scope,
+    canManage,
     },
-  })) as ReceiptRow[];
-  const unreadCount = receipts.reduce((count, receipt) => count + (receipt.readAt ? 0 : 1), 0);
+  );
 
   return (
     <div>
       <PageHeader
         eyebrow="CRM · Сигналы"
         title="Уведомления"
-        description="Ваша персональная лента. Прочтение сигнала не закрывает задачу ответа."
+        description={
+          scope === "all"
+            ? "Все события системы. Непрочитанное и отметки прочтения остаются вашими личными."
+            : "Ваша персональная лента. Прочтение сигнала не закрывает задачу ответа."
+        }
         actions={
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/notifications/telegram" className="btn btn-secondary text-sm">
-              Telegram
+            <Link href="/profile#staff-notifications" className="btn btn-secondary text-sm">
+              Настройки уведомлений
             </Link>
             {canManage ? (
               <Link
@@ -88,41 +79,49 @@ export default async function StaffNotificationsPage() {
         }
       />
 
+      {canManage ? (
+        <div className="mb-4 flex items-center gap-3">
+          <span className="text-sm text-[var(--foreground-muted)]">Лента:</span>
+          <NotificationScopeSwitcher scope={scope} />
+        </div>
+      ) : null}
+
       <Card>
-        {receipts.length === 0 ? (
+        {items.length === 0 ? (
           <p className="text-sm text-[var(--foreground-muted)]">Уведомлений пока нет.</p>
         ) : (
           <ul className="divide-y divide-[var(--border)]">
-            {receipts.map((receipt) => {
-              const copy = inboundCommunicationCopy(receipt.event.channel ?? "");
+            {items.map((item) => {
+              const copy = inboundCommunicationCopy(item.channel ?? "");
+              const isPersonalUnread = item.hasPersonalReceipt && item.readAt === null;
               return (
                 <li
-                  key={receipt.eventId}
-                  className={`py-4 ${receipt.readAt ? "" : "border-l-2 border-[var(--color-accent)] pl-3"}`}
+                  key={item.eventId}
+                  className={`py-4 ${isPersonalUnread ? "border-l-2 border-[var(--color-accent)] pl-3" : ""}`}
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        {!receipt.readAt ? (
+                        {isPersonalUnread ? (
                           <span className="badge bg-[var(--color-accent)] text-[var(--color-accent-foreground)]">
                             Новое
                           </span>
                         ) : null}
                         <span className="text-xs text-[var(--foreground-muted)]">
-                          {formatDateTime(receipt.event.occurredAt)}
+                          {formatDateTime(item.occurredAt)}
                         </span>
                       </div>
-                      <p className="mt-2 font-medium">{receipt.event.summary}</p>
+                      <p className="mt-2 font-medium">{item.summary}</p>
                       <p className="mt-1 text-xs text-[var(--foreground-muted)]">
                         Уведомление прочитано отдельно от задачи FOLLOW_UP.
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      <Link href={receipt.event.actionPath} className="btn btn-secondary text-sm">
+                      <Link href={item.actionPath} className="btn btn-secondary text-sm">
                         {copy.openAction}
                       </Link>
-                      {!receipt.readAt ? (
-                        <form action={markStaffNotificationRead.bind(null, receipt.eventId)}>
+                      {isPersonalUnread ? (
+                        <form action={markStaffNotificationRead.bind(null, item.eventId)}>
                           <button type="submit" className="btn btn-ghost text-sm">
                             Прочитано
                           </button>

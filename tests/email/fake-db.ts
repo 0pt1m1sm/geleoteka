@@ -50,6 +50,7 @@ export class FakeEmailDb implements EmailIngestDb {
   crmTasks: AnyRow[] = [];
   staffNotificationReceipts: AnyRow[] = [];
   staffNotificationDeliveries: AnyRow[] = [];
+  staffNotificationOptOuts: AnyRow[] = [];
   settings: AnyRow[] = [];
   telegramDestinations: AnyRow[] = [];
 
@@ -302,6 +303,12 @@ export class FakeEmailDb implements EmailIngestDb {
   };
 
   rolePermission = { findMany: async (): Promise<AnyRow[]> => [] };
+  staffNotificationOptOut = {
+    findMany: async (args: Record<string, unknown>): Promise<AnyRow[]> => {
+      const where = (args.where ?? {}) as Record<string, unknown>;
+      return this.staffNotificationOptOuts.filter((row) => matchesWhere(row, where));
+    },
+  };
   telegramDestination = {
     findMany: async (args: Record<string, unknown>): Promise<AnyRow[]> => {
       const where = (args.where ?? {}) as Record<string, unknown>;

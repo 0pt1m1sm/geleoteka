@@ -2,14 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requirePermission } from "@/lib/authz";
+import { requirePermission, rolePermissions } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
+import { PERMISSIONS } from "@/lib/permissions";
 import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/feed";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { createTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
 import { requeueDeadStaffNotificationDelivery } from "@/lib/staff-notifications/operations";
+import { staffNotificationTypesForPermissions } from "@/lib/staff-notifications/preferences";
 import {
+  isStaffNotificationType,
   isTelegramDeliveryScope,
   type TelegramDeliveryScope,
 } from "@/lib/staff-notifications/types";
@@ -57,6 +60,51 @@ export async function createSharedTelegramLink(
 export async function revokePersonalTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.view");
   await revokeTelegramDestinations({ kind: "PERSONAL", userId: session.id }, session);
+}
+
+/**
+ * Saves only explicit opt-outs for categories currently allowed by the
+ * employee's role. Checked boxes delete opt-outs; unchecked boxes create them.
+ * There is no persisted "grant" state, so this action cannot widen rights.
+ */
+export async function updateOwnStaffNotificationOptOuts(
+  formData: FormData,
+): Promise<void> {
+  const session = await requirePermission("notifications.view");
+  const permissions =
+    session.permissionRole === "ADMIN"
+      ? new Set<string>(PERMISSIONS)
+      : await rolePermissions(session.permissionRole);
+  const availableTypes = staffNotificationTypesForPermissions(permissions);
+  const submittedEnabled = new Set(
+    formData.getAll("enabledEventType").filter(isStaffNotificationType),
+  );
+  const disabledTypes = availableTypes.filter(
+    (type) => !submittedEnabled.has(type),
+  );
+
+  await db.$transaction(async (tx) => {
+    if (availableTypes.length > 0) {
+      await tx.staffNotificationOptOut.deleteMany({
+        where: {
+          tenantKey: TENANT_KEY,
+          userId: session.id,
+          eventType: { in: availableTypes },
+        },
+      });
+    }
+    if (disabledTypes.length > 0) {
+      await tx.staffNotificationOptOut.createMany({
+        data: disabledTypes.map((eventType) => ({
+          tenantKey: TENANT_KEY,
+          userId: session.id,
+          eventType,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  });
+  revalidatePath("/profile");
 }
 
 export async function revokeSharedTelegramLink(): Promise<void> {
@@ -230,4 +278,5 @@ async function revokeTelegramDestinations(
     );
   });
   revalidatePath("/admin/notifications/telegram");
+  if (target.kind === "PERSONAL") revalidatePath("/profile");
 }
