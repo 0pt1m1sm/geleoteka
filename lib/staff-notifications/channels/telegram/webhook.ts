@@ -19,6 +19,7 @@ interface TelegramWebhookTx {
     findFirst(args: QueryArgs): Promise<unknown>;
     create(args: QueryArgs): Promise<unknown>;
     update(args: QueryArgs): Promise<unknown>;
+    updateMany(args: QueryArgs): Promise<{ count: number }>;
   };
   user: {
     findUnique(args: QueryArgs): Promise<unknown>;
@@ -34,6 +35,7 @@ export interface TelegramWebhookDb {
 
 export type TelegramWebhookOutcome =
   | "linked"
+  | "migrated"
   | "duplicate"
   | "ignored"
   | "invalid-update"
@@ -43,10 +45,11 @@ export type TelegramWebhookOutcome =
 
 interface ParsedTelegramUpdate {
   updateId: string;
-  privateChat: boolean;
+  chatType: string | null;
   chatId: string | null;
   telegramUserId: string | null;
   rawLinkToken: string | null;
+  migrateToChatId: string | null;
 }
 
 interface LinkTokenRow {
@@ -86,9 +89,21 @@ export async function processTelegramWebhookUpdate(
     });
     if (receipt.count === 0) return "duplicate";
 
+    if (update.chatId && update.migrateToChatId) {
+      const migrated = await tx.telegramDestination.updateMany({
+        where: {
+          tenantKey: TENANT_KEY,
+          kind: "SHARED",
+          chatId: update.chatId,
+        },
+        data: { chatId: update.migrateToChatId },
+      });
+      return migrated.count > 0 ? "migrated" : "ignored";
+    }
+
     if (
-      !update.privateChat ||
       !update.chatId ||
+      !update.chatType ||
       !update.telegramUserId ||
       !update.rawLinkToken
     ) {
@@ -121,6 +136,9 @@ export async function processTelegramWebhookUpdate(
       (token.purpose === "SHARED" && token.userId !== null)
     ) {
       return "invalid-token";
+    }
+    if (!chatTypeAllowedForPurpose(update.chatType, token.purpose)) {
+      return "ignored";
     }
 
     const lockKey = `${TENANT_KEY}\u0000telegram-link\u0000${token.purpose}\u0000${token.userId ?? "shared"}`;
@@ -185,6 +203,7 @@ export async function processTelegramWebhookUpdate(
             chatId: update.chatId,
             telegramUserId: update.telegramUserId,
             label: null,
+            deliveryScope: "FALLBACK_ONLY",
             isActive: true,
             verifiedAt: now,
           },
@@ -200,7 +219,7 @@ export async function processTelegramWebhookUpdate(
         action: "telegram.destination_link",
         targetType: "TelegramDestination",
         targetId: destination.id,
-        targetLabel: token.purpose === "PERSONAL" ? "Личная привязка" : "Общий fallback",
+        targetLabel: token.purpose === "PERSONAL" ? "Личная привязка" : "Общий получатель",
         metadata: { kind: token.purpose },
         ip: null,
       },
@@ -224,10 +243,11 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
 
   return {
     updateId,
-    privateChat: chat?.type === "private",
+    chatType: typeof chat?.type === "string" ? chat.type : null,
     chatId: integerId(chat?.id),
     telegramUserId: from?.is_bot === true ? null : integerId(from?.id),
     rawLinkToken: match?.[1] ?? null,
+    migrateToChatId: integerId(message?.migrate_to_chat_id),
   };
 }
 
@@ -245,6 +265,14 @@ function integerId(value: unknown): string | null {
 
 function isLinkPurpose(value: string): value is TelegramLinkPurpose {
   return value === "PERSONAL" || value === "SHARED";
+}
+
+function chatTypeAllowedForPurpose(
+  chatType: string,
+  purpose: TelegramLinkPurpose,
+): boolean {
+  if (purpose === "PERSONAL") return chatType === "private";
+  return chatType === "private" || chatType === "group" || chatType === "supergroup";
 }
 
 function sameLinkTarget(destination: DestinationRow, token: LinkTokenRow): boolean {

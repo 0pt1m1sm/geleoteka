@@ -283,7 +283,8 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     group: "Уведомления сотрудников (Telegram)",
     key: "TELEGRAM_ROUTING_MODE",
     label: "Маршрутизация",
-    description: "Лично владельцу; общий служебный fallback используется только для события без подходящего владельца.",
+    description:
+      "Управляет резервом для событий без подходящего владельца. Общий получатель с режимом «Все события» работает независимо и не отключает личные уведомления.",
     input: "select",
     options: TELEGRAM_ROUTING_MODES.map((value) => ({
       value,
@@ -308,10 +309,10 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     description: "Целое число 1–3650. Старые события удаляются cron вместе с receipts и deliveries по каскаду.",
     input: "text",
   },
-  ...Object.keys(STAFF_NOTIFICATION_EVENT_CATALOG).map((type) => ({
+  ...Object.entries(STAFF_NOTIFICATION_EVENT_CATALOG).map(([type, definition]) => ({
     group: "Уведомления сотрудников (Telegram)",
     key: `TELEGRAM_NOTIFY_${type}`,
-    label: `Отправлять ${type}`,
+    label: definition.label,
     description: "Переключатель типа события. Отсутствующее или некорректное значение = false.",
     input: "boolean" as const,
   })),

@@ -6,9 +6,10 @@ import { redirect } from "next/navigation";
 import {
   revokePersonalTelegramLink,
   revokeSharedTelegramLink,
+  setSharedTelegramDeliveryScope,
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
-import { Card, PageHeader } from "@/components/ui";
+import { Alert, Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
 import { db } from "@/lib/db";
@@ -19,6 +20,7 @@ import { formatDateTime } from "@/lib/utils";
 interface DestinationStatus {
   id: string;
   verifiedAt: Date;
+  deliveryScope: string;
 }
 
 export default async function TelegramNotificationsPage() {
@@ -40,7 +42,7 @@ export default async function TelegramNotificationsPage() {
         isActive: true,
         disabledAt: null,
       },
-      select: { id: true, verifiedAt: true },
+      select: { id: true, verifiedAt: true, deliveryScope: true },
     }) as Promise<DestinationStatus | null>,
     canManage
       ? (db.telegramDestination.findFirst({
@@ -52,7 +54,7 @@ export default async function TelegramNotificationsPage() {
             disabledAt: null,
           },
           orderBy: { verifiedAt: "desc" },
-          select: { id: true, verifiedAt: true },
+          select: { id: true, verifiedAt: true, deliveryScope: true },
         }) as Promise<DestinationStatus | null>)
       : Promise.resolve(null),
   ]);
@@ -94,14 +96,39 @@ export default async function TelegramNotificationsPage() {
 
         {canManage ? (
           <Card>
-            <h2 className="text-base font-semibold">Общий служебный fallback</h2>
+            <h2 className="text-base font-semibold">Общие уведомления</h2>
             <p className="mt-2 text-sm text-[var(--foreground-muted)]">
-              Используется только для событий без подходящего владельца. Ссылку нужно открыть из приватного служебного Telegram-аккаунта.
+              Рабочая группа может получать только события без подходящего владельца или весь поток, не отменяя личные уведомления менеджеров.
             </p>
+            <Alert variant="info" className="mt-4">
+              В группе имя клиента и номер сделки увидят все участники — в том числе те, кого добавят позже.
+            </Alert>
             <div className="mt-4">
               {shared ? (
                 <div className="space-y-3">
                   <p className="text-sm">Привязано {formatDateTime(shared.verifiedAt)}</p>
+                  <form
+                    action={setSharedTelegramDeliveryScope.bind(null, shared.id)}
+                    className="space-y-2"
+                  >
+                    <label htmlFor="telegram-delivery-scope" className="block text-sm font-medium">
+                      Какие события отправлять
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select
+                        id="telegram-delivery-scope"
+                        name="deliveryScope"
+                        defaultValue={shared.deliveryScope}
+                        className="input w-auto"
+                      >
+                        <option value="FALLBACK_ONLY">Только без подходящего владельца</option>
+                        <option value="ALL_EVENTS">Все события</option>
+                      </select>
+                      <button type="submit" className="btn btn-primary text-sm">
+                        Сохранить
+                      </button>
+                    </div>
+                  </form>
                   <form action={revokeSharedTelegramLink}>
                     <button type="submit" className="btn btn-secondary text-sm">
                       Отвязать
@@ -118,4 +145,3 @@ export default async function TelegramNotificationsPage() {
     </div>
   );
 }
-

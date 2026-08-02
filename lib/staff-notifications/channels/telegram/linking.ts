@@ -69,7 +69,10 @@ export async function createTelegramLinkToken(
   });
 
   return {
-    deepLink: `https://t.me/${input.botUsername}?start=${rawToken}`,
+    deepLink:
+      input.purpose === "SHARED"
+        ? `https://t.me/${input.botUsername}?startgroup=${rawToken}`
+        : `https://t.me/${input.botUsername}?start=${rawToken}`,
     expiresAt,
   };
 }

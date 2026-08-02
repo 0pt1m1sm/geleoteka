@@ -41,7 +41,9 @@ export function TelegramLinkPanel({
       {state?.ok && state.deepLink ? (
         <Alert variant="success">
           <span className="block mb-2">
-            Откройте ссылку в приватном чате с ботом. Она одноразовая и истечёт через 10 минут.
+            {purpose === "PERSONAL"
+              ? "Откройте ссылку в приватном чате с ботом. Она одноразовая и истечёт через 10 минут."
+              : "Откройте ссылку и выберите рабочую группу. Telegram добавит бота и отправит команду привязки; ссылка истечёт через 10 минут."}
           </span>
           <a
             href={state.deepLink}
@@ -49,11 +51,12 @@ export function TelegramLinkPanel({
             rel="noreferrer"
             className="font-medium text-[var(--color-accent)] underline"
           >
-            Открыть Telegram и привязать
+            {purpose === "PERSONAL"
+              ? "Открыть Telegram и привязать"
+              : "Выбрать группу в Telegram"}
           </a>
         </Alert>
       ) : null}
     </div>
   );
 }
-

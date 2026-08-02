@@ -88,6 +88,45 @@ describe("Telegram routing", () => {
     });
   });
 
+  it("routes an assigned event to its owner and to a shared all-events destination", async () => {
+    const db = routableDb("manager_1");
+    const routingMode = db.settings.find((row) => row.key === "TELEGRAM_ROUTING_MODE");
+    if (!routingMode) throw new Error("test Telegram routing mode missing");
+    routingMode.value = "PERSONAL_ONLY";
+    db.telegramDestinations.push(
+      {
+        id: "personal_1",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "manager_1",
+        deliveryScope: "FALLBACK_ONLY",
+        isActive: true,
+        disabledAt: null,
+      },
+      {
+        id: "shared_all",
+        tenantKey: TENANT_KEY,
+        kind: "SHARED",
+        userId: null,
+        deliveryScope: "ALL_EVENTS",
+        isActive: true,
+        disabledAt: null,
+      },
+    );
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationReceipts[0]).toMatchObject({ userId: "manager_1" });
+    expect(db.staffNotificationDeliveries).toHaveLength(2);
+    expect(db.staffNotificationDeliveries.map((row) => row.destinationKey).sort()).toEqual([
+      "personal_1",
+      "shared_all",
+    ]);
+  });
+
   it("uses only the shared fallback for an unassigned event", async () => {
     const db = routableDb(null);
     db.telegramDestinations.push({
@@ -153,6 +192,42 @@ describe("Telegram routing", () => {
       isActive: true,
       disabledAt: null,
     });
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationDeliveries).toHaveLength(0);
+  });
+
+  it("creates no personal or shared delivery when the event category is disabled", async () => {
+    const db = routableDb("manager_1");
+    const category = db.settings.find(
+      (row) => row.key === "TELEGRAM_NOTIFY_INBOUND_CUSTOMER_MESSAGE",
+    );
+    if (!category) throw new Error("test Telegram category setting missing");
+    category.value = "false";
+    db.telegramDestinations.push(
+      {
+        id: "personal_1",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "manager_1",
+        deliveryScope: "FALLBACK_ONLY",
+        isActive: true,
+        disabledAt: null,
+      },
+      {
+        id: "shared_all",
+        tenantKey: TENANT_KEY,
+        kind: "SHARED",
+        userId: null,
+        deliveryScope: "ALL_EVENTS",
+        isActive: true,
+        disabledAt: null,
+      },
+    );
 
     await expect(
       projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),

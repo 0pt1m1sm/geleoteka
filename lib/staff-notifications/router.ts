@@ -28,7 +28,7 @@ export interface StaffRecipientCandidate {
 
 /**
  * A destination already verified by its adapter. recipientUserId is null for a
- * shared fallback destination. Raw Telegram chat_id never crosses this seam.
+ * shared destination. Raw Telegram chat_id never crosses this seam.
  */
 export interface StaffDeliveryDestination {
   recipientUserId: string | null;
