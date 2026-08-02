@@ -83,6 +83,52 @@ export async function POST(request: Request): Promise<NextResponse> {
     } | null;
 
     const now = new Date();
+    const [recentEvents, recentDeliveries] = await Promise.all([
+      (async () => {
+        const rows = (await db.staffNotificationEvent.findMany({
+          where: { tenantKey: TENANT_KEY },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { type: true, occurredAt: true, createdAt: true },
+        })) as Array<{ type: string; occurredAt: Date; createdAt: Date }>;
+        return rows.map((row) => ({
+          type: row.type,
+          occurredAt: row.occurredAt.toISOString(),
+          createdAt: row.createdAt.toISOString(),
+        }));
+      })(),
+      (async () => {
+        const rows = (await db.staffNotificationDelivery.findMany({
+          where: { tenantKey: TENANT_KEY },
+          orderBy: { nextAttemptAt: "desc" },
+          take: 5,
+          select: {
+            status: true,
+            attempts: true,
+            lastErrorCode: true,
+            nextAttemptAt: true,
+            sentAt: true,
+            event: { select: { type: true, occurredAt: true } },
+          },
+        })) as unknown as Array<{
+          status: string;
+          attempts: number;
+          lastErrorCode: string | null;
+          nextAttemptAt: Date;
+          sentAt: Date | null;
+          event: { type: string; occurredAt: Date } | null;
+        }>;
+        return rows.map((row) => ({
+          status: row.status,
+          attempts: row.attempts,
+          lastErrorCode: row.lastErrorCode,
+          nextAttemptAt: row.nextAttemptAt.toISOString(),
+          sentAt: row.sentAt?.toISOString() ?? null,
+          eventType: row.event?.type ?? null,
+          eventOccurredAt: row.event?.occurredAt.toISOString() ?? null,
+        }));
+      })(),
+    ]);
     const [recentPolls, recentReplies, activeLinkTokens, destinations] =
       await Promise.all([
         recentAttempts("UPDATES_POLL"),
@@ -124,6 +170,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         : null,
       recentPolls,
       recentReplies,
+      // Событийный конвейер: только типы/статусы/времена/коды — без
+      // summary и каких-либо текстов.
+      recentEvents,
+      recentDeliveries,
       linkTokens: { active: activeLinkTokens },
       destinations: { total: destinations[0], active: destinations[1] },
     });

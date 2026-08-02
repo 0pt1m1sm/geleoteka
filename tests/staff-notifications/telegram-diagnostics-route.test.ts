@@ -77,6 +77,30 @@ function installDb(): void {
     },
     telegramLinkToken: { count: async () => 1 },
     telegramDestination: { count: async () => 2 },
+    staffNotificationEvent: {
+      findMany: async () => [
+        {
+          type: "MESSAGE_UNPARSED",
+          occurredAt: new Date("2026-08-02T20:10:00.000Z"),
+          createdAt: new Date("2026-08-02T20:12:00.000Z"),
+        },
+      ],
+    },
+    staffNotificationDelivery: {
+      findMany: async () => [
+        {
+          status: "DEAD",
+          attempts: 5,
+          lastErrorCode: "TELEGRAM_TIMEOUT",
+          nextAttemptAt: new Date("2026-08-02T20:20:00.000Z"),
+          sentAt: null,
+          event: {
+            type: "MESSAGE_UNPARSED",
+            occurredAt: new Date("2026-08-02T20:10:00.000Z"),
+          },
+        },
+      ],
+    },
   });
 }
 
@@ -153,6 +177,12 @@ describe("telegram diagnostics route", () => {
       errorCode: "TELEGRAM_TIMEOUT",
     });
     expect(payload.destinations).toEqual({ total: 2, active: 2 });
+    expect(payload.recentEvents[0]).toMatchObject({ type: "MESSAGE_UNPARSED" });
+    expect(payload.recentDeliveries[0]).toMatchObject({
+      status: "DEAD",
+      lastErrorCode: "TELEGRAM_TIMEOUT",
+      eventType: "MESSAGE_UNPARSED",
+    });
     // Ни одного URL и ни одного секрета в сериализованном ответе.
     const serialized = JSON.stringify(payload);
     expect(serialized).not.toContain("old.example");
