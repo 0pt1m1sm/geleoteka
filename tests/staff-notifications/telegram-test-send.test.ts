@@ -296,6 +296,7 @@ function enabledConfig(): TelegramRuntimeConfig {
     webhookSecret: "S".repeat(32),
     routingMode: "PERSONAL_ONLY",
     applicationOrigin: "https://geleoteka.ru",
+    apiBaseUrl: "https://api.telegram.org",
     enabledEventTypes: new Set(),
   };
 }

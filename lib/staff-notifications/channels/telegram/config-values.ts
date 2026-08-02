@@ -1,5 +1,6 @@
 import { parseBooleanSetting } from "@/lib/settings-shared";
 import {
+  TELEGRAM_DEFAULT_API_BASE_URL,
   TELEGRAM_ROUTING_MODES,
   type TelegramRoutingMode,
 } from "@/lib/staff-notifications/channels/telegram/constants";
@@ -20,6 +21,7 @@ export const TELEGRAM_CORE_SETTING_KEYS = [
   "TELEGRAM_BOT_USERNAME",
   "TELEGRAM_WEBHOOK_SECRET",
   "TELEGRAM_ROUTING_MODE",
+  "TELEGRAM_API_BASE_URL",
 ] as const;
 
 export const TELEGRAM_EVENT_SETTING_KEYS = Object.freeze(
@@ -43,9 +45,15 @@ export type TelegramRuntimeConfig =
       enabledAt: Date;
       botToken: string;
       botUsername: string;
-      webhookSecret: string;
+      /**
+       * Optional since the polling switch: inbound updates arrive via
+       * getUpdates, so no webhook registration — and no shared secret — is
+       * required. The webhook route stays fail-closed while this is null.
+       */
+      webhookSecret: string | null;
       routingMode: TelegramRoutingMode;
       applicationOrigin: string;
+      apiBaseUrl: string;
       enabledEventTypes: ReadonlySet<StaffNotificationType>;
     };
 
@@ -74,14 +82,19 @@ export function resolveTelegramRuntimeConfig(
   );
   const routingMode = normalizeTelegramRoutingMode(values.TELEGRAM_ROUTING_MODE);
   const applicationOrigin = normalizeApplicationOrigin(applicationUrl);
+  const apiBaseUrl = normalizeTelegramApiBaseUrl(values.TELEGRAM_API_BASE_URL);
 
+  // The webhook secret is deliberately absent from this gate: inbound updates
+  // arrive via getUpdates polling, so the channel must work without a webhook
+  // registration. A missing or malformed secret only keeps the webhook route
+  // fail-closed; it no longer disables the whole channel.
   if (
     !enabledAt ||
     !botToken ||
     !botUsername ||
-    !webhookSecret ||
     !routingMode ||
-    !applicationOrigin
+    !applicationOrigin ||
+    !apiBaseUrl
   ) {
     return { enabled: false, reason: "invalid-config", enabledEventTypes };
   }
@@ -94,8 +107,36 @@ export function resolveTelegramRuntimeConfig(
     webhookSecret,
     routingMode,
     applicationOrigin,
+    apiBaseUrl,
     enabledEventTypes,
   };
+}
+
+/**
+ * Absent value falls back to the official host. A present value must be a
+ * clean https base — origin plus optional path, no credentials, query or
+ * fragment — because the bot token is appended into this URL and a mangled
+ * base could leak or misroute it. A present-but-invalid value fails the whole
+ * config closed rather than silently reverting to the direct host: the owner
+ * set a relay for a reason.
+ */
+export function normalizeTelegramApiBaseUrl(value: unknown): string | null {
+  if (value === null || value === undefined) return TELEGRAM_DEFAULT_API_BASE_URL;
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (trimmed === "") return TELEGRAM_DEFAULT_API_BASE_URL;
+
+  let url: URL;
+  try {
+    url = new URL(trimmed);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:") return null;
+  if (url.username || url.password || url.search || url.hash) return null;
+
+  const path = url.pathname.replace(/\/+$/, "");
+  return `${url.origin}${path}`;
 }
 
 export function normalizeTelegramEnabledAt(value: unknown): Date | null {

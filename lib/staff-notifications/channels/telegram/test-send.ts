@@ -107,6 +107,7 @@ export async function sendTelegramTestNotification(options: {
     client: options.client,
     fetchImpl: options.fetchImpl,
     message: {
+      apiBaseUrl: options.config.apiBaseUrl,
       botToken: options.config.botToken,
       chatId: destination.chatId,
       text: TELEGRAM_TEST_NOTIFICATION_TEXT,

@@ -44,9 +44,23 @@ interface TelegramApiResponse {
 }
 
 export interface TelegramTextMessage {
+  apiBaseUrl: string;
   botToken: string;
   chatId: string;
   text: string;
+}
+
+/**
+ * The only place a Bot API URL is assembled. The token lives inside this URL,
+ * so the result must never be logged or surfaced in errors — callers receive
+ * normalized error codes instead.
+ */
+export function telegramApiMethodUrl(
+  apiBaseUrl: string,
+  botToken: string,
+  method: string,
+): string {
+  return `${apiBaseUrl}/bot${botToken}/${method}`;
 }
 
 export type TelegramTextSendResult =
@@ -129,6 +143,7 @@ async function sendTelegramNotification(
     client: dependencies.db,
     fetchImpl: dependencies.fetch,
     message: {
+      apiBaseUrl: config.apiBaseUrl,
       botToken: config.botToken,
       chatId: destination.chatId,
       text,
@@ -292,7 +307,7 @@ export async function sendTelegramText(
       // The Bot API requires the credential in the URL. This URL must never be
       // logged or surfaced in an exception/error response.
       const response = await fetchImpl(
-        `https://api.telegram.org/bot${message.botToken}/sendMessage`,
+        telegramApiMethodUrl(message.apiBaseUrl, message.botToken, "sendMessage"),
         {
           method: "POST",
           headers: { "content-type": "application/json" },

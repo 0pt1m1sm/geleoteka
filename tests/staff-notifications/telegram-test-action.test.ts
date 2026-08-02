@@ -28,6 +28,16 @@ vi.mock("@/lib/staff-notifications/channels/telegram/config", () => ({
 vi.mock("@/lib/staff-notifications/channels/telegram/linking", () => ({
   createTelegramLinkToken: vi.fn(),
 }));
+vi.mock(
+  "@/lib/staff-notifications/channels/telegram/updates-runtime",
+  () => ({
+    drainTelegramUpdatesNow: vi.fn(async () => ({
+      status: "drained",
+      processed: 0,
+      batches: 1,
+    })),
+  }),
+);
 vi.mock("@/lib/staff-notifications/channels/telegram/test-send", () => ({
   sendTelegramTestNotification: mocks.sendTest,
 }));

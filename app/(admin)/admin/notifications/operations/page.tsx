@@ -444,6 +444,7 @@ function TelegramSendState({
 function telegramOperationLabel(operation: string): string {
   if (operation === "NOTIFICATION_DELIVERY") return "Уведомление";
   if (operation === "TEST_NOTIFICATION") return "Тестовое уведомление";
+  if (operation === "UPDATES_POLL") return "Опрос обновлений";
   return "Ответ бота";
 }
 

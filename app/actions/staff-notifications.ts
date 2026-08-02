@@ -9,6 +9,7 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/feed";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { createTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
+import { drainTelegramUpdatesNow } from "@/lib/staff-notifications/channels/telegram/updates-runtime";
 import {
   sendTelegramTestNotification,
   type TelegramTestNotificationResult,
@@ -68,6 +69,51 @@ export async function createSharedTelegramLink(
 export async function revokePersonalTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.view");
   await revokeTelegramDestinations({ kind: "PERSONAL", userId: session.id }, session);
+}
+
+export interface TelegramLinkStatusState {
+  linked: boolean;
+  verifiedAt: string | null;
+}
+
+/**
+ * The link panel's polling target. Confirmation comes from OUR database, not
+ * from a bot reply: with a throttled channel the reply may arrive minutes
+ * late or never, while the link row commits the moment the update is
+ * processed. Each check also triggers a short update drain, so during the
+ * linking flow updates are pulled every few seconds instead of waiting for
+ * the next cron tick — the drain's own cooldown keeps this from turning
+ * into hammering.
+ */
+export async function refreshTelegramLinkStatus(
+  purpose: "PERSONAL" | "SHARED",
+): Promise<TelegramLinkStatusState> {
+  const session = await requirePermission(
+    purpose === "PERSONAL" ? "notifications.view" : "notifications.manage",
+  );
+
+  try {
+    await drainTelegramUpdatesNow({ budgetMs: 3_000, maxBatches: 1 });
+  } catch {
+    // A failed drain must not hide an already-committed link: the read below
+    // still answers from local state.
+  }
+
+  const destination = (await db.telegramDestination.findFirst({
+    where: {
+      tenantKey: TENANT_KEY,
+      kind: purpose,
+      userId: purpose === "PERSONAL" ? session.id : null,
+      isActive: true,
+      disabledAt: null,
+    },
+    select: { verifiedAt: true },
+  })) as { verifiedAt: Date } | null;
+
+  return {
+    linked: destination !== null,
+    verifiedAt: destination ? destination.verifiedAt.toISOString() : null,
+  };
 }
 
 export async function sendPersonalTelegramTest(

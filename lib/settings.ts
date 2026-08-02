@@ -273,9 +273,19 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
   },
   {
     group: "Уведомления сотрудников (Telegram)",
+    key: "TELEGRAM_API_BASE_URL",
+    label: "Адрес Bot API (релей)",
+    description:
+      "Пусто = https://api.telegram.org напрямую. РКН замедляет трафик к Telegram из РФ, поэтому сюда можно поставить https-адрес релея вне России (например Cloudflare Worker) — через него пойдут и отправка, и приём обновлений. Адрес открытого релея — секрет: любой, кто его знает, может пользоваться релеем. Рецепт — в docs/runbooks/staff-notifications.md.",
+    secret: true,
+    input: "secret",
+  },
+  {
+    group: "Уведомления сотрудников (Telegram)",
     key: "TELEGRAM_WEBHOOK_SECRET",
-    label: "Webhook secret token",
-    description: "Случайная строка 32–256 символов A-Z, a-z, 0-9, _ или -. То же значение задаётся при setWebhook.",
+    label: "Webhook secret token (не требуется)",
+    description:
+      "Приём идёт опросом getUpdates, webhook регистрировать не нужно. Поле осталось на случай возврата к webhook-режиму: без значения маршрут webhook закрыт, канал работает как обычно.",
     secret: true,
     input: "secret",
   },

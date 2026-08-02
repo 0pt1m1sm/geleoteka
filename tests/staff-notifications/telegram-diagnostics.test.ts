@@ -97,7 +97,12 @@ describe("Telegram outbound diagnostics", () => {
     await sendTelegramTextWithDiagnostics({
       client: recorder.db,
       fetchImpl: successfulFetch(),
-      message: { botToken, chatId, text },
+      message: {
+        apiBaseUrl: "https://relay-SENTINEL.example",
+        botToken,
+        chatId,
+        text,
+      },
       operation: "WEBHOOK_REPLY",
       monotonicNow: sequenceClock(0, 75),
     });
@@ -109,6 +114,9 @@ describe("Telegram outbound diagnostics", () => {
     expect(persisted).not.toContain("chat_id");
     expect(persisted).not.toContain("botToken");
     expect(persisted).not.toContain("api.telegram.org");
+    // The relay address must be guarded like the token: the token travels
+    // inside URLs built on this base.
+    expect(persisted).not.toContain("relay-SENTINEL");
   });
 
   it("keeps the successful send result when the diagnostic write fails", async () => {
@@ -191,6 +199,7 @@ function successfulFetch() {
 
 function safeMessage() {
   return {
+    apiBaseUrl: "https://api.telegram.org",
     botToken: `123456:${"A".repeat(32)}`,
     chatId: "777001",
     text: "Привязка выполнена.",

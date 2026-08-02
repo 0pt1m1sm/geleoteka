@@ -25,8 +25,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "not configured" }, { status: 503 });
   }
 
+  // Polling is the primary inbound path; this route only works when the owner
+  // has explicitly provisioned a webhook secret. No secret — no webhook.
+  const webhookSecret = config.webhookSecret;
+  if (!webhookSecret) {
+    return NextResponse.json({ error: "not configured" }, { status: 503 });
+  }
+
   const presented = request.headers.get(TELEGRAM_WEBHOOK_SECRET_HEADER) ?? "";
-  if (!presented || !constantTimeSecretEqual(presented, config.webhookSecret)) {
+  if (!presented || !constantTimeSecretEqual(presented, webhookSecret)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
@@ -57,6 +64,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 client: db as unknown as TelegramSendDiagnosticsWriteDb,
                 fetchImpl: globalThis.fetch,
                 message: {
+                  apiBaseUrl: config.apiBaseUrl,
                   botToken: config.botToken,
                   chatId,
                   text,

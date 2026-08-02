@@ -16,6 +16,7 @@ import {
   scanOverdueCrmTasks,
   type StaffNotificationOverdueScannerDb,
 } from "@/lib/staff-notifications/overdue";
+import { drainTelegramUpdatesNow } from "@/lib/staff-notifications/channels/telegram/updates-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
+    // Inbound Telegram updates ride the same external cron: polling is the
+    // primary transport now, and the cron tick is its guaranteed cadence.
+    // force bypasses the interactive cooldown — this tick IS the schedule.
+    const updates = await drainTelegramUpdatesNow({
+      force: true,
+      budgetMs: 6_000,
+      maxBatches: 3,
+    });
+
     const overdue = await scanOverdueCrmTasks(
       db as unknown as StaffNotificationOverdueScannerDb,
       { limit: 100 },
@@ -52,19 +62,32 @@ export async function POST(request: Request): Promise<NextResponse> {
         ])
       : null;
 
-    return NextResponse.json({
-      ok: true,
-      overdue,
-      retention: retention
-        ? {
-            configured: true,
-            days: retentionDays,
-            deletedEvents: retention[0].deletedEvents,
-            deletedTelegramAttempts: retention[1].deletedAttempts,
-            cutoff: retention[0].cutoff.toISOString(),
-          }
-        : { configured: false },
-    });
+    // Health-contract: провал опроса обязан красить cron-тик (workflow
+    // проверяет только HTTP-код), но не отменяет уже выполненную работу —
+    // overdue и retention отработали выше. skipped-*/channel-disabled —
+    // штатные исходы, не сбой. budget-exhausted без единого обработанного
+    // апдейта — тоже мёртвый канал (409/таймауты съели весь бюджет);
+    // с прогрессом — просто большой backlog, дожуётся следующими тиками.
+    const pollFailed =
+      updates.status === "failed" ||
+      (updates.status === "budget-exhausted" && updates.processed === 0);
+    return NextResponse.json(
+      {
+        ok: !pollFailed,
+        updates,
+        overdue,
+        retention: retention
+          ? {
+              configured: true,
+              days: retentionDays,
+              deletedEvents: retention[0].deletedEvents,
+              deletedTelegramAttempts: retention[1].deletedAttempts,
+              cutoff: retention[0].cutoff.toISOString(),
+            }
+          : { configured: false },
+      },
+      { status: pollFailed ? 503 : 200 },
+    );
   } catch {
     return NextResponse.json({ error: "maintenance failed" }, { status: 500 });
   }

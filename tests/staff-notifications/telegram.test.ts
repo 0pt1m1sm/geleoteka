@@ -111,12 +111,27 @@ describe("Telegram runtime config", () => {
         TELEGRAM_BOT_TOKEN: "damaged",
       }),
     ).toMatchObject({ enabled: false, reason: "invalid-config" });
+    // Intentional behavior change with the polling switch: a missing or
+    // malformed webhook secret no longer disables the channel — inbound goes
+    // through getUpdates. It only keeps the webhook route fail-closed.
     expect(
       resolveTelegramRuntimeConfig({
         ...validSettingValues(),
         TELEGRAM_WEBHOOK_SECRET: "short",
       }),
+    ).toMatchObject({ enabled: true, webhookSecret: null });
+    expect(
+      resolveTelegramRuntimeConfig({
+        ...validSettingValues(),
+        TELEGRAM_API_BASE_URL: "http://insecure-relay.example",
+      }),
     ).toMatchObject({ enabled: false, reason: "invalid-config" });
+    expect(
+      resolveTelegramRuntimeConfig({
+        ...validSettingValues(),
+        TELEGRAM_API_BASE_URL: "https://relay.example/tg/",
+      }),
+    ).toMatchObject({ enabled: true, apiBaseUrl: "https://relay.example/tg" });
     expect(
       resolveTelegramRuntimeConfig({
         ...validSettingValues(),
@@ -338,6 +353,33 @@ describe("Telegram webhook processing", () => {
       ),
     });
     expect(scheduleReply.mock.calls[0]?.[0].text).not.toContain(String(chatId));
+  });
+
+  it("дожидается async-планировщика ответа до возврата (гарантия для polling-обвязки)", async () => {
+    const fake = new FakeTelegramWebhookDb("U".repeat(43));
+    let replyFinished = false;
+    const scheduleReply = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      replyFinished = true;
+    });
+
+    await processTelegramWebhookUpdate(
+      fake,
+      {
+        update_id: 8997,
+        message: {
+          text: "/start",
+          chat: { id: 777009991, type: "private" },
+          from: { id: 777009991, is_bot: false },
+        },
+      },
+      NOW,
+      scheduleReply,
+    );
+
+    // В polling-обвязке нет after(): ответ обязан быть доставлен (и его
+    // диагностика записана) до завершения drain, а не повиснуть в воздухе.
+    expect(replyFinished).toBe(true);
   });
 
   it("does not reply to a bare /start command in a group", async () => {
@@ -711,7 +753,9 @@ describe("Telegram webhook processing", () => {
           },
         },
         NOW,
-        (reply) => scheduledReplies.push(reply),
+        (reply) => {
+          scheduledReplies.push(reply);
+        },
       ),
     ).resolves.toBe("linked");
 
@@ -786,6 +830,7 @@ describe("Telegram delivery classification", () => {
 
     await expect(
       sendTelegramText(fetchMock, {
+        apiBaseUrl: "https://api.telegram.org",
         botToken: `123456:${"A".repeat(32)}`,
         chatId: "777001",
         text: "Привязка выполнена.",
@@ -828,6 +873,7 @@ describe("Telegram delivery classification", () => {
       );
 
       const result = sendTelegramText(fetchMock, {
+        apiBaseUrl: "https://api.telegram.org",
         botToken: `123456:${"A".repeat(32)}`,
         chatId: "777001",
         text: "Привязка выполнена.",

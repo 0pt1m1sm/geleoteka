@@ -2321,6 +2321,28 @@ model TelegramSendAttempt {
   @@index([tenantKey, createdAt])
 }
 
+/// getUpdates polling cursor: one row per tenant. nextOffset is Telegram's
+/// confirmation offset (highest processed update_id + 1); advancing it is the
+/// durable acknowledgement, so it only ever moves forward. lastDrainStartedAt
+/// is a cooldown stamp, not a lock — concurrent drains stay correct because
+/// processing is idempotent and the offset is guarded monotonic.
+model TelegramPollState {
+  tenantKey          String    @id @default("geleoteka")
+  nextOffset         BigInt    @default(0)
+  lastDrainStartedAt DateTime?
+  /// Durable-счётчик ядовитого апдейта: после N подряд неудач курсор
+  /// продвигается мимо виновника. Хранится только update_id, без содержимого.
+  stuckUpdateId      BigInt?
+  stuckAttempts      Int       @default(0)
+  /// Момент последней засчитанной попытки: попытки чаще spacing не считаются,
+  /// чтобы частый панельный опрос не сжигал карантин за секунды.
+  stuckLastAt        DateTime?
+  /// Single-flight lease активного drain; освобождается по завершении,
+  /// протухший перехватывается по времени.
+  leaseUntil         DateTime?
+  updatedAt          DateTime  @default(now()) @updatedAt
+}
+
 /// One atomic, server-side cooldown per person pressing a Telegram test
 /// button. It stores no Telegram destination or message data.
 model TelegramTestSendThrottle {
