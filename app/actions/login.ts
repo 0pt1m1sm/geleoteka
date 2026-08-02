@@ -4,16 +4,29 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
+import { roleLabel } from "@/lib/roles";
+import {
+  publishUserLogin,
+  type StaffNotificationPublishTx,
+} from "@/lib/staff-notifications/publish";
+import { TENANT_KEY } from "@/lib/tenant";
 import { normalizePhone } from "@/lib/utils";
 
 interface MinimalUser {
   id: string;
   email: string;
   phone: string;
+  name: string;
   passwordHash: string | null;
   permissionRole: string;
   isTempPassword: boolean;
   deletedAt: Date | null;
+}
+
+interface LoginEventTx extends StaffNotificationPublishTx {
+  auditLog: {
+    create(args: Record<string, unknown>): Promise<unknown>;
+  };
 }
 
 /**
@@ -30,6 +43,7 @@ async function findUserByIdentifier(identifierRaw: string): Promise<MinimalUser 
     id: true,
     email: true,
     phone: true,
+    name: true,
     passwordHash: true,
     permissionRole: true,
     isTempPassword: true,
@@ -84,6 +98,7 @@ export async function loginInlineForCheckout(input: {
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) return { ok: false, error: "Неверный email/телефон или пароль" };
 
+  await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
   return { ok: true };
@@ -120,6 +135,7 @@ export async function loginAction(_prevState: { error: string | null } | null, f
     return { error: "Неверный email/телефон или пароль" };
   }
 
+  await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
 
@@ -132,4 +148,35 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   }
 
   redirect("/cabinet");
+}
+
+async function recordSuccessfulPasswordLogin(user: MinimalUser): Promise<void> {
+  const occurredAt = new Date();
+  const transactionalDb = db as unknown as {
+    $transaction<T>(callback: (tx: LoginEventTx) => Promise<T>): Promise<T>;
+  };
+  await transactionalDb.$transaction(async (tx) => {
+    const audit = (await tx.auditLog.create({
+      data: {
+        tenantKey: TENANT_KEY,
+        actorUserId: user.id,
+        actorName: user.name,
+        actorRole: roleLabel(user.permissionRole),
+        action: "user.login",
+        targetType: "User",
+        targetId: user.id,
+        targetLabel: user.name,
+        metadata: { method: "PASSWORD" },
+        ip: null,
+      },
+      select: { id: true },
+    })) as { id: string };
+    await publishUserLogin(tx, {
+      userId: user.id,
+      userName: user.name,
+      permissionRole: user.permissionRole,
+      loginAuditId: audit.id,
+      occurredAt,
+    });
+  });
 }

@@ -1,7 +1,10 @@
 "use server";
 
 import { requireRole } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { replayDeadLetter } from "@/lib/email/sync";
+import { roleLabel } from "@/lib/roles";
+import { TENANT_KEY } from "@/lib/tenant";
 
 /**
  * Manual replay of a dead-lettered IMAP message, driven from the mail-sync
@@ -37,8 +40,9 @@ export interface ManualMailSyncResult {
  * runSyncOnce, что у фонового воркера и cron-роута; один ограниченный батч.
  */
 export async function runMailSyncNow(): Promise<ManualMailSyncResult> {
+  let session;
   try {
-    await requireRole(["ADMIN", "MANAGER"]);
+    session = await requireRole(["ADMIN", "MANAGER"]);
   } catch {
     return { ok: false, error: "Недостаточно прав" };
   }
@@ -61,12 +65,32 @@ export async function runMailSyncNow(): Promise<ManualMailSyncResult> {
       runtime.deps,
     );
     await recordMailSyncRun();
+    const processed = results.reduce((sum, result) => sum + result.processed, 0);
+    const created = results.reduce((sum, result) => sum + result.created, 0);
+    await db.auditLog.create({
+      data: {
+        tenantKey: TENANT_KEY,
+        actorUserId: session.id,
+        actorName: session.name,
+        actorRole: roleLabel(session.permissionRole),
+        action: "mail.sync_manual",
+        targetType: "MailSync",
+        targetId: null,
+        targetLabel: "Ручная проверка почты",
+        metadata: {
+          processed,
+          created,
+          sourceCount: runtime.config.sources.length,
+        },
+        ip: null,
+      },
+    });
     revalidatePath("/admin/crm/inbox");
     return {
       ok: true,
       error: null,
-      processed: results.reduce((sum, r) => sum + r.processed, 0),
-      created: results.reduce((sum, r) => sum + r.created, 0),
+      processed,
+      created,
     };
   } catch (err) {
     console.error("[MAIL SYNC] runMailSyncNow", err);

@@ -4,11 +4,112 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
+import { requirePermission } from "@/lib/authz";
+import { roleLabel } from "@/lib/roles";
+import { TENANT_KEY } from "@/lib/tenant";
 import { normalizePhone } from "@/lib/utils";
 
 export interface DeleteCustomerResult {
   error: string | null;
   hardDeleted?: boolean;
+}
+
+interface CustomerManagerResult {
+  error: string | null;
+}
+
+interface CustomerManagerTx {
+  user: {
+    update(args: Record<string, unknown>): Promise<unknown>;
+  };
+  auditLog: {
+    create(args: Record<string, unknown>): Promise<unknown>;
+  };
+}
+
+/** Assign or clear the personal CRM manager shown in Customer 360. */
+export async function setCustomerManager(
+  _prevState: CustomerManagerResult | null,
+  formData: FormData,
+): Promise<CustomerManagerResult> {
+  const session = await requirePermission("crm.manage");
+  const customerUserId =
+    ((formData.get("customerUserId") as string | null) ?? "").trim();
+  const managerUserId =
+    ((formData.get("managerUserId") as string | null) ?? "").trim() || null;
+  if (!customerUserId) return { error: "Клиент не найден" };
+
+  const customer = (await db.user.findUnique({
+    where: { id: customerUserId },
+    select: {
+      id: true,
+      name: true,
+      isCustomer: true,
+      deletedAt: true,
+      managerUserId: true,
+    },
+  })) as {
+    id: string;
+    name: string;
+    isCustomer: boolean;
+    deletedAt: Date | null;
+    managerUserId: string | null;
+  } | null;
+  if (!customer || !customer.isCustomer || customer.deletedAt) {
+    return { error: "Клиент не найден" };
+  }
+
+  if (managerUserId) {
+    const manager = (await db.user.findUnique({
+      where: { id: managerUserId },
+      select: { id: true, permissionRole: true, deletedAt: true },
+    })) as {
+      id: string;
+      permissionRole: string;
+      deletedAt: Date | null;
+    } | null;
+    if (
+      !manager ||
+      manager.deletedAt !== null ||
+      (manager.permissionRole !== "ADMIN" && manager.permissionRole !== "MANAGER")
+    ) {
+      return { error: "Менеджер не найден среди сотрудников" };
+    }
+  }
+
+  if (customer.managerUserId === managerUserId) return { error: null };
+
+  const transactionalDb = db as unknown as {
+    $transaction<T>(callback: (tx: CustomerManagerTx) => Promise<T>): Promise<T>;
+  };
+  await transactionalDb.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: customerUserId },
+      data: { managerUserId },
+    });
+    await tx.auditLog.create({
+      data: {
+        tenantKey: TENANT_KEY,
+        actorUserId: session.id,
+        actorName: session.name,
+        actorRole: roleLabel(session.permissionRole),
+        action: managerUserId
+          ? "customer.manager_assign"
+          : "customer.manager_unassign",
+        targetType: "User",
+        targetId: customer.id,
+        targetLabel: customer.name,
+        metadata: {
+          previousManagerUserId: customer.managerUserId,
+          managerUserId,
+        },
+        ip: null,
+      },
+    });
+  });
+
+  revalidatePath(`/admin/customers/${customerUserId}`);
+  return { error: null };
 }
 
 /**

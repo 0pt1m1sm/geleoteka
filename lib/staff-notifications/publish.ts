@@ -1,5 +1,8 @@
 import { isInboundCommChannel } from "@/lib/crm/inbound-communications";
-import { assertSafeAdminActionUrl } from "@/lib/staff-notifications/safe-action-url";
+import {
+  assertSafeAdminActionUrl,
+  makeAdminActionUrl,
+} from "@/lib/staff-notifications/safe-action-url";
 import {
   STAFF_NOTIFICATION_EVENT_CATALOG,
   isStaffNotificationType,
@@ -10,6 +13,8 @@ import {
   type StaffNotificationType,
 } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
+import { formatDateTime } from "@/lib/utils";
+import { roleLabel } from "@/lib/roles";
 
 type QueryArgs = Record<string, unknown>;
 
@@ -38,6 +43,10 @@ const ENTITY_EVENT_IDENTITY = {
     sourceType: "InboxMessage",
     dedupePrefix: "inbound-message-unresolved",
   },
+  TASK_CREATED: {
+    sourceType: "CrmTask",
+    dedupePrefix: "task-created",
+  },
 } as const satisfies Partial<
   Record<StaffNotificationType, { sourceType: string; dedupePrefix: string }>
 >;
@@ -47,6 +56,35 @@ export interface StaffNotificationPublishTx {
   staffNotificationEvent: {
     upsert(args: QueryArgs): Promise<unknown>;
   };
+}
+
+export interface PublishTaskAssignedInput {
+  taskId: string;
+  ownerUserId: string;
+  assignedByUserId: string;
+  assignmentAuditId: string;
+  customerUserId: string | null;
+  customerName: string | null;
+  dealId: string | null;
+  dueAt: Date;
+  occurredAt: Date;
+}
+
+export interface PublishTaskCreatedInput {
+  taskId: string;
+  customerUserId: string | null;
+  customerName: string | null;
+  dealId: string | null;
+  dealNumber: string | null;
+  occurredAt: Date;
+}
+
+export interface PublishUserLoginInput {
+  userId: string;
+  userName: string;
+  permissionRole: string;
+  loginAuditId: string;
+  occurredAt: Date;
 }
 
 const EVENT_SELECT = {
@@ -143,6 +181,129 @@ export function crmTaskOverdueDedupeKey(taskId: string, dueAt: Date): string {
   return `task-overdue:${id}:${dueAt.toISOString()}`;
 }
 
+export function taskAssignedDedupeKey(
+  taskId: string,
+  ownerUserId: string,
+  assignmentAuditId: string,
+): string {
+  return `task-assigned:${requireNonBlank(taskId, "taskId")}:${requireNonBlank(
+    ownerUserId,
+    "ownerUserId",
+  )}:${requireNonBlank(assignmentAuditId, "assignmentAuditId")}`;
+}
+
+export function userLoginDedupeKey(
+  userId: string,
+  loginAuditId: string,
+): string {
+  return `user-login:${requireNonBlank(userId, "userId")}:${requireNonBlank(
+    loginAuditId,
+    "loginAuditId",
+  )}`;
+}
+
+export async function publishUserLogin(
+  client: StaffNotificationPublishTx,
+  input: PublishUserLoginInput,
+): Promise<StaffNotificationEventRecord> {
+  const userId = requireNonBlank(input.userId, "userId");
+  const userName = normalizeSafeCustomerName(input.userName) ?? "Пользователь";
+  const role = roleLabel(requireNonBlank(input.permissionRole, "permissionRole"));
+  return publishStaffNotificationEvent(client, {
+    type: "USER_LOGIN",
+    dedupeKey: userLoginDedupeKey(userId, input.loginAuditId),
+    sourceType: "User",
+    sourceId: userId,
+    safeSummary: `Вход в платформу\n${userName} · ${role}`,
+    actionPath: makeAdminActionUrl(
+      `/admin/users/${encodeURIComponent(userId)}`,
+    ),
+    occurredAt: input.occurredAt,
+  });
+}
+
+export async function publishTaskCreated(
+  client: StaffNotificationPublishTx,
+  input: PublishTaskCreatedInput,
+): Promise<StaffNotificationEventRecord> {
+  const taskId = requireNonBlank(input.taskId, "taskId");
+  const customerName = normalizeSafeCustomerName(input.customerName);
+  const dealNumber = normalizeSafeDealNumber(input.dealNumber);
+  const context = [
+    customerName,
+    dealNumber ? `сделка ${dealNumber}` : null,
+  ]
+    .filter((value): value is string => value !== null)
+    .join(" · ");
+  const actionPath = input.dealId
+    ? `/admin/crm/deals/${encodeURIComponent(input.dealId)}`
+    : input.customerUserId
+      ? `/admin/customers/${encodeURIComponent(input.customerUserId)}`
+      : "/admin/crm/tasks";
+
+  return publishStaffNotificationEvent(client, {
+    type: "TASK_CREATED",
+    dedupeKey: staffNotificationEntityDedupeKey("TASK_CREATED", taskId),
+    sourceType: "CrmTask",
+    sourceId: taskId,
+    relatedCustomerUserId: input.customerUserId,
+    relatedDealId: input.dealId,
+    relatedTaskId: taskId,
+    safeSummary: context ? `Новая задача\n${context}` : "Новая задача",
+    actionPath: makeAdminActionUrl(actionPath),
+    occurredAt: input.occurredAt,
+  });
+}
+
+/** Publish only assignments made by somebody other than the new owner. */
+export async function publishTaskAssigned(
+  client: StaffNotificationPublishTx,
+  input: PublishTaskAssignedInput,
+): Promise<StaffNotificationEventRecord | null> {
+  const taskId = requireNonBlank(input.taskId, "taskId");
+  const ownerUserId = requireNonBlank(input.ownerUserId, "ownerUserId");
+  const assignedByUserId = requireNonBlank(
+    input.assignedByUserId,
+    "assignedByUserId",
+  );
+  if (ownerUserId === assignedByUserId) return null;
+  if (!(input.dueAt instanceof Date) || !Number.isFinite(input.dueAt.getTime())) {
+    throw new Error("dueAt must be a valid Date");
+  }
+
+  const customerName = normalizeSafeCustomerName(input.customerName);
+  const safeSummary = [
+    "Вам назначена задача",
+    customerName,
+    `Срок: ${formatDateTime(input.dueAt)}`,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+  const actionPath = input.dealId
+    ? `/admin/crm/deals/${encodeURIComponent(input.dealId)}`
+    : input.customerUserId
+      ? `/admin/customers/${encodeURIComponent(input.customerUserId)}`
+      : "/admin/crm/tasks";
+
+  return publishStaffNotificationEvent(client, {
+    type: "TASK_ASSIGNED",
+    dedupeKey: taskAssignedDedupeKey(
+      taskId,
+      ownerUserId,
+      input.assignmentAuditId,
+    ),
+    sourceType: "CrmTask",
+    sourceId: taskId,
+    relatedCustomerUserId: input.customerUserId,
+    relatedDealId: input.dealId,
+    relatedTaskId: taskId,
+    targetUserId: ownerUserId,
+    safeSummary,
+    actionPath: makeAdminActionUrl(actionPath),
+    occurredAt: input.occurredAt,
+  });
+}
+
 export function toSafeChannelPayload(
   event: StaffNotificationEventRecord,
 ): SafeChannelPayload {
@@ -200,6 +361,41 @@ function assertPublishInput(input: PublishStaffNotificationInput): void {
       throw new Error("CRM_TASK_OVERDUE dedupeKey must include CrmTask.id and dueAt");
     }
   }
+  if (input.type === "TASK_ASSIGNED") {
+    if (input.sourceType !== "CrmTask") {
+      throw new Error("TASK_ASSIGNED must use CrmTask as its source");
+    }
+    if (input.relatedTaskId !== input.sourceId) {
+      throw new Error("TASK_ASSIGNED must reference its source task");
+    }
+    if (!input.targetUserId) {
+      throw new Error("TASK_ASSIGNED must target the task owner");
+    }
+    const prefix = `task-assigned:${input.sourceId}:${input.targetUserId}:`;
+    if (
+      !input.dedupeKey.startsWith(prefix) ||
+      input.dedupeKey.slice(prefix.length).trim().length === 0
+    ) {
+      throw new Error(
+        "TASK_ASSIGNED dedupeKey must include task, owner and assignment occurrence",
+      );
+    }
+  }
+  if (input.type === "TASK_CREATED" && input.relatedTaskId !== input.sourceId) {
+    throw new Error("TASK_CREATED must reference its source task");
+  }
+  if (input.type === "USER_LOGIN") {
+    if (input.sourceType !== "User") {
+      throw new Error("USER_LOGIN must use User as its source");
+    }
+    const prefix = `user-login:${input.sourceId}:`;
+    if (
+      !input.dedupeKey.startsWith(prefix) ||
+      input.dedupeKey.slice(prefix.length).trim().length === 0
+    ) {
+      throw new Error("USER_LOGIN dedupeKey must include user and login occurrence");
+    }
+  }
   const entityIdentity = (
     ENTITY_EVENT_IDENTITY as Partial<
       Record<StaffNotificationType, { sourceType: string; dedupePrefix: string }>
@@ -245,4 +441,16 @@ function assertDedupeIdentity(
 function requireNonBlank(value: string, field: string): string {
   if (value.trim().length === 0) throw new Error(`${field} must not be blank`);
   return value;
+}
+
+function normalizeSafeCustomerName(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.trim().replace(/\s+/g, " ");
+  return normalized ? normalized.slice(0, 200) : null;
+}
+
+function normalizeSafeDealNumber(value: string | null): string | null {
+  if (!value) return null;
+  const normalized = value.trim();
+  return /^[A-Za-zА-Яа-яЁё0-9-]{1,40}$/.test(normalized) ? normalized : null;
 }

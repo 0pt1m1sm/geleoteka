@@ -59,6 +59,58 @@ describe("inbound customer message projector retries", () => {
 });
 
 describe("Telegram routing", () => {
+  it("prioritizes the customer's personal manager over the deal owner", async () => {
+    const db = routableDb("deal_manager");
+    const customer = db.users.find((row) => row.id === "customer_1");
+    if (!customer) throw new Error("test customer missing");
+    customer.managerUserId = "customer_manager";
+    db.users.push(
+      {
+        id: "deal_manager",
+        name: "Владелец сделки",
+        permissionRole: "MANAGER",
+        deletedAt: null,
+      },
+      {
+        id: "customer_manager",
+        name: "Менеджер клиента",
+        permissionRole: "MANAGER",
+        deletedAt: null,
+      },
+    );
+    db.telegramDestinations.push(
+      {
+        id: "personal_deal",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "deal_manager",
+        isActive: true,
+        disabledAt: null,
+      },
+      {
+        id: "personal_customer",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "customer_manager",
+        isActive: true,
+        disabledAt: null,
+      },
+    );
+
+    await expect(
+      projectInboundCustomerMessageEvent(projectorDb(db), "event_route", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationReceipts[0]).toMatchObject({
+      userId: "customer_manager",
+    });
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      destinationKey: "personal_customer",
+    });
+  });
+
   it("routes an assigned event only to the eligible owner's personal destination", async () => {
     const db = routableDb("manager_1");
     db.telegramDestinations.push({
@@ -293,6 +345,161 @@ describe("Telegram routing", () => {
     expect(db.staffNotificationDeliveries[0]).toMatchObject({
       channel: "TELEGRAM",
       destinationKey: "shared_parts",
+    });
+  });
+
+  it("routes TASK_ASSIGNED only to the task owner's personal destination", async () => {
+    const db = new FakeEmailDb();
+    db.users.push(
+      {
+        id: "manager_1",
+        name: "Постановщик",
+        permissionRole: "MANAGER",
+        deletedAt: null,
+      },
+      {
+        id: "manager_2",
+        name: "Исполнитель",
+        permissionRole: "MANAGER",
+        deletedAt: null,
+      },
+    );
+    db.staffNotificationEvents.push({
+      ...eventRecord(),
+      id: "event_task_assigned",
+      type: "TASK_ASSIGNED",
+      priority: "P1",
+      channel: null,
+      dedupeKey: "task-assigned:task_1:manager_2",
+      sourceType: "CrmTask",
+      sourceId: "task_1",
+      relatedCustomerUserId: "customer_1",
+      relatedDealId: null,
+      relatedTaskId: "task_1",
+      targetUserId: "manager_2",
+      fallbackPermission: "crm.manage",
+      routingStatus: "PENDING",
+      routingAttempts: 0,
+      nextRoutingAt: NOW,
+      routedAt: null,
+      lastRoutingError: null,
+    });
+    db.telegramDestinations.push(
+      {
+        id: "personal_1",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "manager_1",
+        isActive: true,
+        disabledAt: null,
+      },
+      {
+        id: "personal_2",
+        tenantKey: TENANT_KEY,
+        kind: "PERSONAL",
+        userId: "manager_2",
+        isActive: true,
+        disabledAt: null,
+      },
+    );
+    for (const [key, value] of Object.entries({
+      TELEGRAM_ENABLED: "true",
+      TELEGRAM_ENABLED_AT: NOW.toISOString(),
+      TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
+      TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
+      TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
+      TELEGRAM_ROUTING_MODE: "PERSONAL_WITH_SHARED_FALLBACK",
+      TELEGRAM_NOTIFY_TASK_ASSIGNED: "true",
+    })) {
+      db.settings.push({ id: `setting_${key}`, key, value });
+    }
+
+    await expect(
+      projectStaffNotificationEvent(db as unknown as InboundCustomerMessageProjectorDb, "event_task_assigned", NOW),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationReceipts[0]).toMatchObject({ userId: "manager_2" });
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      destinationKey: "personal_2",
+    });
+  });
+
+  it.each([
+    {
+      type: "USER_LOGIN",
+      sourceType: "User",
+      sourceId: "client_1",
+      dedupeKey: "user-login:client_1:audit_1",
+      fallbackPermission: "users.manage",
+    },
+    {
+      type: "TASK_CREATED",
+      sourceType: "CrmTask",
+      sourceId: "task_1",
+      dedupeKey: "task-created:task_1",
+      fallbackPermission: "crm.manage",
+    },
+  ])("routes $type through fallbackPermission to a shared destination", async (input) => {
+    const db = new FakeEmailDb();
+    db.users.push({
+      id: "admin_1",
+      name: "Администратор",
+      permissionRole: "ADMIN",
+      deletedAt: null,
+    });
+    db.staffNotificationEvents.push({
+      ...eventRecord(),
+      id: `event_${input.type}`,
+      type: input.type,
+      priority: input.type === "USER_LOGIN" ? "P2" : "P1",
+      channel: null,
+      dedupeKey: input.dedupeKey,
+      sourceType: input.sourceType,
+      sourceId: input.sourceId,
+      relatedTaskId: input.type === "TASK_CREATED" ? input.sourceId : null,
+      targetUserId: null,
+      fallbackPermission: input.fallbackPermission,
+      routingStatus: "PENDING",
+      routingAttempts: 0,
+      nextRoutingAt: NOW,
+      routedAt: null,
+      lastRoutingError: null,
+    });
+    db.telegramDestinations.push({
+      id: "shared_story_4",
+      tenantKey: TENANT_KEY,
+      kind: "SHARED",
+      userId: null,
+      isActive: true,
+      disabledAt: null,
+    });
+    for (const [key, value] of Object.entries({
+      TELEGRAM_ENABLED: "true",
+      TELEGRAM_ENABLED_AT: NOW.toISOString(),
+      TELEGRAM_BOT_TOKEN: `123456:${"A".repeat(32)}`,
+      TELEGRAM_BOT_USERNAME: "GeleotekaStaffBot",
+      TELEGRAM_WEBHOOK_SECRET: "W".repeat(32),
+      TELEGRAM_ROUTING_MODE: "PERSONAL_WITH_SHARED_FALLBACK",
+      [`TELEGRAM_NOTIFY_${input.type}`]: "true",
+    })) {
+      db.settings.push({ id: `setting_${key}`, key, value });
+    }
+
+    await expect(
+      projectStaffNotificationEvent(
+        db as unknown as InboundCustomerMessageProjectorDb,
+        `event_${input.type}`,
+        NOW,
+      ),
+    ).resolves.toBe("projected");
+
+    expect(db.staffNotificationReceipts).toHaveLength(1);
+    expect(db.staffNotificationReceipts[0]).toMatchObject({ userId: "admin_1" });
+    expect(db.staffNotificationDeliveries).toHaveLength(1);
+    expect(db.staffNotificationDeliveries[0]).toMatchObject({
+      destinationKey: "shared_story_4",
     });
   });
 });

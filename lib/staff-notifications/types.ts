@@ -9,6 +9,8 @@ export interface StaffNotificationEventDefinition {
   priority: StaffNotificationPriority;
   fallbackPermission: Permission;
   requiresInboundChannel: boolean;
+  /** Never fan out when an explicit recipient is unavailable or opted out. */
+  targetOnly?: boolean;
 }
 
 /**
@@ -60,6 +62,25 @@ export const STAFF_NOTIFICATION_EVENT_CATALOG = {
   },
   CRM_TASK_OVERDUE: {
     label: "Просроченная задача",
+    priority: "P1",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: false,
+  },
+  TASK_ASSIGNED: {
+    label: "Задача назначена",
+    priority: "P1",
+    fallbackPermission: "crm.manage",
+    requiresInboundChannel: false,
+    targetOnly: true,
+  },
+  USER_LOGIN: {
+    label: "Вход в платформу",
+    priority: "P2",
+    fallbackPermission: "users.manage",
+    requiresInboundChannel: false,
+  },
+  TASK_CREATED: {
+    label: "Новая задача",
     priority: "P1",
     fallbackPermission: "crm.manage",
     requiresInboundChannel: false,

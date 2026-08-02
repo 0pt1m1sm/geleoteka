@@ -369,6 +369,10 @@ model User {
   // field existed will have unknown source.
   referralSource ReferralSource?
 
+  // Personal CRM manager for a customer. This is intentionally a self-
+  // relation because staff and customers share the unified User model.
+  managerUserId String?
+
   /// Часовой пояс и язык — предпочтения самого человека.
   /// НЕ управляют показом времени записи: у сервиса одни часы, те что на стене
   /// в цехе, и «когда привозить машину» не зависит от того, где сейчас клиент.
@@ -446,6 +450,9 @@ model User {
   crmTasksOwned      CrmTask[] @relation("CrmTaskOwner")
   crmTasksAsCustomer CrmTask[] @relation("CrmTaskCustomer")
 
+  manager          User?  @relation("CustomerManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+  managedCustomers User[] @relation("CustomerManager")
+
   // Self-referential — referrals
   referredBy    User?   @relation("Referral", fields: [referredById], references: [id])
   referredUsers User[]  @relation("Referral")
@@ -459,6 +466,7 @@ model User {
   @@index([permissionRole])
   @@index([isCustomer, permissionRole])
   @@index([deletedAt])
+  @@index([managerUserId])
 }
 
 model CustomerProfile {

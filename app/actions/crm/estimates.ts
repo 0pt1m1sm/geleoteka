@@ -82,6 +82,14 @@ export async function openOrCreateActiveEstimate(
     data: { dealId, stage: "DRAFT", preparedByUserId: session.id },
     select: { id: true },
   })) as { id: string };
+  await recordAudit({
+    actor: session,
+    action: "estimate.create",
+    targetType: "Estimate",
+    targetId: created.id,
+    targetLabel: created.id,
+    metadata: { dealId, kind: "blank" },
+  });
   revalidatePath(`/admin/crm/deals/${dealId}`);
   return { error: null, estimateId: created.id };
 }
@@ -625,6 +633,21 @@ export async function reviseEstimate(estimateId: string): Promise<EstimateMutati
       await releasePartLinesForEstimate(tx, parent.id, actorId(session));
     }
     await reservePartLinesForEstimate(tx, created.id, actorId(session));
+    await recordAudit(
+      {
+        actor: session,
+        action: "estimate.create",
+        targetType: "Estimate",
+        targetId: created.id,
+        targetLabel: number ?? created.id,
+        metadata: {
+          dealId: parent.dealId,
+          kind: "revision",
+          parentEstimateId: parent.id,
+        },
+      },
+      tx,
+    );
     return created;
   });
 

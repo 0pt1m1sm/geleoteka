@@ -120,6 +120,32 @@ describe("safe staff notification action URLs", () => {
 });
 
 describe("staff notification router", () => {
+  it("does not fan out an opted-out target-only assignment to fallback staff", () => {
+    expect(
+      selectStaffNotificationRecipients(
+        {
+          type: "TASK_ASSIGNED",
+          targetUserId: "owner",
+          fallbackPermission: "crm.manage",
+        },
+        [
+          {
+            userId: "owner",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "crm.manage"]),
+            disabledEventTypes: new Set(["TASK_ASSIGNED"]),
+          },
+          {
+            userId: "other_manager",
+            canViewNotifications: true,
+            permissions: new Set(["notifications.view", "crm.manage"]),
+            disabledEventTypes: new Set(),
+          },
+        ],
+      ),
+    ).toEqual([]);
+  });
+
   it("shows profile categories only for effective notification and domain rights", () => {
     expect(
       staffNotificationTypesForPermissions(

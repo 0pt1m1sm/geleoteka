@@ -1,4 +1,8 @@
-import { isStaffNotificationChannel } from "@/lib/staff-notifications/types";
+import {
+  STAFF_NOTIFICATION_EVENT_CATALOG,
+  isStaffNotificationChannel,
+  isStaffNotificationType,
+} from "@/lib/staff-notifications/types";
 import type {
   StaffNotificationChannel,
   StaffNotificationEventRecord,
@@ -76,6 +80,12 @@ export function selectStaffNotificationRecipients(
   if (event.targetUserId) {
     const target = eligible.find((candidate) => candidate.userId === event.targetUserId);
     if (target) return [target.userId];
+    if (
+      isStaffNotificationType(event.type) &&
+      STAFF_NOTIFICATION_EVENT_CATALOG[event.type].targetOnly === true
+    ) {
+      return [];
+    }
   }
 
   if (!permission) return [];
