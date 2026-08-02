@@ -6,7 +6,10 @@ import {
 } from "@/lib/staff-notifications/channels/telegram/adapter";
 import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
 import { resolveTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
-import { parseTelegramLinkCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
+import {
+  formatTelegramLinkCommand,
+  parseTelegramLinkCommand,
+} from "@/lib/staff-notifications/channels/telegram/link-command";
 import {
   createTelegramLinkToken,
   hashTelegramLinkToken,
@@ -31,6 +34,34 @@ import { TENANT_KEY } from "@/lib/tenant";
 import { validateSettingValue } from "@/lib/settings-validation";
 
 const NOW = new Date("2026-08-01T12:00:00.000Z");
+
+describe("Telegram link commands", () => {
+  const rawToken = `${"A".repeat(41)}_-`;
+
+  it.each([
+    ["a line break", `/start\n${rawToken}`],
+    ["multiple spaces", `/start   ${rawToken}`],
+    ["a tab", `/start\t${rawToken}`],
+    ["surrounding whitespace", ` \n/start ${rawToken}\t `],
+    ["a bot username and line break", `/start@GeleotekaStaffBot\n${rawToken}`],
+  ])("accepts %s between or around the command", (_case, command) => {
+    expect(parseTelegramLinkCommand(command)).toBe(rawToken);
+  });
+
+  it.each([
+    ["42 characters", "A".repeat(42)],
+    ["44 characters", "A".repeat(44)],
+    ["an invalid character", `${"A".repeat(42)}!`],
+  ])("rejects a token with %s", (_case, token) => {
+    expect(parseTelegramLinkCommand(`/start ${token}`)).toBeNull();
+  });
+
+  it("parses a formatted command after its separator becomes a line break", () => {
+    const receivedCommand = formatTelegramLinkCommand(rawToken).replace(" ", "\n");
+
+    expect(parseTelegramLinkCommand(receivedCommand)).toBe(rawToken);
+  });
+});
 
 describe("Telegram runtime config", () => {
   it("has human-readable labels for every notification category", () => {
@@ -208,6 +239,29 @@ describe("Telegram link tokens", () => {
 });
 
 describe("Telegram webhook processing", () => {
+  it("accepts a formatted link command received with a line break", async () => {
+    const rawToken = "N".repeat(43);
+    const fake = new FakeTelegramWebhookDb(rawToken);
+    const receivedCommand = formatTelegramLinkCommand(rawToken).replace(" ", "\n");
+
+    await expect(
+      processTelegramWebhookUpdate(
+        fake,
+        {
+          update_id: 8995,
+          message: {
+            text: receivedCommand,
+            chat: { id: 777009995, type: "private" },
+            from: { id: 777009995, is_bot: false },
+          },
+        },
+        NOW,
+      ),
+    ).resolves.toBe("linked");
+
+    expect(fake.destinations).toHaveLength(1);
+  });
+
   it("guides a private chat after a bare /start command", async () => {
     const chatId = 777009990;
     const fake = new FakeTelegramWebhookDb("S".repeat(43));
@@ -243,7 +297,7 @@ describe("Telegram webhook processing", () => {
     expect(scheduleReply.mock.calls[0]?.[0].text).not.toContain(String(chatId));
   });
 
-  it("guides a group after a bare /start command", async () => {
+  it("guides a group after a bare /start command with surrounding whitespace", async () => {
     const fake = new FakeTelegramWebhookDb("T".repeat(43));
     const scheduleReply = vi.fn();
 
@@ -253,7 +307,7 @@ describe("Telegram webhook processing", () => {
         {
           update_id: 8997,
           message: {
-            text: "/start",
+            text: " \n/start\t ",
             chat: { id: -777009997, type: "group" },
             from: { id: 777009997, is_bot: false },
           },
