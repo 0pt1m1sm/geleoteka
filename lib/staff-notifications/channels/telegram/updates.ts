@@ -60,6 +60,23 @@ export interface DrainTelegramUpdatesOptions {
    * not be starved by interactive drains refreshing the cooldown stamp.
    */
   force?: boolean;
+  /**
+   * Секунды длинного опроса: запрос getUpdates висит на стороне Telegram и
+   * возвращается мгновенно при апдейте. Урезается остатком бюджета; 0 или
+   * отсутствие — короткий опрос.
+   */
+  longPollSeconds?: number;
+  /**
+   * Тихий режим фонового воркера: успешные опросы БЕЗ апдейтов не пишут
+   * диагностику (иначе цикл раз в ~25с затапливает экран операций).
+   * Успех с апдейтами и провалы пишутся как обычно.
+   */
+  quietDiagnostics?: boolean;
+  /**
+   * Воркер подавляет диагностику ПОВТОРНОГО провала с тем же кодом (дедуп
+   * держит сам воркер): первый провал виден, шторм одинаковых — нет.
+   */
+  suppressFailureDiagnostic?: boolean;
   now?: () => Date;
   monotonicNow?: () => number;
   requestTimeoutMs?: number;
@@ -235,11 +252,26 @@ async function runDrainLoop(
       lastAt: state?.stuckLastAt ?? null,
     };
 
+    // Длинный опрос урезается остатком бюджета: серверное ожидание Telegram
+    // не должно пережить наш собственный HTTP-таймаут.
+    const longPollSeconds = Math.max(
+      0,
+      Math.min(
+        options.longPollSeconds ?? 0,
+        Math.floor((remaining() - requestTimeoutMs) / 1000),
+      ),
+    );
     const batch = await fetchTelegramUpdates(db, fetchImpl, {
       apiBaseUrl: options.apiBaseUrl,
       botToken: options.botToken,
       offset,
-      requestTimeoutMs: capTimeout(requestTimeoutMs, remaining()),
+      longPollSeconds,
+      quietDiagnostics: options.quietDiagnostics === true,
+      suppressFailureDiagnostic: options.suppressFailureDiagnostic === true,
+      requestTimeoutMs: capTimeout(
+        requestTimeoutMs + longPollSeconds * 1000,
+        remaining(),
+      ),
       monotonicNow,
     });
     batches += 1;
@@ -388,6 +420,9 @@ async function fetchTelegramUpdates(
     apiBaseUrl: string;
     botToken: string;
     offset: number;
+    longPollSeconds: number;
+    quietDiagnostics: boolean;
+    suppressFailureDiagnostic: boolean;
     requestTimeoutMs: number;
     monotonicNow: () => number;
   },
@@ -406,7 +441,7 @@ async function fetchTelegramUpdates(
         body: JSON.stringify({
           offset: input.offset,
           limit: TELEGRAM_POLL_BATCH_LIMIT,
-          timeout: 0,
+          timeout: input.longPollSeconds,
           allowed_updates: ["message"],
         }),
         signal: controller.signal,
@@ -433,17 +468,25 @@ async function fetchTelegramUpdates(
     clearTimeout(timer);
   }
 
-  await recordTelegramSendDiagnostic(db, {
-    operation: "UPDATES_POLL",
-    outcome: result.outcome === "ok" ? "SUCCESS" : "FAILURE",
-    durationMs: input.monotonicNow() - startedAt,
-    errorCode:
-      result.outcome === "ok"
-        ? null
-        : result.outcome === "conflict"
-          ? "TELEGRAM_CONFLICT"
-          : result.errorCode,
-  });
+  const quietEmptySuccess =
+    input.quietDiagnostics &&
+    result.outcome === "ok" &&
+    result.updates.length === 0;
+  const quietRepeatFailure =
+    input.suppressFailureDiagnostic && result.outcome !== "ok";
+  if (!quietEmptySuccess && !quietRepeatFailure) {
+    await recordTelegramSendDiagnostic(db, {
+      operation: "UPDATES_POLL",
+      outcome: result.outcome === "ok" ? "SUCCESS" : "FAILURE",
+      durationMs: input.monotonicNow() - startedAt,
+      errorCode:
+        result.outcome === "ok"
+          ? null
+          : result.outcome === "conflict"
+            ? "TELEGRAM_CONFLICT"
+            : result.errorCode,
+    });
+  }
   return result;
 }
 

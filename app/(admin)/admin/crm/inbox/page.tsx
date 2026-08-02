@@ -8,6 +8,8 @@ import { formatDate } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
 import { InboxCard } from "@/components/admin/inbox/InboxCard";
 import { InboxTabs } from "@/components/admin/inbox/InboxTabs";
+import { MailPullButton } from "@/components/admin/inbox/MailPullButton";
+import { readMailSyncLastRunAt } from "@/lib/email/sync-status";
 
 interface Props {
   searchParams: Promise<{ status?: string }>;
@@ -57,6 +59,16 @@ interface InboxRow {
 
 function attachmentCount(attachments: unknown): number {
   return Array.isArray(attachments) ? attachments.length : 0;
+}
+
+/** «Только что» честнее «0 мин назад»; дальше минуты, часы, дата. */
+function formatSyncAge(date: Date): string {
+  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60_000));
+  if (minutes < 1) return "только что";
+  if (minutes < 60) return `${minutes} мин назад`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ч назад`;
+  return formatDate(date);
 }
 
 /** Message that landed noticeably before the sync picked it up — i.e. imported
@@ -199,6 +211,8 @@ export default async function InboxPage({ searchParams }: Props) {
       })) as AllMailRow[])
     : [];
 
+  const lastSyncAt = await readMailSyncLastRunAt();
+
   return (
     <div>
       <PageHeader
@@ -210,6 +224,15 @@ export default async function InboxPage({ searchParams }: Props) {
             : "Письма от неизвестных отправителей ожидают разбора"
         }
       />
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <MailPullButton />
+        <span className="text-sm text-[var(--foreground-muted)]">
+          {lastSyncAt
+            ? `Почта проверялась: ${formatSyncAge(lastSyncAt)}`
+            : "Почта ещё не проверялась — фоновая проверка идёт раз в минуту"}
+        </span>
+      </div>
 
       <InboxTabs
         active={status}

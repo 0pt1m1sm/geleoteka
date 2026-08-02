@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { loadMailSyncRuntime } from "@/lib/email/mail-sync-config";
 import { runSyncOnce } from "@/lib/email/sync";
+import { recordMailSyncRun } from "@/lib/email/sync-status";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +57,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Keep a route-triggered batch small so it stays well inside request limits;
     // the scheduler calls again to drain a backlog.
     const results = await runSyncOnce({ ...runtime.config, batchSize: 25 }, runtime.deps);
+    await recordMailSyncRun();
     return NextResponse.json({
       ok: true,
       sources: results.map((r) => ({

@@ -27,6 +27,9 @@ export async function drainTelegramUpdatesNow(options: {
   force?: boolean;
   budgetMs?: number;
   maxBatches?: number;
+  longPollSeconds?: number;
+  quietDiagnostics?: boolean;
+  suppressFailureDiagnostic?: boolean;
 }): Promise<
   DrainTelegramUpdatesResult | { status: "channel-disabled"; processed: 0 }
 > {
@@ -43,6 +46,9 @@ export async function drainTelegramUpdatesNow(options: {
       force: options.force,
       budgetMs: options.budgetMs,
       maxBatches: options.maxBatches,
+      longPollSeconds: options.longPollSeconds,
+      quietDiagnostics: options.quietDiagnostics,
+      suppressFailureDiagnostic: options.suppressFailureDiagnostic,
     },
   );
 }

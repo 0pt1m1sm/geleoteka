@@ -24,6 +24,56 @@ export interface ReplayResult {
   status?: string;
 }
 
+export interface ManualMailSyncResult {
+  ok: boolean;
+  error: string | null;
+  /** Сколько писем обработано/создано этим пулом (по всем источникам). */
+  processed?: number;
+  created?: number;
+}
+
+/**
+ * Ручной пул почты с кнопки на странице «Входящие письма». Тот же
+ * runSyncOnce, что у фонового воркера и cron-роута; один ограниченный батч.
+ */
+export async function runMailSyncNow(): Promise<ManualMailSyncResult> {
+  try {
+    await requireRole(["ADMIN", "MANAGER"]);
+  } catch {
+    return { ok: false, error: "Недостаточно прав" };
+  }
+
+  const { loadMailSyncRuntime } = await import("@/lib/email/mail-sync-config");
+  const { runSyncOnce } = await import("@/lib/email/sync");
+  const { recordMailSyncRun } = await import("@/lib/email/sync-status");
+  const { revalidatePath } = await import("next/cache");
+
+  try {
+    const runtime = await loadMailSyncRuntime();
+    if (!runtime.enabled) {
+      return { ok: false, error: "Синхронизация почты выключена в настройках" };
+    }
+    if (runtime.config.sources.length === 0) {
+      return { ok: false, error: "Источники почты не настроены" };
+    }
+    const results = await runSyncOnce(
+      { ...runtime.config, batchSize: 25 },
+      runtime.deps,
+    );
+    await recordMailSyncRun();
+    revalidatePath("/admin/crm/inbox");
+    return {
+      ok: true,
+      error: null,
+      processed: results.reduce((sum, r) => sum + r.processed, 0),
+      created: results.reduce((sum, r) => sum + r.created, 0),
+    };
+  } catch (err) {
+    console.error("[MAIL SYNC] runMailSyncNow", err);
+    return { ok: false, error: "Проверка почты не удалась. Попробуйте ещё раз." };
+  }
+}
+
 export async function replayMailSyncDeadLetter(emailMessageId: string): Promise<ReplayResult> {
   try {
     await requireRole(["ADMIN"]);
