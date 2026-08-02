@@ -58,6 +58,20 @@ export async function createDealManually(
     notes,
   });
 
+  await recordAudit({
+    actor: session,
+    action: "deal.create",
+    targetType: "Deal",
+    targetId: deal.id,
+    targetLabel: deal.number ?? deal.id,
+    metadata: {
+      customerUserId: customer.id,
+      vehicleId,
+      channel,
+      source,
+    },
+  });
+
   revalidatePath("/admin/crm/deals");
   redirect(`/admin/crm/deals/${deal.id}`);
 }

@@ -11,6 +11,7 @@ import { getTagBadgeClass } from "@/lib/customer-tags";
 import { CustomerEditForm } from "@/components/admin/customers/CustomerEditForm";
 import { CustomerTagsManager } from "@/components/admin/customers/CustomerTagsManager";
 import { CustomerContactsManager } from "@/components/admin/customers/CustomerContactsManager";
+import { CustomerManagerSelector } from "@/components/admin/customers/CustomerManagerSelector";
 import { CustomerNotesTimeline, type TimelineNote } from "@/components/admin/customers/CustomerNotesTimeline";
 import { NewDealDialog } from "@/components/crm/NewDealDialog";
 import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
@@ -38,6 +39,7 @@ interface RawCustomer {
   referralSource: string | null;
   isTempPassword: boolean;
   deletedAt: Date | null;
+  manager: { id: string; name: string } | null;
   vehicles: Array<{
     id: string;
     model: string;
@@ -93,6 +95,7 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
         },
         loyaltyAccount: true,
         customerProfile: true,
+        manager: { select: { id: true, name: true } },
         _count: { select: { repairOrders: true } },
         customerNotes: {
           orderBy: { createdAt: "desc" },
@@ -346,6 +349,12 @@ export default async function CustomerDetailPage({ params, searchParams }: Props
                     notes: profileNotes,
                     blacklisted,
                   }}
+                />
+
+                <CustomerManagerSelector
+                  key={customer.manager?.id ?? "unassigned"}
+                  customerUserId={customer.id}
+                  manager={customer.manager}
                 />
 
                 <CustomerTagsManager

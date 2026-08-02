@@ -10,9 +10,17 @@ export function formatTelegramStaffNotification(
   const actionPath = makeAdminActionUrl(payload.actionUrl);
   const actionUrl = new URL(actionPath, `${applicationOrigin}/`).toString();
   const summary = normalizeSafeSummary(payload.safeSummary);
+  const icon =
+    payload.type === "TASK_ASSIGNED"
+      ? "📋"
+      : payload.type === "TASK_CREATED"
+        ? "📝"
+        : payload.type === "USER_LOGIN"
+          ? "🔐"
+          : "📬";
 
   return [
-    `📬 ${summary}`,
+    `${icon} ${summary}`,
     `Получено: ${formatDateTime(payload.occurredAt)}`,
     "Требуется действие",
     "",
@@ -27,4 +35,3 @@ function normalizeSafeSummary(value: string): string {
   }
   return normalized;
 }
-

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { roleLabel } from "@/lib/roles";
+import { TENANT_KEY } from "@/lib/tenant";
 import {
   generateOutboundMessageId,
   recordOutboundEmail,
@@ -21,6 +23,41 @@ import {
 interface InboxActionResult {
   error: string | null;
   communicationLogId?: string;
+}
+
+interface InboxAuditActor {
+  id: string;
+  name: string;
+  permissionRole: string;
+}
+
+interface InboxAuditTx {
+  auditLog: {
+    create(args: Record<string, unknown>): Promise<unknown>;
+  };
+}
+
+async function writeInboxAudit(
+  tx: InboxAuditTx,
+  actor: InboxAuditActor,
+  action: string,
+  inboxMessageId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  await tx.auditLog.create({
+    data: {
+      tenantKey: TENANT_KEY,
+      actorUserId: actor.id,
+      actorName: actor.name,
+      actorRole: roleLabel(actor.permissionRole),
+      action,
+      targetType: "InboxMessage",
+      targetId: inboxMessageId,
+      targetLabel: null,
+      metadata,
+      ip: null,
+    },
+  });
 }
 
 /**
@@ -169,6 +206,13 @@ export async function linkInboxMessageToCustomer(
             occurredAt: msg.receivedAt,
           })
         : null;
+      await writeInboxAudit(tx, session, "inbox.link", inboxMessageId, {
+        customerUserId,
+        dealId: resolvedDealId,
+        communicationLogId: log.id,
+        direction: msg.direction,
+        aliasAdded: shouldAddAlias,
+      });
       return { logId: log.id, eventId: event?.id ?? null };
     });
   } catch (err) {
@@ -197,32 +241,51 @@ export async function linkInboxMessageToCustomer(
 export async function markInboxMessageSpam(
   inboxMessageId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
-  try {
-    await db.inboxMessage.update({
-      where: { id: inboxMessageId },
-      data: { status: "SPAM" },
-    });
-  } catch (err) {
-    console.error("[INBOX] markInboxMessageSpam", err);
-    return { error: "Не удалось обновить статус" };
-  }
-  revalidatePath("/admin/crm/inbox");
-  revalidatePath(`/admin/crm/inbox/${inboxMessageId}`);
-  return { error: null };
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  return updateInboxStatusWithAudit(
+    session,
+    inboxMessageId,
+    "SPAM",
+    "inbox.spam",
+  );
 }
 
 export async function archiveInboxMessage(
   inboxMessageId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  return updateInboxStatusWithAudit(
+    session,
+    inboxMessageId,
+    "ARCHIVED",
+    "inbox.archive",
+  );
+}
+
+async function updateInboxStatusWithAudit(
+  session: InboxAuditActor,
+  inboxMessageId: string,
+  status: "SPAM" | "ARCHIVED" | "DELETED" | "PENDING",
+  action: "inbox.spam" | "inbox.archive" | "inbox.delete" | "inbox.restore",
+): Promise<{ error: string | null }> {
+  const existing = (await db.inboxMessage.findUnique({
+    where: { id: inboxMessageId },
+    select: { id: true, status: true },
+  })) as { id: string; status: string } | null;
+  if (!existing) return { error: "Сообщение не найдено" };
+
   try {
-    await db.inboxMessage.update({
-      where: { id: inboxMessageId },
-      data: { status: "ARCHIVED" },
+    await db.$transaction(async (tx) => {
+      await tx.inboxMessage.update({
+        where: { id: inboxMessageId },
+        data: { status },
+      });
+      await writeInboxAudit(tx, session, action, inboxMessageId, {
+        previousStatus: existing.status,
+      });
     });
   } catch (err) {
-    console.error("[INBOX] archiveInboxMessage", err);
+    console.error(`[INBOX] ${action}`, err);
     return { error: "Не удалось обновить статус" };
   }
   revalidatePath("/admin/crm/inbox");
@@ -341,36 +404,24 @@ function escapeHtml(s: string): string {
 export async function deleteInboxMessage(
   inboxMessageId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
-  try {
-    await db.inboxMessage.update({
-      where: { id: inboxMessageId },
-      data: { status: "DELETED" },
-    });
-  } catch (err) {
-    console.error("[INBOX] deleteInboxMessage", err);
-    return { error: "Не удалось обновить статус" };
-  }
-  revalidatePath("/admin/crm/inbox");
-  revalidatePath(`/admin/crm/inbox/${inboxMessageId}`);
-  return { error: null };
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  return updateInboxStatusWithAudit(
+    session,
+    inboxMessageId,
+    "DELETED",
+    "inbox.delete",
+  );
 }
 
 /** Вернуть письмо в очередь разбора. */
 export async function restoreInboxMessage(
   inboxMessageId: string,
 ): Promise<{ error: string | null }> {
-  await requireRole(["ADMIN", "MANAGER"]);
-  try {
-    await db.inboxMessage.update({
-      where: { id: inboxMessageId },
-      data: { status: "PENDING" },
-    });
-  } catch (err) {
-    console.error("[INBOX] restoreInboxMessage", err);
-    return { error: "Не удалось обновить статус" };
-  }
-  revalidatePath("/admin/crm/inbox");
-  revalidatePath(`/admin/crm/inbox/${inboxMessageId}`);
-  return { error: null };
+  const session = await requireRole(["ADMIN", "MANAGER"]);
+  return updateInboxStatusWithAudit(
+    session,
+    inboxMessageId,
+    "PENDING",
+    "inbox.restore",
+  );
 }

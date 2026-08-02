@@ -127,6 +127,9 @@ const ROUTABLE_EVENT_SOURCE_TYPES = {
   RENTAL_BOOKING_CREATED: "RentalBooking",
   INBOUND_MESSAGE_UNRESOLVED: "InboxMessage",
   CRM_TASK_OVERDUE: "CrmTask",
+  TASK_ASSIGNED: "CrmTask",
+  USER_LOGIN: "User",
+  TASK_CREATED: "CrmTask",
 } as const satisfies Partial<Record<StaffNotificationType, string>>;
 
 const ROUTABLE_EVENT_TYPES = Object.keys(
@@ -297,8 +300,12 @@ export async function projectLockedInboundCustomerMessage(
   const [customer, deal] = await Promise.all([
     tx.user.findUnique({
       where: { id: source.customerUserId },
-      select: { id: true, name: true },
-    }) as Promise<{ id: string; name: string } | null>,
+      select: { id: true, name: true, managerUserId: true },
+    }) as Promise<{
+      id: string;
+      name: string;
+      managerUserId: string | null;
+    } | null>,
     source.dealId
       ? (tx.deal.findUnique({
           where: { id: source.dealId },
@@ -330,7 +337,7 @@ export async function projectLockedInboundCustomerMessage(
     customerUserId: source.customerUserId,
     customerName: customer.name,
     dealId: source.dealId,
-    ownerUserId: deal?.ownerUserId ?? null,
+    ownerUserId: customer.managerUserId ?? deal?.ownerUserId ?? null,
     channel: event.channel,
     messageOccurredAt: event.occurredAt,
     eventCreatedAt: event.createdAt,

@@ -131,6 +131,12 @@ interface PickedCustomer {
   phone: string;
 }
 
+interface StaffOption {
+  id: string;
+  name: string;
+  permissionRole: "ADMIN" | "MANAGER";
+}
+
 function TaskForm({
   customerUserId,
   dealId,
@@ -153,6 +159,8 @@ function TaskForm({
   const [pickedCustomer, setPickedCustomer] = useState<PickedCustomer | null>(null);
   const [pickedDealId, setPickedDealId] = useState<string>(dealId ?? "");
   const [dealOptions, setDealOptions] = useState<DealOption[]>([]);
+  const [staffOptions, setStaffOptions] = useState<StaffOption[]>([]);
+  const [staffLoadError, setStaffLoadError] = useState<string | null>(null);
 
   const effectiveCustomerId = customerUserId ?? pickedCustomer?.id ?? "";
   const effectiveDealId = dealId ?? pickedDealId ?? "";
@@ -174,6 +182,27 @@ function TaskForm({
       .catch(() => {});
     return () => controller.abort();
   }, [isContextBound, pickedCustomer]);
+
+  // The form is mounted only after "Новая задача" is opened, so this request
+  // stays lazy and does not add work to pages that merely render task rows.
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/admin/staff", { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Не удалось загрузить сотрудников");
+        return response.json() as Promise<{ staff?: unknown }>;
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setStaffOptions(Array.isArray(data.staff) ? (data.staff as StaffOption[]) : []);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setStaffLoadError("Не удалось загрузить список сотрудников");
+        }
+      });
+    return () => controller.abort();
+  }, []);
 
   function clearCustomer(): void {
     setPickedCustomer(null);
@@ -286,6 +315,28 @@ function TaskForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium" htmlFor="task-owner">
+          Исполнитель
+        </label>
+        <select
+          id="task-owner"
+          name="ownerUserId"
+          defaultValue=""
+          className="input text-sm"
+        >
+          <option value="">Я (по умолчанию)</option>
+          {staffOptions.map((staff) => (
+            <option key={staff.id} value={staff.id}>
+              {staff.name}
+            </option>
+          ))}
+        </select>
+        {staffLoadError ? (
+          <p className="text-xs text-[var(--color-error)]">{staffLoadError}</p>
+        ) : null}
       </div>
 
       <Textarea

@@ -99,6 +99,9 @@ describe("Telegram runtime config", () => {
       RENTAL_BOOKING_CREATED: "Бронь аренды",
       INBOUND_MESSAGE_UNRESOLVED: "Сообщение не разобрано",
       CRM_TASK_OVERDUE: "Просроченная задача",
+      TASK_ASSIGNED: "Задача назначена",
+      USER_LOGIN: "Вход в платформу",
+      TASK_CREATED: "Новая задача",
       STAFF_DELIVERY_DEAD: "Доставка не прошла",
     });
   });

@@ -1,6 +1,11 @@
-import { isStaffNotificationChannel } from "@/lib/staff-notifications/types";
+import {
+  STAFF_NOTIFICATION_EVENT_CATALOG,
+  isStaffNotificationChannel,
+  isStaffNotificationType,
+} from "@/lib/staff-notifications/types";
 import type {
   StaffNotificationChannel,
+  StaffNotificationEventDefinition,
   StaffNotificationEventRecord,
 } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
@@ -76,6 +81,11 @@ export function selectStaffNotificationRecipients(
   if (event.targetUserId) {
     const target = eligible.find((candidate) => candidate.userId === event.targetUserId);
     if (target) return [target.userId];
+    if (isStaffNotificationType(event.type)) {
+      const definition: StaffNotificationEventDefinition =
+        STAFF_NOTIFICATION_EVENT_CATALOG[event.type];
+      if (definition.targetOnly === true) return [];
+    }
   }
 
   if (!permission) return [];

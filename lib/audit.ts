@@ -27,6 +27,7 @@ type DbLike = Pick<typeof db, "auditLog">;
  */
 export type AuditAction =
   | "user.create"
+  | "user.login"
   | "customer.erase"
   | "customer.archive"
   | "customer.restore"
@@ -39,14 +40,31 @@ export type AuditAction =
   | "telegram.destination_unlink"
   | "telegram.destination_scope_change"
   | "telegram.webhook_reply_failed"
+  | "telegram.update_quarantined"
   | "staff_notification.delivery_retry"
   | "deal.delete"
+  | "deal.create"
   | "estimate.delete"
+  | "estimate.create"
+  | "task.create"
+  | "task.complete"
+  | "task.cancel"
+  | "task.claim"
+  | "task.reassign"
+  | "task.reopen"
+  | "task.reschedule"
+  | "inbox.link"
+  | "inbox.spam"
+  | "inbox.archive"
+  | "customer.manager_assign"
+  | "customer.manager_unassign"
+  | "mail.sync_manual"
   | "vehicle.delete"
   | "repairOrder.create";
 
 export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "user.create": "Создание пользователя",
+  "user.login": "Вход в платформу",
   "customer.erase": "Удаление клиента",
   "customer.archive": "Скрытие клиента из CRM",
   "customer.restore": "Восстановление клиента",
@@ -59,9 +77,25 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "telegram.destination_unlink": "Отвязка Telegram",
   "telegram.destination_scope_change": "Изменение потока Telegram",
   "telegram.webhook_reply_failed": "Сбой ответа Telegram-бота",
+  "telegram.update_quarantined": "Карантин Telegram update",
   "staff_notification.delivery_retry": "Повтор доставки уведомления",
   "deal.delete": "Удаление сделки",
+  "deal.create": "Создание сделки",
   "estimate.delete": "Удаление сметы",
+  "estimate.create": "Создание сметы",
+  "task.create": "Создание задачи",
+  "task.complete": "Выполнение задачи",
+  "task.cancel": "Отмена задачи",
+  "task.claim": "Взятие задачи",
+  "task.reassign": "Переназначение задачи",
+  "task.reopen": "Повторное открытие задачи",
+  "task.reschedule": "Перенос срока задачи",
+  "inbox.link": "Привязка письма к клиенту",
+  "inbox.spam": "Пометка письма как спам",
+  "inbox.archive": "Архивация письма",
+  "customer.manager_assign": "Назначение менеджера клиента",
+  "customer.manager_unassign": "Снятие менеджера клиента",
+  "mail.sync_manual": "Ручная проверка почты",
   "vehicle.delete": "Удаление автомобиля",
   "repairOrder.create": "Создание заказ-наряда",
 };
@@ -79,10 +113,14 @@ export interface AuditInput {
     | "User"
     | "Deal"
     | "Estimate"
+    | "CrmTask"
+    | "InboxMessage"
+    | "MailSync"
     | "Vehicle"
     | "Role"
     | "RepairOrder"
     | "TelegramDestination"
+    | "TelegramUpdate"
     | "StaffNotificationDelivery";
   targetId?: string | null;
   /** How the target was known at the time — a name, a number, a role label. */

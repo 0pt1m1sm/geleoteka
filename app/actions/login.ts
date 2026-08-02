@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
+import { recordSuccessfulLogin } from "@/lib/auth-events";
 import { normalizePhone } from "@/lib/utils";
 
 interface MinimalUser {
   id: string;
   email: string;
   phone: string;
+  name: string;
   passwordHash: string | null;
   permissionRole: string;
   isTempPassword: boolean;
@@ -30,6 +32,7 @@ async function findUserByIdentifier(identifierRaw: string): Promise<MinimalUser 
     id: true,
     email: true,
     phone: true,
+    name: true,
     passwordHash: true,
     permissionRole: true,
     isTempPassword: true,
@@ -84,6 +87,7 @@ export async function loginInlineForCheckout(input: {
   const valid = await bcrypt.compare(input.password, user.passwordHash);
   if (!valid) return { ok: false, error: "Неверный email/телефон или пароль" };
 
+  await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
   return { ok: true };
@@ -120,6 +124,7 @@ export async function loginAction(_prevState: { error: string | null } | null, f
     return { error: "Неверный email/телефон или пароль" };
   }
 
+  await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
 
@@ -132,4 +137,11 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   }
 
   redirect("/cabinet");
+}
+
+async function recordSuccessfulPasswordLogin(user: MinimalUser): Promise<void> {
+  await recordSuccessfulLogin(
+    { id: user.id, name: user.name, permissionRole: user.permissionRole },
+    "PASSWORD",
+  );
 }
