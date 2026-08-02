@@ -335,7 +335,7 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
   const message = objectValue(update.message);
   const chat = objectValue(message?.chat);
   const from = objectValue(message?.from);
-  const text = typeof message?.text === "string" ? message.text : "";
+  const text = typeof message?.text === "string" ? message.text.trim() : "";
   const rawLinkToken = parseTelegramLinkCommand(text);
   const isStartCommand = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s.*)?$/s.test(text);
   const isBareStart = /^\/start(?:@[A-Za-z0-9_]+)?$/.test(text);
