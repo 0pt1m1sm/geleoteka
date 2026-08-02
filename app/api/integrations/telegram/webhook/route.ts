@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { constantTimeSecretEqual } from "@/lib/security/constant-time";
@@ -6,8 +6,12 @@ import {
   loadTelegramRuntimeConfig,
 } from "@/lib/staff-notifications/channels/telegram/config";
 import { TELEGRAM_WEBHOOK_SECRET_HEADER } from "@/lib/staff-notifications/channels/telegram/constants";
-import { sendTelegramText } from "@/lib/staff-notifications/channels/telegram/adapter";
 import {
+  normalizeTelegramTextSendResult,
+  sendTelegramText,
+} from "@/lib/staff-notifications/channels/telegram/adapter";
+import {
+  deliverTelegramWebhookReply,
   processTelegramWebhookUpdate,
   type TelegramWebhookDb,
 } from "@/lib/staff-notifications/channels/telegram/webhook";
@@ -43,16 +47,27 @@ export async function POST(request: Request): Promise<NextResponse> {
       db as unknown as TelegramWebhookDb,
       update,
       new Date(),
-      async ({ chatId, text }) => {
-        try {
-          await sendTelegramText(globalThis.fetch, {
-            botToken: config.botToken,
-            chatId,
-            text,
-          });
-        } catch {
-          // Reply delivery is best-effort and must not change webhook status.
-        }
+      (reply) => {
+        after(() =>
+          deliverTelegramWebhookReply(
+            db as unknown as TelegramWebhookDb,
+            reply,
+            async ({ chatId, text }) => {
+              const sent = await sendTelegramText(globalThis.fetch, {
+                botToken: config.botToken,
+                chatId,
+                text,
+              });
+              const normalized = normalizeTelegramTextSendResult(sent);
+              if (normalized.outcome === "failed") {
+                return {
+                  errorCode: normalized.errorCode,
+                  httpStatus: normalized.httpStatus,
+                };
+              }
+            },
+          ),
+        );
       },
     );
     if (outcome === "invalid-update") {

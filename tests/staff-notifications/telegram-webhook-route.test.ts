@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { processUpdate, sendText } = vi.hoisted(() => ({
+const { afterCallbacks, auditCreate, processUpdate, sendText } = vi.hoisted(() => ({
+  afterCallbacks: [] as Array<() => void | Promise<void>>,
+  auditCreate: vi.fn(),
   processUpdate: vi.fn(),
   sendText: vi.fn(),
 }));
 
-vi.mock("@/lib/db", () => ({ db: {} }));
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (callback: () => void | Promise<void>) => {
+    afterCallbacks.push(callback);
+  },
+}));
+vi.mock("@/lib/db", () => ({
+  db: { auditLog: { create: auditCreate } },
+}));
 vi.mock("@/lib/staff-notifications/channels/telegram/config", () => ({
   loadTelegramRuntimeConfig: vi.fn(async () => ({
     enabled: true,
@@ -17,17 +27,31 @@ vi.mock("@/lib/staff-notifications/channels/telegram/config", () => ({
     enabledEventTypes: new Set(["INBOUND_CUSTOMER_MESSAGE"]),
   })),
 }));
-vi.mock("@/lib/staff-notifications/channels/telegram/webhook", () => ({
-  processTelegramWebhookUpdate: processUpdate,
-}));
-vi.mock("@/lib/staff-notifications/channels/telegram/adapter", () => ({
-  sendTelegramText: sendText,
-}));
+vi.mock(
+  "@/lib/staff-notifications/channels/telegram/webhook",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/lib/staff-notifications/channels/telegram/webhook")
+    >()),
+    processTelegramWebhookUpdate: processUpdate,
+  }),
+);
+vi.mock(
+  "@/lib/staff-notifications/channels/telegram/adapter",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/lib/staff-notifications/channels/telegram/adapter")
+    >()),
+    sendTelegramText: sendText,
+  }),
+);
 
 import { POST } from "@/app/api/integrations/telegram/webhook/route";
 
 describe("Telegram webhook route", () => {
   beforeEach(() => {
+    afterCallbacks.length = 0;
+    auditCreate.mockReset().mockResolvedValue({});
     processUpdate.mockReset();
     sendText.mockReset();
   });
@@ -48,22 +72,51 @@ describe("Telegram webhook route", () => {
     expect(processUpdate).not.toHaveBeenCalled();
   });
 
-  it("sends the post-commit reply through the existing Telegram sender", async () => {
+  it("returns the webhook response while the post-response send is still pending", async () => {
+    const pendingSend = deferred<ReturnType<typeof successfulSendResult>>();
+    let transactionCommitted = false;
     processUpdate.mockImplementation(
       async (
         _client: unknown,
         _update: unknown,
         _now: Date,
-        sendReply: (reply: { chatId: string; text: string }) => Promise<unknown>,
+        scheduleReply: (reply: { chatId: string; text: string }) => void,
       ) => {
-        await sendReply({ chatId: "777001", text: "Привязка выполнена." });
+        transactionCommitted = true;
+        scheduleReply({ chatId: "777001", text: "Привязка выполнена." });
         return "linked";
       },
     );
-    sendText.mockResolvedValue({ outcome: "response" });
+    sendText.mockReturnValue(pendingSend.promise);
 
-    const response = await POST(validWebhookRequest());
+    let earlyResponse: Awaited<ReturnType<typeof POST>> | null = null;
+    const responsePromise = POST(validWebhookRequest()).then((response) => {
+      earlyResponse = response;
+      return response;
+    });
+    await nextEventLoopTurn();
 
+    const returnedBeforeSendFinished = earlyResponse !== null;
+    const sentBeforeAfter = sendText.mock.calls.length > 0;
+    const callback = afterCallbacks.shift();
+    let backgroundSettled = false;
+    const backgroundPromise = callback
+      ? Promise.resolve(callback()).finally(() => {
+          backgroundSettled = true;
+        })
+      : null;
+    await nextEventLoopTurn();
+    const backgroundWasPending = callback !== undefined && !backgroundSettled;
+
+    pendingSend.resolve(successfulSendResult());
+    const response = await responsePromise;
+    await backgroundPromise;
+
+    expect(transactionCommitted).toBe(true);
+    expect(returnedBeforeSendFinished).toBe(true);
+    expect(sentBeforeAfter).toBe(false);
+    expect(callback).toBeDefined();
+    expect(backgroundWasPending).toBe(true);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, outcome: "linked" });
     expect(sendText).toHaveBeenCalledWith(globalThis.fetch, {
@@ -73,26 +126,116 @@ describe("Telegram webhook route", () => {
     });
   });
 
-  it("keeps a 200 webhook response when sending the reply throws", async () => {
+  it("keeps the committed webhook response when the background send throws", async () => {
+    let transactionCommitted = false;
     processUpdate.mockImplementation(
       async (
         _client: unknown,
         _update: unknown,
         _now: Date,
-        sendReply: (reply: { chatId: string; text: string }) => Promise<unknown>,
+        scheduleReply: (reply: { chatId: string; text: string }) => void,
       ) => {
-        await sendReply({ chatId: "777001", text: "Привязка выполнена." });
+        transactionCommitted = true;
+        scheduleReply({ chatId: "777001", text: "Привязка выполнена." });
         return "linked";
       },
     );
-    sendText.mockRejectedValue(new Error("SEND_FAILURE_SENTINEL"));
+    sendText.mockRejectedValue(new Error("network unavailable"));
+
+    const response = await POST(validWebhookRequest());
+
+    expect(transactionCommitted).toBe(true);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, outcome: "linked" });
+    await runNextAfterCallback();
+    expect(auditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "telegram.webhook_reply_failed",
+        metadata: {
+          errorCode: "TELEGRAM_NETWORK",
+          httpStatus: null,
+        },
+      }),
+    });
+  });
+
+  it("records the classified error code from a background Telegram rejection", async () => {
+    processUpdate.mockImplementation(
+      async (
+        _client: unknown,
+        _update: unknown,
+        _now: Date,
+        scheduleReply: (reply: { chatId: string; text: string }) => void,
+      ) => {
+        scheduleReply({ chatId: "777001", text: "Привязка выполнена." });
+        return "linked";
+      },
+    );
+    sendText.mockResolvedValue({
+      outcome: "response",
+      response: Response.json(
+        {
+          ok: false,
+          error_code: 429,
+          description: "Too Many Requests",
+          parameters: { retry_after: 60 },
+        },
+        { status: 429 },
+      ),
+      body: {
+        ok: false,
+        error_code: 429,
+        description: "Too Many Requests",
+        parameters: { retry_after: 60 },
+      },
+    });
 
     const response = await POST(validWebhookRequest());
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, outcome: "linked" });
+    await runNextAfterCallback();
+    expect(sendText).toHaveBeenCalledOnce();
+    expect(auditCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "telegram.webhook_reply_failed",
+        metadata: {
+          errorCode: "TELEGRAM_RATE_LIMITED",
+          httpStatus: 429,
+        },
+      }),
+    });
   });
 });
+
+function successfulSendResult() {
+  return {
+    outcome: "response" as const,
+    response: Response.json({ ok: true, result: { message_id: 42 } }),
+    body: { ok: true, result: { message_id: 42 } },
+  };
+}
+
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+} {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+}
+
+async function nextEventLoopTurn(): Promise<void> {
+  await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+async function runNextAfterCallback(): Promise<void> {
+  const callback = afterCallbacks.shift();
+  expect(callback).toBeDefined();
+  await callback?.();
+}
 
 function validWebhookRequest(): Request {
   return new Request("https://geleoteka.ru/api/integrations/telegram/webhook", {

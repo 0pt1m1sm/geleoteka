@@ -22,6 +22,7 @@ export interface CreateTelegramLinkState {
   ok: boolean;
   error: string | null;
   deepLink?: string;
+  manualCommand?: string;
   expiresAt?: string;
 }
 
@@ -239,6 +240,7 @@ async function createLink(
     ok: true,
     error: null,
     deepLink: result.deepLink,
+    manualCommand: result.manualCommand,
     expiresAt: result.expiresAt.toISOString(),
   };
 }
