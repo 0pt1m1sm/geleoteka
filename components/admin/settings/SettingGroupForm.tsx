@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Alert, Button, Input, Select } from "@/components/ui";
+import { Alert, Button, Checkbox, Input, Select } from "@/components/ui";
 import { upsertSettings } from "@/app/actions/settings";
 import { SECRET_PLACEHOLDER } from "@/lib/settings-shared";
 import type { SettingDescriptor } from "@/lib/settings";
@@ -51,8 +51,33 @@ export function SettingGroupForm({ groupName, fields, infoRows }: Props): React.
       ) : null}
 
       <div className="space-y-5">
-        {fields.map(({ descriptor: s, source, value }) => (
-          <SettingField key={s.key} descriptor={s} source={source} value={value} />
+        {fields
+          .filter((f) => !f.descriptor.compactGroup)
+          .map(({ descriptor: s, source, value }) => (
+            <SettingField key={s.key} descriptor={s} source={source} value={value} />
+          ))}
+        {compactClusters(fields).map(([clusterName, clusterFields]) => (
+          <fieldset key={clusterName} className="space-y-2">
+            <legend className="text-sm font-medium">{clusterName}</legend>
+            <p className="text-xs text-[var(--foreground-muted)]">
+              Выключенный тип не создаёт Telegram-доставок. Галочка = включено.
+            </p>
+            <div className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+              {clusterFields.map(({ descriptor: s, value }) => (
+                <div key={s.key}>
+                  {/* Скрытое false + чекбокс true: непроставленная галочка
+                      явно сохраняет «false», а не молча пропускает ключ. */}
+                  <input type="hidden" name={s.key} value="false" />
+                  <Checkbox
+                    name={s.key}
+                    value="true"
+                    defaultChecked={value === "true"}
+                    label={s.label}
+                  />
+                </div>
+              ))}
+            </div>
+          </fieldset>
         ))}
       </div>
 
@@ -73,6 +98,19 @@ export function SettingGroupForm({ groupName, fields, infoRows }: Props): React.
       </div>
     </form>
   );
+}
+
+/** Кластеры компактных булевых полей в порядке первого появления. */
+function compactClusters(fields: FieldState[]): Array<[string, FieldState[]]> {
+  const clusters = new Map<string, FieldState[]>();
+  for (const field of fields) {
+    const name = field.descriptor.compactGroup;
+    if (!name) continue;
+    const list = clusters.get(name) ?? [];
+    list.push(field);
+    clusters.set(name, list);
+  }
+  return Array.from(clusters.entries());
 }
 
 function InfoRow({
