@@ -4,12 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
-import { roleLabel } from "@/lib/roles";
-import {
-  publishUserLogin,
-  type StaffNotificationPublishTx,
-} from "@/lib/staff-notifications/publish";
-import { TENANT_KEY } from "@/lib/tenant";
+import { recordSuccessfulLogin } from "@/lib/auth-events";
 import { normalizePhone } from "@/lib/utils";
 
 interface MinimalUser {
@@ -21,12 +16,6 @@ interface MinimalUser {
   permissionRole: string;
   isTempPassword: boolean;
   deletedAt: Date | null;
-}
-
-interface LoginEventTx extends StaffNotificationPublishTx {
-  auditLog: {
-    create(args: Record<string, unknown>): Promise<unknown>;
-  };
 }
 
 /**
@@ -151,32 +140,8 @@ export async function loginAction(_prevState: { error: string | null } | null, f
 }
 
 async function recordSuccessfulPasswordLogin(user: MinimalUser): Promise<void> {
-  const occurredAt = new Date();
-  const transactionalDb = db as unknown as {
-    $transaction<T>(callback: (tx: LoginEventTx) => Promise<T>): Promise<T>;
-  };
-  await transactionalDb.$transaction(async (tx) => {
-    const audit = (await tx.auditLog.create({
-      data: {
-        tenantKey: TENANT_KEY,
-        actorUserId: user.id,
-        actorName: user.name,
-        actorRole: roleLabel(user.permissionRole),
-        action: "user.login",
-        targetType: "User",
-        targetId: user.id,
-        targetLabel: user.name,
-        metadata: { method: "PASSWORD" },
-        ip: null,
-      },
-      select: { id: true },
-    })) as { id: string };
-    await publishUserLogin(tx, {
-      userId: user.id,
-      userName: user.name,
-      permissionRole: user.permissionRole,
-      loginAuditId: audit.id,
-      occurredAt,
-    });
-  });
+  await recordSuccessfulLogin(
+    { id: user.id, name: user.name, permissionRole: user.permissionRole },
+    "PASSWORD",
+  );
 }

@@ -265,7 +265,7 @@ export async function archiveInboxMessage(
 async function updateInboxStatusWithAudit(
   session: InboxAuditActor,
   inboxMessageId: string,
-  status: "SPAM" | "ARCHIVED",
+  status: "SPAM" | "ARCHIVED" | "DELETED" | "PENDING",
   action: "inbox.spam" | "inbox.archive" | "inbox.delete" | "inbox.restore",
 ): Promise<{ error: string | null }> {
   const existing = (await db.inboxMessage.findUnique({
