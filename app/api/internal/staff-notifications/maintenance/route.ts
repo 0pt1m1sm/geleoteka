@@ -38,9 +38,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Inbound Telegram updates ride the same external cron: polling is the
     // primary transport now, and the cron tick is its guaranteed cadence.
     // force bypasses the interactive cooldown — this tick IS the schedule.
+    // 25с: через замедленный РКН канал один вызов живёт ~5с, а самолечение
+    // 409 — это до четырёх последовательных вызовов (getUpdates →
+    // getWebhookInfo → deleteWebhook → getUpdates). Бюджет 6с не давал ему
+    // завершиться никогда. curl в workflow ждёт до 40с — запас есть.
     const updates = await drainTelegramUpdatesNow({
       force: true,
-      budgetMs: 6_000,
+      budgetMs: 25_000,
       maxBatches: 3,
     });
 

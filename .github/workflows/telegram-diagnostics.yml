@@ -1,0 +1,41 @@
+name: telegram-diagnostics
+
+# Ручная диагностика Telegram-канала: живые пробы Bot API (getMe,
+# зарегистрирован ли webhook), срез состояния опроса, последние попытки и
+# опциональный принудительный drain. Endpoint отдаёт только безопасную
+# проекцию (булевы признаки, коды, счётчики) — печать в лог безопасна.
+#
+# Требуемый секрет: STAFF_NOTIFICATION_DISPATCH_SECRET (тот же, что у cron).
+
+on:
+  workflow_dispatch:
+    inputs:
+      drain:
+        description: "Прогнать drain прямо сейчас (force, бюджет 25с)"
+        type: boolean
+        default: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Probe telegram channel
+        env:
+          SECRET: ${{ secrets.STAFF_NOTIFICATION_DISPATCH_SECRET }}
+          URL: ${{ vars.STAFF_NOTIFICATION_DIAGNOSTICS_URL || 'https://geleoteka.ru/api/internal/staff-notifications/diagnostics' }}
+          DRAIN: ${{ inputs.drain }}
+        run: |
+          if [ -z "$SECRET" ]; then
+            echo "STAFF_NOTIFICATION_DISPATCH_SECRET is not set." >&2
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/diagnostics.json -w '%{http_code}' \
+            -X POST "$URL" \
+            -H "Authorization: Bearer $SECRET" \
+            -H "content-type: application/json" \
+            -d "{\"drain\": ${DRAIN:-true}}" --max-time 60 || true)
+          echo "diagnostics → HTTP $code"
+          cat /tmp/diagnostics.json || true
+          echo
+          [ "$code" = "200" ]

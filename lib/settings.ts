@@ -245,7 +245,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     group: "Уведомления сотрудников (Telegram)",
     key: "TELEGRAM_ENABLED",
     label: "Telegram-уведомления включены",
-    description: "Главный рубильник. Включается только при валидных токене, username, webhook-секрете и режиме маршрутизации.",
+    description: "Главный рубильник. Включается только при валидных токене, username и режиме маршрутизации; webhook-секрет не требуется — приём идёт опросом getUpdates.",
     input: "boolean",
   },
   {

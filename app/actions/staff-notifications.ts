@@ -93,7 +93,9 @@ export async function refreshTelegramLinkStatus(
   );
 
   try {
-    await drainTelegramUpdatesNow({ budgetMs: 3_000, maxBatches: 1 });
+    // 8с: замеренная RKN-латентность одного вызова ~5с; бюджет 3с рубил
+    // каждый запрос по таймауту, и панельный опрос не приносил апдейтов.
+    await drainTelegramUpdatesNow({ budgetMs: 8_000, maxBatches: 1 });
   } catch {
     // A failed drain must not hide an already-committed link: the read below
     // still answers from local state.
