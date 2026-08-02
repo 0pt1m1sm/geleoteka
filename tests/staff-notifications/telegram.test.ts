@@ -1132,7 +1132,7 @@ function adapterDb() {
     diagnostics,
     db: {
       telegramDestination: {
-        findUnique: async () => ({
+        findFirst: async () => ({
           id: "destination_1",
           chatId: "777001",
           isActive: true,
@@ -1292,6 +1292,7 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
       const rows = this.destinations.filter(
         (row) =>
           (where.tenantKey === undefined || row.tenantKey === where.tenantKey) &&
+          (where.id === undefined || row.id === where.id) &&
           (where.kind === undefined || row.kind === where.kind) &&
           (where.chatId === undefined || row.chatId === where.chatId),
       );

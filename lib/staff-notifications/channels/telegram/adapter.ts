@@ -15,7 +15,7 @@ type QueryArgs = Record<string, unknown>;
 
 export interface TelegramAdapterDb extends TelegramSendDiagnosticsWriteDb {
   telegramDestination: {
-    findUnique(args: QueryArgs): Promise<unknown>;
+    findFirst(args?: QueryArgs): Promise<unknown>;
     updateMany(args: QueryArgs): Promise<{ count: number }>;
   };
 }
@@ -124,8 +124,13 @@ async function sendTelegramNotification(
     };
   }
 
-  const destination = (await dependencies.db.telegramDestination.findUnique({
-    where: { tenantKey_id: { tenantKey: TENANT_KEY, id: destinationKey } },
+  // findFirst, НЕ findUnique(tenantKey_id): у TelegramDestination нет
+  // compound-уникальности [tenantKey, id], и такой селектор валит
+  // PrismaClientValidationError на КАЖДОЙ доставке (ADAPTER_EXCEPTION →
+  // RETRY → DEAD). Тесты на фейках и tsc это не видят — типы Prisma за
+  // ts-nocheck; воспроизведено на реальной БД 2026-08-03.
+  const destination = (await dependencies.db.telegramDestination.findFirst({
+    where: { tenantKey: TENANT_KEY, id: destinationKey },
     select: { id: true, chatId: true, isActive: true, disabledAt: true },
   })) as DestinationRow | null;
   if (!destination || !destination.isActive || destination.disabledAt !== null) {

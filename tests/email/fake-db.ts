@@ -116,6 +116,12 @@ export class FakeEmailDb implements EmailIngestDb {
     throw new Error(`FakeEmailDb.$queryRaw: unsupported query: ${sql}`);
   }
 
+  async $executeRaw(query: TemplateStringsArray, ..._values: unknown[]): Promise<number> {
+    const sql = query.join("?");
+    if (sql.includes("pg_advisory_xact_lock")) return 1;
+    throw new Error(`FakeEmailDb.$executeRaw: unsupported query: ${sql}`);
+  }
+
   emailMessage = {
     findFirst: async (args: Record<string, unknown>): Promise<AnyRow | null> => {
       if (this.simulateLostPrecheck) {

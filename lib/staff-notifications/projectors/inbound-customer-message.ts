@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { isInboundCommChannel } from "@/lib/crm/inbound-communications";
 import {
   upsertInboundFollowUpTask,
@@ -25,6 +27,7 @@ type QueryArgs = Record<string, unknown>;
 
 interface ProjectorTx extends InboundFollowUpTx, StaffNotificationRouterTx {
   $queryRaw<T>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   staffNotificationEvent: StaffNotificationRouterTx["staffNotificationEvent"] & {
     update(args: QueryArgs): Promise<unknown>;
   };
@@ -313,10 +316,13 @@ export async function projectLockedInboundCustomerMessage(
 
   // Serialize every projector touching the same open-task identity. This keeps
   // two different inbound events from racing the task's last-message anchor.
-  const pairKey = `${TENANT_KEY}\u0000${source.customerUserId}\u0000${source.dealId ?? ""}`;
-  await tx.$queryRaw<Array<{ locked: unknown }>>`
-    SELECT pg_advisory_xact_lock(hashtextextended(${pairKey}, 0)) AS "locked"
-  `;
+  // Ключ замка считается в приложении (bigint): строка с NUL внутрь
+  // hashtextextended валила запрос Postgres-ошибкой 22021 — тот же класс
+  // бага, что ломал привязку в webhook.ts.
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(${inboundPairLockId(
+    source.customerUserId,
+    source.dealId,
+  )})`;
 
   const task = await upsertInboundFollowUpTask(tx, {
     communicationLogId: source.id,
@@ -384,6 +390,15 @@ export async function projectLockedStaffNotification(
 
   const candidates = await loadRecipientCandidates(tx);
   await routeProjectedStaffNotification(tx, event, candidates);
+}
+
+
+/** 64-битный ключ advisory-замка пары клиент+сделка, без NUL-байтов в SQL. */
+function inboundPairLockId(customerUserId: string, dealId: string | null): bigint {
+  const digest = createHash("sha256")
+    .update([TENANT_KEY, "inbound-follow-up", customerUserId, dealId ?? ""].join("\u001f"))
+    .digest();
+  return digest.readBigInt64BE(0);
 }
 
 async function routeProjectedStaffNotification(
