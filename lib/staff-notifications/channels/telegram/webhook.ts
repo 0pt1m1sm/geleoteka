@@ -257,18 +257,24 @@ export async function processTelegramWebhookUpdate(
       return transactionResult("expired-token", INVALID_LINK_REPLY);
     }
 
+    // updateMany по (tenantKey, id), НЕ update(tenantKey_id): у модели нет
+    // такой compound-уникальности, невалидный селектор валит перепривязку
+    // PrismaClientValidationError (тот же класс, что ронял доставку
+    // уведомлений в адаптере).
     const destination = existing
-      ? ((await tx.telegramDestination.update({
-          where: { tenantKey_id: { tenantKey: TENANT_KEY, id: existing.id } },
-          data: {
-            chatId: update.chatId,
-            telegramUserId: destinationTelegramUserId,
-            isActive: true,
-            verifiedAt: now,
-            disabledAt: null,
-          },
-          select: { id: true },
-        })) as { id: string })
+      ? await (async () => {
+          await tx.telegramDestination.updateMany({
+            where: { tenantKey: TENANT_KEY, id: existing.id },
+            data: {
+              chatId: update.chatId,
+              telegramUserId: destinationTelegramUserId,
+              isActive: true,
+              verifiedAt: now,
+              disabledAt: null,
+            },
+          });
+          return { id: existing.id };
+        })()
       : ((await tx.telegramDestination.create({
           data: {
             tenantKey: TENANT_KEY,
