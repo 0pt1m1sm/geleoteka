@@ -2304,3 +2304,19 @@ model TelegramUpdateReceipt {
   @@unique([tenantKey, updateId])
   @@index([tenantKey, processedAt])
 }
+
+/// One secret-free observation of an outbound Telegram Bot API call. This
+/// model deliberately has no destination, message, token, URL or provider
+/// payload columns: it answers only whether the external channel is healthy.
+model TelegramSendAttempt {
+  id         String   @id @default(cuid())
+  tenantKey  String   @default("geleoteka")
+  operation  String
+  outcome    String
+  durationMs Int
+  isSlow     Boolean
+  errorCode  String?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantKey, createdAt])
+}

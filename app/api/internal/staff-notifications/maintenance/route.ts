@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { constantTimeSecretEqual } from "@/lib/security/constant-time";
 import { loadStaffNotificationDispatchSecret } from "@/lib/staff-notifications/channels/telegram/config";
 import {
+  retainTelegramSendAttempts,
+  type TelegramSendDiagnosticsRetentionDb,
+} from "@/lib/staff-notifications/channels/telegram/diagnostics";
+import {
   retainStaffNotificationEvents,
   type StaffNotificationOperationsDb,
 } from "@/lib/staff-notifications/operations";
@@ -36,10 +40,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
     const retentionDays = await loadStaffNotificationRetentionDays();
     const retention = retentionDays
-      ? await retainStaffNotificationEvents(
-          db as unknown as StaffNotificationOperationsDb,
-          { retentionDays },
-        )
+      ? await Promise.all([
+          retainStaffNotificationEvents(
+            db as unknown as StaffNotificationOperationsDb,
+            { retentionDays },
+          ),
+          retainTelegramSendAttempts(
+            db as unknown as TelegramSendDiagnosticsRetentionDb,
+            { retentionDays },
+          ),
+        ])
       : null;
 
     return NextResponse.json({
@@ -49,8 +59,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? {
             configured: true,
             days: retentionDays,
-            deletedEvents: retention.deletedEvents,
-            cutoff: retention.cutoff.toISOString(),
+            deletedEvents: retention[0].deletedEvents,
+            deletedTelegramAttempts: retention[1].deletedAttempts,
+            cutoff: retention[0].cutoff.toISOString(),
           }
         : { configured: false },
     });

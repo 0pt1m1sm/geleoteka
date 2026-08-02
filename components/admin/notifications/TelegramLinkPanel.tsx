@@ -8,6 +8,7 @@ import {
   type CreateTelegramLinkState,
 } from "@/app/actions/staff-notifications";
 import { Alert, Button } from "@/components/ui";
+import { getTelegramLinkPanelCopy } from "@/lib/staff-notifications/channels/telegram/link-copy";
 
 interface TelegramLinkPanelProps {
   purpose: "PERSONAL" | "SHARED";
@@ -20,6 +21,7 @@ export function TelegramLinkPanel({
 }: TelegramLinkPanelProps): React.ReactElement {
   const action =
     purpose === "PERSONAL" ? createPersonalTelegramLink : createSharedTelegramLink;
+  const copy = getTelegramLinkPanelCopy(purpose);
   const [state, formAction, pending] = useActionState<CreateTelegramLinkState | null, FormData>(
     action,
     null,
@@ -34,17 +36,13 @@ export function TelegramLinkPanel({
       ) : null}
       <form action={formAction}>
         <Button type="submit" disabled={!configured || pending} isLoading={pending}>
-          Создать ссылку на 10 минут
+          {copy.buttonLabel}
         </Button>
       </form>
       {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
       {state?.ok && state.deepLink && state.manualCommand ? (
         <Alert variant="success">
-          <span className="block mb-2">
-            {purpose === "PERSONAL"
-              ? "Откройте ссылку в приватном чате с ботом. Она одноразовая и истечёт через 10 минут."
-              : "Откройте ссылку и выберите рабочую группу. Telegram добавит бота и отправит команду привязки; ссылка истечёт через 10 минут."}
-          </span>
+          <span className="block mb-2">{copy.successMessage}</span>
           <a
             href={state.deepLink}
             target="_blank"

@@ -42,7 +42,7 @@ vi.mock(
     ...(await importOriginal<
       typeof import("@/lib/staff-notifications/channels/telegram/adapter")
     >()),
-    sendTelegramText: sendText,
+    sendTelegramTextWithDiagnostics: sendText,
   }),
 );
 
@@ -119,11 +119,17 @@ describe("Telegram webhook route", () => {
     expect(backgroundWasPending).toBe(true);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, outcome: "linked" });
-    expect(sendText).toHaveBeenCalledWith(globalThis.fetch, {
-      botToken: `123456:${"A".repeat(32)}`,
-      chatId: "777001",
-      text: "Привязка выполнена.",
-    });
+    expect(sendText).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fetchImpl: globalThis.fetch,
+        message: {
+          botToken: `123456:${"A".repeat(32)}`,
+          chatId: "777001",
+          text: "Привязка выполнена.",
+        },
+        operation: "WEBHOOK_REPLY",
+      }),
+    );
   });
 
   it("keeps the committed webhook response when the background send throws", async () => {
@@ -172,22 +178,10 @@ describe("Telegram webhook route", () => {
       },
     );
     sendText.mockResolvedValue({
-      outcome: "response",
-      response: Response.json(
-        {
-          ok: false,
-          error_code: 429,
-          description: "Too Many Requests",
-          parameters: { retry_after: 60 },
-        },
-        { status: 429 },
-      ),
-      body: {
-        ok: false,
-        error_code: 429,
-        description: "Too Many Requests",
-        parameters: { retry_after: 60 },
-      },
+      outcome: "failed",
+      errorCode: "TELEGRAM_RATE_LIMITED",
+      httpStatus: 429,
+      retryAfterMs: 60_000,
     });
 
     const response = await POST(validWebhookRequest());
@@ -210,9 +204,8 @@ describe("Telegram webhook route", () => {
 
 function successfulSendResult() {
   return {
-    outcome: "response" as const,
-    response: Response.json({ ok: true, result: { message_id: 42 } }),
-    body: { ok: true, result: { message_id: 42 } },
+    outcome: "sent" as const,
+    providerMessageId: "42",
   };
 }
 

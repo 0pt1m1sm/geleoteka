@@ -3,10 +3,15 @@ import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/t
 import { formatTelegramStaffNotification } from "@/lib/staff-notifications/channels/telegram/format";
 import type { SafeChannelPayload } from "@/lib/staff-notifications/types";
 import { TENANT_KEY } from "@/lib/tenant";
+import {
+  recordTelegramSendDiagnostic,
+  type TelegramSendDiagnosticsWriteDb,
+  type TelegramSendOperation,
+} from "@/lib/staff-notifications/channels/telegram/diagnostics";
 
 type QueryArgs = Record<string, unknown>;
 
-export interface TelegramAdapterDb {
+export interface TelegramAdapterDb extends TelegramSendDiagnosticsWriteDb {
   telegramDestination: {
     findUnique(args: QueryArgs): Promise<unknown>;
     updateMany(args: QueryArgs): Promise<{ count: number }>;
@@ -18,6 +23,7 @@ export interface TelegramAdapterDependencies {
   fetch: typeof fetch;
   loadConfig: () => Promise<TelegramRuntimeConfig>;
   now?: () => Date;
+  monotonicNow?: () => number;
 }
 
 interface DestinationRow {
@@ -114,12 +120,17 @@ async function sendTelegramNotification(
     return { outcome: "dead" as const, errorCode: "INVALID_SAFE_PAYLOAD" };
   }
 
-  const sent = await sendTelegramText(dependencies.fetch, {
-    botToken: config.botToken,
-    chatId: destination.chatId,
-    text,
+  const normalized = await sendTelegramTextWithDiagnostics({
+    client: dependencies.db,
+    fetchImpl: dependencies.fetch,
+    message: {
+      botToken: config.botToken,
+      chatId: destination.chatId,
+      text,
+    },
+    operation: "NOTIFICATION_DELIVERY",
+    monotonicNow: dependencies.monotonicNow,
   });
-  const normalized = normalizeTelegramTextSendResult(sent);
   if (normalized.outcome === "sent") {
     return {
       outcome: "sent" as const,
@@ -291,6 +302,37 @@ export async function sendTelegramText(
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export async function sendTelegramTextWithDiagnostics(options: {
+  client: TelegramSendDiagnosticsWriteDb;
+  fetchImpl: typeof fetch;
+  message: TelegramTextMessage;
+  operation: TelegramSendOperation;
+  monotonicNow?: () => number;
+}): Promise<NormalizedTelegramTextSendResult> {
+  const monotonicNow = options.monotonicNow ?? (() => performance.now());
+  const startedAt = monotonicNow();
+  let normalized: NormalizedTelegramTextSendResult;
+  try {
+    normalized = normalizeTelegramTextSendResult(
+      await sendTelegramText(options.fetchImpl, options.message),
+    );
+  } catch {
+    normalized = {
+      outcome: "failed",
+      errorCode: "TELEGRAM_NETWORK",
+      httpStatus: null,
+    };
+  }
+
+  await recordTelegramSendDiagnostic(options.client, {
+    operation: options.operation,
+    outcome: normalized.outcome === "sent" ? "SUCCESS" : "FAILURE",
+    durationMs: monotonicNow() - startedAt,
+    errorCode: normalized.outcome === "failed" ? normalized.errorCode : null,
+  });
+  return normalized;
 }
 
 function telegramIntegerId(value: unknown): string | null {

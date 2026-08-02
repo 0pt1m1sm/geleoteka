@@ -7,9 +7,9 @@ import {
 } from "@/lib/staff-notifications/channels/telegram/config";
 import { TELEGRAM_WEBHOOK_SECRET_HEADER } from "@/lib/staff-notifications/channels/telegram/constants";
 import {
-  normalizeTelegramTextSendResult,
-  sendTelegramText,
+  sendTelegramTextWithDiagnostics,
 } from "@/lib/staff-notifications/channels/telegram/adapter";
+import type { TelegramSendDiagnosticsWriteDb } from "@/lib/staff-notifications/channels/telegram/diagnostics";
 import {
   deliverTelegramWebhookReply,
   processTelegramWebhookUpdate,
@@ -53,12 +53,16 @@ export async function POST(request: Request): Promise<NextResponse> {
             db as unknown as TelegramWebhookDb,
             reply,
             async ({ chatId, text }) => {
-              const sent = await sendTelegramText(globalThis.fetch, {
-                botToken: config.botToken,
-                chatId,
-                text,
+              const normalized = await sendTelegramTextWithDiagnostics({
+                client: db as unknown as TelegramSendDiagnosticsWriteDb,
+                fetchImpl: globalThis.fetch,
+                message: {
+                  botToken: config.botToken,
+                  chatId,
+                  text,
+                },
+                operation: "WEBHOOK_REPLY",
               });
-              const normalized = normalizeTelegramTextSendResult(sent);
               if (normalized.outcome === "failed") {
                 return {
                   errorCode: normalized.errorCode,

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   scan: vi.fn(),
   retain: vi.fn(),
+  retainTelegram: vi.fn(),
   retentionDays: vi.fn(),
 }));
 
@@ -16,6 +17,9 @@ vi.mock("@/lib/staff-notifications/overdue", () => ({
 vi.mock("@/lib/staff-notifications/operations", () => ({
   retainStaffNotificationEvents: mocks.retain,
 }));
+vi.mock("@/lib/staff-notifications/channels/telegram/diagnostics", () => ({
+  retainTelegramSendAttempts: mocks.retainTelegram,
+}));
 vi.mock("@/lib/staff-notifications/operations-config", () => ({
   loadStaffNotificationRetentionDays: mocks.retentionDays,
 }));
@@ -26,11 +30,16 @@ describe("staff notification maintenance route", () => {
   beforeEach(() => {
     mocks.scan.mockReset();
     mocks.retain.mockReset();
+    mocks.retainTelegram.mockReset();
     mocks.retentionDays.mockReset();
     mocks.scan.mockResolvedValue({ scanned: 1, eventsEnsured: 1 });
     mocks.retentionDays.mockResolvedValue(30);
     mocks.retain.mockResolvedValue({
       deletedEvents: 2,
+      cutoff: new Date("2026-07-02T12:00:00.000Z"),
+    });
+    mocks.retainTelegram.mockResolvedValue({
+      deletedAttempts: 3,
       cutoff: new Date("2026-07-02T12:00:00.000Z"),
     });
   });
@@ -49,6 +58,7 @@ describe("staff notification maintenance route", () => {
     expect(response.status).toBe(401);
     expect(mocks.scan).not.toHaveBeenCalled();
     expect(mocks.retain).not.toHaveBeenCalled();
+    expect(mocks.retainTelegram).not.toHaveBeenCalled();
   });
 
   it("runs overdue scanning and configured retention in one bounded tick", async () => {
@@ -66,9 +76,15 @@ describe("staff notification maintenance route", () => {
     expect(await response.json()).toMatchObject({
       ok: true,
       overdue: { scanned: 1, eventsEnsured: 1 },
-      retention: { configured: true, days: 30, deletedEvents: 2 },
+      retention: {
+        configured: true,
+        days: 30,
+        deletedEvents: 2,
+        deletedTelegramAttempts: 3,
+      },
     });
     expect(mocks.scan).toHaveBeenCalledOnce();
     expect(mocks.retain).toHaveBeenCalledOnce();
+    expect(mocks.retainTelegram).toHaveBeenCalledOnce();
   });
 });
