@@ -28,3 +28,18 @@ export const TELEGRAM_DEFAULT_API_BASE_URL = "https://api.telegram.org";
 export const TELEGRAM_POLL_REQUEST_TIMEOUT_MS = 8_000;
 export const TELEGRAM_POLL_BATCH_LIMIT = 100;
 export const TELEGRAM_POLL_COOLDOWN_MS = 4_000;
+
+/**
+ * A deterministically-failing update would otherwise stay first in the queue
+ * forever and block everything behind it. After this many failed drains in a
+ * row the cursor is advanced past it (quarantine) with a diagnostic record.
+ */
+export const TELEGRAM_POLL_POISON_MAX_ATTEMPTS = 3;
+
+/**
+ * Single-flight lease: ровно один drain на bot token в каждый момент. Второй
+ * параллельный getUpdates глазами Telegram — это 409 «terminated by other
+ * getUpdates request», неотличимый по HTTP-коду от 409 «webhook is active».
+ * Срок должен с запасом покрывать худший drain (бюджет + сетевые хвосты).
+ */
+export const TELEGRAM_POLL_LEASE_MS = 30_000;

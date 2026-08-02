@@ -276,7 +276,9 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "TELEGRAM_API_BASE_URL",
     label: "Адрес Bot API (релей)",
     description:
-      "Пусто = https://api.telegram.org напрямую. РКН замедляет трафик к Telegram из РФ, поэтому сюда можно поставить https-адрес релея вне России (например Cloudflare Worker) — через него пойдут и отправка, и приём обновлений. Рецепт релея — в docs/runbooks/staff-notifications.md.",
+      "Пусто = https://api.telegram.org напрямую. РКН замедляет трафик к Telegram из РФ, поэтому сюда можно поставить https-адрес релея вне России (например Cloudflare Worker) — через него пойдут и отправка, и приём обновлений. Адрес открытого релея — секрет: любой, кто его знает, может пользоваться релеем. Рецепт — в docs/runbooks/staff-notifications.md.",
+    secret: true,
+    input: "secret",
   },
   {
     group: "Уведомления сотрудников (Telegram)",

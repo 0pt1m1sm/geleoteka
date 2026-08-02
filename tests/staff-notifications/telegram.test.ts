@@ -355,6 +355,33 @@ describe("Telegram webhook processing", () => {
     expect(scheduleReply.mock.calls[0]?.[0].text).not.toContain(String(chatId));
   });
 
+  it("дожидается async-планировщика ответа до возврата (гарантия для polling-обвязки)", async () => {
+    const fake = new FakeTelegramWebhookDb("U".repeat(43));
+    let replyFinished = false;
+    const scheduleReply = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      replyFinished = true;
+    });
+
+    await processTelegramWebhookUpdate(
+      fake,
+      {
+        update_id: 8997,
+        message: {
+          text: "/start",
+          chat: { id: 777009991, type: "private" },
+          from: { id: 777009991, is_bot: false },
+        },
+      },
+      NOW,
+      scheduleReply,
+    );
+
+    // В polling-обвязке нет after(): ответ обязан быть доставлен (и его
+    // диагностика записана) до завершения drain, а не повиснуть в воздухе.
+    expect(replyFinished).toBe(true);
+  });
+
   it("does not reply to a bare /start command in a group", async () => {
     const fake = new FakeTelegramWebhookDb("T".repeat(43));
     const scheduleReply = vi.fn();
@@ -726,7 +753,9 @@ describe("Telegram webhook processing", () => {
           },
         },
         NOW,
-        (reply) => scheduledReplies.push(reply),
+        (reply) => {
+          scheduledReplies.push(reply);
+        },
       ),
     ).resolves.toBe("linked");
 

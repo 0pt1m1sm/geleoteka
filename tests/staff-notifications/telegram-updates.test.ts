@@ -12,6 +12,9 @@ interface PollRow {
   tenantKey: string;
   nextOffset: number;
   lastDrainStartedAt: Date | null;
+  stuckUpdateId: number | null;
+  stuckAttempts: number;
+  leaseUntil: Date | null;
 }
 
 class FakePollDb implements TelegramPollStateDb {
@@ -26,6 +29,9 @@ class FakePollDb implements TelegramPollStateDb {
           tenantKey: create.tenantKey,
           nextOffset: create.nextOffset,
           lastDrainStartedAt: null,
+          stuckUpdateId: null,
+          stuckAttempts: 0,
+          leaseUntil: null,
         };
       }
       return this.row;
@@ -39,9 +45,43 @@ class FakePollDb implements TelegramPollStateDb {
           lastDrainStartedAt?: null | { lt: Date };
         }>;
       };
+      const data = args.data as Record<string, unknown>;
       if (where.nextOffset) {
         if (!(this.row.nextOffset < where.nextOffset.lt)) return { count: 0 };
         this.row.nextOffset = (args.data as { nextOffset: number }).nextOffset;
+        return { count: 1 };
+      }
+      if ("stuckUpdateId" in data) {
+        this.row.stuckUpdateId = data.stuckUpdateId as number | null;
+        this.row.stuckAttempts = data.stuckAttempts as number;
+        return { count: 1 };
+      }
+      if ("leaseUntil" in data) {
+        const leaseWhere = args.where as {
+          leaseUntil?: Date;
+          OR?: Array<{ leaseUntil?: null | { lt: Date } }>;
+        };
+        if (leaseWhere.leaseUntil instanceof Date) {
+          // release: только собственный штамп
+          if (
+            this.row.leaseUntil !== null &&
+            this.row.leaseUntil.getTime() === leaseWhere.leaseUntil.getTime()
+          ) {
+            this.row.leaseUntil = data.leaseUntil as Date | null;
+            return { count: 1 };
+          }
+          return { count: 0 };
+        }
+        // acquire: свободен или протух
+        const free = (leaseWhere.OR ?? []).some((clause) =>
+          clause.leaseUntil === null
+            ? this.row!.leaseUntil === null
+            : this.row!.leaseUntil !== null &&
+              this.row!.leaseUntil <
+                (clause.leaseUntil as { lt: Date }).lt,
+        );
+        if (!free) return { count: 0 };
+        this.row.leaseUntil = data.leaseUntil as Date;
         return { count: 1 };
       }
       if (where.OR) {
@@ -74,6 +114,13 @@ function updatesResponse(ids: number[]): Response {
     JSON.stringify({ ok: true, result: ids.map((id) => ({ update_id: id })) }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
+}
+
+function webhookInfoResponse(url: string): Response {
+  return new Response(JSON.stringify({ ok: true, result: { url } }), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 function fetchScript(
@@ -129,10 +176,11 @@ describe("drainTelegramUpdates", () => {
     });
   });
 
-  it("self-heals the webhook conflict: 409 → deleteWebhook → retry in one drain", async () => {
+  it("self-heals the webhook conflict: 409 → getWebhookInfo → deleteWebhook → retry", async () => {
     const db = new FakePollDb();
     const { fetchImpl, calls } = fetchScript([
       new Response("conflict", { status: 409 }),
+      webhookInfoResponse("https://old.example/hook"),
       new Response(JSON.stringify({ ok: true, result: true }), { status: 200 }),
       updatesResponse([5]),
     ]);
@@ -142,13 +190,82 @@ describe("drainTelegramUpdates", () => {
     expect(result).toMatchObject({ status: "drained", processed: 1 });
     expect(calls.map((c) => c.url.split("/").pop())).toEqual([
       "getUpdates",
+      "getWebhookInfo",
       "deleteWebhook",
       "getUpdates",
     ]);
     // Pending updates survive the mode switch: an employee may have sent the
     // link command seconds earlier.
-    expect(calls[1].body).toMatchObject({ drop_pending_updates: false });
+    expect(calls[2].body).toMatchObject({ drop_pending_updates: false });
     expect(db.row?.nextOffset).toBe(6);
+  });
+
+  it("409 без зарегистрированного webhook (конкурентный getUpdates) → failed БЕЗ deleteWebhook", async () => {
+    const db = new FakePollDb();
+    const { fetchImpl, calls } = fetchScript([
+      new Response("conflict", { status: 409 }),
+      webhookInfoResponse(""),
+    ]);
+
+    const result = await drainTelegramUpdates(db, fetchImpl, baseOptions());
+
+    expect(result).toEqual({
+      status: "failed",
+      errorCode: "TELEGRAM_CONFLICT",
+      processed: 0,
+    });
+    expect(calls.map((c) => c.url.split("/").pop())).toEqual([
+      "getUpdates",
+      "getWebhookInfo",
+    ]);
+  });
+
+  it("живой чужой lease: drain уходит skipped-lease без сетевых вызовов", async () => {
+    const db = new FakePollDb();
+    await db.telegramPollState.upsert({
+      create: { tenantKey: "geleoteka", nextOffset: 0 },
+      where: {},
+    });
+    db.row!.leaseUntil = new Date("2026-08-02T12:00:25.000Z"); // now + 25s
+
+    const { fetchImpl, calls } = fetchScript([updatesResponse([])]);
+    const result = await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(),
+      force: true,
+    });
+
+    expect(result).toEqual({ status: "skipped-lease", processed: 0 });
+    expect(calls).toHaveLength(0);
+    // Чужой штамп не тронут.
+    expect(db.row?.leaseUntil?.toISOString()).toBe("2026-08-02T12:00:25.000Z");
+  });
+
+  it("протухший lease перехватывается, после drain lease освобождён", async () => {
+    const db = new FakePollDb();
+    await db.telegramPollState.upsert({
+      create: { tenantKey: "geleoteka", nextOffset: 0 },
+      where: {},
+    });
+    db.row!.leaseUntil = new Date("2026-08-02T11:59:00.000Z"); // протух
+
+    const { fetchImpl } = fetchScript([updatesResponse([7])]);
+    const result = await drainTelegramUpdates(db, fetchImpl, baseOptions());
+
+    expect(result).toMatchObject({ status: "drained", processed: 1 });
+    expect(db.row?.leaseUntil).toBeNull();
+  });
+
+  it("lease освобождается и после failed drain", async () => {
+    const db = new FakePollDb();
+    const { fetchImpl } = fetchScript([updatesResponse([30])]);
+    const result = await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(vi.fn(async () => {
+        throw new Error("boom");
+      })),
+    });
+
+    expect(result).toMatchObject({ status: "failed" });
+    expect(db.row?.leaseUntil).toBeNull();
   });
 
   it("skips when a drain ran within the cooldown, unless forced", async () => {
@@ -207,6 +324,175 @@ describe("drainTelegramUpdates", () => {
       outcome: "FAILURE",
       errorCode: "TELEGRAM_NETWORK",
     });
+  });
+
+  it("карантинит стабильно падающий апдейт после 3 drain и обрабатывает хвост за ним", async () => {
+    const db = new FakePollDb();
+    const poison = vi.fn(async (update: unknown) => {
+      if ((update as { update_id: number }).update_id === 30) {
+        throw new Error("P2002 unique constraint");
+      }
+      return "ok";
+    });
+    const drainOnce = () =>
+      drainTelegramUpdates(
+        db,
+        fetchScript([updatesResponse([30, 31, 32])]).fetchImpl,
+        { ...baseOptions(poison), force: true },
+      );
+
+    // Две первые попытки: drain падает, офсет стоит, счётчик копится durable.
+    for (const expectedAttempts of [1, 2]) {
+      const failed = await drainOnce();
+      expect(failed).toEqual({
+        status: "failed",
+        errorCode: "UPDATE_PROCESSING_FAILED",
+        processed: 0,
+      });
+      expect(db.row?.nextOffset).toBe(0);
+      expect(db.row?.stuckUpdateId).toBe(30);
+      expect(db.row?.stuckAttempts).toBe(expectedAttempts);
+    }
+
+    // Третья попытка: виновник в карантине, хвост за ним обработан.
+    const third = await drainOnce();
+    expect(third).toEqual({ status: "drained", processed: 2, batches: 1 });
+    expect(db.row?.nextOffset).toBe(33);
+    expect(db.row?.stuckUpdateId).toBeNull();
+    expect(db.row?.stuckAttempts).toBe(0);
+    expect(
+      db.diagnostics.some((d) => d.errorCode === "UPDATE_QUARANTINED"),
+    ).toBe(true);
+    // Хвост (31, 32) обработан, виновник больше не предлагался процессору
+    // лишний раз: по одному вызову на drain плюс хвост третьего.
+    expect(
+      poison.mock.calls.filter(
+        ([u]) => (u as { update_id: number }).update_id === 30,
+      ),
+    ).toHaveLength(3);
+  });
+
+  it("transient-сбой не карантинится: после успеха счётчик сбрасывается, апдейт не теряется", async () => {
+    const db = new FakePollDb();
+    let failOnce = true;
+    const flaky = vi.fn(async (update: unknown) => {
+      if ((update as { update_id: number }).update_id === 30 && failOnce) {
+        failOnce = false;
+        throw new Error("deadlock, try again");
+      }
+      return "ok";
+    });
+    const drainOnce = () =>
+      drainTelegramUpdates(
+        db,
+        fetchScript([updatesResponse([30, 31, 32])]).fetchImpl,
+        { ...baseOptions(flaky), force: true },
+      );
+
+    const failed = await drainOnce();
+    expect(failed).toMatchObject({ status: "failed" });
+    expect(db.row?.stuckUpdateId).toBe(30);
+    expect(db.row?.stuckAttempts).toBe(1);
+
+    const recovered = await drainOnce();
+    expect(recovered).toEqual({ status: "drained", processed: 3, batches: 1 });
+    expect(db.row?.nextOffset).toBe(33);
+    expect(db.row?.stuckUpdateId).toBeNull();
+    expect(db.row?.stuckAttempts).toBe(0);
+    expect(
+      db.diagnostics.some((d) => d.errorCode === "UPDATE_QUARANTINED"),
+    ).toBe(false);
+  });
+
+  it("wall-clock: исчерпанный бюджет останавливает разрешение 409 до getWebhookInfo", async () => {
+    const db = new FakePollDb();
+    let t = 0;
+    const calls: string[] = [];
+    const fetchImpl = (async (input: RequestInfo | URL) => {
+      calls.push(String(input).split("/").pop() ?? "");
+      t += 8_000; // медленная сеть съедает бюджет первым же вызовом
+      return new Response("conflict", { status: 409 });
+    }) as typeof fetch;
+
+    const result = await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(),
+      budgetMs: 3_000,
+      monotonicNow: () => t,
+    });
+
+    expect(result).toMatchObject({ status: "budget-exhausted" });
+    expect(calls).toEqual(["getUpdates"]);
+  });
+
+  it("wall-clock: дедлайн внутри батча подтверждает префикс и выходит budget-exhausted", async () => {
+    const db = new FakePollDb();
+    let t = 0;
+    const fetchImpl = (async () => {
+      t += 1_000;
+      return updatesResponse([1, 2, 3]);
+    }) as typeof fetch;
+    const slowProcess = vi.fn(async () => {
+      t += 5_000;
+      return "ok";
+    });
+
+    const result = await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(slowProcess),
+      budgetMs: 3_000,
+      monotonicNow: () => t,
+    });
+
+    expect(result).toMatchObject({ status: "budget-exhausted", processed: 1 });
+    expect(slowProcess).toHaveBeenCalledTimes(1);
+    // Обработанный префикс подтверждён, необработанные придут в следующем drain.
+    expect(db.row?.nextOffset).toBe(2);
+  });
+
+  it("wall-clock: сетевой таймаут урезается остатком бюджета", async () => {
+    vi.useFakeTimers();
+    try {
+      const db = new FakePollDb();
+      const fetchImpl = ((_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        })) as typeof fetch;
+
+      const pending = drainTelegramUpdates(db, fetchImpl, {
+        ...baseOptions(),
+        budgetMs: 500,
+        requestTimeoutMs: 8_000,
+        monotonicNow: () => Date.now(),
+      });
+      // Через 600 мс (fake) запрос обязан быть уже оборван остатком бюджета
+      // 500 мс, а не жить до полных 8 секунд.
+      await vi.advanceTimersByTimeAsync(600);
+      const result = await pending;
+      expect(result).toEqual({
+        status: "failed",
+        errorCode: "TELEGRAM_TIMEOUT",
+        processed: 0,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("батч ровно в лимит (100) не считается осушением — drain продолжает", async () => {
+    const db = new FakePollDb();
+    const ids = Array.from({ length: 100 }, (_, i) => i + 1);
+    const { fetchImpl, calls } = fetchScript([
+      updatesResponse(ids),
+      updatesResponse([]),
+    ]);
+
+    const result = await drainTelegramUpdates(db, fetchImpl, baseOptions());
+
+    expect(result).toEqual({ status: "drained", processed: 100, batches: 2 });
+    expect(calls).toHaveLength(2);
+    expect(calls[1].body).toMatchObject({ offset: 101 });
+    expect(db.row?.nextOffset).toBe(101);
   });
 
   it("never lets a stale drain rewind the offset", async () => {

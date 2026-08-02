@@ -62,20 +62,28 @@ export async function POST(request: Request): Promise<NextResponse> {
         ])
       : null;
 
-    return NextResponse.json({
-      ok: true,
-      updates,
-      overdue,
-      retention: retention
-        ? {
-            configured: true,
-            days: retentionDays,
-            deletedEvents: retention[0].deletedEvents,
-            deletedTelegramAttempts: retention[1].deletedAttempts,
-            cutoff: retention[0].cutoff.toISOString(),
-          }
-        : { configured: false },
-    });
+    // Health-contract: провал опроса обязан красить cron-тик (workflow
+    // проверяет только HTTP-код), но не отменяет уже выполненную работу —
+    // overdue и retention отработали выше. skipped-*/channel-disabled —
+    // штатные исходы, не сбой.
+    const pollFailed = updates.status === "failed";
+    return NextResponse.json(
+      {
+        ok: !pollFailed,
+        updates,
+        overdue,
+        retention: retention
+          ? {
+              configured: true,
+              days: retentionDays,
+              deletedEvents: retention[0].deletedEvents,
+              deletedTelegramAttempts: retention[1].deletedAttempts,
+              cutoff: retention[0].cutoff.toISOString(),
+            }
+          : { configured: false },
+      },
+      { status: pollFailed ? 503 : 200 },
+    );
   } catch {
     return NextResponse.json({ error: "maintenance failed" }, { status: 500 });
   }

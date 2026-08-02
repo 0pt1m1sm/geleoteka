@@ -1,6 +1,8 @@
 import {
   TELEGRAM_POLL_BATCH_LIMIT,
   TELEGRAM_POLL_COOLDOWN_MS,
+  TELEGRAM_POLL_LEASE_MS,
+  TELEGRAM_POLL_POISON_MAX_ATTEMPTS,
   TELEGRAM_POLL_REQUEST_TIMEOUT_MS,
 } from "@/lib/staff-notifications/channels/telegram/constants";
 import { telegramApiMethodUrl } from "@/lib/staff-notifications/channels/telegram/adapter";
@@ -54,7 +56,7 @@ export interface DrainTelegramUpdatesOptions {
 }
 
 export type DrainTelegramUpdatesResult =
-  | { status: "skipped-cooldown"; processed: 0 }
+  | { status: "skipped-cooldown" | "skipped-lease"; processed: 0 }
   | { status: "failed"; errorCode: TelegramPollErrorCode; processed: number }
   | { status: "drained" | "budget-exhausted"; processed: number; batches: number };
 
@@ -68,6 +70,8 @@ export type TelegramPollErrorCode =
 
 interface PollStateRow {
   nextOffset: bigint | number;
+  stuckUpdateId: bigint | number | null;
+  stuckAttempts: number;
 }
 
 interface TelegramUpdatesResponse {
@@ -93,10 +97,9 @@ export async function drainTelegramUpdates(
     update: {},
   });
 
-  // The cooldown is a single atomic stamp update, not a lock. Concurrent
-  // drains are harmless for correctness (processing is idempotent and the
-  // offset only moves forward), so all the stamp prevents is pointless
-  // duplicate network traffic from interactive status polling.
+  // The cooldown is cadence control for interactive callers (the panel's
+  // 5-second status polling); cron's force bypasses it. Mutual exclusion is
+  // the lease below — the cooldown only prevents pointless traffic.
   const startedAtWall = now();
   const stamped = await db.telegramPollState.updateMany({
     where: {
@@ -118,41 +121,115 @@ export async function drainTelegramUpdates(
   });
   if (stamped.count === 0) return { status: "skipped-cooldown", processed: 0 };
 
+  // Single-flight lease: ровно один drain на токен. Второй одновременный
+  // getUpdates «терминирует» первый на стороне Telegram (409), поэтому
+  // перекрытие пресекается ещё до сети. force кулдаун обходит, lease — нет.
+  const leaseUntil = new Date(startedAtWall.getTime() + TELEGRAM_POLL_LEASE_MS);
+  const leased = await db.telegramPollState.updateMany({
+    where: {
+      tenantKey: TENANT_KEY,
+      OR: [{ leaseUntil: null }, { leaseUntil: { lt: startedAtWall } }],
+    },
+    data: { leaseUntil },
+  });
+  if (leased.count === 0) return { status: "skipped-lease", processed: 0 };
+
+  try {
+    return await runDrainLoop(db, fetchImpl, options, {
+      budgetMs,
+      maxBatches,
+      requestTimeoutMs,
+      monotonicNow,
+    });
+  } finally {
+    // Освобождаем только собственный штамп: протухший и перехваченный lease
+    // нельзя снимать из-под нового владельца.
+    await db.telegramPollState.updateMany({
+      where: { tenantKey: TENANT_KEY, leaseUntil },
+      data: { leaseUntil: null },
+    });
+  }
+}
+
+async function runDrainLoop(
+  db: TelegramPollStateDb,
+  fetchImpl: typeof fetch,
+  options: DrainTelegramUpdatesOptions,
+  limits: {
+    budgetMs: number;
+    maxBatches: number;
+    requestTimeoutMs: number;
+    monotonicNow: () => number;
+  },
+): Promise<DrainTelegramUpdatesResult> {
+  const { budgetMs, maxBatches, requestTimeoutMs, monotonicNow } = limits;
   const startedAt = monotonicNow();
+  // Жёсткий wall-clock: дедлайн проверяется перед каждым сетевым вызовом и
+  // каждой обработкой, а таймаут каждого вызова урезается остатком бюджета —
+  // иначе drain с бюджетом 3с доживал до ~16с (fetch 8с + deleteWebhook 8с).
+  const deadlineAt = startedAt + budgetMs;
+  const remaining = (): number => deadlineAt - monotonicNow();
   let processed = 0;
   let batches = 0;
   let webhookDeleted = false;
 
   while (batches < maxBatches) {
-    if (monotonicNow() - startedAt > budgetMs) {
+    if (remaining() <= 0) {
       return { status: "budget-exhausted", processed, batches };
     }
 
     const state = (await db.telegramPollState.findUnique({
       where: { tenantKey: TENANT_KEY },
-      select: { nextOffset: true },
+      select: { nextOffset: true, stuckUpdateId: true, stuckAttempts: true },
     })) as PollStateRow | null;
     const offset = Number(state?.nextOffset ?? 0);
+    let stuck = {
+      updateId:
+        state?.stuckUpdateId === null || state?.stuckUpdateId === undefined
+          ? null
+          : Number(state.stuckUpdateId),
+      attempts: state?.stuckAttempts ?? 0,
+    };
 
     const batch = await fetchTelegramUpdates(db, fetchImpl, {
       apiBaseUrl: options.apiBaseUrl,
       botToken: options.botToken,
       offset,
-      requestTimeoutMs,
+      requestTimeoutMs: capTimeout(requestTimeoutMs, remaining()),
       monotonicNow,
     });
     batches += 1;
 
     if (batch.outcome === "conflict") {
-      // getUpdates refuses to run while a webhook registration exists. This
-      // is the one-time migration edge (and the self-heal if anything ever
-      // re-registers a webhook): drop the registration, keep pending updates,
-      // and retry within the same drain.
+      // 409 двусмысленен: активная webhook-регистрация ИЛИ параллельный
+      // getUpdates с тем же токеном. Различает только getWebhookInfo —
+      // слепое удаление маскировало бы перекрытие под смену режима.
       if (webhookDeleted) {
         return { status: "failed", errorCode: "TELEGRAM_CONFLICT", processed };
       }
+      if (remaining() <= 0) {
+        return { status: "budget-exhausted", processed, batches };
+      }
+      const registered = await telegramWebhookRegistered(
+        fetchImpl,
+        options,
+        capTimeout(requestTimeoutMs, remaining()),
+      );
+      if (registered !== true) {
+        return { status: "failed", errorCode: "TELEGRAM_CONFLICT", processed };
+      }
+      if (remaining() <= 0) {
+        return { status: "budget-exhausted", processed, batches };
+      }
+      // Одноразовая грань миграции (и самолечение, если что-то снова
+      // зарегистрирует webhook): снять регистрацию, сохранить накопленные
+      // апдейты, повторить в этом же drain.
       webhookDeleted = true;
-      await deleteTelegramWebhook(fetchImpl, options, requestTimeoutMs);
+      await deleteTelegramWebhook(
+        fetchImpl,
+        options,
+        capTimeout(requestTimeoutMs, remaining()),
+      );
       continue;
     }
     if (batch.outcome === "failed") {
@@ -161,6 +238,12 @@ export async function drainTelegramUpdates(
 
     let highestUpdateId: number | null = null;
     for (const update of batch.updates) {
+      if (remaining() <= 0) {
+        if (highestUpdateId !== null) {
+          await advanceOffset(db, highestUpdateId + 1);
+        }
+        return { status: "budget-exhausted", processed, batches };
+      }
       const updateId = readUpdateId(update);
       try {
         await options.processUpdate(update);
@@ -171,6 +254,31 @@ export async function drainTelegramUpdates(
         if (highestUpdateId !== null) {
           await advanceOffset(db, highestUpdateId + 1);
         }
+        const attempts =
+          updateId !== null && stuck.updateId === updateId
+            ? stuck.attempts + 1
+            : 1;
+        if (updateId !== null && attempts >= TELEGRAM_POLL_POISON_MAX_ATTEMPTS) {
+          // Quarantine: the same update failed this many drains in a row, so
+          // the failure is deterministic and waiting will not fix it. Skipping
+          // one poisoned update is the lesser evil next to silently blocking
+          // every update behind it. Only the counter is durable — no update
+          // content is ever stored.
+          await advanceOffset(db, updateId + 1);
+          await writeStuckState(db, null, 0);
+          stuck = { updateId: null, attempts: 0 };
+          await recordTelegramSendDiagnostic(db, {
+            operation: "UPDATES_POLL",
+            outcome: "FAILURE",
+            durationMs: 0,
+            errorCode: "UPDATE_QUARANTINED",
+          });
+          highestUpdateId = updateId;
+          continue;
+        }
+        if (updateId !== null) {
+          await writeStuckState(db, updateId, attempts);
+        }
         return {
           status: "failed",
           errorCode: "UPDATE_PROCESSING_FAILED",
@@ -178,7 +286,13 @@ export async function drainTelegramUpdates(
         };
       }
       processed += 1;
-      if (updateId !== null) highestUpdateId = updateId;
+      if (updateId !== null) {
+        highestUpdateId = updateId;
+        if (stuck.updateId === updateId) {
+          await writeStuckState(db, null, 0);
+          stuck = { updateId: null, attempts: 0 };
+        }
+      }
     }
 
     if (highestUpdateId !== null) {
@@ -263,6 +377,42 @@ async function fetchTelegramUpdates(
   return result;
 }
 
+/**
+ * true — webhook зарегистрирован; false — точно нет (значит, 409 вызван
+ * конкурентным getUpdates); null — выяснить не удалось. Значение url
+ * проверяется ТОЛЬКО на непустоту и никуда не логируется.
+ */
+async function telegramWebhookRegistered(
+  fetchImpl: typeof fetch,
+  options: Pick<DrainTelegramUpdatesOptions, "apiBaseUrl" | "botToken">,
+  requestTimeoutMs: number,
+): Promise<boolean | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), requestTimeoutMs);
+  try {
+    const response = await fetchImpl(
+      telegramApiMethodUrl(options.apiBaseUrl, options.botToken, "getWebhookInfo"),
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+        signal: controller.signal,
+      },
+    );
+    if (!response.ok) return null;
+    const body = (await response.json().catch(() => null)) as {
+      ok?: boolean;
+      result?: { url?: unknown };
+    } | null;
+    if (body?.ok !== true) return null;
+    return typeof body.result?.url === "string" && body.result.url.length > 0;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function deleteTelegramWebhook(
   fetchImpl: typeof fetch,
   options: Pick<DrainTelegramUpdatesOptions, "apiBaseUrl" | "botToken">,
@@ -289,6 +439,21 @@ async function deleteTelegramWebhook(
   } finally {
     clearTimeout(timer);
   }
+}
+
+function capTimeout(baseTimeoutMs: number, remainingMs: number): number {
+  return Math.max(1, Math.min(baseTimeoutMs, Math.ceil(remainingMs)));
+}
+
+async function writeStuckState(
+  db: TelegramPollStateDb,
+  stuckUpdateId: number | null,
+  stuckAttempts: number,
+): Promise<void> {
+  await db.telegramPollState.updateMany({
+    where: { tenantKey: TENANT_KEY },
+    data: { stuckUpdateId, stuckAttempts },
+  });
 }
 
 async function advanceOffset(

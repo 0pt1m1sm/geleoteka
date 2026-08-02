@@ -64,7 +64,7 @@ export type TelegramWebhookReplySender = (
 
 export type TelegramWebhookReplyScheduler = (
   reply: TelegramWebhookReply,
-) => void;
+) => void | Promise<void>;
 
 interface TelegramWebhookTransactionResult {
   outcome: TelegramWebhookOutcome;
@@ -306,11 +306,13 @@ export async function processTelegramWebhookUpdate(
     );
   });
 
-  // Prisma resolves the interactive transaction only after commit. The route
-  // schedules this reply for post-response delivery; no provider I/O belongs
-  // to the transaction or the webhook response path.
+  // Prisma resolves the interactive transaction only after commit. The
+  // webhook route passes a sync scheduler (after() takes the reply out of the
+  // response path); the polling runtime passes an async deliverer, and it is
+  // awaited here — polling has no after(), so the drain must not outrun the
+  // reply and its diagnostics.
   if (result.replyText && update.chatId && scheduleReply) {
-    scheduleReply({ chatId: update.chatId, text: result.replyText });
+    await scheduleReply({ chatId: update.chatId, text: result.replyText });
   }
 
   return result.outcome;

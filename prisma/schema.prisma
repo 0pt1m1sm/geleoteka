@@ -2330,7 +2330,14 @@ model TelegramPollState {
   tenantKey          String    @id @default("geleoteka")
   nextOffset         BigInt    @default(0)
   lastDrainStartedAt DateTime?
-  updatedAt          DateTime  @updatedAt
+  /// Durable-счётчик ядовитого апдейта: после N подряд неудач курсор
+  /// продвигается мимо виновника. Хранится только update_id, без содержимого.
+  stuckUpdateId      BigInt?
+  stuckAttempts      Int       @default(0)
+  /// Single-flight lease активного drain; освобождается по завершении,
+  /// протухший перехватывается по времени.
+  leaseUntil         DateTime?
+  updatedAt          DateTime  @default(now()) @updatedAt
 }
 
 /// One atomic, server-side cooldown per person pressing a Telegram test

@@ -1,6 +1,7 @@
 import type { SettingDescriptor } from "@/lib/settings";
 import {
   normalizeStaffNotificationDispatchSecret,
+  normalizeTelegramApiBaseUrl,
   normalizeTelegramBotToken,
   normalizeTelegramBotUsername,
   normalizeTelegramRoutingMode,
@@ -50,6 +51,13 @@ export function validateSettingValue(
   }
   if (descriptor.key === "TELEGRAM_ROUTING_MODE") {
     const normalized = normalizeTelegramRoutingMode(value);
+    return normalized ? { ok: true, value: normalized } : invalid(descriptor);
+  }
+  if (descriptor.key === "TELEGRAM_API_BASE_URL") {
+    // Невалидный адрес на этапе рантайма молча выключает весь канал
+    // (fail-closed в resolveTelegramRuntimeConfig), поэтому отбивается ещё
+    // при сохранении. Пустое значение сюда не доходит — оно удаляет строку.
+    const normalized = normalizeTelegramApiBaseUrl(value);
     return normalized ? { ok: true, value: normalized } : invalid(descriptor);
   }
   if (descriptor.key === "STAFF_NOTIFICATION_RETENTION_DAYS") {

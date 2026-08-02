@@ -56,7 +56,13 @@ export function TelegramLinkPanel({
               : "Выбрать группу в Telegram"}
           </a>
           <ManualLinkCommand command={state.manualCommand} purpose={purpose} />
-          <LinkStatusWatcher purpose={purpose} expiresAt={state.expiresAt ?? null} />
+          {/* key: новая ссылка = новый watcher, иначе фаза «expired» от
+              старой ссылки переживает перегенерацию и залипает. */}
+          <LinkStatusWatcher
+            key={state.expiresAt ?? "no-deadline"}
+            purpose={purpose}
+            expiresAt={state.expiresAt ?? null}
+          />
         </Alert>
       ) : null}
     </div>

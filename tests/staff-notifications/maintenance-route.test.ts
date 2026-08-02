@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   retain: vi.fn(),
   retainTelegram: vi.fn(),
   retentionDays: vi.fn(),
+  drainNow: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ db: {} }));
@@ -26,11 +27,7 @@ vi.mock("@/lib/staff-notifications/operations-config", () => ({
 vi.mock(
   "@/lib/staff-notifications/channels/telegram/updates-runtime",
   () => ({
-    drainTelegramUpdatesNow: vi.fn(async () => ({
-      status: "drained",
-      processed: 0,
-      batches: 1,
-    })),
+    drainTelegramUpdatesNow: mocks.drainNow,
   }),
 );
 
@@ -42,6 +39,12 @@ describe("staff notification maintenance route", () => {
     mocks.retain.mockReset();
     mocks.retainTelegram.mockReset();
     mocks.retentionDays.mockReset();
+    mocks.drainNow.mockReset();
+    mocks.drainNow.mockResolvedValue({
+      status: "drained",
+      processed: 0,
+      batches: 1,
+    });
     mocks.scan.mockResolvedValue({ scanned: 1, eventsEnsured: 1 });
     mocks.retentionDays.mockResolvedValue(30);
     mocks.retain.mockResolvedValue({
@@ -96,5 +99,59 @@ describe("staff notification maintenance route", () => {
     expect(mocks.scan).toHaveBeenCalledOnce();
     expect(mocks.retain).toHaveBeenCalledOnce();
     expect(mocks.retainTelegram).toHaveBeenCalledOnce();
+    // Опрос — часть того же тика с параметрами cron-расписания.
+    expect(mocks.drainNow).toHaveBeenCalledWith({
+      force: true,
+      budgetMs: 6_000,
+      maxBatches: 3,
+    });
+  });
+
+  it("провал опроса красит тик: 503, но overdue и retention всё равно выполнены", async () => {
+    mocks.drainNow.mockResolvedValue({
+      status: "failed",
+      errorCode: "TELEGRAM_AUTH_REJECTED",
+      processed: 0,
+    });
+
+    const response = await POST(
+      new Request(
+        "https://geleoteka.ru/api/internal/staff-notifications/maintenance",
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${"D".repeat(32)}` },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      updates: { status: "failed", errorCode: "TELEGRAM_AUTH_REJECTED" },
+    });
+    // Health-contract не отменяет остальную работу тика.
+    expect(mocks.scan).toHaveBeenCalledOnce();
+    expect(mocks.retain).toHaveBeenCalledOnce();
+    expect(mocks.retainTelegram).toHaveBeenCalledOnce();
+  });
+
+  it("выключенный канал и пропуски по lease/cooldown остаются зелёными", async () => {
+    for (const status of [
+      { status: "channel-disabled", processed: 0 },
+      { status: "skipped-lease", processed: 0 },
+      { status: "skipped-cooldown", processed: 0 },
+    ]) {
+      mocks.drainNow.mockResolvedValue(status);
+      const response = await POST(
+        new Request(
+          "https://geleoteka.ru/api/internal/staff-notifications/maintenance",
+          {
+            method: "POST",
+            headers: { authorization: `Bearer ${"D".repeat(32)}` },
+          },
+        ),
+      );
+      expect(response.status).toBe(200);
+    }
   });
 });
