@@ -102,7 +102,7 @@ describe("staff notification maintenance route", () => {
     // Опрос — часть того же тика с параметрами cron-расписания.
     expect(mocks.drainNow).toHaveBeenCalledWith({
       force: true,
-      budgetMs: 6_000,
+      budgetMs: 25_000,
       maxBatches: 3,
     });
   });
