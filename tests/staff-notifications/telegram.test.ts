@@ -67,6 +67,18 @@ describe("Telegram link commands", () => {
 
     expect(parseTelegramLinkCommand(receivedCommand)).toBe(rawToken);
   });
+
+  it("rejects excessively long input before trimming or parsing it", () => {
+    const command = `/start ${rawToken}${" ".repeat(200)}`;
+    const trimSpy = vi.spyOn(String.prototype, "trim");
+
+    const result = parseTelegramLinkCommand(command);
+    const trimCallCount = trimSpy.mock.calls.length;
+    trimSpy.mockRestore();
+
+    expect(result).toBeNull();
+    expect(trimCallCount).toBe(0);
+  });
 });
 
 describe("Telegram runtime config", () => {
