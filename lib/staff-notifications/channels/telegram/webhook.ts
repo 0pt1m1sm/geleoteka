@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { hashTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
 import { parseTelegramStartCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
 import type { TelegramTextSendErrorCode } from "@/lib/staff-notifications/channels/telegram/adapter";
@@ -8,7 +10,7 @@ import { TENANT_KEY } from "@/lib/tenant";
 type QueryArgs = Record<string, unknown>;
 
 interface TelegramWebhookTx {
-  $queryRaw<T>(query: TemplateStringsArray, ...values: unknown[]): Promise<T>;
+  $executeRaw(query: TemplateStringsArray, ...values: unknown[]): Promise<number>;
   telegramUpdateReceipt: {
     createMany(args: QueryArgs): Promise<{ count: number }>;
   };
@@ -211,10 +213,7 @@ export async function processTelegramWebhookUpdate(
     const destinationTelegramUserId =
       token.purpose === "PERSONAL" ? update.telegramUserId : null;
 
-    const lockKey = `${TENANT_KEY}\u0000telegram-link\u0000${token.purpose}\u0000${token.userId ?? "shared"}`;
-    await tx.$queryRaw<Array<{ locked: unknown }>>`
-      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0)) AS "locked"
-    `;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(${telegramLinkLockId(token)})`;
 
     const chatDestination = (await tx.telegramDestination.findUnique({
       where: {
@@ -332,6 +331,27 @@ export async function deliverTelegramWebhookReply(
   if (failure) {
     await recordTelegramReplyFailure(client, failure);
   }
+}
+
+/**
+ * 64-битный ключ advisory-замка считается В ПРИЛОЖЕНИИ. Прежний вариант —
+ * строковый параметр с NUL-разделителями внутрь hashtextextended — Postgres
+ * отбивал ошибкой 22021 «invalid byte sequence for encoding UTF8: 0x00», и
+ * КАЖДАЯ валидная привязка детерминированно падала (ядовитый апдейт).
+ * Bigint-параметр таких граней не имеет; воспроизведено и проверено на
+ * настоящем Prisma+Postgres 2026-08-02.
+ */
+function telegramLinkLockId(
+  token: Pick<LinkTokenRow, "purpose" | "userId">,
+): bigint {
+  const digest = createHash("sha256")
+    .update(
+      [TENANT_KEY, "telegram-link", token.purpose, token.userId ?? "shared"].join(
+        "",
+      ),
+    )
+    .digest();
+  return digest.readBigInt64BE(0);
 }
 
 function transactionResult(

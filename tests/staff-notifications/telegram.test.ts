@@ -761,6 +761,10 @@ describe("Telegram webhook processing", () => {
 
     expect(fake.destinations).toHaveLength(1);
     expect(fake.auditWrites).toBe(1);
+    // Advisory-lock обязан идти bigint-параметром: строковый ключ с NUL
+    // Postgres отбивал ошибкой 22021, превращая привязку в ядовитый апдейт.
+    expect(fake.lockParams).toHaveLength(1);
+    expect(typeof fake.lockParams[0]).toBe("bigint");
     await deliverTelegramWebhookReply(
       fake,
       scheduledReplies[0]!,
@@ -1235,7 +1239,15 @@ class FakeTelegramWebhookDb implements TelegramWebhookDb {
     this.token.usedAt = new Date(NOW.getTime() - 1);
   }
 
-  $queryRaw = async <T>(): Promise<T> => [{ locked: true }] as T;
+  lockParams: unknown[] = [];
+
+  $executeRaw = async (
+    _query: TemplateStringsArray,
+    ...values: unknown[]
+  ): Promise<number> => {
+    this.lockParams.push(...values);
+    return 0;
+  };
 
   telegramUpdateReceipt = {
     createMany: async (args: Record<string, unknown>) => {
