@@ -39,6 +39,9 @@ interface ProjectorTx extends InboundFollowUpTx, StaffNotificationRouterTx {
   rolePermission: {
     findMany(args: QueryArgs): Promise<unknown>;
   };
+  staffNotificationOptOut: {
+    findMany(args: QueryArgs): Promise<unknown>;
+  };
   telegramDestination: {
     findMany(args: QueryArgs): Promise<unknown>;
   };
@@ -99,6 +102,11 @@ interface RolePermissionRow {
   role: string;
   permission: string;
   allowed: boolean;
+}
+
+interface NotificationOptOutRow {
+  userId: string;
+  eventType: string;
 }
 
 interface DestinationRow {
@@ -477,17 +485,34 @@ async function loadRecipientCandidates(tx: ProjectorTx) {
     select: { id: true, permissionRole: true },
   })) as StaffUserRow[];
   const roles = [...new Set(users.map((user) => user.permissionRole).filter((r) => r !== "ADMIN"))];
-  const stored = roles.length
-    ? ((await tx.rolePermission.findMany({
-        where: { tenantKey: TENANT_KEY, role: { in: roles } },
-        select: { role: true, permission: true, allowed: true },
-      })) as RolePermissionRow[])
-    : [];
+  const [stored, optOuts] = await Promise.all([
+    roles.length
+      ? (tx.rolePermission.findMany({
+          where: { tenantKey: TENANT_KEY, role: { in: roles } },
+          select: { role: true, permission: true, allowed: true },
+        }) as Promise<RolePermissionRow[]>)
+      : Promise.resolve([]),
+    users.length
+      ? (tx.staffNotificationOptOut.findMany({
+          where: {
+            tenantKey: TENANT_KEY,
+            userId: { in: users.map((user) => user.id) },
+          },
+          select: { userId: true, eventType: true },
+        }) as Promise<NotificationOptOutRow[]>)
+      : Promise.resolve([]),
+  ]);
   const rowsByRole = new Map<string, RolePermissionRow[]>();
   for (const row of stored) {
     const rows = rowsByRole.get(row.role) ?? [];
     rows.push(row);
     rowsByRole.set(row.role, rows);
+  }
+  const disabledByUser = new Map<string, Set<string>>();
+  for (const row of optOuts) {
+    const disabled = disabledByUser.get(row.userId) ?? new Set<string>();
+    disabled.add(row.eventType);
+    disabledByUser.set(row.userId, disabled);
   }
 
   return users.map((user) => {
@@ -500,6 +525,7 @@ async function loadRecipientCandidates(tx: ProjectorTx) {
       userId: user.id,
       canViewNotifications: permissions.has("notifications.view"),
       permissions,
+      disabledEventTypes: disabledByUser.get(user.id) ?? new Set<string>(),
     };
   });
 }

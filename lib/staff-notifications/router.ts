@@ -24,6 +24,7 @@ export interface StaffRecipientCandidate {
   userId: string;
   canViewNotifications: boolean;
   permissions: ReadonlySet<string>;
+  disabledEventTypes: ReadonlySet<string>;
 }
 
 /**
@@ -58,14 +59,18 @@ export interface RouteStaffNotificationResult {
  * core to a page/API authorization helper.
  */
 export function selectStaffNotificationRecipients(
-  event: Pick<StaffNotificationEventRecord, "targetUserId" | "fallbackPermission">,
+  event: Pick<
+    StaffNotificationEventRecord,
+    "type" | "targetUserId" | "fallbackPermission"
+  >,
   candidates: readonly StaffRecipientCandidate[],
 ): string[] {
   const permission = event.fallbackPermission;
   const eligible = candidates.filter(
     (candidate) =>
       candidate.canViewNotifications &&
-      (permission === null || candidate.permissions.has(permission)),
+      (permission === null || candidate.permissions.has(permission)) &&
+      !candidate.disabledEventTypes.has(event.type),
   );
 
   if (event.targetUserId) {

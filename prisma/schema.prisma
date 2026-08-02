@@ -2214,6 +2214,21 @@ model StaffNotificationReceipt {
   @@index([tenantKey, userId, readAt, createdAt], map: "StaffNotificationReceipt_user_read_created_idx")
 }
 
+/// Explicit per-employee opt-outs. Absence means the category is enabled, so
+/// adding this table cannot silence notifications for existing employees.
+/// The router still checks role permissions first; these rows can only narrow
+/// that permission-derived recipient set.
+model StaffNotificationOptOut {
+  id        String   @id @default(cuid())
+  tenantKey String   @default("geleoteka")
+  userId    String
+  eventType String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantKey, userId, eventType], map: "StaffNotificationOptOut_tenant_user_event_key")
+  @@index([tenantKey, userId], map: "StaffNotificationOptOut_tenant_user_idx")
+}
+
 /// One attempt stream for one event/channel/destination tuple. destinationKey
 /// is an internal adapter key (for Telegram it will be TelegramDestination.id),
 /// never an address accepted from a browser.
