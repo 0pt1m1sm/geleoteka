@@ -9,6 +9,11 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/feed";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { createTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
+import {
+  sendTelegramTestNotification,
+  type TelegramTestNotificationResult,
+  type TelegramTestSendDb,
+} from "@/lib/staff-notifications/channels/telegram/test-send";
 import { requeueDeadStaffNotificationDelivery } from "@/lib/staff-notifications/operations";
 import { staffNotificationTypesForPermissions } from "@/lib/staff-notifications/preferences";
 import {
@@ -25,6 +30,8 @@ export interface CreateTelegramLinkState {
   manualCommand?: string;
   expiresAt?: string;
 }
+
+export type TelegramTestNotificationState = TelegramTestNotificationResult;
 
 export async function markStaffNotificationRead(eventId: string): Promise<void> {
   const session = await requirePermission("notifications.view");
@@ -61,6 +68,16 @@ export async function createSharedTelegramLink(
 export async function revokePersonalTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.view");
   await revokeTelegramDestinations({ kind: "PERSONAL", userId: session.id }, session);
+}
+
+export async function sendPersonalTelegramTest(
+  _previous: TelegramTestNotificationState | null,
+  _formData: FormData,
+): Promise<TelegramTestNotificationState> {
+  void _previous;
+  void _formData;
+  const session = await requirePermission("notifications.view");
+  return sendTelegramTest("PERSONAL", session.id);
 }
 
 /**
@@ -111,6 +128,16 @@ export async function updateOwnStaffNotificationOptOuts(
 export async function revokeSharedTelegramLink(): Promise<void> {
   const session = await requirePermission("notifications.manage");
   await revokeTelegramDestinations({ kind: "SHARED", userId: null }, session);
+}
+
+export async function sendSharedTelegramTest(
+  _previous: TelegramTestNotificationState | null,
+  _formData: FormData,
+): Promise<TelegramTestNotificationState> {
+  void _previous;
+  void _formData;
+  const session = await requirePermission("notifications.manage");
+  return sendTelegramTest("SHARED", session.id);
 }
 
 export async function setSharedTelegramDeliveryScope(
@@ -243,6 +270,19 @@ async function createLink(
     manualCommand: result.manualCommand,
     expiresAt: result.expiresAt.toISOString(),
   };
+}
+
+async function sendTelegramTest(
+  target: "PERSONAL" | "SHARED",
+  actorUserId: string,
+): Promise<TelegramTestNotificationState> {
+  return sendTelegramTestNotification({
+    client: db as unknown as TelegramTestSendDb,
+    fetchImpl: globalThis.fetch,
+    config: await loadTelegramRuntimeConfig(),
+    actorUserId,
+    target,
+  });
 }
 
 async function revokeTelegramDestinations(

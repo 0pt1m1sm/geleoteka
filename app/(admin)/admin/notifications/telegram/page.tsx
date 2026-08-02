@@ -8,6 +8,7 @@ import {
   setSharedTelegramDeliveryScope,
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
+import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
@@ -68,6 +69,7 @@ export default async function TelegramNotificationsPage() {
             {shared ? (
               <div className="space-y-3">
                 <p className="text-sm">Привязано {formatDateTime(shared.verifiedAt)}</p>
+                <TelegramTestButton purpose="SHARED" />
                 <form
                   action={setSharedTelegramDeliveryScope.bind(null, shared.id)}
                   className="space-y-2"

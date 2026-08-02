@@ -1,5 +1,5 @@
 import { hashTelegramLinkToken } from "@/lib/staff-notifications/channels/telegram/linking";
-import { parseTelegramLinkCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
+import { parseTelegramStartCommand } from "@/lib/staff-notifications/channels/telegram/link-command";
 import type { TelegramTextSendErrorCode } from "@/lib/staff-notifications/channels/telegram/adapter";
 import { roleLabel } from "@/lib/roles";
 import type { TelegramLinkPurpose } from "@/lib/staff-notifications/types";
@@ -90,6 +90,7 @@ interface ParsedTelegramUpdate {
   rawLinkToken: string | null;
   isStartCommand: boolean;
   isBareStart: boolean;
+  isAddressedStart: boolean;
   migrateToChatId: string | null;
 }
 
@@ -143,25 +144,31 @@ export async function processTelegramWebhookUpdate(
       return transactionResult(migrated.count > 0 ? "migrated" : "ignored");
     }
 
-    if (update.chatId && update.telegramUserId && update.isBareStart) {
-      return transactionResult("ignored", BARE_START_REPLY);
+    if (update.chatId && update.isBareStart) {
+      if (
+        (update.chatType === "private" && update.telegramUserId) ||
+        (isGroupChatType(update.chatType) && update.isAddressedStart)
+      ) {
+        return transactionResult("ignored", BARE_START_REPLY);
+      }
+      return transactionResult("ignored");
     }
 
     if (
       update.chatId &&
-      update.telegramUserId &&
       update.isStartCommand &&
       !update.rawLinkToken
     ) {
-      return transactionResult("invalid-token", INVALID_LINK_REPLY);
+      if (
+        (update.chatType === "private" && update.telegramUserId) ||
+        (isGroupChatType(update.chatType) && update.isAddressedStart)
+      ) {
+        return transactionResult("invalid-token", INVALID_LINK_REPLY);
+      }
+      return transactionResult("ignored");
     }
 
-    if (
-      !update.chatId ||
-      !update.chatType ||
-      !update.telegramUserId ||
-      !update.rawLinkToken
-    ) {
+    if (!update.chatId || !update.chatType || !update.rawLinkToken) {
       return transactionResult("ignored");
     }
 
@@ -194,9 +201,15 @@ export async function processTelegramWebhookUpdate(
     ) {
       return transactionResult("invalid-token", INVALID_LINK_REPLY);
     }
+    if (token.purpose === "PERSONAL" && !update.telegramUserId) {
+      return transactionResult("ignored");
+    }
     if (!chatTypeAllowedForPurpose(update.chatType, token.purpose)) {
       return transactionResult("ignored", INVALID_LINK_REPLY);
     }
+
+    const destinationTelegramUserId =
+      token.purpose === "PERSONAL" ? update.telegramUserId : null;
 
     const lockKey = `${TENANT_KEY}\u0000telegram-link\u0000${token.purpose}\u0000${token.userId ?? "shared"}`;
     await tx.$queryRaw<Array<{ locked: unknown }>>`
@@ -250,7 +263,7 @@ export async function processTelegramWebhookUpdate(
           where: { tenantKey_id: { tenantKey: TENANT_KEY, id: existing.id } },
           data: {
             chatId: update.chatId,
-            telegramUserId: update.telegramUserId,
+            telegramUserId: destinationTelegramUserId,
             isActive: true,
             verifiedAt: now,
             disabledAt: null,
@@ -263,7 +276,7 @@ export async function processTelegramWebhookUpdate(
             kind: token.purpose,
             userId: token.userId,
             chatId: update.chatId,
-            telegramUserId: update.telegramUserId,
+            telegramUserId: destinationTelegramUserId,
             label: null,
             deliveryScope: "FALLBACK_ONLY",
             isActive: true,
@@ -336,18 +349,17 @@ function parseTelegramUpdate(value: unknown): ParsedTelegramUpdate | null {
   const chat = objectValue(message?.chat);
   const from = objectValue(message?.from);
   const text = typeof message?.text === "string" ? message.text.trim() : "";
-  const rawLinkToken = parseTelegramLinkCommand(text);
-  const isStartCommand = /^\/start(?:@[A-Za-z0-9_]+)?(?:\s.*)?$/s.test(text);
-  const isBareStart = /^\/start(?:@[A-Za-z0-9_]+)?$/.test(text);
+  const startCommand = parseTelegramStartCommand(text);
 
   return {
     updateId,
     chatType: typeof chat?.type === "string" ? chat.type : null,
     chatId: integerId(chat?.id),
     telegramUserId: from?.is_bot === true ? null : integerId(from?.id),
-    rawLinkToken,
-    isStartCommand,
-    isBareStart,
+    rawLinkToken: startCommand?.rawLinkToken ?? null,
+    isStartCommand: startCommand !== null,
+    isBareStart: startCommand?.isBare ?? false,
+    isAddressedStart: startCommand?.isAddressed ?? false,
     migrateToChatId: integerId(message?.migrate_to_chat_id),
   };
 }
@@ -404,6 +416,10 @@ function chatTypeAllowedForPurpose(
 ): boolean {
   if (purpose === "PERSONAL") return chatType === "private";
   return chatType === "private" || chatType === "group" || chatType === "supergroup";
+}
+
+function isGroupChatType(chatType: string | null): boolean {
+  return chatType === "group" || chatType === "supergroup";
 }
 
 function sameLinkTarget(destination: DestinationRow, token: LinkTokenRow): boolean {
