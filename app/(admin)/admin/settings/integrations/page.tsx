@@ -38,16 +38,13 @@ export default async function IntegrationsSettingsPage() {
     groups.set(s.group, list);
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
-  const telegramWebhookUrl = `${appUrl.replace(/\/$/, "")}/api/integrations/telegram/webhook`;
-
   // Per-group static info rows.
   const groupInfo: Record<string, Array<{ label: string; value: string; copyable?: boolean }>> = {
     "Уведомления сотрудников (Telegram)": [
       {
-        label: "Webhook URL для setWebhook (secret_token берётся из настройки ниже)",
-        value: telegramWebhookUrl,
-        copyable: true,
+        label:
+          "Регистрировать webhook не нужно: приём идёт опросом getUpdates. Достаточно токена бота, имени бота и включённого канала.",
+        value: "Приём: getUpdates (polling)",
       },
     ],
   };

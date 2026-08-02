@@ -23,6 +23,16 @@ vi.mock("@/lib/staff-notifications/channels/telegram/diagnostics", () => ({
 vi.mock("@/lib/staff-notifications/operations-config", () => ({
   loadStaffNotificationRetentionDays: mocks.retentionDays,
 }));
+vi.mock(
+  "@/lib/staff-notifications/channels/telegram/updates-runtime",
+  () => ({
+    drainTelegramUpdatesNow: vi.fn(async () => ({
+      status: "drained",
+      processed: 0,
+      batches: 1,
+    })),
+  }),
+);
 
 import { POST } from "@/app/api/internal/staff-notifications/maintenance/route";
 

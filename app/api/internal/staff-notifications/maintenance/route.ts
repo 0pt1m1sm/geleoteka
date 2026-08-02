@@ -16,6 +16,7 @@ import {
   scanOverdueCrmTasks,
   type StaffNotificationOverdueScannerDb,
 } from "@/lib/staff-notifications/overdue";
+import { drainTelegramUpdatesNow } from "@/lib/staff-notifications/channels/telegram/updates-runtime";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
+    // Inbound Telegram updates ride the same external cron: polling is the
+    // primary transport now, and the cron tick is its guaranteed cadence.
+    // force bypasses the interactive cooldown — this tick IS the schedule.
+    const updates = await drainTelegramUpdatesNow({
+      force: true,
+      budgetMs: 6_000,
+      maxBatches: 3,
+    });
+
     const overdue = await scanOverdueCrmTasks(
       db as unknown as StaffNotificationOverdueScannerDb,
       { limit: 100 },
@@ -54,6 +64,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json({
       ok: true,
+      updates,
       overdue,
       retention: retention
         ? {

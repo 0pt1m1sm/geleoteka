@@ -111,12 +111,27 @@ describe("Telegram runtime config", () => {
         TELEGRAM_BOT_TOKEN: "damaged",
       }),
     ).toMatchObject({ enabled: false, reason: "invalid-config" });
+    // Intentional behavior change with the polling switch: a missing or
+    // malformed webhook secret no longer disables the channel — inbound goes
+    // through getUpdates. It only keeps the webhook route fail-closed.
     expect(
       resolveTelegramRuntimeConfig({
         ...validSettingValues(),
         TELEGRAM_WEBHOOK_SECRET: "short",
       }),
+    ).toMatchObject({ enabled: true, webhookSecret: null });
+    expect(
+      resolveTelegramRuntimeConfig({
+        ...validSettingValues(),
+        TELEGRAM_API_BASE_URL: "http://insecure-relay.example",
+      }),
     ).toMatchObject({ enabled: false, reason: "invalid-config" });
+    expect(
+      resolveTelegramRuntimeConfig({
+        ...validSettingValues(),
+        TELEGRAM_API_BASE_URL: "https://relay.example/tg/",
+      }),
+    ).toMatchObject({ enabled: true, apiBaseUrl: "https://relay.example/tg" });
     expect(
       resolveTelegramRuntimeConfig({
         ...validSettingValues(),
@@ -786,6 +801,7 @@ describe("Telegram delivery classification", () => {
 
     await expect(
       sendTelegramText(fetchMock, {
+        apiBaseUrl: "https://api.telegram.org",
         botToken: `123456:${"A".repeat(32)}`,
         chatId: "777001",
         text: "Привязка выполнена.",
@@ -828,6 +844,7 @@ describe("Telegram delivery classification", () => {
       );
 
       const result = sendTelegramText(fetchMock, {
+        apiBaseUrl: "https://api.telegram.org",
         botToken: `123456:${"A".repeat(32)}`,
         chatId: "777001",
         text: "Привязка выполнена.",

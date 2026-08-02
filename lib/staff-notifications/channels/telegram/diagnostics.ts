@@ -8,6 +8,7 @@ export const TELEGRAM_SEND_OPERATIONS = [
   "NOTIFICATION_DELIVERY",
   "WEBHOOK_REPLY",
   "TEST_NOTIFICATION",
+  "UPDATES_POLL",
 ] as const;
 
 export type TelegramSendOperation = (typeof TELEGRAM_SEND_OPERATIONS)[number];
