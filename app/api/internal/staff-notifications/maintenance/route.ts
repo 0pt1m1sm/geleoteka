@@ -65,8 +65,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Health-contract: провал опроса обязан красить cron-тик (workflow
     // проверяет только HTTP-код), но не отменяет уже выполненную работу —
     // overdue и retention отработали выше. skipped-*/channel-disabled —
-    // штатные исходы, не сбой.
-    const pollFailed = updates.status === "failed";
+    // штатные исходы, не сбой. budget-exhausted без единого обработанного
+    // апдейта — тоже мёртвый канал (409/таймауты съели весь бюджет);
+    // с прогрессом — просто большой backlog, дожуётся следующими тиками.
+    const pollFailed =
+      updates.status === "failed" ||
+      (updates.status === "budget-exhausted" && updates.processed === 0);
     return NextResponse.json(
       {
         ok: !pollFailed,

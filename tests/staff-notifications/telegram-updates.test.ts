@@ -14,6 +14,7 @@ interface PollRow {
   lastDrainStartedAt: Date | null;
   stuckUpdateId: number | null;
   stuckAttempts: number;
+  stuckLastAt: Date | null;
   leaseUntil: Date | null;
 }
 
@@ -31,6 +32,7 @@ class FakePollDb implements TelegramPollStateDb {
           lastDrainStartedAt: null,
           stuckUpdateId: null,
           stuckAttempts: 0,
+          stuckLastAt: null,
           leaseUntil: null,
         };
       }
@@ -54,6 +56,7 @@ class FakePollDb implements TelegramPollStateDb {
       if ("stuckUpdateId" in data) {
         this.row.stuckUpdateId = data.stuckUpdateId as number | null;
         this.row.stuckAttempts = data.stuckAttempts as number;
+        this.row.stuckLastAt = (data.stuckLastAt as Date | null) ?? null;
         return { count: 1 };
       }
       if ("leaseUntil" in data) {
@@ -104,6 +107,15 @@ class FakePollDb implements TelegramPollStateDb {
   telegramSendAttempt = {
     create: async (args: Record<string, unknown>) => {
       this.diagnostics.push(args.data as Record<string, unknown>);
+      return {};
+    },
+  };
+
+  auditEntries: Array<Record<string, unknown>> = [];
+
+  auditLog = {
+    create: async (args: Record<string, unknown>) => {
+      this.auditEntries.push(args.data as Record<string, unknown>);
       return {};
     },
   };
@@ -334,16 +346,19 @@ describe("drainTelegramUpdates", () => {
       }
       return "ok";
     });
-    const drainOnce = () =>
+    // Попытки разнесены по времени (cron-каденция): подряд идущие быстрые
+    // drain не считаются, см. отдельный тест на spacing.
+    const drainAt = (iso: string) =>
       drainTelegramUpdates(
         db,
         fetchScript([updatesResponse([30, 31, 32])]).fetchImpl,
-        { ...baseOptions(poison), force: true },
+        { ...baseOptions(poison), force: true, now: () => new Date(iso) },
       );
 
     // Две первые попытки: drain падает, офсет стоит, счётчик копится durable.
-    for (const expectedAttempts of [1, 2]) {
-      const failed = await drainOnce();
+    const times = ["2026-08-02T12:00:00.000Z", "2026-08-02T12:05:00.000Z"];
+    for (const [index, iso] of times.entries()) {
+      const failed = await drainAt(iso);
       expect(failed).toEqual({
         status: "failed",
         errorCode: "UPDATE_PROCESSING_FAILED",
@@ -351,17 +366,24 @@ describe("drainTelegramUpdates", () => {
       });
       expect(db.row?.nextOffset).toBe(0);
       expect(db.row?.stuckUpdateId).toBe(30);
-      expect(db.row?.stuckAttempts).toBe(expectedAttempts);
+      expect(db.row?.stuckAttempts).toBe(index + 1);
     }
 
     // Третья попытка: виновник в карантине, хвост за ним обработан.
-    const third = await drainOnce();
+    const third = await drainAt("2026-08-02T12:10:00.000Z");
     expect(third).toEqual({ status: "drained", processed: 2, batches: 1 });
     expect(db.row?.nextOffset).toBe(33);
     expect(db.row?.stuckUpdateId).toBeNull();
     expect(db.row?.stuckAttempts).toBe(0);
     expect(
       db.diagnostics.some((d) => d.errorCode === "UPDATE_QUARANTINED"),
+    ).toBe(true);
+    // След для расследования: update_id (число, без содержимого) в AuditLog.
+    expect(
+      db.auditEntries.some(
+        (e) =>
+          e.action === "telegram.update_quarantined" && e.targetId === "30",
+      ),
     ).toBe(true);
     // Хвост (31, 32) обработан, виновник больше не предлагался процессору
     // лишний раз: по одному вызову на drain плюс хвост третьего.
@@ -370,6 +392,82 @@ describe("drainTelegramUpdates", () => {
         ([u]) => (u as { update_id: number }).update_id === 30,
       ),
     ).toHaveLength(3);
+  });
+
+  it("быстрые повторные drain не сжигают попытки карантина (spacing)", async () => {
+    const db = new FakePollDb();
+    const poison = vi.fn(async () => {
+      throw new Error("db down");
+    });
+    const drainAt = (iso: string) =>
+      drainTelegramUpdates(
+        db,
+        fetchScript([updatesResponse([30])]).fetchImpl,
+        { ...baseOptions(poison), force: true, now: () => new Date(iso) },
+      );
+
+    // Панель дёргает каждые ~5 секунд: короткий сбой БД не должен
+    // превратиться в необратимый карантин апдейта за 15 секунд.
+    await drainAt("2026-08-02T12:00:00.000Z");
+    await drainAt("2026-08-02T12:00:05.000Z");
+    await drainAt("2026-08-02T12:00:10.000Z");
+    expect(db.row?.stuckAttempts).toBe(1);
+    expect(db.row?.nextOffset).toBe(0);
+    expect(
+      db.diagnostics.some((d) => d.errorCode === "UPDATE_QUARANTINED"),
+    ).toBe(false);
+  });
+
+  it("исключение при release lease не маскирует результат drain", async () => {
+    const db = new FakePollDb();
+    const realUpdateMany = db.telegramPollState.updateMany;
+    db.telegramPollState.updateMany = async (args: Record<string, unknown>) => {
+      const data = args.data as Record<string, unknown>;
+      if ("leaseUntil" in data && data.leaseUntil === null) {
+        throw new Error("connection lost");
+      }
+      return realUpdateMany(args);
+    };
+
+    const { fetchImpl } = fetchScript([updatesResponse([7])]);
+    const result = await drainTelegramUpdates(db, fetchImpl, baseOptions());
+
+    // Drain выполнен, offset подтверждён — сбой release не должен ни
+    // выбрасываться (maintenance прервал бы overdue/retention), ни менять итог.
+    expect(result).toMatchObject({ status: "drained", processed: 1 });
+    expect(db.row?.nextOffset).toBe(8);
+  });
+
+  it("перехват lease посреди drain останавливает его без порчи чужого состояния", async () => {
+    const db = new FakePollDb();
+    const ids = Array.from({ length: 100 }, (_, i) => i + 1);
+    const { fetchImpl } = fetchScript([
+      updatesResponse(ids),
+      updatesResponse([200]),
+    ]);
+    const processUpdate = vi.fn(async (update: unknown) => {
+      if ((update as { update_id: number }).update_id === 100) {
+        // Симуляция: обработка затянулась, lease протух и перехвачен другим.
+        db.row!.leaseUntil = new Date("2026-08-02T12:09:00.000Z");
+      }
+      return "ok";
+    });
+
+    const result = await drainTelegramUpdates(db, fetchImpl, {
+      ...baseOptions(processUpdate),
+      maxBatches: 3,
+    });
+
+    // Батч 1 подтверждён, но продолжать без владения нельзя — второй батч
+    // не запрашивается, результат сигнализирует о конфликте.
+    expect(result).toEqual({
+      status: "failed",
+      errorCode: "TELEGRAM_CONFLICT",
+      processed: 100,
+    });
+    expect(db.row?.nextOffset).toBe(101);
+    // Чужой lease не тронут ни продлением, ни release.
+    expect(db.row?.leaseUntil?.toISOString()).toBe("2026-08-02T12:09:00.000Z");
   });
 
   it("transient-сбой не карантинится: после успеха счётчик сбрасывается, апдейт не теряется", async () => {

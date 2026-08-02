@@ -2334,6 +2334,9 @@ model TelegramPollState {
   /// продвигается мимо виновника. Хранится только update_id, без содержимого.
   stuckUpdateId      BigInt?
   stuckAttempts      Int       @default(0)
+  /// Момент последней засчитанной попытки: попытки чаще spacing не считаются,
+  /// чтобы частый панельный опрос не сжигал карантин за секунды.
+  stuckLastAt        DateTime?
   /// Single-flight lease активного drain; освобождается по завершении,
   /// протухший перехватывается по времени.
   leaseUntil         DateTime?

@@ -135,6 +135,49 @@ describe("staff notification maintenance route", () => {
     expect(mocks.retainTelegram).toHaveBeenCalledOnce();
   });
 
+  it("budget-exhausted без единого обработанного апдейта — тоже красный тик", async () => {
+    // Сценарий: 409/таймауты съедают бюджет каждый тик, канал фактически
+    // мёртв, но status не «failed» — health-contract обязан это видеть.
+    mocks.drainNow.mockResolvedValue({
+      status: "budget-exhausted",
+      processed: 0,
+      batches: 1,
+    });
+
+    const response = await POST(
+      new Request(
+        "https://geleoteka.ru/api/internal/staff-notifications/maintenance",
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${"D".repeat(32)}` },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(503);
+    expect(mocks.scan).toHaveBeenCalledOnce();
+  });
+
+  it("budget-exhausted с прогрессом (большой backlog) остаётся зелёным", async () => {
+    mocks.drainNow.mockResolvedValue({
+      status: "budget-exhausted",
+      processed: 42,
+      batches: 3,
+    });
+
+    const response = await POST(
+      new Request(
+        "https://geleoteka.ru/api/internal/staff-notifications/maintenance",
+        {
+          method: "POST",
+          headers: { authorization: `Bearer ${"D".repeat(32)}` },
+        },
+      ),
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it("выключенный канал и пропуски по lease/cooldown остаются зелёными", async () => {
     for (const status of [
       { status: "channel-disabled", processed: 0 },

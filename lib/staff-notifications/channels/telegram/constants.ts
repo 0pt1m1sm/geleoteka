@@ -37,6 +37,13 @@ export const TELEGRAM_POLL_COOLDOWN_MS = 4_000;
 export const TELEGRAM_POLL_POISON_MAX_ATTEMPTS = 3;
 
 /**
+ * Попытки карантина считаются не чаще этого интервала: панель дёргает drain
+ * каждые ~5 секунд, и без spacing короткий сбой БД сжёг бы все попытки за
+ * секунды, необратимо выбросив живой апдейт.
+ */
+export const TELEGRAM_POLL_POISON_ATTEMPT_SPACING_MS = 60_000;
+
+/**
  * Single-flight lease: ровно один drain на bot token в каждый момент. Второй
  * параллельный getUpdates глазами Telegram — это 409 «terminated by other
  * getUpdates request», неотличимый по HTTP-коду от 409 «webhook is active».

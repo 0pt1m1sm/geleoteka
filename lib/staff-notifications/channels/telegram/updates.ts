@@ -2,6 +2,7 @@ import {
   TELEGRAM_POLL_BATCH_LIMIT,
   TELEGRAM_POLL_COOLDOWN_MS,
   TELEGRAM_POLL_LEASE_MS,
+  TELEGRAM_POLL_POISON_ATTEMPT_SPACING_MS,
   TELEGRAM_POLL_POISON_MAX_ATTEMPTS,
   TELEGRAM_POLL_REQUEST_TIMEOUT_MS,
 } from "@/lib/staff-notifications/channels/telegram/constants";
@@ -35,6 +36,9 @@ export interface TelegramPollStateDb extends TelegramSendDiagnosticsWriteDb {
     findUnique(args: QueryArgs): Promise<unknown>;
     updateMany(args: QueryArgs): Promise<{ count: number }>;
   };
+  auditLog: {
+    create(args: QueryArgs): Promise<unknown>;
+  };
 }
 
 export interface DrainTelegramUpdatesOptions {
@@ -42,7 +46,13 @@ export interface DrainTelegramUpdatesOptions {
   botToken: string;
   /** Domain handler for one raw update. Must be idempotent (it is: receipts). */
   processUpdate: (update: unknown) => Promise<unknown>;
-  /** Wall-clock budget for the whole drain, network time included. */
+  /**
+   * Wall-clock budget for the whole drain, network time included. Дедлайн
+   * проверяется перед каждым сетевым вызовом и каждой обработкой, сетевой
+   * таймаут урезается остатком. Уже НАЧАТАЯ обработка не прерывается: хвост
+   * за дедлайном ограничен одним апдейтом (его транзакция + ответ бота со
+   * своим таймаутом); владение на это время держит продлеваемый lease.
+   */
   budgetMs?: number;
   maxBatches?: number;
   /**
@@ -72,6 +82,7 @@ interface PollStateRow {
   nextOffset: bigint | number;
   stuckUpdateId: bigint | number | null;
   stuckAttempts: number;
+  stuckLastAt: Date | null;
 }
 
 interface TelegramUpdatesResponse {
@@ -133,6 +144,7 @@ export async function drainTelegramUpdates(
     data: { leaseUntil },
   });
   if (leased.count === 0) return { status: "skipped-lease", processed: 0 };
+  const leaseRef = { current: leaseUntil };
 
   try {
     return await runDrainLoop(db, fetchImpl, options, {
@@ -140,14 +152,22 @@ export async function drainTelegramUpdates(
       maxBatches,
       requestTimeoutMs,
       monotonicNow,
+      now,
+      leaseRef,
     });
   } finally {
-    // Освобождаем только собственный штамп: протухший и перехваченный lease
-    // нельзя снимать из-под нового владельца.
-    await db.telegramPollState.updateMany({
-      where: { tenantKey: TENANT_KEY, leaseUntil },
-      data: { leaseUntil: null },
-    });
+    try {
+      // Освобождаем только собственный штамп: протухший и перехваченный lease
+      // нельзя снимать из-под нового владельца.
+      await db.telegramPollState.updateMany({
+        where: { tenantKey: TENANT_KEY, leaseUntil: leaseRef.current },
+        data: { leaseUntil: null },
+      });
+    } catch {
+      // Сбой release не маскирует результат drain: неснятый штамп безопасен —
+      // он протухнет и будет перехвачен по времени.
+      console.error("telegram.poll_lease_release_failed");
+    }
   }
 }
 
@@ -160,9 +180,12 @@ async function runDrainLoop(
     maxBatches: number;
     requestTimeoutMs: number;
     monotonicNow: () => number;
+    now: () => Date;
+    leaseRef: { current: Date };
   },
 ): Promise<DrainTelegramUpdatesResult> {
-  const { budgetMs, maxBatches, requestTimeoutMs, monotonicNow } = limits;
+  const { budgetMs, maxBatches, requestTimeoutMs, monotonicNow, now, leaseRef } =
+    limits;
   const startedAt = monotonicNow();
   // Жёсткий wall-clock: дедлайн проверяется перед каждым сетевым вызовом и
   // каждой обработкой, а таймаут каждого вызова урезается остатком бюджета —
@@ -174,13 +197,33 @@ async function runDrainLoop(
   let webhookDeleted = false;
 
   while (batches < maxBatches) {
+    if (batches > 0) {
+      // Продление владения перед следующим батчем. Если lease протух во время
+      // патологически долгой обработки и перехвачен — продолжать нельзя:
+      // конкурент уже опрашивает, наши дальнейшие записи стали бы чужим
+      // состоянием. Обработанное до этого момента подтверждено офсетом.
+      const nextLease = new Date(now().getTime() + TELEGRAM_POLL_LEASE_MS);
+      const renewed = await db.telegramPollState.updateMany({
+        where: { tenantKey: TENANT_KEY, leaseUntil: leaseRef.current },
+        data: { leaseUntil: nextLease },
+      });
+      if (renewed.count === 0) {
+        return { status: "failed", errorCode: "TELEGRAM_CONFLICT", processed };
+      }
+      leaseRef.current = nextLease;
+    }
     if (remaining() <= 0) {
       return { status: "budget-exhausted", processed, batches };
     }
 
     const state = (await db.telegramPollState.findUnique({
       where: { tenantKey: TENANT_KEY },
-      select: { nextOffset: true, stuckUpdateId: true, stuckAttempts: true },
+      select: {
+        nextOffset: true,
+        stuckUpdateId: true,
+        stuckAttempts: true,
+        stuckLastAt: true,
+      },
     })) as PollStateRow | null;
     const offset = Number(state?.nextOffset ?? 0);
     let stuck = {
@@ -189,6 +232,7 @@ async function runDrainLoop(
           ? null
           : Number(state.stuckUpdateId),
       attempts: state?.stuckAttempts ?? 0,
+      lastAt: state?.stuckLastAt ?? null,
     };
 
     const batch = await fetchTelegramUpdates(db, fetchImpl, {
@@ -254,30 +298,46 @@ async function runDrainLoop(
         if (highestUpdateId !== null) {
           await advanceOffset(db, highestUpdateId + 1);
         }
-        const attempts =
-          updateId !== null && stuck.updateId === updateId
-            ? stuck.attempts + 1
-            : 1;
+        const wallNow = now();
+        const sameCulprit = updateId !== null && stuck.updateId === updateId;
+        const withinSpacing =
+          sameCulprit &&
+          stuck.lastAt !== null &&
+          wallNow.getTime() - stuck.lastAt.getTime() <
+            TELEGRAM_POLL_POISON_ATTEMPT_SPACING_MS;
+        if (withinSpacing) {
+          // Панель дёргает drain каждые ~5 секунд: попытки, идущие чаще
+          // spacing, не считаются — короткий сбой БД не должен превращаться
+          // в необратимый карантин живого апдейта за секунды.
+          return {
+            status: "failed",
+            errorCode: "UPDATE_PROCESSING_FAILED",
+            processed,
+          };
+        }
+        const attempts = sameCulprit ? stuck.attempts + 1 : 1;
         if (updateId !== null && attempts >= TELEGRAM_POLL_POISON_MAX_ATTEMPTS) {
-          // Quarantine: the same update failed this many drains in a row, so
-          // the failure is deterministic and waiting will not fix it. Skipping
-          // one poisoned update is the lesser evil next to silently blocking
-          // every update behind it. Only the counter is durable — no update
-          // content is ever stored.
+          // Quarantine: the same update failed this many spaced drains in a
+          // row, so the failure is deterministic and waiting will not fix it.
+          // Skipping one poisoned update is the lesser evil next to silently
+          // blocking every update behind it. Durable trail: attempt counter
+          // here, update_id (a bare number) in the audit log — never the
+          // update content.
           await advanceOffset(db, updateId + 1);
-          await writeStuckState(db, null, 0);
-          stuck = { updateId: null, attempts: 0 };
+          await writeStuckState(db, null, 0, null);
+          stuck = { updateId: null, attempts: 0, lastAt: null };
           await recordTelegramSendDiagnostic(db, {
             operation: "UPDATES_POLL",
             outcome: "FAILURE",
             durationMs: 0,
             errorCode: "UPDATE_QUARANTINED",
           });
+          await recordTelegramQuarantineAudit(db, updateId, attempts);
           highestUpdateId = updateId;
           continue;
         }
         if (updateId !== null) {
-          await writeStuckState(db, updateId, attempts);
+          await writeStuckState(db, updateId, attempts, wallNow);
         }
         return {
           status: "failed",
@@ -289,8 +349,8 @@ async function runDrainLoop(
       if (updateId !== null) {
         highestUpdateId = updateId;
         if (stuck.updateId === updateId) {
-          await writeStuckState(db, null, 0);
-          stuck = { updateId: null, attempts: 0 };
+          await writeStuckState(db, null, 0, null);
+          stuck = { updateId: null, attempts: 0, lastAt: null };
         }
       }
     }
@@ -449,11 +509,39 @@ async function writeStuckState(
   db: TelegramPollStateDb,
   stuckUpdateId: number | null,
   stuckAttempts: number,
+  stuckLastAt: Date | null,
 ): Promise<void> {
   await db.telegramPollState.updateMany({
     where: { tenantKey: TENANT_KEY },
-    data: { stuckUpdateId, stuckAttempts },
+    data: { stuckUpdateId, stuckAttempts, stuckLastAt },
   });
+}
+
+/** След карантина для расследования: только update_id, никакого содержимого. */
+async function recordTelegramQuarantineAudit(
+  db: TelegramPollStateDb,
+  updateId: number,
+  attempts: number,
+): Promise<void> {
+  try {
+    await db.auditLog.create({
+      data: {
+        tenantKey: TENANT_KEY,
+        actorUserId: null,
+        actorName: "Система",
+        actorRole: "Система",
+        action: "telegram.update_quarantined",
+        targetType: "TelegramUpdate",
+        targetId: String(updateId),
+        targetLabel: null,
+        metadata: { attempts },
+        ip: null,
+      },
+    });
+  } catch {
+    // Диагностический след не имеет права менять исход drain.
+    console.error("telegram.update_quarantine_audit_failed");
+  }
 }
 
 async function advanceOffset(
