@@ -242,7 +242,12 @@ const FAB_CHANNELS_DEFAULT: ReadonlyArray<Record<string, string>> = [
     color: "#25D366",
     iconKey: "whatsapp",
   },
-  { name: "Max", href: "https://max.ru/geleoteka", color: "#E60023", iconKey: "max" },
+  {
+    name: "Max",
+    href: "https://max.ru/u/f9LHodD0cOLKCoYmYpOwz-CC-NLkqpEl8k96Ono9VvA9WqRCeQI0Y3ANxpo",
+    color: "#E60023",
+    iconKey: "max",
+  },
 ];
 
 export const CMS_SCHEMA = {
