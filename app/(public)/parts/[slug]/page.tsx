@@ -11,6 +11,8 @@ import { trimLabel } from "@/lib/vehicle-catalog-types";
 import { AddToCartButton } from "@/components/parts/AddToCartButton";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { pageSeo } from "@/lib/seo";
+import { buildProductJsonLd } from "@/lib/seo-jsonld";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -121,18 +123,28 @@ export default async function PartDetailPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* Breadcrumb */}
-      <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">Главная</Link>
-        {" / "}
-        <Link href="/parts" className="hover:text-[var(--foreground)]">Запчасти</Link>
-        {cat && (
-          <>
-            {" / "}
-            <Link href={`/parts?category=${cat.slug}`} className="hover:text-[var(--foreground)]">{cat.name}</Link>
-          </>
-        )}
-      </nav>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: buildProductJsonLd({
+            name: p.name as string,
+            slug: slug,
+            article: p.article as string,
+            description: p.description as string | null,
+            price: p.price as number,
+            image: photos[0] ?? null,
+            inStock: onHand > 0,
+          }),
+        }}
+      />
+      <Breadcrumbs
+        items={[
+          { name: "Главная", href: "/" },
+          { name: "Запчасти", href: "/parts" },
+          ...(cat ? [{ name: cat.name, href: `/parts?category=${cat.slug}` }] : []),
+          { name: p.name as string },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
         {/* Left column — image + details */}

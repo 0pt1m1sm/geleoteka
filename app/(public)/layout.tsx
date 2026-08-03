@@ -4,6 +4,7 @@ import { FloatingButtons, type FloatingChannel } from "@/components/shared/Float
 import { CookieConsent } from "@/components/shared/CookieConsent";
 import { YandexMetrika } from "@/components/shared/YandexMetrika";
 import { getSession } from "@/lib/auth";
+import { buildOrganizationJsonLd } from "@/lib/seo-jsonld";
 import {
   getCMSMany,
   getCMSText,
@@ -18,53 +19,9 @@ const FOOTER_CONTACT_KEYS = [
   "contacts.hours.service",
 ] as const;
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
-
-/**
- * Organization + AutoRepair structured data for the whole public site.
- *
- * `AutoRepair` is the schema.org type search engines use for a garage, and it
- * inherits LocalBusiness — so one node covers both the brand and the local
- * listing (name, address, phone, hours) that drives the map/knowledge panel.
- * Values come from the CMS rows the footer already renders, so the markup can
- * never drift from what a visitor reads on the page.
- */
-function buildOrganizationJsonLd(contacts: {
-  phone?: string;
-  email?: string;
-  address?: string;
-  hours?: string;
-}): string {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "AutoRepair",
-    "@id": `${SITE_URL}#organization`,
-    name: "Geleoteka",
-    description:
-      "Специализированный сервис Mercedes-Benz G-Class (Гелендваген): ремонт, ТО, запчасти и аренда.",
-    url: SITE_URL,
-    image: `${SITE_URL}/images/hero/g-class-hero.jpg`,
-    ...(contacts.phone ? { telephone: contacts.phone } : {}),
-    ...(contacts.email ? { email: contacts.email } : {}),
-    ...(contacts.address
-      ? { address: { "@type": "PostalAddress", streetAddress: contacts.address, addressCountry: "RU" } }
-      : {}),
-    ...(contacts.hours ? { openingHours: contacts.hours } : {}),
-    areaServed: "RU",
-    brand: { "@type": "Brand", name: "Mercedes-Benz G-Class" },
-    makesOffer: {
-      "@type": "Offer",
-      itemOffered: {
-        "@type": "Service",
-        name: "Ремонт и обслуживание Mercedes-Benz G-Class",
-      },
-    },
-  };
-
-  // Escape `<` so a value containing "</script>" cannot break out of the tag —
-  // the sanitisation Next's own JSON-LD guidance prescribes.
-  return JSON.stringify(jsonLd).replace(/</g, "\\u003c");
-}
+// Organization/AutoRepair JSON-LD переехал в lib/seo-jsonld.ts (Story 2 SEO):
+// там же расписание из CMS-строки конвертируется в формат openingHours, а
+// ссылки мессенджеров из fab.channels становятся sameAs.
 
 export default async function PublicLayout({
   children,
@@ -111,6 +68,7 @@ export default async function PublicLayout({
     email: contacts["contacts.email"],
     address: contacts["contacts.address"],
     hours: contacts["contacts.hours.service"],
+    sameAs: channels.map((c) => c.href),
   });
 
   return (

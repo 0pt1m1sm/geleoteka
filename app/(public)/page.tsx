@@ -5,6 +5,7 @@ import { Reviews } from "@/components/shared/Reviews";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList, getCMSImage } from "@/lib/cms";
 import { pageSeo } from "@/lib/seo";
+import { buildFaqJsonLd } from "@/lib/seo-jsonld";
 
 export const dynamic = "force-dynamic";
 
@@ -282,6 +283,16 @@ export default async function HomePage(): Promise<React.ReactElement> {
             {faqTitle}
           </h2>
         </div>
+        {/* FAQPage-разметка из тех же CMS-вопросов, что рендерит аккордеон:
+            Яндекс умеет показывать такие ответы прямо в сниппете. */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: buildFaqJsonLd(
+              faqItems.map((i) => ({ question: i.question ?? "", answer: i.answer ?? "" })),
+            ),
+          }}
+        />
         <FAQAccordion items={faqRendered} />
       </section>
 

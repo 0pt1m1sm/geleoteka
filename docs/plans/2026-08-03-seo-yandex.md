@@ -45,7 +45,7 @@ SEO-полей/FAQ/длинного текста нет. JSON-LD только Au
 «/»). Метрики Яндекса в коде нет. force-dynamic везде, revalidate нигде.
 
 ## Progress Tracking
-- [ ] Story 1: Технический фундамент индексации   (Status: PENDING)
+- [x] Story 1: Технический фундамент индексации   (Status: VERIFIED — 517/517 тестов (8 новых: pageSeo OG-фолбэк, indexnow route/ping), tsc/lint/build чистые)
 - [ ] Story 2: Микроразметка Schema.org   (Status: PENDING)
 - [ ] Story 3: Метадата и тексты под семантику   (Status: PENDING)
 - [ ] Story 4: Контент страниц услуг (схема+админка+черновики)   (Status: PENDING)

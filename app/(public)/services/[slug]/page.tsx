@@ -7,6 +7,8 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
+import { buildServiceJsonLd } from "@/lib/seo-jsonld";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
 interface ServiceDetail {
   slug: string;
@@ -57,17 +59,25 @@ export default async function ServicePage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-      <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">
-          Главная
-        </Link>
-        {" / "}
-        <Link href="/services" className="hover:text-[var(--foreground)]">
-          Услуги
-        </Link>
-        {" / "}
-        <span className="text-[var(--foreground)]">{service.name}</span>
-      </nav>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: buildServiceJsonLd({
+            name: service.name,
+            slug: service.slug,
+            description: service.description,
+            priceMin: service.priceMin,
+            priceMax: service.priceMax,
+          }),
+        }}
+      />
+      <Breadcrumbs
+        items={[
+          { name: "Главная", href: "/" },
+          { name: "Услуги", href: "/services" },
+          { name: service.name },
+        ]}
+      />
 
       <h1 className="text-display text-4xl font-bold mb-4">{service.name}</h1>
 

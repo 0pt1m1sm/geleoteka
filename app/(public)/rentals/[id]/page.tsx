@@ -2,13 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { cache } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
 import { RentalBookingForm } from "@/components/rentals/RentalBookingForm";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { pageSeo } from "@/lib/seo";
 
@@ -81,20 +81,13 @@ export default async function RentalCarPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* Breadcrumb */}
-      <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">
-          Главная
-        </Link>
-        {" / "}
-        <Link href="/rentals" className="hover:text-[var(--foreground)]">
-          Аренда
-        </Link>
-        {" / "}
-        <span className="text-[var(--foreground)]">
-          Mercedes-Benz {c.model as string}
-        </span>
-      </nav>
+      <Breadcrumbs
+        items={[
+          { name: "Главная", href: "/" },
+          { name: "Аренда", href: "/rentals" },
+          { name: `Mercedes-Benz ${c.model as string}` },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
         {/* Left column — image + details */}
