@@ -294,7 +294,11 @@ export default async function InboxPage({ searchParams }: Props) {
                       // письма во вкладке, а состояние у него своё.
                       actions={
                         inbox ? (
-                          <InboxRowActions inboxMessageId={inbox.id} status={inbox.status} />
+                          <InboxRowActions
+                            inboxMessageId={inbox.id}
+                            status={inbox.status}
+                            canDestroy={session.permissionRole === "ADMIN"}
+                          />
                         ) : null
                       }
                     />
@@ -332,7 +336,13 @@ export default async function InboxPage({ searchParams }: Props) {
                   ]}
                   // Разбор из списка: иначе очередь чистится только по одному
                   // письму за заход в карточку и обратно.
-                  actions={<InboxRowActions inboxMessageId={row.id} status={status} />}
+                  actions={
+                    <InboxRowActions
+                      inboxMessageId={row.id}
+                      status={status}
+                      canDestroy={session.permissionRole === "ADMIN"}
+                    />
+                  }
                 />
               </li>
             ))}

@@ -7,7 +7,9 @@ import {
   createMailIdentityLookup,
   createMimeMapper,
   createTimewebImapPort,
+  deleteImapMessage,
   resolveImapCredential,
+  type ImapDeleteOutcome,
 } from "@/lib/email/providers/timeweb-imap";
 import type {
   ImapPort,
@@ -91,6 +93,30 @@ export async function buildImapPortFromSettings(): Promise<ImapPort> {
     port: parsePort(portRaw),
     credential: (mailbox) => resolveImapCredential(mailbox),
   });
+}
+
+/**
+ * Безвозвратное удаление письма из ящика по сохранённым координатам —
+ * те же настройки хоста и тот же резолвер кредов, что у синка.
+ */
+export async function deleteMailFromMailbox(target: {
+  mailbox: string;
+  folder: string;
+  uid: bigint;
+  uidValidity: bigint | null;
+}): Promise<ImapDeleteOutcome> {
+  const [host, portRaw] = await Promise.all([
+    getSetting("TIMEWEB_IMAP_HOST"),
+    getSetting("TIMEWEB_IMAP_PORT"),
+  ]);
+  return deleteImapMessage(
+    {
+      host: host?.trim() || DEFAULT_HOST,
+      port: parsePort(portRaw),
+      credential: (mailbox) => resolveImapCredential(mailbox),
+    },
+    target,
+  );
 }
 
 /**

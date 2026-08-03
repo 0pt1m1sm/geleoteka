@@ -262,6 +262,112 @@ export async function archiveInboxMessage(
   );
 }
 
+/**
+ * Безвозвратное стирание: письмо удаляется из ПОЧТОВОГО ЯЩИКА (IMAP,
+ * \Deleted+expunge) и из CRM (InboxMessage + EmailMessage). Введено по
+ * прямому требованию владельца 2026-08-03; только ADMIN, с подтверждением
+ * в UI. Письмо, привязанное к переписке клиента, стереть нельзя — история
+ * клиента неприкосновенна.
+ *
+ * Порядок жёсткий: сначала ящик, потом БД. Если ящик недоступен — ничего
+ * не удаляем и возвращаем ошибку; «стёрто в CRM, но лежит в ящике» снова
+ * приехало бы синком, а обратная ситуация невосстановима.
+ */
+export async function destroyInboxMessageForever(
+  inboxMessageId: string,
+): Promise<{ error: string | null }> {
+  const session = await requireRole(["ADMIN"]);
+
+  const existing = (await db.inboxMessage.findUnique({
+    where: { id: inboxMessageId },
+    select: {
+      id: true,
+      status: true,
+      linkedCommunicationLogId: true,
+      emailMessage: {
+        select: {
+          id: true,
+          provider: true,
+          sourceMailbox: true,
+          sourceFolder: true,
+          uid: true,
+          uidValidity: true,
+          communicationLogs: { select: { id: true }, take: 1 },
+        },
+      },
+    },
+  })) as {
+    id: string;
+    status: string;
+    linkedCommunicationLogId: string | null;
+    emailMessage: {
+      id: string;
+      provider: string;
+      sourceMailbox: string;
+      sourceFolder: string;
+      uid: bigint | null;
+      uidValidity: bigint | null;
+      communicationLogs: Array<{ id: string }>;
+    } | null;
+  } | null;
+  if (!existing) return { error: "Сообщение не найдено" };
+  if (
+    existing.linkedCommunicationLogId !== null ||
+    (existing.emailMessage?.communicationLogs.length ?? 0) > 0
+  ) {
+    return {
+      error: "Письмо привязано к переписке клиента — безвозвратное удаление запрещено",
+    };
+  }
+
+  // Ящик — первым. IMAP-координаты есть только у писем, пришедших синком.
+  let imapOutcome = "no-imap-copy";
+  const email = existing.emailMessage;
+  if (email && email.provider === "TIMEWEB_IMAP" && email.uid !== null) {
+    const { deleteMailFromMailbox } = await import("@/lib/email/mail-sync-config");
+    try {
+      imapOutcome = await deleteMailFromMailbox({
+        mailbox: email.sourceMailbox,
+        folder: email.sourceFolder,
+        uid: email.uid,
+        uidValidity: email.uidValidity,
+      });
+    } catch (err) {
+      console.error("[INBOX] destroy: imap delete failed", err);
+      return {
+        error: "Не удалось удалить письмо из почтового ящика — ничего не тронуто",
+      };
+    }
+    if (imapOutcome === "uidvalidity-changed") {
+      return {
+        error:
+          "Ящик был переиндексирован, координаты письма устарели — запустите проверку почты и повторите",
+      };
+    }
+  }
+
+  try {
+    await db.$transaction(async (tx) => {
+      await writeInboxAudit(tx, session, "inbox.destroy", inboxMessageId, {
+        previousStatus: existing.status,
+        emailMessageId: email?.id ?? null,
+        imapOutcome,
+      });
+      await tx.inboxMessage.delete({ where: { id: inboxMessageId } });
+      if (email) {
+        // Прочие inbox-ссылки на это письмо отцепятся SetNull-ом; сама
+        // строка письма уходит вместе с содержимым и координатами вложений.
+        await tx.emailMessage.delete({ where: { id: email.id } });
+      }
+    });
+  } catch (err) {
+    console.error("[INBOX] inbox.destroy", err);
+    return { error: "Письмо удалено из ящика, но не из CRM — повторите удаление" };
+  }
+  revalidatePath("/admin/crm/inbox");
+  return { error: null };
+}
+
 async function updateInboxStatusWithAudit(
   session: InboxAuditActor,
   inboxMessageId: string,

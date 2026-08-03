@@ -6,9 +6,11 @@ import { ActionsMenu, type ActionsMenuItem } from "@/components/ui";
 import {
   archiveInboxMessage,
   deleteInboxMessage,
+  destroyInboxMessageForever,
   markInboxMessageSpam,
   restoreInboxMessage,
 } from "@/app/actions/crm/inbox";
+import { confirm } from "@/lib/ui/confirm";
 import { toast } from "@/lib/ui/toast";
 
 /**
@@ -21,16 +23,21 @@ import { toast } from "@/lib/ui/toast";
  * возвращают. Предлагать «в спам» тому, что уже в спаме, или «в архив» тому,
  * что уже в архиве, — значит заставлять оператора самому отсеивать бессмыслицу.
  *
- * Удаления как стирания здесь нет и не будет: ящик это переписка сервиса, а
- * «в корзину» — статус, из которого письмо возвращается.
+ * «В корзину» — обратимый статус. Настоящее стирание — отдельный пункт
+ * «Удалить безвозвратно» (по требованию владельца 03.08): сносит письмо из
+ * почтового ящика и из CRM, только ADMIN и только с подтверждением; для
+ * писем, привязанных к клиенту, экшен отвечает отказом.
  */
 export function InboxRowActions({
   inboxMessageId,
   status,
+  canDestroy = false,
 }: {
   inboxMessageId: string;
   /** Состояние письма: PENDING/ARCHIVED/SPAM/DELETED или JUNK из вкладки. */
   status: string;
+  /** ADMIN-only пункт безвозвратного стирания. */
+  canDestroy?: boolean;
 }): React.ReactElement | null {
   const [pending, startTransition] = useTransition();
 
@@ -62,6 +69,23 @@ export function InboxRowActions({
     danger: true,
     onSelect: () => run(() => deleteInboxMessage(inboxMessageId), "В корзине"),
   };
+  const destroyForever: ActionsMenuItem = {
+    label: "Удалить безвозвратно",
+    danger: true,
+    onSelect: () => {
+      void (async () => {
+        const ok = await confirm({
+          message:
+            "Стереть письмо навсегда — и из CRM, и из почтового ящика? Отменить будет нельзя.",
+          danger: true,
+          confirmText: "Стереть навсегда",
+          cancelText: "Оставить",
+        });
+        if (!ok) return;
+        run(() => destroyInboxMessageForever(inboxMessageId), "Письмо стёрто");
+      })();
+    },
+  };
 
   const byState: Record<string, ActionsMenuItem[]> = {
     // Очередь разбора: письмо нужно куда-то деть.
@@ -81,9 +105,10 @@ export function InboxRowActions({
   const state = status === "SPAM" || status === "DELETED" ? "JUNK" : status;
 
   // ASSIGNED — письмо уже привязано к клиенту и лежит в его переписке.
-  // Разбирать нечего, поэтому меню нет вовсе.
-  const items = byState[state];
-  if (!items) return null;
+  // Разбирать нечего, поэтому меню нет вовсе (и стирание там запрещено).
+  const base = byState[state];
+  if (!base) return null;
+  const items = canDestroy ? [...base, destroyForever] : base;
 
   // Блокируем контейнер, а не пункты: ActionsMenu отфильтровывает отключённые,
   // и при пустом списке исчезает целиком — меню пропадало бы прямо во время
