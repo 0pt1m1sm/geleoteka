@@ -7,13 +7,18 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
-import { buildServiceJsonLd } from "@/lib/seo-jsonld";
+import { buildFaqJsonLd, buildServiceJsonLd } from "@/lib/seo-jsonld";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { FAQAccordion } from "@/components/shared/FAQAccordion";
+import { Markdown } from "@/components/shared/Markdown";
+import { normalizeFaq } from "@/lib/service-content";
 
 interface ServiceDetail {
   slug: string;
   name: string;
   description: string | null;
+  body: string | null;
+  faq: unknown;
   priceMin: number | null;
   priceMax: number | null;
   durationMinutes: number | null;
@@ -62,6 +67,8 @@ export default async function ServicePage({ params }: Props) {
 
   if (!service) notFound();
 
+  const faq = normalizeFaq(service.faq);
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
       <script
@@ -103,6 +110,51 @@ export default async function ServicePage({ params }: Props) {
           {service.description}
         </p>
       </div>
+
+      {service.body ? (
+        <div className="card mb-8">
+          <Markdown
+            source={service.body}
+            className="text-[var(--foreground-muted)] leading-relaxed space-y-4"
+            components={{
+              h2: (props) => (
+                <h2
+                  className="text-xl font-semibold text-[var(--foreground)] mt-6 first:mt-0"
+                  {...props}
+                />
+              ),
+              h3: (props) => (
+                <h3 className="text-lg font-semibold text-[var(--foreground)] mt-4" {...props} />
+              ),
+              ul: (props) => <ul className="list-disc pl-5 space-y-1" {...props} />,
+              ol: (props) => <ol className="list-decimal pl-5 space-y-1" {...props} />,
+              strong: (props) => <strong className="text-[var(--foreground)]" {...props} />,
+            }}
+          />
+        </div>
+      ) : null}
+
+      {faq.length > 0 ? (
+        <div className="card mb-8">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: buildFaqJsonLd(faq.map((i) => ({ question: i.q, answer: i.a }))),
+            }}
+          />
+          <h2 className="text-lg font-semibold mb-4">Вопросы и ответы</h2>
+          <FAQAccordion
+            items={faq.map((i) => ({
+              question: i.q,
+              answerNode: (
+                <p className="text-sm text-[var(--foreground-muted)] leading-relaxed pt-3">
+                  {i.a}
+                </p>
+              ),
+            }))}
+          />
+        </div>
+      ) : null}
 
       {service.applicableModels.length > 0 && (
         <div className="card mb-8">

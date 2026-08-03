@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PageHeader } from "@/components/ui";
 import { ServiceForm } from "@/components/admin/ServiceForm";
+import { faqToBlocks, normalizeFaq } from "@/lib/service-content";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -15,6 +16,8 @@ interface ServiceRow {
   slug: string;
   name: string;
   description: string | null;
+  body: string | null;
+  faq: unknown;
   priceMin: number | null;
   priceMax: number | null;
   durationMinutes: number | null;
@@ -31,6 +34,8 @@ export default async function EditServicePage({ params }: Props) {
       slug: true,
       name: true,
       description: true,
+      body: true,
+      faq: true,
       priceMin: true,
       priceMax: true,
       durationMinutes: true,
@@ -42,7 +47,9 @@ export default async function EditServicePage({ params }: Props) {
   return (
     <div>
       <PageHeader eyebrow="Услуги" title={service.name} />
-      <ServiceForm initial={service} />
+      <ServiceForm
+        initial={{ ...service, faqBlocks: faqToBlocks(normalizeFaq(service.faq)) }}
+      />
     </div>
   );
 }
