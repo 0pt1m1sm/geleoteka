@@ -2,8 +2,13 @@ import { getDefaultContact } from "@/lib/session-defaults";
 import { getSession } from "@/lib/auth";
 import { StepIndicator } from "@/components/booking/StepIndicator";
 import { Step3ContactConfirm } from "@/components/booking/Step3ContactConfirm";
+import { NOINDEX } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
+
+// Промежуточный шаг мастера: без своей метадаты страница наследует корневой
+// canonical «/» и попадает в индекс дублем главной.
+export const metadata = NOINDEX;
 
 export default async function BookingStep3() {
   const [defaultContact, session] = await Promise.all([

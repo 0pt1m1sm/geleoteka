@@ -39,7 +39,29 @@ const SITE_TITLE = "Geleoteka — специализированный серв�
 const SITE_DESCRIPTION =
   "Специализированный сервис Mercedes-Benz G-Class (Гелендваген): ремонт и ТО, оригинальные запчасти, аренда. Онлайн-запись, личный кабинет, отслеживание статуса ремонта в реальном времени.";
 
-export const metadata: Metadata = {
+// generateMetadata вместо статичного экспорта: коды верификации Вебмастера и
+// Search Console живут в Setting (правятся из админки без деплоя), а на этапе
+// сборки БД недоступна — getSetting тихо падает в env-фолбэк и вернёт null.
+export async function generateMetadata(): Promise<Metadata> {
+  const { getSetting } = await import("@/lib/settings");
+  const [yandex, google] = await Promise.all([
+    getSetting("YANDEX_VERIFICATION"),
+    getSetting("GOOGLE_SITE_VERIFICATION"),
+  ]);
+  return {
+    ...BASE_METADATA,
+    ...(yandex?.trim() || google?.trim()
+      ? {
+          verification: {
+            ...(yandex?.trim() ? { yandex: yandex.trim() } : {}),
+            ...(google?.trim() ? { google: google.trim() } : {}),
+          },
+        }
+      : {}),
+  };
+}
+
+const BASE_METADATA: Metadata = {
   // Required before any relative canonical/OG URL can resolve; without it Next
   // errors on build for URL-based metadata fields.
   metadataBase: new URL(SITE_URL),
@@ -73,8 +95,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/images/hero/g-class-hero.jpg",
-        width: 1200,
-        height: 630,
+        width: 1920,
+        height: 1080,
         alt: "Mercedes-Benz G-Class в сервисе Geleoteka",
       },
     ],

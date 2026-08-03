@@ -5,6 +5,11 @@ import { getActiveModels } from "@/lib/vehicle-catalog";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
+// Без этого Next запекает sitemap на этапе сборки, где БД недоступна, — все
+// динамические ветки молча падают в .catch и прод навсегда отдаёт 9 статических
+// URL без услуг, моделей и запчастей (наблюдалось в бою 03.08.2026).
+export const dynamic = "force-dynamic";
+
 /**
  * Sitemap for the public marketing site.
  *

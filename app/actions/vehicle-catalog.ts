@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
+import { pingIndexNow } from "@/lib/indexnow";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import type { FuelType } from "@/lib/vehicle-catalog-types";
@@ -41,6 +43,8 @@ const VEHICLE_PUBLIC_PATHS = ["/models", "/booking", "/parts"] as const;
 function revalidateAllConsumers(): void {
   for (const path of VEHICLE_PUBLIC_PATHS) revalidatePath(path);
   revalidatePath("/admin/models");
+  // Fire-and-forget: сервер долгоживущий (next start), промис доработает.
+  void pingIndexNow(["/models"]);
 }
 
 export async function createModel(input: ModelFields): Promise<{ id: string }> {

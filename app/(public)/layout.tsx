@@ -2,6 +2,7 @@ import { Header } from "@/components/shared/Header";
 import { Footer } from "@/components/shared/Footer";
 import { FloatingButtons, type FloatingChannel } from "@/components/shared/FloatingButtons";
 import { CookieConsent } from "@/components/shared/CookieConsent";
+import { YandexMetrika } from "@/components/shared/YandexMetrika";
 import { getSession } from "@/lib/auth";
 import {
   getCMSMany,
@@ -118,6 +119,7 @@ export default async function PublicLayout({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: organizationJsonLd }}
       />
+      <YandexMetrika />
       <div className="print:hidden">
         <Header variant="public" cabinetHref={cabinetHref} cabinetLabel={cabinetLabel} />
       </div>

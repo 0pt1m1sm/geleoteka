@@ -1,5 +1,10 @@
 import { StepIndicator } from "@/components/booking/StepIndicator";
 import { CalendarSlotPicker } from "@/components/booking/CalendarSlotPicker";
+import { NOINDEX } from "@/lib/seo";
+
+// Промежуточный шаг мастера: без своей метадаты страница наследует корневой
+// canonical «/» и попадает в индекс дублем главной.
+export const metadata = NOINDEX;
 
 export default function BookingStep2() {
   return (

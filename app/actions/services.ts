@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { pingIndexNow } from "@/lib/indexnow";
 
 interface ServiceFormData {
   slug: string;
@@ -76,6 +77,7 @@ export async function createService(
 
   revalidatePath("/services");
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services", `/services/${data.slug}`]);
   redirect("/admin/services");
 }
 
@@ -102,6 +104,7 @@ export async function updateService(
   revalidatePath("/services");
   revalidatePath(`/services/${data.slug}`);
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services", `/services/${data.slug}`]);
   redirect("/admin/services");
 }
 
@@ -110,4 +113,5 @@ export async function deleteService(serviceId: string): Promise<void> {
   await db.service.delete({ where: { id: serviceId } });
   revalidatePath("/services");
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services"]);
 }
