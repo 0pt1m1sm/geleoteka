@@ -27,6 +27,7 @@ export type HeaderProps = PublicHeaderProps | PanelHeaderProps;
 
 const PUBLIC_NAV: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/services", label: "Услуги" },
+  { href: "/models", label: "Модели" },
   { href: "/parts", label: "Запчасти" },
   { href: "/rentals", label: "Аренда" },
   { href: "/about", label: "О нас" },

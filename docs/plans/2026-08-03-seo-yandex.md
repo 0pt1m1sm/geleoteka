@@ -46,7 +46,7 @@ SEO-полей/FAQ/длинного текста нет. JSON-LD только Au
 
 ## Progress Tracking
 - [x] Story 1: Технический фундамент индексации   (Status: VERIFIED — 517/517 тестов (8 новых: pageSeo OG-фолбэк, indexnow route/ping), tsc/lint/build чистые)
-- [ ] Story 2: Микроразметка Schema.org   (Status: PENDING)
+- [x] Story 2: Микроразметка Schema.org   (Status: VERIFIED — 528/528 тестов (11 новых на билдеры), tsc/lint/build чистые)
 - [ ] Story 3: Метадата и тексты под семантику   (Status: PENDING)
 - [ ] Story 4: Контент страниц услуг (схема+админка+черновики)   (Status: PENDING)
 - [ ] Story 5: Аренда — главный кластер   (Status: PENDING)

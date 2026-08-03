@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return pageSeo({
-    title: `Mercedes-Benz ${model.name} — модели и поколения`,
+    title: `Mercedes-Benz ${model.name} — обслуживание и ремонт в Москве`,
     description:
       model.description ??
       `Mercedes-Benz ${model.name}: поколения, двигатели, особенности и услуги сервиса для этого автомобиля в Geleoteka.`,

@@ -7,7 +7,7 @@ import { StepIndicator } from "@/components/booking/StepIndicator";
 import { pageSeo } from "@/lib/seo";
 
 export const metadata = pageSeo({
-  title: "Онлайн-запись на сервис Mercedes-Benz G-Class",
+  title: "Запись в сервис Гелендвагена (G-Class) в Москве онлайн",
   description:
     "Запишитесь на ремонт или техобслуживание Mercedes-Benz G-Class онлайн за пару минут: выберите услугу, автомобиль и удобное время визита в сервис Geleoteka.",
   path: "/booking",

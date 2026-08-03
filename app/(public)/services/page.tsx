@@ -9,9 +9,9 @@ import { getCMSText, getCMSRichtext } from "@/lib/cms";
 import { pageSeo } from "@/lib/seo";
 
 export const metadata = pageSeo({
-  title: "Услуги и цены на ремонт и ТО Mercedes-Benz G-Class",
+  title: "Ремонт и ТО Гелендвагена (G-Class) в Москве — услуги и цены",
   description:
-    "Прайс на ремонт и техобслуживание Mercedes-Benz G-Class: диагностика, двигатель, подвеска, тормоза, кондиционер. Актуальные цены на работы для Гелендвагена.",
+    "Прайс на ремонт и обслуживание Mercedes-Benz G-Class в Москве: диагностика, двигатель, АКПП, подвеска, тормоза, кузовной ремонт. Актуальные цены на работы для Гелендвагена.",
   path: "/services",
 });
 

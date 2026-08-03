@@ -42,11 +42,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     });
   }
 
+  // Title по семантическому ядру «услуга × гелендваген × москва × цена»:
+  // латиница «g class ремонт» почти не ищется, народная форма — «гелендваген».
+  const priceNote =
+    service.priceMin != null ? ` Цены от ${formatPrice(service.priceMin)}.` : "";
   return pageSeo({
-    title: service.name,
+    title: `${service.name} Гелендвагена (G-Class) в Москве — цены и запись`,
     description:
-      service.description ??
-      `Услуга «${service.name}» для Mercedes-Benz G-Class в специализированном сервисе Geleoteka: цена, сроки, запись онлайн.`,
+      `${service.name} Mercedes-Benz G-Class (Гелендваген) в Москве. ` +
+      `${service.description ?? "Работы любой сложности, оригинальные запчасти."}` +
+      `${priceNote} Онлайн-запись в сервис Geleoteka.`,
     path: `/services/${slug}`,
   });
 }

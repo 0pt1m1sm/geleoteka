@@ -7,7 +7,7 @@ import { pageSeo } from "@/lib/seo";
 export const dynamic = "force-dynamic";
 
 export const metadata = pageSeo({
-  title: "Контакты сервиса Geleoteka: адрес, телефон, часы работы",
+  title: "Контакты сервиса Гелендвагенов в Москве: адрес, телефон, часы работы",
   description:
     "Адрес, телефоны отделов сервиса и запчастей, часы работы и схема проезда к специализированному сервису Mercedes-Benz G-Class. Запишитесь на ремонт онлайн.",
   path: "/contacts",

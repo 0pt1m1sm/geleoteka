@@ -4,15 +4,17 @@ import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList, getCMSImage } from "@/lib/cms";
+import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
+import { formatPrice } from "@/lib/utils";
 import { buildFaqJsonLd } from "@/lib/seo-jsonld";
 
 export const dynamic = "force-dynamic";
 
 export const metadata = pageSeo({
-  title: "Специализированный сервис Mercedes-Benz G-Class",
+  title: "Сервис Гелендвагенов в Москве — ремонт и ТО Mercedes-Benz G-Class",
   description:
-    "Ремонт и ТО Mercedes-Benz G-Class в Москве: диагностика, подвеска, двигатель, кузовной ремонт. Онлайн-запись, оригинальные запчасти, аренда G63 и G500.",
+    "Ремонт и обслуживание Гелендвагена (Mercedes-Benz G-Class) в Москве: диагностика, подвеска, двигатель, кузовной ремонт. Онлайн-запись, оригинальные запчасти, аренда G63 и G500.",
   path: "/",
 });
 
@@ -85,6 +87,25 @@ export default async function HomePage(): Promise<React.ReactElement> {
     { value: statsSat, label: statsSatLabel },
     { value: statsParts, label: statsPartsLabel },
   ];
+
+  // «Наши услуги» — из БД, как на /services (тот же порядок, «other» в хвост):
+  // раньше здесь жил захардкоженный дубль с ценами, который расходился с
+  // прайсом. Ошибка БД не роняет главную — блок просто скрывается.
+  const homeServicesRaw = (await db.service
+    .findMany({
+      orderBy: { name: "asc" },
+      select: { slug: true, name: true, description: true, priceMin: true },
+    })
+    .catch(() => [])) as Array<{
+    slug: string;
+    name: string;
+    description: string | null;
+    priceMin: number | null;
+  }>;
+  const homeServices = homeServicesRaw
+    .slice()
+    .sort((a, b) => (a.slug === "other" ? 1 : b.slug === "other" ? -1 : 0))
+    .slice(0, 6);
 
   // FAQ answers are markdown — pre-render to React nodes so FAQAccordion stays
   // a thin presentational component. answerNode is what the accordion renders.
@@ -204,45 +225,47 @@ export default async function HomePage(): Promise<React.ReactElement> {
         </div>
       </section>
 
-      {/* Services overview cards — TODO(cms): migrate to read from db.service.findMany() in a follow-up plan. */}
-      <section className="py-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-display text-3xl sm:text-4xl font-bold mb-4">
-            Наши услуги
-          </h2>
-          <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto">
-            Полный спектр услуг по обслуживанию и ремонту автомобилей
-            Mercedes-Benz
-          </p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            { href: "/services/to", title: "Техобслуживание", desc: "ТО по регламенту Mercedes", price: "от 8 000 ₽" },
-            { href: "/services/diagnostic", title: "Диагностика", desc: "STAR Diagnostics, полная проверка", price: "от 5 000 ₽" },
-            { href: "/services/repair", title: "Двигатель", desc: "Любой вид ремонта узлов и агрегатов", price: "от 15 000 ₽" },
-            { href: "/services/brakes", title: "Тормозная система", desc: "Замена колодок, дисков, суппортов", price: "от 4 500 ₽" },
-            { href: "/services/suspension", title: "Подвеска", desc: "Диагностика и ремонт ходовой части", price: "от 5 500 ₽" },
-            { href: "/services/conditioner", title: "Кондиционер", desc: "Заправка, диагностика, ремонт", price: "от 3 500 ₽" },
-          ].map((service, i) => (
-            <Link key={i} href={service.href} className="card card-hover group">
-              <h3 className="text-lg font-semibold mb-2 group-hover:text-[var(--color-accent)] transition-colors">
-                {service.title}
-              </h3>
-              <p className="text-sm text-[var(--foreground-muted)] mb-4">
-                {service.desc}
-              </p>
-              <div className="text-[var(--color-accent)] text-sm font-medium">
-                {service.price}
-              </div>
+      {/* Services overview cards — живые данные из прайса, ссылки на страницы
+          услуг дают внутреннюю перелинковку с главной. */}
+      {homeServices.length > 0 ? (
+        <section className="py-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-display text-3xl sm:text-4xl font-bold mb-4">
+              Наши услуги
+            </h2>
+            <p className="text-[var(--foreground-muted)] max-w-2xl mx-auto">
+              Ремонт и обслуживание Гелендвагена в Москве — по ценам из
+              актуального прайса
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {homeServices.map((service) => (
+              <Link
+                key={service.slug}
+                href={`/services/${service.slug}`}
+                className="card card-hover group"
+              >
+                <h3 className="text-lg font-semibold mb-2 group-hover:text-[var(--color-accent)] transition-colors">
+                  {service.name}
+                </h3>
+                <p className="text-sm text-[var(--foreground-muted)] mb-4">
+                  {service.description}
+                </p>
+                {service.priceMin != null ? (
+                  <div className="text-[var(--color-accent)] text-sm font-medium">
+                    от {formatPrice(service.priceMin)}
+                  </div>
+                ) : null}
+              </Link>
+            ))}
+          </div>
+          <div className="text-center mt-8">
+            <Link href="/services" className="btn btn-secondary">
+              Все услуги →
             </Link>
-          ))}
-        </div>
-        <div className="text-center mt-8">
-          <Link href="/services" className="btn btn-secondary">
-            Все услуги →
-          </Link>
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : null}
 
       {/* Why Us */}
       <section className="py-20 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">

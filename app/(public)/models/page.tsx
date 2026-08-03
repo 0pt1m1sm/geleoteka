@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { getActiveModels, generationLabel } from "@/lib/vehicle-catalog";
+import { getCMSText } from "@/lib/cms";
 import { PageHeader } from "@/components/ui";
 import { pageSeo } from "@/lib/seo";
 
@@ -13,14 +14,18 @@ export const metadata = pageSeo({
 });
 
 export default async function ModelsPage(): Promise<React.ReactElement> {
-  const models = await getActiveModels();
+  const [models, title, description] = await Promise.all([
+    getActiveModels(),
+    getCMSText("catalog.models.title"),
+    getCMSText("catalog.models.description"),
+  ]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
       <PageHeader
         eyebrow="Каталог"
-        title="Модели Mercedes-Benz"
-        description="Обслуживаем весь модельный ряд — от A-Class до AMG GT и электрических EQ. Выберите свою модель, чтобы посмотреть доступные услуги."
+        title={title}
+        description={description}
         align="center"
         className="mb-12"
       />

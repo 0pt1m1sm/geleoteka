@@ -19,6 +19,7 @@ export type CMSGroup =
   | "home"
   | "about"
   | "services"
+  | "catalog"
   | "contacts"
   | "vacancies"
   | "footer"
@@ -69,6 +70,7 @@ export const GROUP_LABELS: Record<CMSGroup, string> = {
   home: "Главная",
   about: "О нас",
   services: "Услуги (обзор)",
+  catalog: "Каталог (модели и запчасти)",
   contacts: "Контакты",
   vacancies: "Вакансии",
   footer: "Подвал",
@@ -82,6 +84,7 @@ export const GROUP_ORDER: readonly CMSGroup[] = [
   "home",
   "about",
   "services",
+  "catalog",
   "contacts",
   "requisites",
   "vacancies",
@@ -542,13 +545,42 @@ export const CMS_SCHEMA = {
     group: "services",
     label: "Услуги (обзор) — описание",
     defaultValue:
-      "Полный спектр работ по обслуживанию и ремонту автомобилей Mercedes-Benz",
+      "Полный спектр работ по обслуживанию и ремонту Гелендвагена и других Mercedes-Benz в Москве",
   },
   "services.cta.text": {
     type: "richtext",
     group: "services",
     label: "Услуги (обзор) — текст под списком",
     defaultValue: "Не нашли нужную услугу? Свяжитесь с нами.",
+  },
+  // Заголовки каталожных листингов — раньше жили хардкодом в TSX, из-за чего
+  // подправить формулировку (или добавить город для SEO) без деплоя было
+  // нельзя. Дефолты повторяют прежний текст с добавленной геопривязкой.
+  "catalog.models.title": {
+    type: "text",
+    group: "catalog",
+    label: "Модели — заголовок",
+    defaultValue: "Модели Mercedes-Benz",
+  },
+  "catalog.models.description": {
+    type: "text",
+    group: "catalog",
+    label: "Модели — описание",
+    defaultValue:
+      "Обслуживаем в Москве весь модельный ряд — от A-Class до AMG GT и электрических EQ. Выберите свою модель, чтобы посмотреть доступные услуги.",
+  },
+  "catalog.parts.title": {
+    type: "text",
+    group: "catalog",
+    label: "Запчасти — заголовок",
+    defaultValue: "Запчасти",
+  },
+  "catalog.parts.subtitle": {
+    type: "text",
+    group: "catalog",
+    label: "Запчасти — подзаголовок",
+    defaultValue:
+      "Оригинальные запчасти и качественные аналоги для Гелендвагена и других Mercedes-Benz — в наличии в Москве и под заказ",
   },
   "services.cta.button": {
     type: "text",
