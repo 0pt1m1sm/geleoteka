@@ -231,6 +231,7 @@ const FOOTER_SERVICES_DEFAULT: ReadonlyArray<Record<string, string>> = [
   { label: "Диагностика", href: "/services/diagnostic" },
   { label: "Ремонт", href: "/services/repair" },
   { label: "Все услуги →", href: "/services" },
+  { label: "Статьи", href: "/blog" },
 ];
 
 // Телефон мессенджеров и шаблон первого сообщения. Telegram по номеру

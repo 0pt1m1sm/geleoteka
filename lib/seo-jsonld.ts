@@ -227,6 +227,29 @@ export function buildRentalJsonLd(r: RentalJsonLdInput): string {
   });
 }
 
+export interface ArticleJsonLdInput {
+  title: string;
+  slug: string;
+  excerpt?: string | null;
+  publishedAt?: Date | null;
+  updatedAt?: Date | null;
+}
+
+export function buildArticleJsonLd(a: ArticleJsonLdInput): string {
+  return toJsonLdScript({
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: a.title,
+    ...(a.excerpt ? { description: a.excerpt } : {}),
+    url: `${SITE_URL}/blog/${a.slug}`,
+    ...(a.publishedAt ? { datePublished: a.publishedAt.toISOString() } : {}),
+    ...(a.updatedAt ? { dateModified: a.updatedAt.toISOString() } : {}),
+    inLanguage: "ru-RU",
+    author: { "@id": ORGANIZATION_ID },
+    publisher: { "@id": ORGANIZATION_ID },
+  });
+}
+
 export interface FaqJsonLdItem {
   question: string;
   answer: string;

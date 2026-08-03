@@ -60,7 +60,12 @@ export type AuditAction =
   | "customer.manager_unassign"
   | "mail.sync_manual"
   | "vehicle.delete"
-  | "repairOrder.create";
+  | "repairOrder.create"
+  | "blog.create"
+  | "blog.update"
+  | "blog.publish"
+  | "blog.unpublish"
+  | "blog.delete";
 
 export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "user.create": "Создание пользователя",
@@ -98,6 +103,11 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "mail.sync_manual": "Ручная проверка почты",
   "vehicle.delete": "Удаление автомобиля",
   "repairOrder.create": "Создание заказ-наряда",
+  "blog.create": "Создание статьи",
+  "blog.update": "Правка статьи",
+  "blog.publish": "Публикация статьи",
+  "blog.unpublish": "Снятие статьи с публикации",
+  "blog.delete": "Удаление статьи",
 };
 
 export interface AuditActor {
@@ -121,7 +131,8 @@ export interface AuditInput {
     | "RepairOrder"
     | "TelegramDestination"
     | "TelegramUpdate"
-    | "StaffNotificationDelivery";
+    | "StaffNotificationDelivery"
+    | "BlogPost";
   targetId?: string | null;
   /** How the target was known at the time — a name, a number, a role label. */
   targetLabel?: string | null;

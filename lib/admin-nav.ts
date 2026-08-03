@@ -105,6 +105,7 @@ export const adminNav: AdminNavEntry[] = [
     label: "Сайт",
     items: [
       { href: "/admin/cms", label: "Контент" },
+      { href: "/admin/blog", label: "Статьи" },
       { href: "/admin/team", label: "Команда" },
       { href: "/admin/vacancies", label: "Вакансии" },
     ],
