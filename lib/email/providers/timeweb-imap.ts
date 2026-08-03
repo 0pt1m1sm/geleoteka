@@ -87,6 +87,72 @@ export function resolveImapCredential(
   return null;
 }
 
+export type ImapDeleteOutcome = "deleted" | "missing" | "uidvalidity-changed";
+
+/**
+ * Безвозвратно удалить ОДНО письмо из ящика: \Deleted + expunge по UID.
+ *
+ * Единственная пишущая операция во всём IMAP-слое (порт синка принципиально
+ * read-only). Вызывается только явным действием администратора «Удалить
+ * безвозвратно». Сверка uidValidity обязательна: после переиндексации ящика
+ * старый UID указывает на ДРУГОЕ письмо, и без сверки мы бы стёрли чужое.
+ */
+export async function deleteImapMessage(
+  config: TimewebImapConfig,
+  target: { mailbox: string; folder: string; uid: bigint; uidValidity: bigint | null },
+): Promise<ImapDeleteOutcome> {
+  const cred = config.credential(target.mailbox);
+  if (!cred) {
+    throw new Error(`No IMAP credential configured for mailbox ${target.mailbox}`);
+  }
+
+  const client = new ImapFlow({
+    host: config.host,
+    port: config.port,
+    secure: true,
+    auth: { user: cred.user, pass: cred.pass },
+    logger: false,
+    tls: { rejectUnauthorized: true, minVersion: "TLSv1.2", servername: config.host },
+    connectionTimeout: config.connectionTimeoutMs ?? 30_000,
+  });
+
+  await client.connect();
+  let lock;
+  try {
+    lock = await client.getMailboxLock(target.folder, { readOnly: false });
+  } catch (err) {
+    try {
+      await client.logout();
+    } catch {
+      client.close();
+    }
+    throw err;
+  }
+
+  try {
+    const box = client.mailbox;
+    if (!box) {
+      throw new Error(`Failed to open mailbox ${target.mailbox}/${target.folder}`);
+    }
+    if (
+      target.uidValidity !== null &&
+      box.uidValidity !== undefined &&
+      BigInt(box.uidValidity) !== target.uidValidity
+    ) {
+      return "uidvalidity-changed";
+    }
+    const deleted = await client.messageDelete(String(target.uid), { uid: true });
+    return deleted ? "deleted" : "missing";
+  } finally {
+    lock.release();
+    try {
+      await client.logout();
+    } catch {
+      client.close();
+    }
+  }
+}
+
 /** Build the real IMAP port. Kept out of the sync core so that stays testable. */
 export function createTimewebImapPort(config: TimewebImapConfig): ImapPort {
   const maxLen = config.maxMessageBytes ?? DEFAULT_MAX_MESSAGE_BYTES;
