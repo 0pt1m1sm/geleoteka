@@ -187,6 +187,46 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
   });
 }
 
+export interface RentalJsonLdInput {
+  /** Например «Mercedes-Benz G 63 AMG». */
+  name: string;
+  /** Путь карточки, например `/rentals/<id>`. */
+  path: string;
+  /** Цена за сутки, ₽. */
+  dailyPrice: number;
+  description?: string | null;
+  image?: string | null;
+}
+
+/**
+ * Карточка аренды: Product + Offer с ценой за сутки. Яндекс понимает такую
+ * разметку в сниппетах цен; unitText уточняет, что цена суточная.
+ */
+export function buildRentalJsonLd(r: RentalJsonLdInput): string {
+  return toJsonLdScript({
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: `Аренда ${r.name} в Москве`,
+    ...(r.description ? { description: r.description } : {}),
+    ...(r.image ? { image: r.image.startsWith("http") ? r.image : `${SITE_URL}${r.image}` } : {}),
+    url: `${SITE_URL}${r.path}`,
+    brand: { "@type": "Brand", name: "Mercedes-Benz" },
+    offers: {
+      "@type": "Offer",
+      price: r.dailyPrice,
+      priceCurrency: "RUB",
+      priceSpecification: {
+        "@type": "UnitPriceSpecification",
+        price: r.dailyPrice,
+        priceCurrency: "RUB",
+        unitText: "сутки",
+      },
+      availability: "https://schema.org/InStock",
+      seller: { "@id": ORGANIZATION_ID },
+    },
+  });
+}
+
 export interface FaqJsonLdItem {
   question: string;
   answer: string;

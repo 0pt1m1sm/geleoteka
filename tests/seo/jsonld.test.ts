@@ -5,6 +5,7 @@ import {
   buildFaqJsonLd,
   buildOrganizationJsonLd,
   buildProductJsonLd,
+  buildRentalJsonLd,
   buildServiceJsonLd,
   parseRussianSchedule,
   toJsonLdScript,
@@ -121,6 +122,24 @@ describe("buildProductJsonLd", () => {
     expect((out.offers as Record<string, unknown>).availability).toBe(
       "https://schema.org/OutOfStock",
     );
+  });
+});
+
+describe("buildRentalJsonLd", () => {
+  it("marks the daily price with a unit specification", () => {
+    const rental = parse(
+      buildRentalJsonLd({
+        name: "Mercedes-Benz G 63 AMG",
+        path: "/rentals/abc",
+        dailyPrice: 45000,
+      }),
+    );
+    expect(rental.name).toBe("Аренда Mercedes-Benz G 63 AMG в Москве");
+    const offers = rental.offers as Record<string, unknown>;
+    expect(offers.price).toBe(45000);
+    const spec = offers.priceSpecification as Record<string, unknown>;
+    expect(spec.unitText).toBe("сутки");
+    expect((rental.url as string).endsWith("/rentals/abc")).toBe(true);
   });
 });
 
