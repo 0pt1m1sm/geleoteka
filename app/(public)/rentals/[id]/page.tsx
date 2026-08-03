@@ -2,13 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { cache } from "react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
-import { getCMS } from "@/lib/cms";
+import { getCMS, getCMSList } from "@/lib/cms";
+import { buildRentalJsonLd } from "@/lib/seo-jsonld";
 import { RentalBookingForm } from "@/components/rentals/RentalBookingForm";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { pageSeo } from "@/lib/seo";
 
@@ -17,6 +18,15 @@ interface Props {
 }
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
+// Пути SVG-иконок условий аренды по позиции пункта: щит (страховка), часы
+// (поддержка), стрелки (доставка), карта (залог). Лишним пунктам — щит.
+const TERM_ICON_PATHS = [
+  "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+  "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  "M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4",
+  "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z",
+];
+
 const getRentalVehicleById = cache(async (id: string) => {
   return db.vehicle.findFirst({
     where: { id, ownershipType: "RENTAL", isArchived: false },
@@ -38,10 +48,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return pageSeo({
-    title: `Аренда Mercedes-Benz ${c.model as string}`,
+    title: `Аренда Mercedes-Benz ${c.model as string} в Москве — от ${formatPrice(
+      (c.dailyRate as number) ?? 0,
+    )}/сутки`,
     description:
-      (c.description as string | null) ??
-      `Аренда Mercedes-Benz ${c.model as string} ${c.year as number} года: страховка КАСКО включена, подача в удобное место, поддержка 24/7.`,
+      `Аренда Гелендвагена ${c.model as string} ${c.year as number} года в Москве, с водителем и без: ` +
+      "страховка КАСКО включена, подача в удобное место, бронирование онлайн.",
     path: `/rentals/${id}`,
   });
 }
@@ -54,6 +66,10 @@ export default async function RentalCarPage({ params }: Props) {
 
   const c = car as Record<string, unknown>;
   const photos = (c.photos as string[]) || [];
+  const [terms, requirements] = await Promise.all([
+    getCMSList("rentals.terms.items"),
+    getCMSList("rentals.requirements.items"),
+  ]);
   const features = (c.features as string[]) || [];
 
   // Active bookings ending today or later — those occupy future dates.
@@ -81,20 +97,25 @@ export default async function RentalCarPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
-      {/* Breadcrumb */}
-      <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">
-          Главная
-        </Link>
-        {" / "}
-        <Link href="/rentals" className="hover:text-[var(--foreground)]">
-          Аренда
-        </Link>
-        {" / "}
-        <span className="text-[var(--foreground)]">
-          Mercedes-Benz {c.model as string}
-        </span>
-      </nav>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: buildRentalJsonLd({
+            name: `Mercedes-Benz ${c.model as string}`,
+            path: `/rentals/${c.id as string}`,
+            dailyPrice: (c.dailyRate as number) ?? 0,
+            description: c.description as string | null,
+            image: photos[0] ?? null,
+          }),
+        }}
+      />
+      <Breadcrumbs
+        items={[
+          { name: "Главная", href: "/" },
+          { name: "Аренда", href: "/rentals" },
+          { name: `Mercedes-Benz ${c.model as string}` },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-10">
         {/* Left column — image + details */}
@@ -215,117 +236,52 @@ export default async function RentalCarPage({ params }: Props) {
             </div>
           )}
 
-          {/* Rental terms */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-3">Условия аренды</h2>
-            <div className="card space-y-4 text-sm text-[var(--foreground-muted)]">
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-                <div>
-                  <p className="text-[var(--foreground)] font-medium mb-0.5">
-                    Страховка КАСКО включена
-                  </p>
-                  <p className="text-xs">Полная страховая защита на весь срок аренды</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div>
-                  <p className="text-[var(--foreground)] font-medium mb-0.5">Поддержка 24/7</p>
-                  <p className="text-xs">Техническая поддержка в любое время</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-                  />
-                </svg>
-                <div>
-                  <p className="text-[var(--foreground)] font-medium mb-0.5">Доставка автомобиля</p>
-                  <p className="text-xs">По Москве и области — за дополнительную плату</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <svg
-                  className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-                <div>
-                  <p className="text-[var(--foreground)] font-medium mb-0.5">
-                    Залог {formatPrice(50000)}
-                  </p>
-                  <p className="text-xs">Возвращается после осмотра автомобиля</p>
-                </div>
+          {/* Rental terms — тексты из CMS (Аренда → условия), иконки по позиции */}
+          {terms.length > 0 ? (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-3">Условия аренды</h2>
+              <div className="card space-y-4 text-sm text-[var(--foreground-muted)]">
+                {terms.map((term, i) => (
+                  <div key={`${term.title}-${i}`} className="flex items-start gap-3">
+                    <svg
+                      className="w-5 h-5 text-[var(--color-accent)] shrink-0 mt-0.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d={TERM_ICON_PATHS[i] ?? TERM_ICON_PATHS[0]}
+                      />
+                    </svg>
+                    <div>
+                      <p className="text-[var(--foreground)] font-medium mb-0.5">{term.title}</p>
+                      <p className="text-xs">{term.subtitle}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
+          ) : null}
 
-          {/* Requirements */}
-          <div className="mb-8">
-            <h2 className="text-lg font-semibold mb-3">Требования к водителю</h2>
-            <div className="card">
-              <ul className="space-y-2 text-sm text-[var(--foreground-muted)]">
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
-                  Возраст от 25 лет
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
-                  Водительский стаж от 3 лет
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
-                  Паспорт РФ и действующее в/у категории B
-                </li>
-                <li className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
-                  Залог {formatPrice(50000)}
-                </li>
-              </ul>
+          {/* Requirements — из CMS (Аренда → требования к водителю) */}
+          {requirements.length > 0 ? (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-3">Требования к водителю</h2>
+              <div className="card">
+                <ul className="space-y-2 text-sm text-[var(--foreground-muted)]">
+                  {requirements.map((req, i) => (
+                    <li key={`${req.text}-${i}`} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-accent)] shrink-0" />
+                      {req.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
 
         {/* Right column — sticky booking card */}

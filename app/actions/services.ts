@@ -4,11 +4,15 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { pingIndexNow } from "@/lib/indexnow";
+import { parseFaqBlocks } from "@/lib/service-content";
 
 interface ServiceFormData {
   slug: string;
   name: string;
   description: string | null;
+  body: string | null;
+  faq: Array<{ q: string; a: string }>;
   priceMin: number | null;
   priceMax: number | null;
   durationMinutes: number | null;
@@ -18,13 +22,15 @@ function parseServiceFormData(formData: FormData): ServiceFormData {
   const slug = ((formData.get("slug") as string) || "").trim().toLowerCase();
   const name = ((formData.get("name") as string) || "").trim();
   const description = ((formData.get("description") as string) || "").trim() || null;
+  const body = ((formData.get("body") as string) || "").trim() || null;
+  const faq = parseFaqBlocks((formData.get("faqBlocks") as string) || "");
   const priceMinRaw = (formData.get("priceMin") as string) || "";
   const priceMaxRaw = (formData.get("priceMax") as string) || "";
   const durationRaw = (formData.get("durationMinutes") as string) || "";
   const priceMin = priceMinRaw ? parseInt(priceMinRaw, 10) : null;
   const priceMax = priceMaxRaw ? parseInt(priceMaxRaw, 10) : null;
   const durationMinutes = durationRaw ? parseInt(durationRaw, 10) : null;
-  return { slug, name, description, priceMin, priceMax, durationMinutes };
+  return { slug, name, description, body, faq, priceMin, priceMax, durationMinutes };
 }
 
 function validateServiceData(data: ServiceFormData): string | null {
@@ -76,6 +82,7 @@ export async function createService(
 
   revalidatePath("/services");
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services", `/services/${data.slug}`]);
   redirect("/admin/services");
 }
 
@@ -102,6 +109,7 @@ export async function updateService(
   revalidatePath("/services");
   revalidatePath(`/services/${data.slug}`);
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services", `/services/${data.slug}`]);
   redirect("/admin/services");
 }
 
@@ -110,4 +118,5 @@ export async function deleteService(serviceId: string): Promise<void> {
   await db.service.delete({ where: { id: serviceId } });
   revalidatePath("/services");
   revalidatePath("/admin/services");
+  await pingIndexNow(["/services"]);
 }

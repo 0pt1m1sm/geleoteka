@@ -693,6 +693,10 @@ model Service {
   slug             String   @unique
   name             String
   description      String?
+  /// Длинный текст страницы услуги (markdown) — SEO-контент, правится в админке.
+  body             String?  @db.Text
+  /// FAQ страницы: [{ "q": "...", "a": "..." }] — рендерится аккордеоном + FAQPage JSON-LD.
+  faq              Json?
   priceMin         Int?
   priceMax         Int?
   durationMinutes  Int?

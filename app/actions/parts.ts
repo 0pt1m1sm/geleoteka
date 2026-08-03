@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { recordMovement } from "@/lib/wms/public";
@@ -107,6 +108,7 @@ export async function createPart(
     });
   });
 
+  await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");
 }
 
@@ -208,6 +210,7 @@ export async function updatePart(
     throw e;
   }
 
+  await pingIndexNow(["/parts"]);
   redirect("/admin/parts");
 }
 

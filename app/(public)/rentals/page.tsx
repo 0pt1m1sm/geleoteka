@@ -1,5 +1,6 @@
 export const dynamic = "force-dynamic";
 
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Zap, Activity } from "lucide-react";
@@ -7,26 +8,51 @@ import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
 import { pageSeo } from "@/lib/seo";
+import { buildFaqJsonLd } from "@/lib/seo-jsonld";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { FAQAccordion } from "@/components/shared/FAQAccordion";
+import { Markdown } from "@/components/shared/Markdown";
+import { getCMSList, getCMSRichtext, getCMSText } from "@/lib/cms";
 
-export const metadata = pageSeo({
-  title: "Аренда Mercedes-Benz G-Class (Гелендваген) в Москве",
-  description:
-    "Аренда легендарного Гелендвагена G63 AMG и G500 на любой срок: сутки, неделя, месяц. Автомобили в идеальном состоянии, полная страховка, подача в удобное место.",
-  path: "/rentals",
-});
-
-export default async function RentalsPage() {
-  const cars = await db.vehicle.findMany({
+const listRentalCars = () =>
+  db.vehicle.findMany({
     where: { ownershipType: "RENTAL", isAvailable: true, isArchived: false },
     orderBy: { dailyRate: "asc" },
   });
 
+// Метадата закрывает главный кластер ядра (~7 тыс. запросов/мес): обе народные
+// формы названия + «в Москве» + цена «от» из парка — цена в сниппете растит CTR.
+export async function generateMetadata(): Promise<Metadata> {
+  const cars = (await listRentalCars().catch(() => [])) as Array<Record<string, unknown>>;
+  const minRate = cars.length > 0 ? (cars[0].dailyRate as number) : null;
+  return pageSeo({
+    title: "Аренда Гелендвагена (Гелика) в Москве — G-Class с водителем и без",
+    description:
+      `Аренда Mercedes-Benz G-Class в Москве${minRate ? ` от ${formatPrice(minRate)}/сутки` : ""}: ` +
+      "G63 AMG и G500 на сутки, на свадьбу и на любой срок, с водителем и без. Страховка КАСКО, подача по Москве, бронирование онлайн.",
+    path: "/rentals",
+  });
+}
+
+export default async function RentalsPage() {
+  const [cars, title, description, seoText, faqItems] = await Promise.all([
+    listRentalCars(),
+    getCMSText("rentals.title"),
+    getCMSText("rentals.description"),
+    getCMSRichtext("rentals.seo.text"),
+    getCMSList("rentals.faq.items"),
+  ]);
+  const faq = faqItems
+    .map((i) => ({ question: i.question ?? "", answer: i.answer ?? "" }))
+    .filter((i) => i.question && i.answer);
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <Breadcrumbs items={[{ name: "Главная", href: "/" }, { name: "Аренда" }]} />
       <PageHeader
         eyebrow="Аренда"
-        title="Аренда G-Class"
-        description="Арендуйте легендарный Mercedes-Benz G-Class на любой срок"
+        title={title}
+        description={description}
         align="center"
         className="mb-12"
       />
@@ -98,6 +124,37 @@ export default async function RentalsPage() {
           ))}
         </div>
       )}
+
+      {seoText ? (
+        <div className="mt-16 mx-auto max-w-3xl">
+          <Markdown
+            source={seoText}
+            className="text-[var(--foreground-muted)] leading-relaxed space-y-4 text-sm"
+          />
+        </div>
+      ) : null}
+
+      {faq.length > 0 ? (
+        <div className="mt-12 mx-auto max-w-3xl">
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: buildFaqJsonLd(faq) }}
+          />
+          <h2 className="text-display text-2xl font-bold mb-6 text-center">
+            Вопросы об аренде
+          </h2>
+          <FAQAccordion
+            items={faq.map((i) => ({
+              question: i.question,
+              answerNode: (
+                <p className="text-sm text-[var(--foreground-muted)] leading-relaxed pt-3">
+                  {i.answer}
+                </p>
+              ),
+            }))}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

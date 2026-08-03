@@ -1,6 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { NOINDEX } from "@/lib/seo";
+
+// Приватная страница вне (public): редиректит без сессии, но до этого фикса не
+// несла ни NOINDEX, ни своего canonical — наследовала корневой «/».
+export const metadata = NOINDEX;
 import { redirect } from "next/navigation";
 
 import {

@@ -11,9 +11,10 @@ import { PartsFilterSidebar, PartsFilterChips } from "@/components/parts/PartsFi
 import { PartsSearchBox } from "@/components/parts/PartsSearchBox";
 import { Pagination } from "@/components/ui";
 import { pageSeo } from "@/lib/seo";
+import { getCMSText } from "@/lib/cms";
 
 export const metadata = pageSeo({
-  title: "Оригинальные запчасти для Mercedes-Benz G-Class (Гелендваген)",
+  title: "Запчасти на Гелендваген (Mercedes G-Class) — купить в Москве",
   description:
     "Каталог оригинальных запчастей и аналогов для Гелендвагена: детали в наличии и под заказ, подбор по VIN и поколению W463. Доставка по Москве и России.",
   path: "/parts",
@@ -52,9 +53,11 @@ export default async function PartsPage({ searchParams }: Props) {
   const hasCarFilter = Boolean(model && generation && !showAll);
   const requestedPage = Math.max(1, parseInt(params.page ?? "1", 10) || 1);
 
-  const [categories, models] = await Promise.all([
+  const [categories, models, partsTitle, partsSubtitle] = await Promise.all([
     db.partCategory.findMany({ orderBy: { sortOrder: "asc" } }),
     getActiveModelsWithTrims(),
+    getCMSText("catalog.parts.title"),
+    getCMSText("catalog.parts.subtitle"),
   ]);
 
   const where: Record<string, unknown> = { isActive: true };
@@ -151,10 +154,8 @@ export default async function PartsPage({ searchParams }: Props) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="text-center mb-8">
-        <h1 className="text-display text-4xl font-bold mb-2">Запчасти</h1>
-        <p className="text-[var(--foreground-muted)]">
-          Оригинальные запчасти и качественные аналоги для Mercedes-Benz
-        </p>
+        <h1 className="text-display text-4xl font-bold mb-2">{partsTitle}</h1>
+        <p className="text-[var(--foreground-muted)]">{partsSubtitle}</p>
       </div>
 
       <MyCarStrip models={models} />

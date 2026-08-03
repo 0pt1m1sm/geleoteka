@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole, getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { pingIndexNow } from "@/lib/indexnow";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
 import { findOrCreateGuestCustomer, generateClaimToken } from "@/lib/customer-onboarding";
@@ -64,6 +65,7 @@ export async function createRentalCar(
     data: { ...data, ownershipType: "RENTAL", photos: photoUrls },
   });
 
+  await pingIndexNow(["/rentals"]);
   redirect("/admin/rentals");
 }
 
@@ -99,6 +101,7 @@ export async function updateRentalCar(
     }
   });
 
+  await pingIndexNow(["/rentals", `/rentals/${carId}`]);
   redirect("/admin/rentals");
 }
 
@@ -109,6 +112,7 @@ export async function deleteRentalCar(carId: string): Promise<void> {
     where: { id: carId },
     data: { isArchived: true, isAvailable: false },
   });
+  await pingIndexNow(["/rentals"]);
 }
 
 export async function updateRentalBookingStatus(

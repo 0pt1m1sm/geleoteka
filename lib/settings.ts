@@ -331,6 +331,35 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     input: "boolean" as const,
     compactGroup: "Типы событий",
   })),
+
+  // ── SEO и аналитика ──────────────────────────────────────────────────
+  {
+    group: "SEO и аналитика",
+    key: "YANDEX_VERIFICATION",
+    label: "Яндекс.Вебмастер — код верификации",
+    description:
+      "Значение meta-тега yandex-verification со страницы подтверждения прав в Вебмастере. После сохранения тег появляется на всех страницах в течение минуты.",
+  },
+  {
+    group: "SEO и аналитика",
+    key: "GOOGLE_SITE_VERIFICATION",
+    label: "Google Search Console — код верификации",
+    description: "Значение meta-тега google-site-verification.",
+  },
+  {
+    group: "SEO и аналитика",
+    key: "YANDEX_METRIKA_ID",
+    label: "Яндекс.Метрика — номер счётчика",
+    description:
+      "Только цифры. Счётчик ставится на публичные страницы; в Вебмастере после этого стоит включить «обход по счётчикам». Вебвизор выключен.",
+  },
+  {
+    group: "SEO и аналитика",
+    key: "INDEXNOW_KEY",
+    label: "IndexNow — ключ",
+    description:
+      "Любая строка 8–128 символов [a-f0-9-]. Отдаётся на /indexnow-key.txt; при сохранении услуг/запчастей/аренды сайт пингует Яндекс для мгновенной переиндексации.",
+  },
 ];
 
 export async function getSetting(key: string): Promise<string | null> {

@@ -10,6 +10,10 @@ interface InitialService {
   slug: string;
   name: string;
   description: string | null;
+  /** Длинный текст страницы (markdown). */
+  body: string | null;
+  /** FAQ в блочном текстовом формате (см. lib/service-content.ts). */
+  faqBlocks: string;
   priceMin: number | null;
   priceMax: number | null;
   durationMinutes: number | null;
@@ -66,6 +70,38 @@ export function ServiceForm({ initial }: Props): React.ReactElement {
             placeholder="Что входит в услугу, особенности, на каких моделях выполняется..."
             defaultValue={initial?.description ?? ""}
           />
+        </div>
+
+        <div>
+          <label htmlFor="body" className="block text-sm font-medium mb-2">
+            Текст страницы (markdown)
+          </label>
+          <textarea
+            id="body"
+            name="body"
+            className="input min-h-[240px] resize-y font-mono text-sm"
+            placeholder={"## Что входит\n\n- пункт работ\n\nПодзаголовки, списки и абзацы — обычный markdown."}
+            defaultValue={initial?.body ?? ""}
+          />
+          <p className="text-xs text-[var(--foreground-muted)] mt-1">
+            Полный текст страницы услуги: этапы работ, особенности узла, рекомендации.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="faqBlocks" className="block text-sm font-medium mb-2">
+            FAQ (вопрос-ответ)
+          </label>
+          <textarea
+            id="faqBlocks"
+            name="faqBlocks"
+            className="input min-h-[160px] resize-y"
+            placeholder={"Сколько занимает работа?\nОбычно один день.\n\nДаёте ли гарантию?\nДа, на работы и запчасти."}
+            defaultValue={initial?.faqBlocks ?? ""}
+          />
+          <p className="text-xs text-[var(--foreground-muted)] mt-1">
+            Первая строка блока — вопрос, остальные — ответ; блоки разделяются пустой строкой.
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4">

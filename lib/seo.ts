@@ -32,6 +32,18 @@ export interface PageSeoInput {
  * Per-page metadata with a canonical URL and page-specific Open Graph.
  * The title is merged into the root `%s | Geleoteka` template by Next.
  */
+/**
+ * Fallback OG image for pages that don't pass their own. Nested metadata
+ * objects in Next REPLACE the parent segment's wholesale (no deep merge), so
+ * without this every page that sets `openGraph` would ship no image at all.
+ */
+export const DEFAULT_OG_IMAGE = {
+  url: "/images/hero/g-class-hero.jpg",
+  width: 1920,
+  height: 1080,
+  alt: "Mercedes-Benz G-Class (Гелендваген) в сервисе Geleoteka",
+};
+
 export function pageSeo({ title, description, path, image }: PageSeoInput): Metadata {
   return {
     title,
@@ -44,13 +56,13 @@ export function pageSeo({ title, description, path, image }: PageSeoInput): Meta
       title,
       description,
       url: path,
-      ...(image ? { images: [{ url: image, alt: title }] } : {}),
+      images: [image ? { url: image, alt: title } : DEFAULT_OG_IMAGE],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      ...(image ? { images: [image] } : {}),
+      images: [image ?? DEFAULT_OG_IMAGE.url],
     },
   };
 }

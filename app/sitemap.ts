@@ -5,6 +5,11 @@ import { getActiveModels } from "@/lib/vehicle-catalog";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
+// Без этого Next запекает sitemap на этапе сборки, где БД недоступна, — все
+// динамические ветки молча падают в .catch и прод навсегда отдаёт 9 статических
+// URL без услуг, моделей и запчастей (наблюдалось в бою 03.08.2026).
+export const dynamic = "force-dynamic";
+
 /**
  * Sitemap for the public marketing site.
  *
@@ -26,6 +31,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: "/about", priority: 0.6, changeFrequency: "monthly" },
   { path: "/contacts", priority: 0.6, changeFrequency: "monthly" },
   { path: "/vacancies", priority: 0.5, changeFrequency: "weekly" },
+  { path: "/blog", priority: 0.6, changeFrequency: "weekly" },
   { path: "/booking", priority: 0.9, changeFrequency: "monthly" },
 ];
 
@@ -39,7 +45,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }));
 
-  const [services, parts, rentals, models] = await Promise.all([
+  const [services, parts, rentals, models, posts] = await Promise.all([
     db.service
       .findMany({ select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
@@ -53,6 +59,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       })
       .catch(() => [] as Array<{ id: string; updatedAt: Date }>),
     getActiveModels().catch(() => [] as Array<{ slug: string }>),
+    db.blogPost
+      .findMany({ where: { published: true }, select: { slug: true, updatedAt: true } })
+      .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
   ]);
 
   for (const s of services as Array<{ slug: string; updatedAt: Date }>) {
@@ -87,6 +96,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: `${SITE_URL}/rentals/${r.id}`,
       lastModified: r.updatedAt,
       changeFrequency: "weekly",
+      priority: 0.5,
+    });
+  }
+
+  for (const p of posts as Array<{ slug: string; updatedAt: Date }>) {
+    entries.push({
+      url: `${SITE_URL}/blog/${p.slug}`,
+      lastModified: p.updatedAt,
+      changeFrequency: "monthly",
       priority: 0.5,
     });
   }

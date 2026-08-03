@@ -7,7 +7,7 @@ import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
 import { pageSeo } from "@/lib/seo";
 
 export const metadata = pageSeo({
-  title: "О сервисе Geleoteka: мастера Mercedes-Benz G-Class",
+  title: "О Geleoteka — клубный сервис Гелендвагенов в Москве",
   description:
     "Специализированный сервис Mercedes-Benz G-Class: история компании, сертифицированные мастера, опыт работы с Гелендвагеном W463 и индивидуальный подход.",
   path: "/about",

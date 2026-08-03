@@ -15,9 +15,9 @@ export default function robots(): MetadataRoute.Robots {
       disallow: [
         "/admin",
         "/cabinet",
-        "/master",
         "/api",
         "/login",
+        "/profile",
         "/register",
         "/reset-password",
         "/estimate",

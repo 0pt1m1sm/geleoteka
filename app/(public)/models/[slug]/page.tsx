@@ -8,6 +8,7 @@ import { getModelBySlug, generationLabel } from "@/lib/vehicle-catalog";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
+import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -30,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   }
 
   return pageSeo({
-    title: `Mercedes-Benz ${model.name} — модели и поколения`,
+    title: `Mercedes-Benz ${model.name} — обслуживание и ремонт в Москве`,
     description:
       model.description ??
       `Mercedes-Benz ${model.name}: поколения, двигатели, особенности и услуги сервиса для этого автомобиля в Geleoteka.`,
@@ -53,13 +54,13 @@ export default async function ModelPage({ params }: Props): Promise<React.ReactE
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
-      <nav className="mb-8 text-sm text-[var(--foreground-muted)]">
-        <Link href="/" className="hover:text-[var(--foreground)]">Главная</Link>
-        {" / "}
-        <Link href="/models" className="hover:text-[var(--foreground)]">Модели</Link>
-        {" / "}
-        <span className="text-[var(--foreground)]">{model.name}</span>
-      </nav>
+      <Breadcrumbs
+        items={[
+          { name: "Главная", href: "/" },
+          { name: "Модели", href: "/models" },
+          { name: model.name },
+        ]}
+      />
 
       <h1 className="text-display text-4xl font-bold mb-3">
         Mercedes-Benz {model.name}
