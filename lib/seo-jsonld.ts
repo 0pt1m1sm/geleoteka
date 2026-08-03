@@ -79,8 +79,10 @@ export function buildOrganizationJsonLd(contacts: OrganizationInput): string {
       ? {
           address: {
             "@type": "PostalAddress",
+            // Полный адрес из CMS как есть, без выдуманного addressLocality:
+            // сервис в Химках, и «Москва» в этом поле противоречила бы
+            // streetAddress — рассогласованный NAP хуже неполного.
             streetAddress: contacts.address,
-            addressLocality: "Москва",
             addressCountry: "RU",
           },
         }

@@ -40,18 +40,21 @@ describe("toJsonLdScript", () => {
 });
 
 describe("buildOrganizationJsonLd", () => {
-  it("builds AutoRepair with Moscow locality, parsed hours and https-only sameAs", () => {
+  it("builds AutoRepair with verbatim address, parsed hours and https-only sameAs", () => {
     const org = parse(
       buildOrganizationJsonLd({
         phone: "+7 495 000-00-00",
-        address: "ул. Примерная, 1",
+        address: "Московская область, Химки, ул. Примерная, 1",
         hours: "Пн–Пт: 10:00–20:00",
         sameAs: ["https://t.me/geleoteka", "#", "http://insecure.example"],
       }),
     );
     expect(org["@type"]).toBe("AutoRepair");
     const address = org.address as Record<string, string>;
-    expect(address.addressLocality).toBe("Москва");
+    expect(address.streetAddress).toBe("Московская область, Химки, ул. Примерная, 1");
+    // Города-выдумки в addressLocality нет: NAP должен совпадать с карточкой
+    // Яндекс Бизнеса дословно.
+    expect(address).not.toHaveProperty("addressLocality");
     expect(org.openingHours).toEqual(["Mo-Fr 10:00-20:00"]);
     expect(org.sameAs).toEqual(["https://t.me/geleoteka"]);
     expect(org.priceRange).toBeTruthy();
