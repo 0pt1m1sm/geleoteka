@@ -355,6 +355,15 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
   },
   {
     group: "SEO и аналитика",
+    key: "YANDEX_OAUTH_TOKEN",
+    label: "Яндекс OAuth-токен (Вебмастер + Метрика)",
+    description:
+      "Токен с правами на чтение Вебмастера и Метрики — включает автоматические данные на панели SEO (страницы в поиске, запросы, визиты). Получить: oauth.yandex.ru → создать приложение с правами «Яндекс.Вебмастер» и «Яндекс.Метрика: получение статистики», затем токен по ссылке авторизации.",
+    secret: true,
+    input: "secret",
+  },
+  {
+    group: "SEO и аналитика",
     key: "INDEXNOW_KEY",
     label: "IndexNow — ключ",
     description:

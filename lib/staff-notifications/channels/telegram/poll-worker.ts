@@ -39,6 +39,8 @@ export interface BackgroundWorkerJobs {
   dispatchTick: () => Promise<unknown>;
   /** Один ограниченный пул почты (внутри сам решает, включён ли синк). */
   mailSyncTick: () => Promise<unknown>;
+  /** Суточный SEO-снапшот (тик сам гейтит частоту; опционален для тестов). */
+  seoSnapshotTick?: () => Promise<unknown>;
 }
 
 export interface BackgroundWorkerState {
@@ -46,6 +48,7 @@ export interface BackgroundWorkerState {
   lastFailureDiagnosticAt: number;
   lastDispatchAt: number;
   lastMailSyncAt: number;
+  lastSeoSnapshotAt: number;
 }
 
 /** Канал выключен или конфигурация невалидна — заглядываем нечасто. */
@@ -60,6 +63,8 @@ const FAILURE_DIAGNOSTIC_WINDOW_MS = 5 * 60_000;
 const DISPATCH_EVERY_MS = 20_000;
 /** Каденция пула почты. */
 const MAIL_SYNC_EVERY_MS = 60_000;
+/** Как часто спрашивать SEO-тик (суточный гейт — внутри самого тика). */
+const SEO_SNAPSHOT_EVERY_MS = 60 * 60_000;
 
 let started = false;
 
@@ -97,6 +102,7 @@ export function freshBackgroundWorkerState(): BackgroundWorkerState {
     lastFailureDiagnosticAt: 0,
     lastDispatchAt: 0,
     lastMailSyncAt: 0,
+    lastSeoSnapshotAt: 0,
   };
 }
 
@@ -160,6 +166,14 @@ export async function runBackgroundWorkerIteration(
       await jobs.mailSyncTick();
     } catch {
       console.error("mail_sync.tick_failed");
+    }
+  }
+  if (jobs.seoSnapshotTick && nowMs - state.lastSeoSnapshotAt >= SEO_SNAPSHOT_EVERY_MS) {
+    state.lastSeoSnapshotAt = nowMs;
+    try {
+      await jobs.seoSnapshotTick();
+    } catch {
+      console.error("seo_snapshot.tick_failed");
     }
   }
 

@@ -35,5 +35,9 @@ export async function register(): Promise<void> {
       await runSyncOnce({ ...runtime.config, batchSize: 25 }, runtime.deps);
       await recordMailSyncRun();
     },
+    seoSnapshotTick: async () => {
+      const { runSeoSnapshotTick } = await import("@/lib/seo-snapshot");
+      await runSeoSnapshotTick();
+    },
   });
 }
