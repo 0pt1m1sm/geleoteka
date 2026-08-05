@@ -1054,6 +1054,27 @@ model CMSBlock {
   @@index([key])
 }
 
+/// Слепок SEO-состояния для панели /admin/seo: техметрики собирает сервер,
+/// indexedPages и note вносятся вручную при замерах выдачи.
+model SeoSnapshot {
+  id                     String   @id @default(cuid())
+  tenantKey              String   @default("geleoteka")
+  createdAt              DateTime @default(now())
+  sitemapUrls            Int?
+  servicesTotal          Int
+  servicesWithBody       Int
+  postsPublished         Int
+  postsDraft             Int
+  metrikaConfigured      Boolean
+  verificationConfigured Boolean
+  indexnowConfigured     Boolean
+  /// Из ручного замера site:домен (капчу сервером не обойти).
+  indexedPages           Int?
+  note                   String?
+
+  @@index([tenantKey, createdAt])
+}
+
 model BlogPost {
   id          String    @id @default(cuid())
   slug        String    @unique
