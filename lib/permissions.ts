@@ -185,6 +185,7 @@ const PATH_PERMISSIONS: ReadonlyArray<readonly [string, Permission]> = [
   ["/admin/rentals", "rentals.manage"],
   ["/admin/cms", "content.manage"],
   ["/admin/blog", "content.manage"],
+  ["/admin/seo", "content.manage"],
   ["/admin/team", "site.manage"],
   ["/admin/vacancies", "site.manage"],
 ];
