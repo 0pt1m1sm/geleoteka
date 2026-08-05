@@ -22,6 +22,8 @@ export interface SeoHealth {
   metrikaConfigured: boolean;
   verificationConfigured: boolean;
   indexnowConfigured: boolean;
+  /** OAuth-токен Яндекса задан — включает данные Вебмастера/Метрики. */
+  oauthConfigured: boolean;
 }
 
 async function countSitemapUrls(): Promise<number | null> {
@@ -50,7 +52,7 @@ export function withDelta(
 }
 
 export async function collectSeoHealth(): Promise<SeoHealth> {
-  const [sitemapUrls, servicesTotal, servicesWithBody, postsPublished, postsDraft, metrika, verification, indexnow] =
+  const [sitemapUrls, servicesTotal, servicesWithBody, postsPublished, postsDraft, metrika, verification, indexnow, oauth] =
     await Promise.all([
       countSitemapUrls(),
       db.service.count() as Promise<number>,
@@ -60,6 +62,7 @@ export async function collectSeoHealth(): Promise<SeoHealth> {
       getSetting("YANDEX_METRIKA_ID"),
       getSetting("YANDEX_VERIFICATION"),
       getSetting("INDEXNOW_KEY"),
+      getSetting("YANDEX_OAUTH_TOKEN"),
     ]);
 
   return {
@@ -73,5 +76,6 @@ export async function collectSeoHealth(): Promise<SeoHealth> {
     // public/ есть навсегда; поле трактуем как «meta-тег задан».
     verificationConfigured: Boolean(verification?.trim()),
     indexnowConfigured: Boolean(indexnow?.trim()),
+    oauthConfigured: Boolean(oauth?.trim()),
   };
 }

@@ -1071,8 +1071,17 @@ model SeoSnapshot {
   /// Из ручного замера site:домен (капчу сервером не обойти).
   indexedPages           Int?
   note                   String?
+  /// auto — суточный тик воркера, manual — кнопка в админке.
+  source                 String   @default("manual")
+  /// Страниц в поиске по Вебмастер API (searchable_pages_count).
+  indexedPagesApi        Int?
+  /// Индекс качества сайта из Вебмастера.
+  sqi                    Int?
+  /// Визиты из поиска за 7 дней (Метрика, organic).
+  searchVisits7d         Int?
 
   @@index([tenantKey, createdAt])
+  @@index([tenantKey, source, createdAt])
 }
 
 model BlogPost {

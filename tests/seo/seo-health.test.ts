@@ -23,6 +23,12 @@ vi.mock("@/lib/auth", () => ({
   requireRole: (...args: unknown[]) => requireRole(...args),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/yandex-webmaster", () => ({
+  fetchWebmasterSummary: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("@/lib/yandex-metrika-api", () => ({
+  fetchSearchTraffic: vi.fn().mockResolvedValue(null),
+}));
 
 import { collectSeoHealth, withDelta } from "@/lib/seo-health";
 import { captureSeoSnapshot } from "@/app/actions/seo";
@@ -65,6 +71,17 @@ describe("collectSeoHealth", () => {
     const h = await collectSeoHealth();
     expect(h.sitemapUrls).toBeNull();
     expect(h.servicesTotal).toBe(10);
+  });
+});
+
+describe("sparklinePath", () => {
+  it("maps values to a scaled SVG path", async () => {
+    const { sparklinePath } = await import("@/components/admin/Sparkline");
+    const d = sparklinePath([0, 10, 5], 102, 44, 1);
+    expect(d.startsWith("M1.0,43.0")).toBe(true);
+    expect(d).toContain("L51.0,1.0");
+    expect(d.endsWith("L101.0,22.0")).toBe(true);
+    expect(sparklinePath([], 100, 40)).toBe("");
   });
 });
 

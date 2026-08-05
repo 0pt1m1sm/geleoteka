@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { collectSeoHealth } from "@/lib/seo-health";
+import { fetchSearchTraffic } from "@/lib/yandex-metrika-api";
+import { fetchWebmasterSummary } from "@/lib/yandex-webmaster";
 import { TENANT_KEY } from "@/lib/tenant";
 
 /**
@@ -24,11 +26,19 @@ export async function captureSeoSnapshot(
   }
   const note = ((formData.get("note") as string) || "").trim() || null;
 
-  const health = await collectSeoHealth();
+  const [health, webmaster, traffic] = await Promise.all([
+    collectSeoHealth(),
+    fetchWebmasterSummary(),
+    fetchSearchTraffic(),
+  ]);
 
   await db.seoSnapshot.create({
     data: {
       tenantKey: TENANT_KEY,
+      source: "manual",
+      indexedPagesApi: webmaster?.searchablePages ?? null,
+      sqi: webmaster?.sqi ?? null,
+      searchVisits7d: traffic?.visits7d ?? null,
       sitemapUrls: health.sitemapUrls,
       servicesTotal: health.servicesTotal,
       servicesWithBody: health.servicesWithBody,
