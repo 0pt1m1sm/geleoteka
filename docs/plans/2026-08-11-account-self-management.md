@@ -1,9 +1,9 @@
 # Управление аккаунтом в профиле клиента — Implementation Plan
 
 Created: 2026-08-11
-Status: IN_PROGRESS
+Status: VERIFIED
 Mode: auto
-Iterations: 0
+Iterations: 1
 Type: Feature
 
 ## Контекст
