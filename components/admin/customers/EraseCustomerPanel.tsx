@@ -275,10 +275,11 @@ export function EraseCustomerPanel({
       ) : null}
 
       <div className="space-y-2">
-        <label className="block text-xs text-[var(--foreground-muted)]">
+        <label htmlFor="erase-confirm-input" className="block text-xs text-[var(--foreground-muted)]">
           Для подтверждения введите <code className="select-all">{confirmPhrase}</code>
         </label>
         <input
+          id="erase-confirm-input"
           className="input"
           value={typed}
           onChange={(e) => setTyped(e.target.value)}

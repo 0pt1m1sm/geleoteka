@@ -7,6 +7,12 @@ import { createToken, setSessionCookie } from "@/lib/auth";
 import { OAUTH_PENDING_COOKIE, verifyPendingProfile } from "@/lib/oauth-login";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.includes("Unique constraint")) return true;
+  return "code" in err && (err as { code?: string }).code === "P2002";
+}
+
 /**
  * Завершение регистрации после входа через Яндекс/VK, когда провайдер не
  * отдал телефон и/или email. Данные провайдера приходят не из формы, а из
@@ -50,22 +56,37 @@ export async function completeOAuthRegistrationAction(
     };
   }
 
-  const user = (await db.user.create({
-    data: {
-      email,
-      phone,
-      name,
-      passwordHash: null,
-      isTempPassword: false,
-      referralSource: "WALK_IN",
-      customerProfile: { create: {} },
-      loyaltyAccount: { create: {} },
-      oauthAccounts: {
-        create: { provider, providerUserId: profile.providerUserId },
+  let user: { id: string; permissionRole: string };
+  try {
+    user = (await db.user.create({
+      data: {
+        email,
+        phone,
+        name,
+        passwordHash: null,
+        isTempPassword: false,
+        referralSource: "WALK_IN",
+        customerProfile: { create: {} },
+        loyaltyAccount: { create: {} },
+        oauthAccounts: {
+          create: { provider, providerUserId: profile.providerUserId },
+        },
       },
-    },
-    select: { id: true, permissionRole: true },
-  })) as { id: string; permissionRole: string };
+      select: { id: true, permissionRole: true },
+    })) as { id: string; permissionRole: string };
+  } catch (err) {
+    // The findFirst check above narrows the window but doesn't close it —
+    // two concurrent OAuth completions with the same email/phone can both
+    // pass it and race to insert. Catch the unique-constraint violation here
+    // rather than let it surface as an unhandled 500.
+    if (isUniqueViolation(err)) {
+      return {
+        error:
+          "Пользователь с таким email или телефоном уже существует. Войдите в него по паролю (или восстановите пароль по SMS) — вход через соцсеть привяжется автоматически при совпадении контактов.",
+      };
+    }
+    throw err;
+  }
 
   cookieStore.delete(OAUTH_PENDING_COOKIE);
   await setSessionCookie(createToken({ userId: user.id, permissionRole: user.permissionRole }));

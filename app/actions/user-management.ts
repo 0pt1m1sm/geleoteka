@@ -65,10 +65,9 @@ export async function createUser(
   if (!name) return { ok: false, error: "Укажите имя" };
   if (name.length > NAME_MAX) return { ok: false, error: "Слишком длинное имя" };
   if (!EMAIL_RE.test(email)) return { ok: false, error: "Некорректный email" };
-  if (!isValidRussianPhone(phoneRaw)) return { ok: false, error: "Некорректный телефон" };
-  if (!isAllowedRole(permissionRole)) return { ok: false, error: "Неизвестная роль" };
-
   const phone = normalizePhone(phoneRaw);
+  if (!isValidRussianPhone(phone)) return { ok: false, error: "Некорректный телефон" };
+  if (!isAllowedRole(permissionRole)) return { ok: false, error: "Неизвестная роль" };
   const tempPassword = generateTempPassword();
 
   let userId: string;
