@@ -57,7 +57,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.3"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -79,5 +79,9 @@
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "sharp": "$sharp",
+    "postcss": "^8.5.23"
   }
 }

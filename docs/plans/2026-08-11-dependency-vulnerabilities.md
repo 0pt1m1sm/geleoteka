@@ -31,7 +31,7 @@ Dependabot: 33 открытых алерта (17 high, 12 moderate, 4 low). Ра
 ## Progress Tracking
 
 - [x] Story 1: next 16.2.3 → 16.2.11 (+eslint-config-next) — 22 алерта (Status: VERIFIED)
-- [ ] Story 2: runtime-хвосты — sharp 0.35.0, postcss ≥8.5.23 — 5 алертов (Status: PENDING)
+- [x] Story 2: runtime-хвосты — sharp 0.35.0, postcss ≥8.5.23 — 5 алертов (Status: VERIFIED)
 - [ ] Story 3: dev-транзитивки + финал — npm audit 0, PR, деплой, закрыть #17 (Status: PENDING)
 
 ## Implementation Tasks
