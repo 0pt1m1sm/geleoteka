@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import bcrypt from "bcryptjs";
 
 import { requireAuth } from "@/lib/auth";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { LOCALES, TIME_ZONES } from "@/lib/profile-options";
@@ -78,5 +80,64 @@ export async function updateOwnProfile(
   }
 
   revalidatePath("/profile");
+  return { error: null, success: true };
+}
+
+const PASSWORD_MIN = 6;
+
+/**
+ * Сменить СВОЙ пароль, зная текущий.
+ *
+ * Гостевые аккаунты (isTempPassword) и учётки без хэша сюда не пускаются:
+ * их «текущий пароль» человеку неизвестен в принципе, честный маршрут для
+ * них — восстановление по SMS. Требование текущего пароля защищает от
+ * захвата аккаунта через оставленную открытой сессию.
+ */
+export async function changeOwnPassword(
+  _prev: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const session = await requireAuth();
+
+  const current = ((formData.get("currentPassword") as string | null) ?? "").trim();
+  const next = ((formData.get("newPassword") as string | null) ?? "").trim();
+  const repeat = ((formData.get("repeatPassword") as string | null) ?? "").trim();
+
+  if (!current || !next || !repeat) return { error: "Все поля обязательны" };
+  if (next.length < PASSWORD_MIN) {
+    return { error: `Новый пароль должен быть минимум ${PASSWORD_MIN} символов` };
+  }
+  if (next !== repeat) return { error: "Новый пароль и повтор не совпадают" };
+  if (next === current) return { error: "Новый пароль совпадает с текущим" };
+
+  const user = (await db.user.findUnique({
+    where: { id: session.id },
+    select: { passwordHash: true, isTempPassword: true },
+  })) as { passwordHash: string | null; isTempPassword: boolean } | null;
+  if (!user) return { error: "Пользователь не найден" };
+  if (!user.passwordHash || user.isTempPassword) {
+    return {
+      error:
+        "Пароль ещё не задан — установите его через «Забыли пароль?» на странице входа (восстановление по SMS)",
+    };
+  }
+
+  const valid = await bcrypt.compare(current, user.passwordHash);
+  if (!valid) return { error: "Текущий пароль неверен" };
+
+  const passwordHash = await bcrypt.hash(next, 12);
+  await db.user.update({
+    where: { id: session.id },
+    data: { passwordHash },
+  });
+
+  await recordAudit({
+    actor: { id: session.id, name: session.name, permissionRole: session.permissionRole },
+    action: "user.password_change",
+    targetType: "User",
+    targetId: session.id,
+    targetLabel: session.name,
+  });
+
   return { error: null, success: true };
 }

@@ -14,6 +14,7 @@ import {
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
 import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
+import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
@@ -132,6 +133,18 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
         locales={LOCALES}
       />
 
+      <Card className="mt-6">
+        <h2 className="text-base font-semibold">Безопасность</h2>
+        <p className="mt-2 text-sm text-[var(--foreground-muted)]">
+          Смена пароля действует сразу. Если пароль ещё не задан (вход по коду
+          или гостевое оформление) — установите его через «Забыли пароль?» на
+          странице входа.
+        </p>
+        <div className="mt-4">
+          <ChangePasswordForm />
+        </div>
+      </Card>
+
       {notificationsAvailable && telegramConfig ? (
         <div id="staff-notifications" className="mt-6 space-y-6 scroll-mt-4">
           <Card>
@@ -191,7 +204,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
       ) : null}
 
       <p className="mt-4 text-xs text-[var(--foreground-muted)]">
-        Пароль и роль здесь не меняются: пароль сбрасывается через вход, роль выдаёт администратор.
+        Роль здесь не меняется — доступ выдаёт администратор.
       </p>
     </div>
   );
