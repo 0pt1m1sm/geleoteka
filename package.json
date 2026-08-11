@@ -49,7 +49,7 @@
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.8.0",
     "mailparser": "^3.9.14",
-    "next": "16.2.3",
+    "next": "16.2.11",
     "nodemailer": "^9.0.3",
     "prisma": "^6.19.3",
     "qrcode": "^1.5.4",
@@ -57,7 +57,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.3"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -74,10 +74,15 @@
     "@types/react-dom": "^19",
     "dotenv": "^16.6.1",
     "eslint": "^9",
-    "eslint-config-next": "16.2.3",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "sharp": "$sharp",
+    "postcss": "^8.5.23",
+    "esbuild": "^0.28.1"
   }
 }
