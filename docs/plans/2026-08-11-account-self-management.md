@@ -42,7 +42,7 @@ Type: Feature
 
 - [x] Story 1: Смена пароля в профиле (блок «Безопасность») (Status: VERIFIED)
 - [x] Story 2: Отзыв сессий — «выйти на всех устройствах» + инвалидация при смене пароля (Status: VERIFIED)
-- [ ] Story 3: Статус email в профиле + самостоятельное удаление аккаунта (Status: PENDING)
+- [x] Story 3: Статус email в профиле + самостоятельное удаление аккаунта (Status: VERIFIED)
 
 ## Implementation Tasks
 

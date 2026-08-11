@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 
-import { createToken, requireAuth, setSessionCookie } from "@/lib/auth";
+import { clearSessionCookie, createToken, requireAuth, setSessionCookie } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
@@ -177,4 +178,56 @@ export async function revokeOtherSessions(
   });
 
   return { error: null, success: true };
+}
+
+/**
+ * Удалить СВОЙ аккаунт (только клиенты).
+ *
+ * Soft-delete, как у админского удаления: deletedAt скрывает человека из CRM
+ * и убивает сессии через getSession, но история заказов и сделок остаётся —
+ * каскадный снос уже однажды уничтожал историю, больше никогда. Сотрудников
+ * сюда не пускаем: их доступ — зона администратора, самоудаление сотрудника
+ * оставило бы сервис без концов в аудите смен и задач.
+ */
+export async function deleteOwnAccount(
+  _prev: Result | null,
+  formData: FormData,
+): Promise<Result> {
+  const session = await requireAuth();
+  if (session.permissionRole !== "CLIENT") {
+    return { error: "Учётную запись сотрудника удаляет администратор" };
+  }
+
+  const password = ((formData.get("password") as string | null) ?? "").trim();
+  if (!password) return { error: "Введите пароль для подтверждения" };
+
+  const user = (await db.user.findUnique({
+    where: { id: session.id },
+    select: { passwordHash: true, isTempPassword: true },
+  })) as { passwordHash: string | null; isTempPassword: boolean } | null;
+  if (!user) return { error: "Пользователь не найден" };
+  if (!user.passwordHash || user.isTempPassword) {
+    return {
+      error:
+        "Удаление подтверждается паролем, а он ещё не задан. Установите его через «Забыли пароль?» на странице входа",
+    };
+  }
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+  if (!valid) return { error: "Пароль неверен" };
+
+  await db.user.update({
+    where: { id: session.id },
+    data: { deletedAt: new Date() },
+  });
+  await recordAudit({
+    actor: { id: session.id, name: session.name, permissionRole: session.permissionRole },
+    action: "user.self_delete",
+    targetType: "User",
+    targetId: session.id,
+    targetLabel: session.name,
+  });
+
+  await clearSessionCookie();
+  redirect("/");
 }

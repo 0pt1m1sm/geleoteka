@@ -14,7 +14,9 @@ import {
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
 import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
+import { EmailVerificationNotice } from "@/components/cabinet/EmailVerificationNotice";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
+import { DeleteAccountForm } from "@/components/profile/DeleteAccountForm";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { RevokeSessionsButton } from "@/components/profile/RevokeSessionsButton";
 import { Card, PageHeader } from "@/components/ui";
@@ -63,6 +65,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
       locale: true,
       permissionRole: true,
       createdAt: true,
+      emailVerifiedAt: true,
     },
   })) as {
     name: string;
@@ -72,6 +75,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
     locale: string | null;
     permissionRole: string;
     createdAt: Date;
+    emailVerifiedAt: Date | null;
   } | null;
   if (!user) redirect("/login");
 
@@ -121,6 +125,14 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
           </Link>
         }
       />
+
+      {user.emailVerifiedAt ? (
+        <p className="mb-4 text-sm text-[var(--foreground-muted)]">
+          ✓ Email подтверждён {formatDateTime(user.emailVerifiedAt)}
+        </p>
+      ) : (
+        <EmailVerificationNotice />
+      )}
 
       <ProfileForm
         initial={{
@@ -211,6 +223,17 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
             </div>
           </Card>
         </div>
+      ) : null}
+
+      {user.permissionRole === "CLIENT" ? (
+        <Card className="mt-6 border-[var(--color-error)]">
+          <h2 className="text-base font-semibold text-[var(--color-error)]">Опасная зона</h2>
+          <p className="mt-2 mb-4 text-sm text-[var(--foreground-muted)]">
+            Удаление аккаунта закрывает доступ в кабинет. История обслуживания
+            автомобилей сохраняется у сервиса.
+          </p>
+          <DeleteAccountForm />
+        </Card>
       ) : null}
 
       <p className="mt-4 text-xs text-[var(--foreground-muted)]">
