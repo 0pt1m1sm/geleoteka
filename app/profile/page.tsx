@@ -14,7 +14,11 @@ import {
 } from "@/app/actions/staff-notifications";
 import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLinkPanel";
 import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
+import { EmailVerificationNotice } from "@/components/cabinet/EmailVerificationNotice";
+import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
+import { DeleteAccountForm } from "@/components/profile/DeleteAccountForm";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { RevokeSessionsButton } from "@/components/profile/RevokeSessionsButton";
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { rolePermissions } from "@/lib/authz";
@@ -61,6 +65,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
       locale: true,
       permissionRole: true,
       createdAt: true,
+      emailVerifiedAt: true,
     },
   })) as {
     name: string;
@@ -70,6 +75,7 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
     locale: string | null;
     permissionRole: string;
     createdAt: Date;
+    emailVerifiedAt: Date | null;
   } | null;
   if (!user) redirect("/login");
 
@@ -120,6 +126,14 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
         }
       />
 
+      {user.emailVerifiedAt ? (
+        <p className="mb-4 text-sm text-[var(--foreground-muted)]">
+          ✓ Email подтверждён {formatDateTime(user.emailVerifiedAt)}
+        </p>
+      ) : (
+        <EmailVerificationNotice />
+      )}
+
       <ProfileForm
         initial={{
           name: user.name,
@@ -131,6 +145,27 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
         timeZones={TIME_ZONES}
         locales={LOCALES}
       />
+
+      <Card className="mt-6">
+        <h2 className="text-base font-semibold">Безопасность</h2>
+        <p className="mt-2 text-sm text-[var(--foreground-muted)]">
+          Смена пароля действует сразу. Если пароль ещё не задан (вход по коду
+          или гостевое оформление) — установите его через «Забыли пароль?» на
+          странице входа.
+        </p>
+        <div className="mt-4">
+          <ChangePasswordForm />
+        </div>
+        <div className="mt-6 border-t border-[var(--border)] pt-4">
+          <h3 className="text-sm font-semibold">Сессии</h3>
+          <p className="mt-1 mb-3 text-sm text-[var(--foreground-muted)]">
+            Входили с чужого или потерянного устройства? Разлогиньте все
+            устройства разом — эта сессия останется активной. Смена пароля
+            делает это автоматически.
+          </p>
+          <RevokeSessionsButton />
+        </div>
+      </Card>
 
       {notificationsAvailable && telegramConfig ? (
         <div id="staff-notifications" className="mt-6 space-y-6 scroll-mt-4">
@@ -190,8 +225,19 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
         </div>
       ) : null}
 
+      {user.permissionRole === "CLIENT" ? (
+        <Card className="mt-6 border-[var(--color-error)]">
+          <h2 className="text-base font-semibold text-[var(--color-error)]">Опасная зона</h2>
+          <p className="mt-2 mb-4 text-sm text-[var(--foreground-muted)]">
+            Удаление аккаунта закрывает доступ в кабинет. История обслуживания
+            автомобилей сохраняется у сервиса.
+          </p>
+          <DeleteAccountForm />
+        </Card>
+      ) : null}
+
       <p className="mt-4 text-xs text-[var(--foreground-muted)]">
-        Пароль и роль здесь не меняются: пароль сбрасывается через вход, роль выдаёт администратор.
+        Роль здесь не меняется — доступ выдаёт администратор.
       </p>
     </div>
   );

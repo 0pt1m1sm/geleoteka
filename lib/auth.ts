@@ -28,6 +28,25 @@ const JWT_EXPIRES_IN: SignOptions["expiresIn"] = (process.env.JWT_EXPIRES_IN || 
 interface JWTPayload {
   userId: string;
   permissionRole: string;
+  /** Секунда выпуска — ставится jsonwebtoken автоматически при sign. */
+  iat?: number;
+}
+
+/**
+ * Выпущен ли токен ДО отзыва сессий.
+ *
+ * Сравнение посекундное (iat в JWT — целые секунды): токен, перевыпущенный
+ * в ту же секунду, что и отзыв, остаётся валидным — так «выйти на всех
+ * устройствах» не выкидывает само устройство, которое нажало кнопку.
+ * Токен без iat при установленном пороге считается отозванным: неизвестный
+ * возраст — не повод пережить отзыв.
+ */
+export function issuedBeforeRevocation(
+  iatSeconds: number | undefined,
+  revokedAt: Date | null,
+): boolean {
+  if (!revokedAt) return false;
+  return (iatSeconds ?? 0) < Math.floor(revokedAt.getTime() / 1000);
 }
 
 export interface SessionUser {
@@ -82,13 +101,24 @@ export const getSession = cache(async (): Promise<SessionUser | null> => {
 
   const user = await db.user.findUnique({
     where: { id: payload.userId },
-    select: { id: true, email: true, phone: true, name: true, permissionRole: true, deletedAt: true },
+    select: {
+      id: true,
+      email: true,
+      phone: true,
+      name: true,
+      permissionRole: true,
+      deletedAt: true,
+      sessionsRevokedAt: true,
+    },
   });
 
   if (!user) return null;
   // Soft-deleted users must not keep a live session — an admin "deleting" a
   // customer sets deletedAt, and that has to revoke access on the next request.
   if (user.deletedAt) return null;
+  // "Log out everywhere" / password change: tokens minted before the threshold
+  // are dead even though the JWT signature itself is still valid.
+  if (issuedBeforeRevocation(payload.iat, user.sessionsRevokedAt)) return null;
   // NONE permission role = entity exists in DB but cannot log in (e.g. suppliers).
   // If a NONE token somehow exists, reject it.
   if (user.permissionRole === "NONE") return null;

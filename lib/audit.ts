@@ -33,6 +33,9 @@ export type AuditAction =
   | "customer.restore"
   | "user.role_change"
   | "user.password_reset"
+  | "user.password_change"
+  | "user.sessions_revoke"
+  | "user.self_delete"
   | "user.block"
   | "role.permissions_set"
   | "role.permissions_reset"
@@ -75,6 +78,9 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<AuditAction, string>> = {
   "customer.restore": "Восстановление клиента",
   "user.role_change": "Смена роли",
   "user.password_reset": "Сброс пароля",
+  "user.password_change": "Смена пароля",
+  "user.sessions_revoke": "Выход на всех устройствах",
+  "user.self_delete": "Самостоятельное удаление аккаунта",
   "user.block": "Блокировка доступа",
   "role.permissions_set": "Изменение прав роли",
   "role.permissions_reset": "Сброс прав роли к умолчанию",
