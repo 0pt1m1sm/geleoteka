@@ -41,7 +41,7 @@ Type: Feature
 ## Progress Tracking
 
 - [x] Story 1: Смена пароля в профиле (блок «Безопасность») (Status: VERIFIED)
-- [ ] Story 2: Отзыв сессий — «выйти на всех устройствах» + инвалидация при смене пароля (Status: PENDING)
+- [x] Story 2: Отзыв сессий — «выйти на всех устройствах» + инвалидация при смене пароля (Status: VERIFIED)
 - [ ] Story 3: Статус email в профиле + самостоятельное удаление аккаунта (Status: PENDING)
 
 ## Implementation Tasks

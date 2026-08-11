@@ -387,6 +387,11 @@ model User {
   // every other delete sets this field so deal/RO history stays intact.
   deletedAt DateTime?
 
+  /// Порог отзыва сессий: JWT с iat старше этого момента недействителен.
+  /// Ставится кнопкой «выйти на всех устройствах» и при смене пароля;
+  /// текущее устройство сразу получает свежий токен и переживает отзыв.
+  sessionsRevokedAt DateTime?
+
   // Optional 1:1 profile extensions (only present when corresponding flag = true)
   customerProfile CustomerProfile?
   masterProfile   MasterProfile?

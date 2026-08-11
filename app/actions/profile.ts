@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 
-import { requireAuth } from "@/lib/auth";
+import { createToken, requireAuth, setSessionCookie } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
@@ -126,14 +126,51 @@ export async function changeOwnPassword(
   if (!valid) return { error: "Текущий пароль неверен" };
 
   const passwordHash = await bcrypt.hash(next, 12);
+  // Смена пароля отзывает все сессии: если пароль меняют из-за компрометации,
+  // чужие устройства должны отвалиться немедленно, а не дожить до истечения JWT.
   await db.user.update({
     where: { id: session.id },
-    data: { passwordHash },
+    data: { passwordHash, sessionsRevokedAt: new Date() },
   });
+  await reissueCurrentSession(session.id, session.permissionRole);
 
   await recordAudit({
     actor: { id: session.id, name: session.name, permissionRole: session.permissionRole },
     action: "user.password_change",
+    targetType: "User",
+    targetId: session.id,
+    targetLabel: session.name,
+  });
+
+  return { error: null, success: true };
+}
+
+/**
+ * Свежий токен для устройства, выполнившего отзыв: его iat не младше порога
+ * sessionsRevokedAt (посекундное сравнение в issuedBeforeRevocation), поэтому
+ * инициатор остаётся в системе, а все ранее выпущенные токены умирают.
+ */
+async function reissueCurrentSession(userId: string, permissionRole: string): Promise<void> {
+  const token = createToken({ userId, permissionRole });
+  await setSessionCookie(token);
+}
+
+/** Выйти на всех устройствах, кроме текущего. */
+export async function revokeOtherSessions(
+  _prev: Result | null,
+  _formData: FormData,
+): Promise<Result> {
+  const session = await requireAuth();
+
+  await db.user.update({
+    where: { id: session.id },
+    data: { sessionsRevokedAt: new Date() },
+  });
+  await reissueCurrentSession(session.id, session.permissionRole);
+
+  await recordAudit({
+    actor: { id: session.id, name: session.name, permissionRole: session.permissionRole },
+    action: "user.sessions_revoke",
     targetType: "User",
     targetId: session.id,
     targetLabel: session.name,

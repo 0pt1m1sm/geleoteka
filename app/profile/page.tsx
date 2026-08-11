@@ -16,6 +16,7 @@ import { TelegramLinkPanel } from "@/components/admin/notifications/TelegramLink
 import { TelegramTestButton } from "@/components/admin/notifications/TelegramTestButton";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { RevokeSessionsButton } from "@/components/profile/RevokeSessionsButton";
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { rolePermissions } from "@/lib/authz";
@@ -142,6 +143,15 @@ export default async function ProfilePage(): Promise<React.ReactElement> {
         </p>
         <div className="mt-4">
           <ChangePasswordForm />
+        </div>
+        <div className="mt-6 border-t border-[var(--border)] pt-4">
+          <h3 className="text-sm font-semibold">Сессии</h3>
+          <p className="mt-1 mb-3 text-sm text-[var(--foreground-muted)]">
+            Входили с чужого или потерянного устройства? Разлогиньте все
+            устройства разом — эта сессия останется активной. Смена пароля
+            делает это автоматически.
+          </p>
+          <RevokeSessionsButton />
         </div>
       </Card>
 

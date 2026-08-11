@@ -37,7 +37,7 @@ vi.mock("@/lib/audit", () => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
-import { changeOwnPassword } from "@/app/actions/profile";
+import { changeOwnPassword, revokeOtherSessions } from "@/app/actions/profile";
 
 function form(fields: Record<string, string>): FormData {
   const fd = new FormData();
@@ -134,6 +134,32 @@ describe("changeOwnPassword", () => {
         targetType: "User",
         targetId: "u1",
       }),
+    );
+  });
+
+  it("revokes all sessions and re-issues the current one", async () => {
+    await changeOwnPassword(null, form(FULL));
+
+    const data = (update.mock.calls[0][0] as { data: Record<string, unknown> }).data;
+    expect(data.sessionsRevokedAt).toBeInstanceOf(Date);
+    expect(createToken).toHaveBeenCalledWith({ userId: "u1", permissionRole: "CLIENT" });
+    expect(setSessionCookie).toHaveBeenCalledWith("FRESH-TOKEN");
+  });
+});
+
+describe("revokeOtherSessions", () => {
+  it("sets the revocation threshold, re-issues the cookie and audits", async () => {
+    const res = await revokeOtherSessions(null, new FormData());
+    expect(res).toEqual({ error: null, success: true });
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "u1" },
+      data: { sessionsRevokedAt: expect.any(Date) },
+    });
+    expect(createToken).toHaveBeenCalledWith({ userId: "u1", permissionRole: "CLIENT" });
+    expect(setSessionCookie).toHaveBeenCalledWith("FRESH-TOKEN");
+    expect(recordAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "user.sessions_revoke", targetId: "u1" }),
     );
   });
 });
