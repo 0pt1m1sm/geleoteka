@@ -1,9 +1,9 @@
 # Устранение 33 уязвимостей зависимостей — Implementation Plan
 
 Created: 2026-08-11
-Status: IN_PROGRESS
+Status: VERIFIED
 Mode: auto
-Iterations: 0
+Iterations: 1
 Type: Bugfix
 
 ## Контекст
@@ -32,7 +32,7 @@ Dependabot: 33 открытых алерта (17 high, 12 moderate, 4 low). Ра
 
 - [x] Story 1: next 16.2.3 → 16.2.11 (+eslint-config-next) — 22 алерта (Status: VERIFIED)
 - [x] Story 2: runtime-хвосты — sharp 0.35.0, postcss ≥8.5.23 — 5 алертов (Status: VERIFIED)
-- [ ] Story 3: dev-транзитивки + финал — npm audit 0, PR, деплой, закрыть #17 (Status: PENDING)
+- [x] Story 3: dev-транзитивки + финал — npm audit 0, PR, деплой, #17 закрыт dependabot'ом (Status: VERIFIED)
 
 ## Implementation Tasks
 
