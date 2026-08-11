@@ -82,6 +82,7 @@
   },
   "overrides": {
     "sharp": "$sharp",
-    "postcss": "^8.5.23"
+    "postcss": "^8.5.23",
+    "esbuild": "^0.28.1"
   }
 }
