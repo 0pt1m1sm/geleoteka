@@ -6,6 +6,12 @@ import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.includes("Unique constraint")) return true;
+  return "code" in err && (err as { code?: string }).code === "P2002";
+}
+
 /** Register a new user */
 export async function registerAction(_prevState: { error: string | null } | null, formData: FormData) {
   // Normalise casing/whitespace up front so the uniqueness check and the row
@@ -38,19 +44,31 @@ export async function registerAction(_prevState: { error: string | null } | null
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = await db.user.create({
-    data: {
-      email,
-      phone,
-      passwordHash,
-      name,
-      isTempPassword: false,
-      // Self-registration from the public site without UTM tracking — default
-      // to WALK_IN. UTM-aware attribution can override later.
-      referralSource: "WALK_IN",
-      customerProfile: { create: {} },
-    },
-  });
+  let user: { id: string; permissionRole: string };
+  try {
+    user = await db.user.create({
+      data: {
+        email,
+        phone,
+        passwordHash,
+        name,
+        isTempPassword: false,
+        // Self-registration from the public site without UTM tracking — default
+        // to WALK_IN. UTM-aware attribution can override later.
+        referralSource: "WALK_IN",
+        customerProfile: { create: {} },
+      },
+    });
+  } catch (err) {
+    // The findFirst check above narrows the window but doesn't close it —
+    // two concurrent submits with the same email/phone can both pass it and
+    // race to insert. Catch the unique-constraint violation here rather than
+    // let it surface as an unhandled 500.
+    if (isUniqueViolation(err)) {
+      return { error: "Пользователь с таким email или телефоном уже существует" };
+    }
+    throw err;
+  }
 
   // Create loyalty account
   await db.loyaltyAccount.create({

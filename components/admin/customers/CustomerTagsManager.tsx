@@ -164,6 +164,7 @@ function TagPicker({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Поиск тэга"
+            aria-label="Поиск тэга"
             className="input"
             autoFocus
           />

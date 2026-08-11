@@ -49,7 +49,8 @@ export async function updateOwnProfile(
 
   if (!name || name.length > NAME_MAX) return { error: "Имя обязательно (до 120 символов)" };
   if (!EMAIL_RE.test(email)) return { error: "Некорректный email" };
-  if (!isValidRussianPhone(phoneRaw)) {
+  const phone = normalizePhone(phoneRaw);
+  if (!isValidRussianPhone(phone)) {
     return { error: "Телефон в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };
   }
 
@@ -67,7 +68,7 @@ export async function updateOwnProfile(
       data: {
         name,
         email,
-        phone: normalizePhone(phoneRaw),
+        phone,
         timeZone,
         locale,
         ...resetEmailVerificationOnChange(session.email, email),

@@ -28,6 +28,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: "invalid date" }, { status: 400 });
   }
 
-  const slots = await getDaySlots(dateParam);
-  return NextResponse.json({ slots });
+  try {
+    const slots = await getDaySlots(dateParam);
+    return NextResponse.json({ slots });
+  } catch (err) {
+    console.error("[GET /api/slots]", err);
+    return NextResponse.json({ error: "Не удалось получить доступные слоты" }, { status: 500 });
+  }
 }
