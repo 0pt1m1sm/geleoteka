@@ -1,10 +1,9 @@
 import "server-only";
 import jwt from "jsonwebtoken";
+import { JWT_SECRET } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { OAuthProfile, OAuthProvider } from "@/lib/oauth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
-
-const JWT_SECRET = process.env.JWT_SECRET || "dev-secret-change-in-production";
 
 /** Кука с подписанным профилем провайдера на время дозаполнения регистрации. */
 export const OAUTH_PENDING_COOKIE = "oauth_pending";

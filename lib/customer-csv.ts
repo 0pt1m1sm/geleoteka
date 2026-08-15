@@ -55,14 +55,21 @@ export interface CustomerCsvRow {
 }
 
 /**
- * RFC 4180 quoting. null/undefined → empty cell. Numbers stringified.
- * Cells containing `,`, `"`, `\n`, or `\r` are wrapped in double quotes;
- * internal `"` are doubled. Newlines are preserved INSIDE the quoted cell.
+ * RFC 4180 quoting + защита от формул (CWE-1236). null/undefined → пустая
+ * ячейка, числа стрингифицируются. Ячейки с `,`, `"`, `\n`, `\r` берутся в
+ * кавычки, внутренние `"` удваиваются.
+ *
+ * Дополнительно: имя/email/телефон — свободный текст из публичной регистрации
+ * и брони, и ячейка, начинающаяся с `= + - @` (либо TAB/CR), исполняется
+ * Excel/Sheets как формула при открытии выгрузки админом. Гасим ведущим
+ * апострофом — стандартная рекомендация OWASP; в самой ячейке текст остаётся
+ * читаемым.
  */
 export function escapeCsvCell(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const str = typeof value === "string" ? value : String(value);
-  if (str === "") return "";
+  const raw = typeof value === "string" ? value : String(value);
+  if (raw === "") return "";
+  const str = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

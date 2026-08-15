@@ -277,10 +277,17 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
     const totalCost = days * vehicle.dailyRate;
 
     const session = await getSession();
+    // customerUserId — админская возможность оформить бронь на выбранного
+    // клиента. Это server action: без проверки роли любой аноним мог передать
+    // чужой userId и findOrCreateGuestCustomer привязал бы бронь/сделку к нему
+    // по ветке matchedBy:"session", не доказав владение контактами. Честим:
+    // приём чужого id только у сотрудника, иначе — молча игнорируем и
+    // резолвим по своей сессии/контактам (публичный поток).
+    const isStaff =
+      session?.permissionRole === "ADMIN" || session?.permissionRole === "MANAGER";
+    const onBehalfOfUserId = isStaff ? (customerUserId ?? null) : null;
     const guestResult = await findOrCreateGuestCustomer({
-      // Admin-selected client wins; else fall back to the caller's own session
-      // (public flow), else match/create by contact details.
-      sessionUserId: customerUserId ?? session?.id ?? null,
+      sessionUserId: onBehalfOfUserId ?? session?.id ?? null,
       name: contactName,
       email: contactEmail,
       phone: normalizePhone(contactPhone),

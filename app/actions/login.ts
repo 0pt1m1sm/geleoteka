@@ -5,7 +5,15 @@ import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { recordSuccessfulLogin } from "@/lib/auth-events";
+import {
+  clearLoginFailures,
+  isLoginBlocked,
+  registerFailedLogin,
+} from "@/lib/login-rate-limit";
 import { normalizePhone } from "@/lib/utils";
+
+const THROTTLED_ERROR =
+  "Слишком много попыток входа. Подождите несколько минут и попробуйте снова.";
 
 interface MinimalUser {
   id: string;
@@ -74,10 +82,14 @@ export async function loginInlineForCheckout(input: {
   if (!input.identifier || !input.password) {
     return { ok: false, error: "Email/телефон и пароль обязательны" };
   }
+  if (isLoginBlocked(input.identifier)) {
+    return { ok: false, error: THROTTLED_ERROR };
+  }
 
   const user = await findUserByIdentifier(input.identifier);
 
   if (!user || !user.passwordHash || user.permissionRole === "NONE") {
+    registerFailedLogin(input.identifier);
     return { ok: false, error: "Неверный email/телефон или пароль" };
   }
   if (user.isTempPassword) {
@@ -85,8 +97,12 @@ export async function loginInlineForCheckout(input: {
   }
 
   const valid = await bcrypt.compare(input.password, user.passwordHash);
-  if (!valid) return { ok: false, error: "Неверный email/телефон или пароль" };
+  if (!valid) {
+    registerFailedLogin(input.identifier);
+    return { ok: false, error: "Неверный email/телефон или пароль" };
+  }
 
+  clearLoginFailures(input.identifier);
   await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
@@ -101,10 +117,14 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   if (!identifier || !password) {
     return { error: "Email/телефон и пароль обязательны" };
   }
+  if (isLoginBlocked(identifier)) {
+    return { error: THROTTLED_ERROR };
+  }
 
   const user = await findUserByIdentifier(identifier);
 
   if (!user || !user.passwordHash) {
+    registerFailedLogin(identifier);
     return { error: "Неверный email/телефон или пароль" };
   }
 
@@ -121,9 +141,11 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   const valid = await bcrypt.compare(password, user.passwordHash);
 
   if (!valid) {
+    registerFailedLogin(identifier);
     return { error: "Неверный email/телефон или пароль" };
   }
 
+  clearLoginFailures(identifier);
   await recordSuccessfulPasswordLogin(user);
   const token = createToken({ userId: user.id, permissionRole: user.permissionRole });
   await setSessionCookie(token);
