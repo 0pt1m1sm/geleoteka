@@ -79,9 +79,11 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
           ))}
           <CartIconLink />
           <ThemeToggle />
-          <Link href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap">
+          {/* Намеренно <a>, не <Link>: полная загрузка убивает tag.js Метрики
+              вместе с документом — SPA-переход уносил внутренние URL в статистику. */}
+          <a href={cabinetHref} className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap">
             {cabinetLabel}
-          </Link>
+          </a>
           <Link href="/booking" className="btn btn-primary text-sm whitespace-nowrap">
             Записаться
           </Link>
@@ -126,9 +128,10 @@ function PublicMobileMenu({
             ))}
           </div>
           <div className="p-4 space-y-2 border-t border-[var(--border)]">
-            <Link href={cabinetHref} onClick={close} className="block w-full text-center btn btn-secondary text-sm">
+            {/* <a> вместо <Link> — см. комментарий у десктопной ссылки кабинета. */}
+            <a href={cabinetHref} onClick={close} className="block w-full text-center btn btn-secondary text-sm">
               {cabinetLabel}
-            </Link>
+            </a>
             <Link href="/booking" onClick={close} className="block w-full text-center btn btn-primary text-sm">
               Записаться
             </Link>

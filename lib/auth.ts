@@ -13,7 +13,14 @@ import { db } from "./db";
  * secret is a deployment fault, and the app must not come up pretending
  * otherwise. Development keeps a fixed key so local work needs no setup.
  */
-const JWT_SECRET = (() => {
+/**
+ * Единственный источник ключа подписи во всём приложении. Fail-closed в
+ * production (без ключа не стартуем), экспортируется, чтобы другие подписчики
+ * (oauth_pending-кука в lib/oauth-login.ts) не заводили свой второй фоллбек с
+ * публично известной строкой — это уже однажды исправляли здесь и не хотим
+ * получить обратно через копипаст в соседнем модуле.
+ */
+export const JWT_SECRET = (() => {
   const fromEnv = process.env.JWT_SECRET?.trim();
   if (fromEnv) return fromEnv;
   if (process.env.NODE_ENV === "production") {
