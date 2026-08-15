@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
-import { isIndexableModel } from "@/lib/vehicle-catalog-types";
+import { resolveModelSlug } from "@/lib/vehicle-catalog-types";
 import { buildFaqJsonLd, buildServiceJsonLd } from "@/lib/seo-jsonld";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
@@ -164,11 +164,10 @@ export default async function ServicePage({ params }: Props) {
             {service.applicableModels.map((model: string) => {
               // applicableModels — свободный текст («AMG», «EQ», «C-Class»).
               // Наивная слагификация давала битые ссылки (/models/amg,
-              // /models/eq → 404). Ссылку строим только на индексируемую модель
-              // (g-class) — остальные показываем текстом: и 404 нет, и
-              // внутренний вес не утекает на непрофильные noindex-страницы.
-              const slug = model.toLowerCase().replace(/\s+/g, "-");
-              return isIndexableModel(slug) ? (
+              // /models/eq → 404). resolveModelSlug возвращает реальный слаг
+              // либо null для имён без страницы — на null рендерим текстом.
+              const slug = resolveModelSlug(model);
+              return slug ? (
                 <Link
                   key={model}
                   href={`/models/${slug}`}

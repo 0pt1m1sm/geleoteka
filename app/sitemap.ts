@@ -2,7 +2,6 @@ import type { MetadataRoute } from "next";
 
 import { db } from "@/lib/db";
 import { getActiveModels } from "@/lib/vehicle-catalog";
-import { isIndexableModel } from "@/lib/vehicle-catalog-types";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
@@ -75,15 +74,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   for (const m of models as Array<{ slug: string }>) {
-    // Только G-Class индексируется — остальные модели каталога не попадают в
-    // sitemap (см. isIndexableModel). Не тратим краул-бюджет молодого домена
-    // на страницы вне тематики специализированного сервиса.
-    if (!isIndexableModel(m.slug)) continue;
+    // Сервис обслуживает все Mercedes (профильно G-Class), поэтому в sitemap
+    // все модели. G-Class приоритетнее прочих — приоритет ниже у остальных.
     entries.push({
       url: `${SITE_URL}/models/${m.slug}`,
       lastModified: now,
       changeFrequency: "monthly",
-      priority: 0.6,
+      priority: m.slug === "g-class" ? 0.8 : 0.5,
     });
   }
 

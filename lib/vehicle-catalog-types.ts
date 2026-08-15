@@ -68,18 +68,23 @@ export function modelDisplayName(modelName: string): string {
 }
 
 /**
- * Слаги моделей, которые сайт продвигает в поиске. Geleoteka —
- * специализированный сервис Mercedes-Benz G-Class, поэтому в индекс и sitemap
- * попадает только g-class: каталог остальных моделей Mercedes существует для
- * навигации/подбора, но у специалиста по Гелендвагену он размывал тематику и
- * тратил краул-бюджет (аудит 2026-08-15). Такие страницы остаются доступны по
- * прямой ссылке, но помечены noindex и исключены из sitemap.
+ * Отображаемые имена моделей (свободный текст в Service.applicableModels)
+ * слагифицируются наивно, но у части имён реальный слаг каталога другой:
+ * «AMG» → amg-gt, а «EQ» отдельной страницы не имеет (в каталоге eqa/eqb/…).
+ * Раньше наивный слаг давал 404 (/models/amg, /models/eq). resolveModelSlug
+ * возвращает настоящий слаг либо null для имён без страницы — ссылку строим
+ * только на непустой результат.
+ *
+ * Сервис профильный по G-Class, но обслуживает все Mercedes, поэтому
+ * ссылки ведут на любую реально существующую модель, а не только g-class.
  */
-export const INDEXABLE_MODEL_SLUGS: ReadonlySet<string> = new Set(["g-class"]);
+const MODEL_SLUG_ALIASES: Readonly<Record<string, string>> = { amg: "amg-gt" };
+const MODEL_SLUG_WITHOUT_PAGE: ReadonlySet<string> = new Set(["eq"]);
 
-/** true, если страницу модели нужно отдавать поисковикам. */
-export function isIndexableModel(slug: string): boolean {
-  return INDEXABLE_MODEL_SLUGS.has(slug);
+export function resolveModelSlug(displayName: string): string | null {
+  const naive = displayName.trim().toLowerCase().replace(/\s+/g, "-");
+  if (!naive || MODEL_SLUG_WITHOUT_PAGE.has(naive)) return null;
+  return MODEL_SLUG_ALIASES[naive] ?? naive;
 }
 
 /** Just the code, for compact contexts. */
