@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getModelBySlug, generationLabel } from "@/lib/vehicle-catalog";
+import { isIndexableModel } from "@/lib/vehicle-catalog-types";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
@@ -36,6 +37,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       model.description ??
       `Mercedes-Benz ${model.name}: поколения, двигатели, особенности и услуги сервиса для этого автомобиля в Geleoteka.`,
     path: `/models/${slug}`,
+    // Не-G-Class модели остаются доступны, но вне индекса — фокус сайта на G-Class.
+    noindex: !isIndexableModel(slug),
   });
 }
 

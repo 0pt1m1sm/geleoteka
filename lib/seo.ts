@@ -26,6 +26,12 @@ export interface PageSeoInput {
   /** Site-root-relative path, e.g. "/services". Becomes the canonical URL. */
   path: string;
   image?: string;
+  /**
+   * Оставить страницу доступной по прямой ссылке, но убрать из индекса
+   * (robots noindex). Для страниц вне тематики сайта — например моделей
+   * Mercedes, не относящихся к G-Class у специализированного сервиса.
+   */
+  noindex?: boolean;
 }
 
 /**
@@ -44,10 +50,11 @@ export const DEFAULT_OG_IMAGE = {
   alt: "Mercedes-Benz G-Class (Гелендваген) в сервисе Geleoteka",
 };
 
-export function pageSeo({ title, description, path, image }: PageSeoInput): Metadata {
+export function pageSeo({ title, description, path, image, noindex }: PageSeoInput): Metadata {
   return {
     title,
     description,
+    ...(noindex ? { robots: NOINDEX.robots } : {}),
     alternates: { canonical: path },
     openGraph: {
       type: "website",

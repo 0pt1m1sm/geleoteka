@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 
 import { SeoSnapshotForm } from "@/components/admin/SeoSnapshotForm";
+import { IndexNowSubmitButton } from "@/components/admin/IndexNowSubmitButton";
 import { Sparkline } from "@/components/admin/Sparkline";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
@@ -303,8 +304,9 @@ export default async function AdminSeoPage() {
             </table>
           </Card>
         )}
-        <div className="mt-4">
+        <div className="mt-4 space-y-3">
           <SeoSnapshotForm />
+          <IndexNowSubmitButton />
         </div>
       </div>
 

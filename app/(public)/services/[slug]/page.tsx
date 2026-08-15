@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
+import { isIndexableModel } from "@/lib/vehicle-catalog-types";
 import { buildFaqJsonLd, buildServiceJsonLd } from "@/lib/seo-jsonld";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
@@ -160,15 +161,27 @@ export default async function ServicePage({ params }: Props) {
         <div className="card mb-8">
           <h2 className="text-lg font-semibold mb-4">Применимые модели</h2>
           <div className="flex flex-wrap gap-2">
-            {service.applicableModels.map((model: string) => (
-              <Link
-                key={model}
-                href={`/models/${model.toLowerCase().replace(/\s+/g, "-")}`}
-                className="badge badge-silver hover:border-[var(--color-accent)] transition-colors"
-              >
-                {model}
-              </Link>
-            ))}
+            {service.applicableModels.map((model: string) => {
+              // applicableModels — свободный текст («AMG», «EQ», «C-Class»).
+              // Наивная слагификация давала битые ссылки (/models/amg,
+              // /models/eq → 404). Ссылку строим только на индексируемую модель
+              // (g-class) — остальные показываем текстом: и 404 нет, и
+              // внутренний вес не утекает на непрофильные noindex-страницы.
+              const slug = model.toLowerCase().replace(/\s+/g, "-");
+              return isIndexableModel(slug) ? (
+                <Link
+                  key={model}
+                  href={`/models/${slug}`}
+                  className="badge badge-silver hover:border-[var(--color-accent)] transition-colors"
+                >
+                  {model}
+                </Link>
+              ) : (
+                <span key={model} className="badge badge-silver">
+                  {model}
+                </span>
+              );
+            })}
           </div>
         </div>
       )}
