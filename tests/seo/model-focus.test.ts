@@ -1,40 +1,45 @@
 import { describe, expect, it } from "vitest";
 
-import { isIndexableModel, INDEXABLE_MODEL_SLUGS } from "@/lib/vehicle-catalog-types";
+import { resolveModelSlug } from "@/lib/vehicle-catalog-types";
 import { pageSeo, NOINDEX } from "@/lib/seo";
 
-describe("isIndexableModel — фокус на G-Class", () => {
-  it("g-class индексируется", () => {
-    expect(isIndexableModel("g-class")).toBe(true);
+describe("resolveModelSlug — имя модели → реальный слаг каталога", () => {
+  it("обычные имена слагифицируются как есть", () => {
+    expect(resolveModelSlug("G-Class")).toBe("g-class");
+    expect(resolveModelSlug("C-Class")).toBe("c-class");
+    expect(resolveModelSlug("GLE")).toBe("gle");
+    expect(resolveModelSlug("S-Class")).toBe("s-class");
   });
 
-  it("прочие модели Mercedes — нет", () => {
-    for (const slug of ["a-class", "c-class", "cla", "cls", "gle", "gls", "eqa", "eqs", "amg-gt", "v-class"]) {
-      expect(isIndexableModel(slug)).toBe(false);
-    }
+  it("AMG маппится на реальный слаг amg-gt (не битый /models/amg)", () => {
+    expect(resolveModelSlug("AMG")).toBe("amg-gt");
   });
 
-  it("неизвестный слаг — не индексируется", () => {
-    expect(isIndexableModel("")).toBe(false);
-    expect(isIndexableModel("amg")).toBe(false);
-    expect(isIndexableModel("eq")).toBe(false);
+  it("EQ не имеет отдельной страницы → null (ссылку не строим)", () => {
+    expect(resolveModelSlug("EQ")).toBeNull();
   });
 
-  it("множество содержит только g-class", () => {
-    expect([...INDEXABLE_MODEL_SLUGS]).toEqual(["g-class"]);
+  it("пустое имя → null", () => {
+    expect(resolveModelSlug("")).toBeNull();
+    expect(resolveModelSlug("   ")).toBeNull();
+  });
+
+  it("регистр и пробелы нормализуются", () => {
+    expect(resolveModelSlug("  g-class ")).toBe("g-class");
+    expect(resolveModelSlug("V Class")).toBe("v-class");
   });
 });
 
-describe("pageSeo noindex-флаг", () => {
+describe("pageSeo noindex-флаг (общая возможность)", () => {
   it("по умолчанию robots не выставляется (страница индексируется)", () => {
     const meta = pageSeo({ title: "T", description: "D", path: "/models/g-class" });
     expect(meta.robots).toBeUndefined();
   });
 
   it("noindex:true выставляет robots как в NOINDEX, сохраняя canonical/title", () => {
-    const meta = pageSeo({ title: "T", description: "D", path: "/models/c-class", noindex: true });
+    const meta = pageSeo({ title: "T", description: "D", path: "/x", noindex: true });
     expect(meta.robots).toEqual(NOINDEX.robots);
-    expect(meta.alternates).toEqual({ canonical: "/models/c-class" });
+    expect(meta.alternates).toEqual({ canonical: "/x" });
     expect(meta.title).toBe("T");
   });
 });
