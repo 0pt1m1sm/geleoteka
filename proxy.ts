@@ -49,7 +49,11 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Матчер прокси и есть список внутренних разделов — им же и запрещаем
+  // индексацию на уровне HTTP (meta noindex в layout'ах — вторая линия).
+  const response = NextResponse.next();
+  response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  return response;
 }
 
 // Only protected sections — public pages never enter the proxy, so the old

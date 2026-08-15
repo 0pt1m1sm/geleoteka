@@ -1,6 +1,10 @@
 import { Header } from "@/components/shared/Header";
 import { Sidebar } from "@/components/shared/Sidebar";
 import { portalNav } from "@/lib/portal-nav";
+import { NOINDEX } from "@/lib/seo";
+
+// Кабинет клиента поисковикам не показываем — см. комментарий в (admin)/layout.
+export const metadata = NOINDEX;
 
 export default function PortalLayout({
   children,

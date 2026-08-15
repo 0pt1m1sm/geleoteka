@@ -3,6 +3,12 @@ import { Sidebar } from "@/components/shared/Sidebar";
 import { adminNav, filterNavForPermissions } from "@/lib/admin-nav";
 import { rolePermissions } from "@/lib/authz";
 import { getSession } from "@/lib/auth";
+import { NOINDEX } from "@/lib/seo";
+
+// Одна точка на все страницы админки: без этого они наследовали
+// robots:index из корневого layout, и URL, узнанный Яндексом из Метрики,
+// формально был индексируем (контент за редиректом, но зачем рисковать).
+export const metadata = NOINDEX;
 
 export default async function AdminLayout({
   children,
