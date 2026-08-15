@@ -67,6 +67,21 @@ export function modelDisplayName(modelName: string): string {
   return modelName;
 }
 
+/**
+ * Слаги моделей, которые сайт продвигает в поиске. Geleoteka —
+ * специализированный сервис Mercedes-Benz G-Class, поэтому в индекс и sitemap
+ * попадает только g-class: каталог остальных моделей Mercedes существует для
+ * навигации/подбора, но у специалиста по Гелендвагену он размывал тематику и
+ * тратил краул-бюджет (аудит 2026-08-15). Такие страницы остаются доступны по
+ * прямой ссылке, но помечены noindex и исключены из sitemap.
+ */
+export const INDEXABLE_MODEL_SLUGS: ReadonlySet<string> = new Set(["g-class"]);
+
+/** true, если страницу модели нужно отдавать поисковикам. */
+export function isIndexableModel(slug: string): boolean {
+  return INDEXABLE_MODEL_SLUGS.has(slug);
+}
+
 /** Just the code, for compact contexts. */
 export function generationShort(g: Pick<Generation, "code">): string {
   return g.code;
