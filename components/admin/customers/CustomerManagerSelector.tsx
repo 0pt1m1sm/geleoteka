@@ -25,6 +25,12 @@ export function CustomerManagerSelector({
   const [state, formAction, isPending] = useActionState(setCustomerManager, null);
   const [staff, setStaff] = useState<StaffOption[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Контролируемое значение обязательно: React 19 сбрасывает неконтролируемую
+  // форму после server action, и выбор визуально «слетал» в «— не назначен —»
+  // сразу после сохранения, хотя запись уже была в БД. Люди читали это как
+  // «не привязывается» и жали снова. Контролируемый select показывает ровно
+  // то, что сохранено, независимо от сброса формы и судьбы router.refresh().
+  const [value, setValue] = useState(manager?.id ?? "");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,7 +75,8 @@ export function CustomerManagerSelector({
         <select
           id="customer-manager"
           name="managerUserId"
-          defaultValue={manager?.id ?? ""}
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
           className="input text-sm"
         >
           <option value="">— не назначен —</option>
@@ -85,6 +92,11 @@ export function CustomerManagerSelector({
       </div>
       {loadError ? <Alert variant="error">{loadError}</Alert> : null}
       {state?.error ? <Alert variant="error">{state.error}</Alert> : null}
+      {state && !state.error && !isPending ? (
+        <Alert variant="success">
+          Сохранено: {value ? (staff.find((s) => s.id === value)?.name ?? "менеджер назначен") : "менеджер снят"}
+        </Alert>
+      ) : null}
       <div className="flex justify-end">
         <Button type="submit" isLoading={isPending} disabled={isPending || !!loadError}>
           Сохранить менеджера
