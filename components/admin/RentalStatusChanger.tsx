@@ -16,8 +16,12 @@ export function RentalStatusChanger({ bookingId, currentStatus }: { bookingId: s
   const router = useRouter();
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    await updateRentalBookingStatus(bookingId, e.target.value);
-    toast.success("Статус бронирования обновлён");
+    try {
+      await updateRentalBookingStatus(bookingId, e.target.value);
+      toast.success("Статус бронирования обновлён");
+    } catch {
+      toast.error("Не удалось обновить статус бронирования");
+    }
     router.refresh();
   }
 

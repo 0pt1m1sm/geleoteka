@@ -44,8 +44,10 @@ export default async function PartsPage({ searchParams }: Props) {
   const categorySlug = params.category || "";
   const oemOnly = params.oem === "true";
   const inStockOnly = params.inStock === "true";
-  const minPrice = params.minPrice ? parseInt(params.minPrice) : null;
-  const maxPrice = params.maxPrice ? parseInt(params.maxPrice) : null;
+  const parsedMinPrice = params.minPrice ? parseInt(params.minPrice, 10) : NaN;
+  const parsedMaxPrice = params.maxPrice ? parseInt(params.maxPrice, 10) : NaN;
+  const minPrice = Number.isFinite(parsedMinPrice) ? parsedMinPrice : null;
+  const maxPrice = Number.isFinite(parsedMaxPrice) ? parsedMaxPrice : null;
   const model = params.model || "";
   const generation = params.generation || "";
   const trimParam = params.trim || "";

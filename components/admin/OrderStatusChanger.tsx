@@ -22,8 +22,12 @@ export function OrderStatusChanger({
   const router = useRouter();
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    await updatePartOrderStatus(orderId, e.target.value);
-    toast.success("Статус заказа обновлён");
+    try {
+      await updatePartOrderStatus(orderId, e.target.value);
+      toast.success("Статус заказа обновлён");
+    } catch {
+      toast.error("Не удалось обновить статус заказа");
+    }
     router.refresh();
   }
 

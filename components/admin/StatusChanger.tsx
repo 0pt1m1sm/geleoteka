@@ -17,8 +17,12 @@ export function StatusChanger({
   const router = useRouter();
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    await updateRepairOrderStatus(repairOrderId, e.target.value);
-    toast.success("Статус обновлён");
+    try {
+      await updateRepairOrderStatus(repairOrderId, e.target.value);
+      toast.success("Статус обновлён");
+    } catch {
+      toast.error("Не удалось обновить статус");
+    }
     router.refresh();
   }
 

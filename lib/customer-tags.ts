@@ -63,8 +63,6 @@ export function isValidColorSlug(slug: string): slug is ColorSlug {
 
 /** Map a slug (possibly bogus) to its CSS class with a neutral fallback. */
 export function getTagBadgeClass(slug: string): string {
-  if (isValidColorSlug(slug)) {
-    return TAG_COLOR_PALETTE.find((c) => c.slug === slug)!.cssClass;
-  }
-  return "tag-color-neutral";
+  const match = TAG_COLOR_PALETTE.find((c) => c.slug === slug);
+  return match?.cssClass ?? "tag-color-neutral";
 }
