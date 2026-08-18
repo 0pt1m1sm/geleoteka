@@ -60,14 +60,14 @@ function RefCard({ r }: { r: RefRow }): React.ReactElement {
   const codes = r.fitments.map((f) => f.generation.code).sort();
   return (
     <div className="card flex items-center justify-between gap-4 py-3">
-      <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{r.name}</p>
+      <Link href={`/admin/parts/refs/${r.id}`} className="flex-1 min-w-0 group">
+        <p className="font-medium truncate group-hover:text-[var(--color-accent)]">{r.name}</p>
         <p className="text-xs text-[var(--foreground-muted)] font-mono">
           {r.oem}
           {r.groupName && ` · ${r.groupName}`}
           {codes.length > 0 && ` · ${codes.join(", ")}`}
         </p>
-      </div>
+      </Link>
       <div className="flex items-center gap-2 shrink-0">
         {shopPartId ? (
           <Link
