@@ -1177,7 +1177,7 @@ model PartReference {
   updatedAt DateTime @updatedAt
 
   fitments      PartReferenceFitment[]
-  parts         Part[] // товары магазина по этой номенклатуре (обычно 0 или 1)
+  parts         Part[] // товары по этой номенклатуре; НЕСКОЛЬКО — норма (каждый б/у экземпляр уникален: состояние/цвет/фото), блокер множественности — уникальность Part.article (см. SKU-инициативу)
   estimateLines EstimateLine[] // строки смет, привязанные к номенклатуре (в т.ч. «под заказ» без товара)
 
   @@index([name])

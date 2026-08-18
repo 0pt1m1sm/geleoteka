@@ -15,6 +15,12 @@ export interface ModelFilterOption {
   generations: GenerationOption[];
 }
 
+export interface GroupFilterOption {
+  key: string;
+  label: string;
+  count: number;
+}
+
 interface Selection {
   model: string;
   gen: string;
@@ -23,16 +29,21 @@ interface Selection {
 }
 
 /**
- * Каскадные фильтры справочника: модель → кузов/годы (из каталога машин),
- * плюс текстовый поиск. Меняет URL (router.push) — список и чипсы агрегатов
- * рендерит сервер. Смена модели сбрасывает кузов; выбранный агрегат (group)
- * сохраняется, пока пользователь не сбросит фильтры целиком.
+ * Каскадные фильтры справочника: модель → кузов/годы (из каталога машин) →
+ * агрегат (селект со счётчиками — чипсы не масштабируются по числу групп),
+ * плюс текстовый поиск. Меняет URL (router.push) — список рендерит сервер.
+ * Смена модели сбрасывает кузов; агрегат сохраняется до «Сбросить».
  */
 export function PartRefFilterBar({
   models,
+  groups,
+  totalInBase,
   initial,
 }: {
   models: ModelFilterOption[];
+  /** Агрегаты со счётчиками в разрезе выбранных модели/кузова/поиска. */
+  groups: GroupFilterOption[];
+  totalInBase: number;
   initial: Selection;
 }): React.ReactElement {
   const nav = useProgressRouter();
@@ -87,6 +98,18 @@ export function PartRefFilterBar({
         </option>
         {selectedModel?.generations.map((g) => (
           <option key={g.code} value={g.code}>{genLabel(g)}</option>
+        ))}
+      </select>
+
+      <select
+        value={initial.group}
+        onChange={(e) => push({ group: e.target.value })}
+        aria-label="Шаг 3: агрегат"
+        className="input w-auto"
+      >
+        <option value="">Все агрегаты · {totalInBase}</option>
+        {groups.map((g) => (
+          <option key={g.key} value={g.key}>{g.label} · {g.count}</option>
         ))}
       </select>
 

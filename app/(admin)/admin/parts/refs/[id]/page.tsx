@@ -18,6 +18,7 @@ interface RefDetail {
   name: string;
   brand: string;
   groupName: string | null;
+  notes: string | null;
   source: string;
   createdAt: Date;
   fitments: Array<{
@@ -49,6 +50,7 @@ export default async function PartRefDetailPage({ params }: Props) {
       name: true,
       brand: true,
       groupName: true,
+      notes: true,
       source: true,
       createdAt: true,
       fitments: {
@@ -75,7 +77,6 @@ export default async function PartRefDetailPage({ params }: Props) {
     where: { referenceId: ref.id },
   })) as number;
 
-  const shopPart = ref.parts[0] ?? null;
   const fitments = [...ref.fitments].sort((a, b) =>
     a.generation.code.localeCompare(b.generation.code),
   );
@@ -85,7 +86,7 @@ export default async function PartRefDetailPage({ params }: Props) {
       <PageHeader
         eyebrow="Справочник номенклатуры"
         title={ref.name}
-        description={`${ref.brand} · официальное название по каталогу производителя`}
+        description={`${ref.brand} · каталожное название`}
         actions={
           <Link href="/admin/parts/refs" className="btn btn-secondary btn-sm">
             ← К справочнику
@@ -108,6 +109,15 @@ export default async function PartRefDetailPage({ params }: Props) {
             <p>{ref.groupName ?? "Без группы"}</p>
           </div>
         </div>
+
+        {ref.notes && (
+          <div>
+            <p className="text-xs uppercase tracking-wide text-[var(--foreground-muted)] mb-1">
+              Уточнение
+            </p>
+            <p className="text-sm">{ref.notes}</p>
+          </div>
+        )}
 
         <div>
           <p className="text-xs uppercase tracking-wide text-[var(--foreground-muted)] mb-2">
@@ -153,20 +163,24 @@ export default async function PartRefDetailPage({ params }: Props) {
 
       <Card className="mt-4 space-y-3">
         <p className="text-xs uppercase tracking-wide text-[var(--foreground-muted)]">
-          Товар магазина
+          {ref.parts.length > 1 ? `Товары магазина · ${ref.parts.length}` : "Товар магазина"}
         </p>
-        {shopPart ? (
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="font-medium truncate">{shopPart.name}</p>
-              <p className="text-xs text-[var(--foreground-muted)]">
-                {formatPrice(shopPart.price)}
-                {!shopPart.isActive && " · скрыт с витрины"}
-              </p>
-            </div>
-            <Link href={`/admin/parts/${shopPart.id}`} className="btn btn-secondary btn-sm shrink-0">
-              Открыть товар
-            </Link>
+        {ref.parts.length > 0 ? (
+          <div className="divide-y divide-[var(--border)]">
+            {ref.parts.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-4 py-2 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{p.name}</p>
+                  <p className="text-xs text-[var(--foreground-muted)]">
+                    {formatPrice(p.price)}
+                    {!p.isActive && " · скрыт с витрины"}
+                  </p>
+                </div>
+                <Link href={`/admin/parts/${p.id}`} className="btn btn-secondary btn-sm shrink-0">
+                  Открыть товар
+                </Link>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4">

@@ -26,6 +26,7 @@ interface RefRow {
   oem: string;
   name: string;
   groupName: string | null;
+  notes: string | null;
   fitments: Array<{ generation: { code: string } }>;
   parts: Array<{ id: string }>;
 }
@@ -41,19 +42,10 @@ const REF_SELECT = {
   oem: true,
   name: true,
   groupName: true,
+  notes: true,
   fitments: { select: { generation: { select: { code: true } } } },
   parts: { select: { id: true }, take: 1 },
 } as const;
-
-function refsHref(params: { q?: string; model?: string; gen?: string; group?: string }): string {
-  const sp = new URLSearchParams();
-  if (params.q) sp.set("q", params.q);
-  if (params.model) sp.set("model", params.model);
-  if (params.gen) sp.set("gen", params.gen);
-  if (params.group) sp.set("group", params.group);
-  const qs = sp.toString();
-  return qs ? `/admin/parts/refs?${qs}` : "/admin/parts/refs";
-}
 
 function RefCard({ r }: { r: RefRow }): React.ReactElement {
   const shopPartId = r.parts[0]?.id ?? null;
@@ -66,6 +58,7 @@ function RefCard({ r }: { r: RefRow }): React.ReactElement {
           {r.oem}
           {r.groupName && ` · ${r.groupName}`}
           {codes.length > 0 && ` · ${codes.join(", ")}`}
+          {r.notes && ` · ${r.notes}`}
         </p>
       </Link>
       <div className="flex items-center gap-2 shrink-0">
@@ -195,6 +188,11 @@ export default async function PartRefsPage({ searchParams }: Props) {
     .sort((a, b) => a.label.localeCompare(b.label, "ru"));
   const totalInBase = groups.reduce((sum, g) => sum + g.count, 0);
   const knownGroups = groups.filter((g) => g.key !== NO_GROUP).map((g) => g.label);
+  // Выбранный агрегат мог занулиться в текущем срезе — селект всё равно должен
+  // показывать его выбранным, а не молча съезжать на «Все агрегаты».
+  if (group && !groups.some((g) => g.key === group)) {
+    groups.push({ key: group, label: group === NO_GROUP ? "Без группы" : group, count: 0 });
+  }
 
   const filterBarModels: ModelFilterOption[] = models.map((m) => ({
     slug: m.slug,
@@ -232,32 +230,14 @@ export default async function PartRefsPage({ searchParams }: Props) {
         </details>
       </div>
 
-      <div className="mb-3">
+      <div className="mb-4">
         <PartRefFilterBar
           models={filterBarModels}
+          groups={groups}
+          totalInBase={totalInBase}
           initial={{ model: selectedModel?.slug ?? "", gen: genValid ? gen : "", group, q }}
         />
       </div>
-
-      <nav aria-label="Шаг 3: агрегат" className="mb-4 flex flex-wrap gap-2 text-sm">
-        <Link
-          href={refsHref({ q, model: modelSlug, gen: genValid ? gen : "" })}
-          className={`badge ${!group ? "bg-[var(--color-accent)] text-black" : ""}`}
-          aria-current={!group ? "true" : undefined}
-        >
-          Все агрегаты · {totalInBase}
-        </Link>
-        {groups.map((g) => (
-          <Link
-            key={g.key}
-            href={refsHref({ q, model: modelSlug, gen: genValid ? gen : "", group: g.key })}
-            className={`badge ${group === g.key ? "bg-[var(--color-accent)] text-black" : ""}`}
-            aria-current={group === g.key ? "true" : undefined}
-          >
-            {g.label} · {g.count}
-          </Link>
-        ))}
-      </nav>
 
       {refs.length === 0 ? (
         <Card className="text-center py-12">

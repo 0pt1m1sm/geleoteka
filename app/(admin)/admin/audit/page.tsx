@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth";
@@ -9,6 +8,7 @@ import { db } from "@/lib/db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { AUDIT_ACTION_LABELS, type AuditAction } from "@/lib/audit";
 import { Card, PageHeader } from "@/components/ui";
+import { UrlParamSelect } from "@/components/shared/UrlParamSelect";
 import { formatDateTime } from "@/lib/utils";
 
 /**
@@ -108,18 +108,9 @@ export default async function AuditPage({ searchParams }: Props): Promise<React.
   const actors = new Map<string, string>();
   for (const r of rows) if (r.actorUserId) actors.set(r.actorUserId, r.actorName);
 
-  const chip = (active: boolean): string =>
-    `badge text-xs ${
-      active
-        ? "bg-[var(--color-accent)]/15 text-[var(--color-accent)]"
-        : "bg-[var(--background-secondary)] text-[var(--foreground-muted)]"
-    }`;
-  const qs = (patch: Record<string, string | undefined>): string => {
-    const p = new URLSearchParams();
-    const merged = { action, actor, days: String(windowDays), ...patch };
-    for (const [k, v] of Object.entries(merged)) if (v) p.set(k, v);
-    return `/admin/audit?${p.toString()}`;
-  };
+  // Действие, попавшее в фильтр, могло не встретиться среди актёров текущей
+  // выборки — селект «Кто» всё равно должен показывать выбор, а не съезжать.
+  if (actor && !actors.has(actor)) actors.set(actor, "выбранный сотрудник");
 
   return (
     <div>
@@ -129,38 +120,33 @@ export default async function AuditPage({ searchParams }: Props): Promise<React.
         description="Удаления, смены ролей и изменения прав. Запись только добавляется — править её нельзя."
       />
 
-      <div className="space-y-2 mb-4">
-        <div className="flex flex-wrap gap-2">
-          <Link href={qs({ action: undefined })} className={chip(!action)}>
-            Все действия
-          </Link>
-          {Object.entries(AUDIT_ACTION_LABELS).map(([key, label]) => (
-            <Link key={key} href={qs({ action: key })} className={chip(action === key)}>
-              {label}
-            </Link>
-          ))}
-        </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-[var(--foreground-muted)]">Период:</span>
-          {[7, 30, 90, 365].map((d) => (
-            <Link key={d} href={qs({ days: String(d) })} className={chip(windowDays === d)}>
-              {d} дн.
-            </Link>
-          ))}
-          {actors.size > 0 ? (
-            <>
-              <span className="text-xs text-[var(--foreground-muted)] ml-2">Кто:</span>
-              <Link href={qs({ actor: undefined })} className={chip(!actor)}>
-                любой
-              </Link>
-              {[...actors].map(([id, name]) => (
-                <Link key={id} href={qs({ actor: id })} className={chip(actor === id)}>
-                  {name}
-                </Link>
-              ))}
-            </>
-          ) : null}
-        </div>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <UrlParamSelect
+          param="action"
+          value={action && action in AUDIT_ACTION_LABELS ? action : ""}
+          ariaLabel="Фильтр по действию"
+          options={[
+            { value: "", label: "Все действия" },
+            ...Object.entries(AUDIT_ACTION_LABELS).map(([value, label]) => ({ value, label })),
+          ]}
+        />
+        <UrlParamSelect
+          param="days"
+          value={String(windowDays)}
+          ariaLabel="Период"
+          options={[7, 30, 90, 365].map((d) => ({ value: String(d), label: `За ${d} дн.` }))}
+        />
+        {actors.size > 0 && (
+          <UrlParamSelect
+            param="actor"
+            value={actor ?? ""}
+            ariaLabel="Фильтр по сотруднику"
+            options={[
+              { value: "", label: "Любой сотрудник" },
+              ...[...actors].map(([value, label]) => ({ value, label })),
+            ]}
+          />
+        )}
       </div>
 
       {rows.length === 0 ? (
