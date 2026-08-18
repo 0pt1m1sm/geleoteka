@@ -10,6 +10,7 @@ import { recordMovement } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { assignCodes, DuplicateCodeError } from "@/lib/warehouse/codes";
 import { MAX_WEIGHT_GRAMS } from "@/lib/suppliers/landed-cost";
+import { normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 
 /**
  * Parses the hidden form field posted by `<PartTrimPicker name="trimIds" />`.
@@ -107,6 +108,19 @@ export async function createPart(
       data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
     });
   });
+
+  // Каждый реальный артикул пополняет номенклатурный справочник, из которого
+  // потом выбирают в сметах и при создании товаров. Служебные коды — нет.
+  if (!SERVICE_ARTICLE_RE.test(article)) {
+    const oem = normalizeOem(article);
+    if (oem) {
+      await db.partReference.upsert({
+        where: { oem },
+        create: { oem, name, source: "shop" },
+        update: {},
+      });
+    }
+  }
 
   await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");

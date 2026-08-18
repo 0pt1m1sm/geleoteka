@@ -37,9 +37,18 @@ async function apiGet(path: string, token: string): Promise<Record<string, unkno
       signal: AbortSignal.timeout(6000),
       cache: "no-store",
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Диагностика без секрета: путь (без токена, он в заголовке) + статус.
+      // 403 обычно = у токена нет права «Вебмастер»; 404 = хост не найден.
+      console.warn("yandex_webmaster.api_non_ok", { path, status: res.status });
+      return null;
+    }
     return (await res.json()) as Record<string, unknown>;
-  } catch {
+  } catch (error) {
+    console.warn("yandex_webmaster.api_error", {
+      path,
+      name: error instanceof Error ? error.name : typeof error,
+    });
     return null;
   }
 }
