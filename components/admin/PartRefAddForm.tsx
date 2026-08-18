@@ -5,7 +5,12 @@ import { createPartReference } from "@/app/actions/part-references";
 import { AdminFormShell } from "./AdminFormShell";
 
 /** Ручное добавление одной позиции в номенклатурный справочник. */
-export function PartRefAddForm(): React.ReactElement {
+export function PartRefAddForm({
+  groups = [],
+}: {
+  /** Существующие группы-агрегаты — подсказки для поля «Группа». */
+  groups?: string[];
+}): React.ReactElement {
   const [state, formAction, isPending] = useActionState(createPartReference, null);
 
   return (
@@ -24,7 +29,12 @@ export function PartRefAddForm(): React.ReactElement {
         </div>
         <div>
           <label htmlFor="ref-group" className="block text-sm font-medium mb-1.5">Группа / узел</label>
-          <input id="ref-group" name="groupName" className="input" placeholder="Тормозная система" />
+          <input id="ref-group" name="groupName" list="ref-groups" className="input" placeholder="Тормозная система" />
+          <datalist id="ref-groups">
+            {groups.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
         </div>
       </div>
 
@@ -34,8 +44,11 @@ export function PartRefAddForm(): React.ReactElement {
       </div>
 
       <div>
-        <label htmlFor="ref-models" className="block text-sm font-medium mb-1.5">Модели (через запятую)</label>
-        <input id="ref-models" name="models" className="input" placeholder="W463, W461" />
+        <label htmlFor="ref-models" className="block text-sm font-medium mb-1.5">Кузова (через запятую)</label>
+        <input id="ref-models" name="models" className="input font-mono" placeholder="W463, W463A" />
+        <p className="text-xs text-[var(--foreground-muted)] mt-1">
+          Коды из каталога «Модели и поколения» — неизвестный код не примется.
+        </p>
       </div>
 
       <button type="submit" disabled={isPending} data-loading={isPending || undefined} aria-busy={isPending || undefined} className="btn btn-primary">

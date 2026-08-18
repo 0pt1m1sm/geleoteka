@@ -10,7 +10,8 @@ import { recordMovement } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { assignCodes, DuplicateCodeError } from "@/lib/warehouse/codes";
 import { MAX_WEIGHT_GRAMS } from "@/lib/suppliers/landed-cost";
-import { normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+import { extractModelCodes } from "@/lib/part-reference";
+import { ensurePartReference, resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 /**
  * Parses the hidden form field posted by `<PartTrimPicker name="trimIds" />`.
@@ -80,6 +81,34 @@ export async function createPart(
 
   const slug = slugify(`${article}-${name}`).slice(0, 80);
 
+  // Каждый реальный артикул пополняет номенклатурный справочник ДО создания
+  // товара — товар сразу ссылается на номенклатуру (referenceId), витринное
+  // название (Part.name) живёт отдельно от официального (reference.name).
+  // Служебные коды (ПОДЗАКАЗ-*) остаются без связи. Применяемость —
+  // объединение «Совместимых вариантов» (тримы → поколения) и кодов кузова
+  // из текста; неизвестные каталогу коды молча пропускаются.
+  const category = categoryId
+    ? ((await db.partCategory.findUnique({
+        where: { id: categoryId },
+        select: { name: true },
+      })) as { name: string } | null)
+    : null;
+  const trimGens = trimIds.length
+    ? ((await db.vehicleTrim.findMany({
+        where: { id: { in: trimIds } },
+        select: { generationId: true },
+      })) as Array<{ generationId: string }>)
+    : [];
+  const { ids: textGenIds } = await resolveGenerationIds(
+    extractModelCodes(`${name} ${description ?? ""}`),
+  );
+  const referenceId = await ensurePartReference(db, {
+    article,
+    name,
+    groupName: category?.name ?? null,
+    generationIds: [...new Set([...trimGens.map((t) => t.generationId), ...textGenIds])],
+  });
+
   // Part + its opening-balance StockItem are created atomically so a part can
   // never exist without a stock row (which would silently lose the opening qty).
   await db.$transaction(async (tx) => {
@@ -93,6 +122,7 @@ export async function createPart(
         compareAtPrice,
         weightGrams,
         isOEM,
+        referenceId,
         categoryId: categoryId || null,
         photos: photoUrls,
         partTrims: {
@@ -108,19 +138,6 @@ export async function createPart(
       data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
     });
   });
-
-  // Каждый реальный артикул пополняет номенклатурный справочник, из которого
-  // потом выбирают в сметах и при создании товаров. Служебные коды — нет.
-  if (!SERVICE_ARTICLE_RE.test(article)) {
-    const oem = normalizeOem(article);
-    if (oem) {
-      await db.partReference.upsert({
-        where: { oem },
-        create: { oem, name, source: "shop" },
-        update: {},
-      });
-    }
-  }
 
   await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");

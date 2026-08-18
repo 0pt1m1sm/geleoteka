@@ -3,7 +3,8 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
-import { normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+import { extractModelCodes, normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+import { resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 /**
  * Resolves a CSV "compatible models" cell to a set of trim ids. Each token can
@@ -98,12 +99,21 @@ export async function POST(request: Request): Promise<NextResponse> {
   let updated = 0;
   const errors: string[] = [];
   // Успешно заведённые артикулы дозаполняют номенклатурный справочник
-  // (см. lib/part-reference.ts) одним createMany после цикла.
-  const refRows: Array<{ oem: string; name: string }> = [];
+  // (см. lib/part-reference.ts) одним createMany после цикла; применяемость
+  // (fitments) — объединение тримов строки и кодов кузова из текста.
+  const refRows: Array<{
+    oem: string;
+    name: string;
+    groupName: string | null;
+    generationIds: string[];
+  }> = [];
 
   // Pre-fetch categories for lookup
   const categories = await db.partCategory.findMany();
   const catMap = new Map((categories as Array<Record<string, unknown>>).map((c) => [c.slug as string, c.id as string]));
+  const catNameById = new Map(
+    (categories as Array<Record<string, unknown>>).map((c) => [c.id as string, c.name as string]),
+  );
 
   for (let i = 0; i < dataLines.length; i++) {
     const lineNum = i + 2; // 1-indexed, skip header
@@ -193,7 +203,25 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
       if (!SERVICE_ARTICLE_RE.test(article)) {
         const oem = normalizeOem(article);
-        if (oem) refRows.push({ oem, name });
+        if (oem) {
+          const trimGens = trimIds.length
+            ? ((await db.vehicleTrim.findMany({
+                where: { id: { in: trimIds } },
+                select: { generationId: true },
+              })) as Array<{ generationId: string }>)
+            : [];
+          const { ids: textGenIds } = await resolveGenerationIds(
+            extractModelCodes(`${name} ${description ?? ""}`),
+          );
+          refRows.push({
+            oem,
+            name,
+            groupName: categoryId ? catNameById.get(categoryId) ?? null : null,
+            generationIds: [
+              ...new Set([...trimGens.map((t) => t.generationId), ...textGenIds]),
+            ],
+          });
+        }
       }
     } catch (err) {
       errors.push(`Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`);
@@ -202,9 +230,35 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (refRows.length > 0) {
     await db.partReference.createMany({
-      data: refRows.map((r) => ({ ...r, source: "shop" })),
+      data: refRows.map((r) => ({
+        oem: r.oem,
+        name: r.name,
+        groupName: r.groupName,
+        source: "shop",
+      })),
       skipDuplicates: true,
     });
+    const refIds = (await db.partReference.findMany({
+      where: { oem: { in: refRows.map((r) => r.oem) } },
+      select: { id: true, oem: true },
+    })) as Array<{ id: string; oem: string }>;
+    const idByOem = new Map(refIds.map((r) => [r.oem, r.id]));
+    const fitmentRows = refRows.flatMap((r) => {
+      const referenceId = idByOem.get(r.oem);
+      if (!referenceId) return [];
+      return r.generationIds.map((generationId) => ({ referenceId, generationId }));
+    });
+    if (fitmentRows.length > 0) {
+      await db.partReferenceFitment.createMany({ data: fitmentRows, skipDuplicates: true });
+    }
+    // Связь товар → номенклатура для только что заведённых строк: один
+    // идемпотентный проход по нормализованному артикулу (как в миграции).
+    await db.$executeRaw`
+      UPDATE "Part" p
+      SET "referenceId" = r.id
+      FROM "PartReference" r
+      WHERE p."referenceId" IS NULL
+        AND upper(regexp_replace(p.article, '[^A-Za-z0-9А-Яа-яЁё]', '', 'g')) = r.oem`;
   }
 
   return NextResponse.json({ created, updated, errors });

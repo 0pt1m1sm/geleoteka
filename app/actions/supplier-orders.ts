@@ -11,6 +11,8 @@ import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
 import { resolveLandedCost } from "@/lib/suppliers/resolve-landed-cost";
 import { canDeleteOrder, canFullyEditOrder, isOrphanDraftPart } from "@/lib/suppliers/order-lifecycle";
+import { extractModelCodes } from "@/lib/part-reference";
+import { ensurePartReference, resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 const CUSTOMS_MODES: readonly CustomsMode[] = ["PERCENT_CIF", "CARGO_PER_KG"];
 
@@ -127,8 +129,15 @@ async function resolveLinesAndCost(
       const existing = (await tx.part.findUnique({ where: { article }, select: { id: true } })) as { id: string } | null;
       if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
       const slug = slugify(`${article}-${name}`).slice(0, 80);
+      // Draft-товар рождается уже связанным с номенклатурой — иначе позиция,
+      // заказанная у поставщика, выпадает из справочника до ручной правки.
+      const referenceId = await ensurePartReference(tx, {
+        article,
+        name,
+        generationIds: (await resolveGenerationIds(extractModelCodes(name))).ids,
+      });
       const part = (await tx.part.create({
-        data: { slug, article, name, price: 0, isActive: false },
+        data: { slug, article, name, price: 0, isActive: false, referenceId },
         select: { id: true },
       })) as { id: string };
       await tx.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) } });

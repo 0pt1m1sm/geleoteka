@@ -51,7 +51,7 @@ export function PartForm({ categories, models, initial }: Props) {
       </div>
 
       <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-2">Название *</label>
+        <label htmlFor="name" className="block text-sm font-medium mb-2">Название в магазине *</label>
         <input id="name" name="name" required value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Масло моторное Mercedes 5W-40 (5л)" />
       </div>
 

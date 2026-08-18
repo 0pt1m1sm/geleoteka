@@ -85,6 +85,7 @@ export function EstimatePartPicker({ estimateId }: { estimateId: string }): Reac
       const fd = new FormData();
       fd.set("estimateId", estimateId);
       fd.set("type", "PART");
+      fd.set("referenceId", r.id);
       fd.set("description", `${r.name} (${r.oem})`);
       fd.set("qty", "1");
       fd.set("unitPrice", "0");
@@ -192,6 +193,7 @@ export function EstimatePartPicker({ estimateId }: { estimateId: string }): Reac
                         <span className="block text-sm truncate">{r.name}</span>
                         <span className="block text-xs font-mono text-[var(--foreground-muted)]">
                           {r.oem}
+                          {r.groupName && ` · ${r.groupName}`}
                           {r.models.length > 0 && ` · ${r.models.join(", ")}`}
                         </span>
                       </span>

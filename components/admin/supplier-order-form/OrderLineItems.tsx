@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import { Button, Card, CardTitle } from "@/components/ui";
 import { formatPrice } from "@/lib/utils";
+import { PartRefPicker } from "@/components/admin/PartRefPicker";
 import { TYPE_LABELS, type ItemRow, type PartOption } from "./types";
 
 interface OrderLineItemsProps {
@@ -82,20 +83,25 @@ export function OrderLineItems({
                     ))}
                   </select>
                 ) : item.type === "NEW_PART" ? (
-                  <div className="flex-1 min-w-0 flex gap-2">
-                    <input
-                      value={item.article ?? ""}
-                      onChange={(e) => updateItem(i, { article: e.target.value })}
-                      className="input w-32 shrink-0 text-sm font-mono"
-                      aria-label="Артикул нового товара"
-                      placeholder="Артикул"
-                    />
-                    <input
-                      value={item.description}
-                      onChange={(e) => updateItem(i, { description: e.target.value })}
-                      className="input flex-1 min-w-0 text-sm"
-                      aria-label="Название нового товара"
-                      placeholder="Название нового товара"
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex gap-2">
+                      <input
+                        value={item.article ?? ""}
+                        onChange={(e) => updateItem(i, { article: e.target.value })}
+                        className="input w-32 shrink-0 text-sm font-mono"
+                        aria-label="Артикул нового товара"
+                        placeholder="Артикул"
+                      />
+                      <input
+                        value={item.description}
+                        onChange={(e) => updateItem(i, { description: e.target.value })}
+                        className="input flex-1 min-w-0 text-sm"
+                        aria-label="Название нового товара"
+                        placeholder="Название нового товара"
+                      />
+                    </div>
+                    <PartRefPicker
+                      onPick={(ref) => updateItem(i, { article: ref.oem, description: ref.name })}
                     />
                   </div>
                 ) : (
