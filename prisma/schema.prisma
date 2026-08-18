@@ -1130,8 +1130,9 @@ model Part {
   id             String   @id @default(cuid())
   slug           String   @unique
   article        String   @unique
-  name           String
+  name           String // витринное название в магазине; официальное по каталогу производителя — reference.name
   description    String?
+  referenceId    String? // номенклатурная позиция справочника; null только у служебных артикулов (ПОДЗАКАЗ-*)
   price          Int
   compareAtPrice Int?
   weightGrams    Int? // unit weight in grams; drives supplier-order shipping calc
@@ -1143,6 +1144,7 @@ model Part {
   updatedAt      DateTime @updatedAt
 
   category           PartCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  reference          PartReference?      @relation(fields: [referenceId], references: [id], onDelete: SetNull)
   orderItems         PartOrderItem[]
   supplierOrderItems SupplierOrderItem[]
   partLines          PartLine[]
@@ -1154,25 +1156,46 @@ model Part {
   @@index([article])
   @@index([categoryId])
   @@index([isActive])
+  @@index([referenceId])
 }
 
 /// Номенклатурный справочник запчастей — источник автокомплита в сметах и при
 /// создании товара. НЕ товар: без цены и остатков (Part остаётся торговой
 /// позицией). Наполняется тремя путями: upsert при создании Part, CSV-импорт
 /// (прайсы поставщиков / выгрузки EPC / 1С), ручное добавление в админке.
+/// Применяемость — ТОЛЬКО через fitments (FK на каталог кузовов), единая
+/// модель с «Совместимыми вариантами» товара.
 model PartReference {
   id        String   @id @default(cuid())
   oem       String   @unique // нормализованный номер: верхний регистр, без пробелов/точек/дефисов
   name      String
   brand     String   @default("Mercedes-Benz")
   groupName String? // узел/группа («Тормозная система», «Подвеска», …)
-  models    String[] @default([]) // применяемость: ["W463", "W461", …]
   notes     String?
   source    String   @default("manual") // shop | import | manual
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  fitments      PartReferenceFitment[]
+  parts         Part[] // товары магазина по этой номенклатуре (обычно 0 или 1)
+  estimateLines EstimateLine[] // строки смет, привязанные к номенклатуре (в т.ч. «под заказ» без товара)
+
   @@index([name])
+}
+
+/// Применяемость позиции справочника к кузову: та же ось каталога
+/// (VehicleGeneration), что и у трим-привязок товара. Строковых кодов нет —
+/// импорт и захват резолвят коды в поколения каталога.
+model PartReferenceFitment {
+  id           String @id @default(cuid())
+  referenceId  String
+  generationId String
+
+  reference  PartReference     @relation(fields: [referenceId], references: [id], onDelete: Cascade)
+  generation VehicleGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceId, generationId])
+  @@index([generationId])
 }
 
 // ============================================
@@ -1709,6 +1732,7 @@ model VehicleGeneration {
   updatedAt DateTime      @updatedAt
   model     VehicleModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
   trims     VehicleTrim[]
+  partReferenceFitments PartReferenceFitment[]
 
   @@unique([modelId, code])
   @@index([modelId, sortOrder])
@@ -1884,14 +1908,17 @@ model EstimateLine {
   unitPrice   Int          @default(0)
   total       Int          @default(0)
   partId      String?
+  referenceId String? // номенклатура позиции; заполняется и когда товара (partId) ещё нет — строка «под заказ» из справочника
 
   createdAt DateTime @default(now())
 
-  estimate Estimate @relation(fields: [estimateId], references: [id], onDelete: Cascade)
-  part     Part?    @relation(fields: [partId], references: [id], onDelete: SetNull)
+  estimate  Estimate       @relation(fields: [estimateId], references: [id], onDelete: Cascade)
+  part      Part?          @relation(fields: [partId], references: [id], onDelete: SetNull)
+  reference PartReference? @relation(fields: [referenceId], references: [id], onDelete: SetNull)
 
   @@index([estimateId, sortOrder])
   @@index([partId])
+  @@index([referenceId])
 }
 
 // ============================================

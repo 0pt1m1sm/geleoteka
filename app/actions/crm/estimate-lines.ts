@@ -54,6 +54,16 @@ export async function addEstimateLine(
   const rawUnitPrice =
     Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
   const partId = ((formData.get("partId") as string | null) ?? "").trim() || null;
+  // Номенклатурная связь строки: приходит от пикера справочника; для строки
+  // с товаром выводится из самого товара, чтобы нить не зависела от клиента.
+  let referenceId = ((formData.get("referenceId") as string | null) ?? "").trim() || null;
+  if (!referenceId && partId) {
+    const part = (await db.part.findUnique({
+      where: { id: partId },
+      select: { referenceId: true },
+    })) as { referenceId: string | null } | null;
+    referenceId = part?.referenceId ?? null;
+  }
 
   const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
 
@@ -66,7 +76,7 @@ export async function addEstimateLine(
 
   await db.$transaction(async (tx) => {
     const line = (await tx.estimateLine.create({
-      data: { estimateId, sortOrder, type: type as never, description, qty, unitPrice, total, partId },
+      data: { estimateId, sortOrder, type: type as never, description, qty, unitPrice, total, partId, referenceId },
       select: { id: true },
     })) as { id: string };
     // A catalog PART line holds reserved stock equal to its qty.

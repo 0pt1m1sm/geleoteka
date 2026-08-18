@@ -1,9 +1,40 @@
 import { describe, expect, it } from "vitest";
 import {
+  expandGenerationCodes,
+  extractModelCodes,
   normalizeOem,
   parseReferenceCsv,
   SERVICE_ARTICLE_RE,
 } from "@/lib/part-reference";
+
+describe("extractModelCodes", () => {
+  it("pulls unique body codes out of free text, case-insensitive", () => {
+    expect(extractModelCodes("Бампер передний G63 AMG (W463)")).toEqual(["W463"]);
+    expect(extractModelCodes("Петля двери (W460/W461/w463)")).toEqual([
+      "W460",
+      "W461",
+      "W463",
+    ]);
+    expect(extractModelCodes("Ступица GLE (W166), GL (X166)")).toEqual(["W166", "X166"]);
+  });
+
+  it("supports letter-suffixed and H/N-prefixed codes", () => {
+    expect(extractModelCodes("Новый G-Class (W463A)")).toEqual(["W463A"]);
+    expect(extractModelCodes("GLA (H247), EQC (N293)")).toEqual(["H247", "N293"]);
+  });
+
+  it("ignores OEM numbers, oil grades, engine codes and model designations", () => {
+    expect(extractModelCodes("A4637200346 масло 5W-40 0W-40 OM642 VG150 S500")).toEqual([]);
+  });
+});
+
+describe("expandGenerationCodes", () => {
+  it("adds known synonyms and keeps everything else as-is", () => {
+    expect(expandGenerationCodes(["W464"])).toEqual(["W464", "W463A"]);
+    expect(expandGenerationCodes(["W463A"])).toEqual(["W463A", "W464"]);
+    expect(expandGenerationCodes(["W463", "X166"])).toEqual(["W463", "X166"]);
+  });
+});
 
 describe("normalizeOem", () => {
   it("collapses spacing/punctuation variants to one key", () => {

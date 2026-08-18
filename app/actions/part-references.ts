@@ -8,6 +8,7 @@ import {
   parseReferenceCsv,
   SERVICE_ARTICLE_RE,
 } from "@/lib/part-reference";
+import { resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 const REFS_PATH = "/admin/parts/refs";
 
@@ -16,9 +17,19 @@ export interface PartReferenceOption {
   oem: string;
   name: string;
   groupName: string | null;
+  /** Коды кузовов из fitments — для отображения в пикерах. */
   models: string[];
   /** id товара магазина с тем же артикулом, если он уже заведён. */
   shopPartId: string | null;
+}
+
+interface RefWithFitments {
+  id: string;
+  oem: string;
+  name: string;
+  groupName: string | null;
+  fitments: Array<{ generation: { code: string } }>;
+  parts: Array<{ id: string }>;
 }
 
 /**
@@ -40,26 +51,26 @@ export async function searchPartReferences(query: string): Promise<PartReference
           ],
         }
       : {},
-    select: { id: true, oem: true, name: true, groupName: true, models: true },
+    select: {
+      id: true,
+      oem: true,
+      name: true,
+      groupName: true,
+      fitments: { select: { generation: { select: { code: true } } } },
+      parts: { select: { id: true }, take: 1 },
+    },
     orderBy: { name: "asc" },
     take: 20,
-  })) as Array<{
-    id: string;
-    oem: string;
-    name: string;
-    groupName: string | null;
-    models: string[];
-  }>;
+  })) as RefWithFitments[];
 
-  if (refs.length === 0) return [];
-
-  const parts = (await db.part.findMany({
-    where: { article: { in: refs.map((r) => r.oem) } },
-    select: { id: true, article: true },
-  })) as Array<{ id: string; article: string }>;
-  const byArticle = new Map(parts.map((p) => [p.article, p.id]));
-
-  return refs.map((r) => ({ ...r, shopPartId: byArticle.get(r.oem) ?? null }));
+  return refs.map((r) => ({
+    id: r.id,
+    oem: r.oem,
+    name: r.name,
+    groupName: r.groupName,
+    models: r.fitments.map((f) => f.generation.code).sort(),
+    shopPartId: r.parts[0]?.id ?? null,
+  }));
 }
 
 export async function createPartReference(
@@ -78,14 +89,32 @@ export async function createPartReference(
   if (SERVICE_ARTICLE_RE.test(oemRaw)) {
     return { error: "Служебные коды (ПОДЗАКАЗ-*, VERIFY-*) в справочник не заводятся" };
   }
-  const models = modelsRaw
+
+  const codes = modelsRaw
     ? modelsRaw.split(",").map((m) => m.trim()).filter(Boolean)
     : [];
+  const { ids: generationIds, unknown } = await resolveGenerationIds(codes);
+  if (unknown.length > 0) {
+    return {
+      error: `Кузовов нет в каталоге: ${unknown.join(", ")}. Добавьте их в «Модели и поколения» или уберите из списка`,
+    };
+  }
 
+  const fitmentRows = generationIds.map((generationId) => ({ generationId }));
   await db.partReference.upsert({
     where: { oem },
-    create: { oem, name, groupName, models, source: "manual" },
-    update: { name, groupName, models },
+    create: {
+      oem,
+      name,
+      groupName,
+      source: "manual",
+      fitments: { create: fitmentRows },
+    },
+    update: {
+      name,
+      groupName,
+      fitments: { deleteMany: {}, create: fitmentRows },
+    },
   });
 
   revalidatePath(REFS_PATH);
@@ -103,6 +132,7 @@ export interface ImportReferencesState {
  * Массовый импорт справочника из вставленного текста (прайс поставщика,
  * выгрузка EPC/1С). Существующие номера не перетираются — импорт только
  * дозаполняет (skipDuplicates), чтобы не затереть выверенные вручную названия.
+ * Коды кузова резолвятся в каталог; неизвестные пропускаются с предупреждением.
  */
 export async function importPartReferencesCsv(
   _prevState: ImportReferencesState | null,
@@ -118,16 +148,49 @@ export async function importPartReferencesCsv(
     return { error: "Не найдено ни одной корректной строки", lineErrors: errors };
   }
 
+  // Один резолв на весь батч: собрать все коды, спросить каталог один раз.
+  const allCodes = [...new Set(rows.flatMap((r) => r.models.map((c) => c.toUpperCase())))];
+  const resolvedByCode = new Map<string, string>();
+  const unknownCodes = new Set<string>();
+  for (const code of allCodes) {
+    const { ids, unknown } = await resolveGenerationIds([code]);
+    if (ids.length > 0) resolvedByCode.set(code, ids[0]);
+    for (const u of unknown) unknownCodes.add(u);
+  }
+  if (unknownCodes.size > 0) {
+    errors.push(
+      `Кузовов нет в каталоге, применяемость пропущена: ${[...unknownCodes].join(", ")}`,
+    );
+  }
+
   const res = await db.partReference.createMany({
     data: rows.map((r) => ({
       oem: r.oem,
       name: r.name,
       groupName: r.groupName,
-      models: r.models,
       source: "import",
     })),
     skipDuplicates: true,
   });
+
+  // Применяемость — вторым проходом по id (createMany не умеет nested).
+  // skipDuplicates дозаполняет и уже существовавшие позиции.
+  const refIds = (await db.partReference.findMany({
+    where: { oem: { in: rows.map((r) => r.oem) } },
+    select: { id: true, oem: true },
+  })) as Array<{ id: string; oem: string }>;
+  const idByOem = new Map(refIds.map((r) => [r.oem, r.id]));
+  const fitmentRows = rows.flatMap((r) => {
+    const referenceId = idByOem.get(r.oem);
+    if (!referenceId) return [];
+    return r.models
+      .map((c) => resolvedByCode.get(c.toUpperCase()))
+      .filter((v): v is string => Boolean(v))
+      .map((generationId) => ({ referenceId, generationId }));
+  });
+  if (fitmentRows.length > 0) {
+    await db.partReferenceFitment.createMany({ data: fitmentRows, skipDuplicates: true });
+  }
 
   revalidatePath(REFS_PATH);
   return {

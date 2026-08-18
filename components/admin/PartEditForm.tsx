@@ -24,6 +24,8 @@ interface PartData {
   categoryId: string;
   trimIds: string[];
   photos: string[];
+  /** Официальное название по каталогу производителя (из справочника номенклатуры). */
+  officialName: string | null;
 }
 
 interface Props {
@@ -57,8 +59,13 @@ export function PartEditForm({ part, categories, models }: Props) {
       </div>
 
       <div>
-        <label htmlFor="name" className="block text-sm font-medium mb-2">Название *</label>
+        <label htmlFor="name" className="block text-sm font-medium mb-2">Название в магазине *</label>
         <input id="name" name="name" required defaultValue={part.name} className="input" />
+        {part.officialName && part.officialName !== part.name && (
+          <p className="text-xs text-[var(--foreground-muted)] mt-1.5">
+            По каталогу производителя: «{part.officialName}» — правится в справочнике номенклатуры.
+          </p>
+        )}
       </div>
 
       <div>
