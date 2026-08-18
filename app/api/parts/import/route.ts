@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
+import { normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 
 /**
  * Resolves a CSV "compatible models" cell to a set of trim ids. Each token can
@@ -96,6 +97,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   let created = 0;
   let updated = 0;
   const errors: string[] = [];
+  // Успешно заведённые артикулы дозаполняют номенклатурный справочник
+  // (см. lib/part-reference.ts) одним createMany после цикла.
+  const refRows: Array<{ oem: string; name: string }> = [];
 
   // Pre-fetch categories for lookup
   const categories = await db.partCategory.findMany();
@@ -187,9 +191,20 @@ export async function POST(request: Request): Promise<NextResponse> {
         });
         created++;
       }
+      if (!SERVICE_ARTICLE_RE.test(article)) {
+        const oem = normalizeOem(article);
+        if (oem) refRows.push({ oem, name });
+      }
     } catch (err) {
       errors.push(`Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`);
     }
+  }
+
+  if (refRows.length > 0) {
+    await db.partReference.createMany({
+      data: refRows.map((r) => ({ ...r, source: "shop" })),
+      skipDuplicates: true,
+    });
   }
 
   return NextResponse.json({ created, updated, errors });

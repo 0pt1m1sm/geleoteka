@@ -1156,6 +1156,25 @@ model Part {
   @@index([isActive])
 }
 
+/// Номенклатурный справочник запчастей — источник автокомплита в сметах и при
+/// создании товара. НЕ товар: без цены и остатков (Part остаётся торговой
+/// позицией). Наполняется тремя путями: upsert при создании Part, CSV-импорт
+/// (прайсы поставщиков / выгрузки EPC / 1С), ручное добавление в админке.
+model PartReference {
+  id        String   @id @default(cuid())
+  oem       String   @unique // нормализованный номер: верхний регистр, без пробелов/точек/дефисов
+  name      String
+  brand     String   @default("Mercedes-Benz")
+  groupName String? // узел/группа («Тормозная система», «Подвеска», …)
+  models    String[] @default([]) // применяемость: ["W463", "W461", …]
+  notes     String?
+  source    String   @default("manual") // shop | import | manual
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([name])
+}
+
 // ============================================
 // WMS — Warehouse stock (extractable core; see docs/design/2026-05-22-wms-module-seam.md)
 // StockItem owns physical stock (on-hand/reserved) keyed 1:1 to a Part.

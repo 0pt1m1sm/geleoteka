@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { createPart } from "@/app/actions/parts";
 import { AdminFormShell } from "./AdminFormShell";
+import { PartRefPicker } from "./PartRefPicker";
 import { PartTrimPicker } from "./PartTrimPicker";
 import { PhotoUploader } from "./PhotoUploader";
 import type { VehicleModel } from "@/lib/vehicle-catalog-types";
@@ -11,19 +12,32 @@ import type { VehicleModel } from "@/lib/vehicle-catalog-types";
 interface Props {
   categories: { id: string; name: string }[];
   models: VehicleModel[];
+  /** Предзаполнение из справочника (/admin/parts/new?ref=<id>). */
+  initial?: { article?: string; name?: string };
 }
 
-export function PartForm({ categories, models }: Props) {
+export function PartForm({ categories, models, initial }: Props) {
   const [state, formAction, isPending] = useActionState(createPart, null);
+  // Артикул и название управляемые: их заполняет и выбор из справочника
+  // (PartRefPicker), и предзаполнение через ?ref=.
+  const [article, setArticle] = useState(initial?.article ?? "");
+  const [name, setName] = useState(initial?.name ?? "");
 
   return (
     <form action={formAction} className="card space-y-4">
       <AdminFormShell error={state?.error}>
 
+      <PartRefPicker
+        onPick={(ref) => {
+          setArticle(ref.oem);
+          setName(ref.name);
+        }}
+      />
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label htmlFor="article" className="block text-sm font-medium mb-2">Артикул *</label>
-          <input id="article" name="article" required className="input font-mono" placeholder="A000989690613" />
+          <input id="article" name="article" required value={article} onChange={(e) => setArticle(e.target.value)} className="input font-mono" placeholder="A000989690613" />
         </div>
         <div>
           <label htmlFor="categoryId" className="block text-sm font-medium mb-2">Категория</label>
@@ -38,7 +52,7 @@ export function PartForm({ categories, models }: Props) {
 
       <div>
         <label htmlFor="name" className="block text-sm font-medium mb-2">Название *</label>
-        <input id="name" name="name" required className="input" placeholder="Масло моторное Mercedes 5W-40 (5л)" />
+        <input id="name" name="name" required value={name} onChange={(e) => setName(e.target.value)} className="input" placeholder="Масло моторное Mercedes 5W-40 (5л)" />
       </div>
 
       <div>
