@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 import { deletePartReference } from "@/app/actions/part-references";
 import { confirm } from "@/lib/ui/confirm";
 import { toast } from "@/lib/ui/toast";
@@ -10,11 +11,15 @@ import { toast } from "@/lib/ui/toast";
 export function PartRefDeleteButton({
   id,
   name,
+  afterDeleteHref,
 }: {
   id: string;
   name: string;
+  /** Куда уйти после удаления (карточка позиции); без него — refresh списка. */
+  afterDeleteHref?: string;
 }): React.ReactElement {
   const router = useRouter();
+  const nav = useProgressRouter();
   const [pending, startTransition] = useTransition();
 
   function handleDelete(): void {
@@ -25,7 +30,11 @@ export function PartRefDeleteButton({
         toast.error(res.error);
         return;
       }
-      router.refresh();
+      if (afterDeleteHref) {
+        nav.push(afterDeleteHref);
+      } else {
+        router.refresh();
+      }
     });
   }
 
