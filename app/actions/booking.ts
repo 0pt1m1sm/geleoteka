@@ -196,8 +196,16 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
       },
     });
 
-    const { sendBookingConfirmation } = await import("@/lib/sms");
-    await sendBookingConfirmation(normalizedPhone, bookingDay, bookingTime);
+    // Best effort: the RO/Deal/Slot already committed above, so a downstream
+    // SMS gateway outage must not turn an already-successful booking into a
+    // reported failure — that would invite the customer to resubmit and
+    // double-book.
+    try {
+      const { sendBookingConfirmation } = await import("@/lib/sms");
+      await sendBookingConfirmation(normalizedPhone, bookingDay, bookingTime);
+    } catch (err) {
+      console.error("[booking sms]", err);
+    }
 
     if (email) {
       const [
@@ -240,18 +248,24 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
         );
     }
 
-    const { pushAppointment: splusPush } = await import("@/lib/splus");
-    await splusPush({
-      clientName: name,
-      clientPhone: normalizedPhone,
-      clientEmail: email,
-      vehicleModel: model,
-      vehicleYear: parseInt(year),
-      vehicleVin: vin || undefined,
-      services: serviceIds,
-      dateTime: appointmentDate.toISOString(),
-      notes: notes || undefined,
-    });
+    // Same best-effort rationale as the SMS send above — S+ is an external
+    // catalog push, not part of the booking itself.
+    try {
+      const { pushAppointment: splusPush } = await import("@/lib/splus");
+      await splusPush({
+        clientName: name,
+        clientPhone: normalizedPhone,
+        clientEmail: email,
+        vehicleModel: model,
+        vehicleYear: parseInt(year),
+        vehicleVin: vin || undefined,
+        services: serviceIds,
+        dateTime: appointmentDate.toISOString(),
+        notes: notes || undefined,
+      });
+    } catch (err) {
+      console.error("[booking splus]", err);
+    }
 
     return {
       success: true,

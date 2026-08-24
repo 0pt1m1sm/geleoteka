@@ -74,8 +74,15 @@ export async function updateRepairOrderStatus(
       },
     });
 
-    const { sendStatusChange } = await import("@/lib/sms");
-    await sendStatusChange(user.phone, label);
+    // Best effort: the status transition already committed above, so an SMS
+    // gateway failure here must not surface as an unhandled error on an
+    // already-successful status change.
+    try {
+      const { sendStatusChange } = await import("@/lib/sms");
+      await sendStatusChange(user.phone, label);
+    } catch (err) {
+      console.error("[status-change sms]", err);
+    }
   }
 }
 

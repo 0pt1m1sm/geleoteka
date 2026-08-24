@@ -73,6 +73,12 @@ export async function createPart(
   if (!article || !name || isNaN(price)) {
     return { error: "Артикул, название и цена обязательны" };
   }
+  if (price <= 0) {
+    return { error: "Цена должна быть больше нуля" };
+  }
+  if (quantity < 0) {
+    return { error: "Количество не может быть отрицательным" };
+  }
 
   const existing = await db.part.findUnique({ where: { article } });
   if (existing) {
@@ -168,6 +174,12 @@ export async function updatePart(
 
   if (!name || isNaN(price)) {
     return { error: "Название и цена обязательны" };
+  }
+  if (price <= 0) {
+    return { error: "Цена должна быть больше нуля" };
+  }
+  if (quantity < 0) {
+    return { error: "Количество не может быть отрицательным" };
   }
 
   // Replace partTrims atomically: drop old links, recreate with new selection.

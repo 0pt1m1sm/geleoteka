@@ -7,8 +7,10 @@ import { LOYALTY_TIERS, getNextTier, formatDate } from "@/lib/utils";
 import type { LoyaltyTier } from "@/lib/utils";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
-// Server Component — `window` is never defined here, so the referral URL
-// must be built from the known site origin instead.
+// Server Component — `window` is never defined here, so the old
+// `typeof window !== "undefined"` check always produced a domain-less,
+// unusable referral link. Built from the known site origin instead, same env
+// fallback pattern as lib/seo-jsonld.ts / lib/indexnow.ts.
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
 export default async function LoyaltyPage() {
