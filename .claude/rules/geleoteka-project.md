@@ -70,6 +70,8 @@ public/images/ # Static images (hero, parts, rentals, logo)
 
 ## Deploy
 
-- **Hosting:** Railway (auto-deploy from GitHub `main`)
+- **Hosting:** Timeweb Cloud App Platform (app 230329 «Geleoteka Prod [RU]», auto-deploy from GitHub `main`)
 - **Repo:** `github.com/0pt1m1sm/geleoteka`
-- **Start:** `next start -H 0.0.0.0 -p ${PORT:-443}`
+- **Start:** `npm start` — runs `prisma migrate deploy` then `next start` (`PORT=3000` in app env)
+- **Config/env:** via API `.claude/scripts/twc-api.sh` — change envs in ONE PATCH (each PATCH redeploys)
+- **Railway is NOT the host** (migrated 2026-07-05), but the Railway project `tg-relay` is LIVE and REQUIRED: it proxies Telegram Bot API for staff notifications (api.telegram.org is blocked from RU IPs; `TELEGRAM_API_BASE_URL` in DB settings points at it). Do not delete.
