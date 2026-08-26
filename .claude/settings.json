@@ -1,6 +1,10 @@
 {
   "permissions": {
     "allow": [
+      "Bash(railway status *)",
+      "Bash(railway variables *)",
+      "Bash(railway logs *)",
+      "Bash(railway deployment *)",
       "Bash(psql $PROD_DB *)",
       "Bash(.claude/scripts/twc-api.sh *)"
     ]
