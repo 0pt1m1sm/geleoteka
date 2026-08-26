@@ -1,2 +1,0 @@
-[deploy]
-preDeployCommand = ["npx prisma migrate deploy"]
