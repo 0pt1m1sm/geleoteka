@@ -77,7 +77,8 @@ export default async function PartRefDetailPage({ params }: Props) {
         // в списке неразличимы. orderBy — чтобы порядок не был произвольным:
         // сначала новый товар, потом экземпляры по возрастанию суффикса.
         select: { id: true, name: true, price: true, isActive: true, sku: true, condition: true },
-        orderBy: [{ condition: "asc" }, { sku: "asc" }],
+        // По дате, а не по sku: лексикографически «-U10» встал бы перед «-U2».
+        orderBy: [{ condition: "asc" }, { createdAt: "asc" }],
       },
     },
   })) as RefDetail | null;

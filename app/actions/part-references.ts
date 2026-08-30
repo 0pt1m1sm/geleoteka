@@ -19,7 +19,6 @@ export interface PartReferenceOption {
   groupName: string | null;
   /** Коды кузовов из fitments — для отображения в пикерах. */
   models: string[];
-  /** id товара магазина с тем же артикулом, если он уже заведён. */
   /** Id НОВОГО товара по этой номенклатуре, если он есть. */
   shopPartId: string | null;
   /** Есть ли по номенклатуре хоть какой-то товар, включая б/у экземпляры.
@@ -79,7 +78,11 @@ export async function searchPartReferences(query: string): Promise<PartReference
       // которой лежит только б/у экземпляр, иначе попадала бы в раздел
       // «под заказ», менеджер добавлял бы строку без partId, и физический
       // экземпляр уехал бы без резерва — то есть мог бы продаться дважды.
-      _count: { select: { parts: true } },
+      // Только АКТИВНЫЕ: Story 4 гасит проданный б/у (isActive=false), и
+      // номенклатура с единственным проданным экземпляром иначе получила бы
+      // hasAnyPart=true, выпала из раздела «под заказ», а в верхнюю секцию не
+      // попала бы (там фильтр isActive) — исчезла бы из пикера сметы совсем.
+      _count: { select: { parts: { where: { isActive: true } } } },
     },
     orderBy: { name: "asc" },
     take: 20,

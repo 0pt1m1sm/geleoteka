@@ -172,7 +172,11 @@ export async function createPart(
   // срезанный суффикс дал бы slug, совпадающий со slug нового товара, и
   // экземпляр было бы не завести вовсе.
   const slugSuffix = condition === "NEW" ? "" : `-${(sku.split("-").pop() ?? "u").toLowerCase()}`;
-  const slug = slugify(`${article}-${name}`).slice(0, 80 - slugSuffix.length) + slugSuffix;
+  const slug = (slugify(`${article}-${name}`).slice(0, 80 - slugSuffix.length) + slugSuffix)
+    // Схлопывание повторных дефисов в slugify отрабатывает ДО склейки, поэтому
+    // база, оканчивающаяся дефисом (кириллическое название), давала бы «--u1».
+    .replace(/-+/g, "-")
+    .replace(/-$/, "");
 
   // Каждый реальный артикул пополняет номенклатурный справочник ДО создания
   // товара — товар сразу ссылается на номенклатуру (referenceId), витринное
@@ -312,10 +316,15 @@ export async function updatePart(
     // снять все фотографии — то самое доказательство состояния при
     // гарантийном возврате, ради которого правило и введено.
     if (current) {
+      // Заметку подставляем непустой, если форма её не присылает: иначе б/у
+      // строка с пустым conditionNote (прямая правка БД, будущий импорт)
+      // заблокировала бы updatePart НАВСЕГДА — включая правку цены и
+      // активности, — и починить через интерфейс было бы нечем.
+      // Фотографии при этом проверяются по-настоящему: их форма присылает.
       const err = validateUsedPartFields(
         current.condition,
         photoUrls,
-        current.conditionNote ?? "",
+        current.conditionNote ?? "не указано",
       );
       if (err) throw new PartValidationError(err);
     }

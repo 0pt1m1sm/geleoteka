@@ -149,6 +149,14 @@ export async function recordCountAction(
   // количество ИЗВЕСТНОЙ позиции систематически падало бы в корзину, и
   // расхождение по ней считалось бы без него.
   if (partId && typeof partId === "object") {
+    // В аудит попасть обязано: у неопознанного скана есть recordUnknownScan, в
+    // подборе и упаковке — AMBIGUOUS_CODE, а здесь попытка исчезала бесследно.
+    await recordUnknownScan(db, {
+      sessionId,
+      location,
+      rawCode: rawItemCode,
+      tenantKey: TENANT_KEY,
+    });
     return { error: partId.ambiguous };
   }
   try {
