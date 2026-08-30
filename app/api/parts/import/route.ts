@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { newPartSku } from "@/lib/part-sku";
+import { SERVICE_ARTICLE_RE, extractModelCodes, normalizeOem } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
-import { extractModelCodes, normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 import { resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 /**
@@ -152,21 +152,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
     const slug = slugify(`${article}-${name}`).slice(0, 80);
 
-    // Импорт прайса ведёт НОВЫЕ товары: артикул больше не уникален (у детали
-    // бывают новый товар и б/у экземпляры), поэтому и поиск, и обновление
-    // идут по торговому идентификатору. Б/у экземпляры импорт не трогает —
-    // их sku несёт суффикс и под этот ключ не попадает.
-    const sku = newPartSku(article);
-
     try {
-      const existing = (await db.part.findUnique({ where: { sku }, select: { id: true } })) as
-        | { id: string }
-        | null;
+      // Импорт прайса ведёт НОВЫЕ товары. Ищем по article + condition, а не по
+      // sku: артикул больше не уникален, а sku у старых строк залит дословно и
+      // с нормализованным ключом не совпадает — по нему повторный залив того
+      // же прайса не нашёл бы 15 из 70 позиций и продублировал бы их.
+      // Б/у экземпляры импорт не трогает: они не NEW.
+      const existing = (await db.part.findFirst({
+        where: { article, condition: "NEW" },
+        select: { id: true },
+      })) as { id: string } | null;
+
+      // Внутри try: артикул, пустой после нормализации («---», разделитель в
+      // CSV), уронил бы newPartSku и весь обработчик, минуя построчный отчёт.
+      if (!normalizeOem(article)) {
+        errors.push(`Строка ${lineNum}: артикул должен содержать буквы или цифры`);
+        continue;
+      }
+      const sku = newPartSku(article);
 
       if (existing) {
         await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
           await tx.part.update({
-            where: { sku },
+            where: { id: existing.id },
             data: { name, description: description || null, price, isOEM, categoryId },
           });
           // CSV import is an authoritative stock load — set the StockItem on-hand directly.

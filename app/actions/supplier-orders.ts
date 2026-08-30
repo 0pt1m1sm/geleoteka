@@ -12,7 +12,7 @@ import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
 import { resolveLandedCost } from "@/lib/suppliers/resolve-landed-cost";
 import { canDeleteOrder, canFullyEditOrder, isOrphanDraftPart } from "@/lib/suppliers/order-lifecycle";
-import { extractModelCodes } from "@/lib/part-reference";
+import { extractModelCodes, normalizeOem } from "@/lib/part-reference";
 import { ensurePartReference, resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 const CUSTOMS_MODES: readonly CustomsMode[] = ["PERCENT_CIF", "CARGO_PER_KG"];
@@ -127,11 +127,13 @@ async function resolveLinesAndCost(
     if (i.type === "NEW_PART") {
       const article = i.article!.trim();
       const name = i.description.trim();
-      // По sku, а не по article: артикул перестал быть уникальным (новый товар
-      // и б/у экземпляры делят номер детали), уникален торговый идентификатор.
-      const sku = newPartSku(article);
-      const existing = (await tx.part.findUnique({ where: { sku }, select: { id: true } })) as { id: string } | null;
+      // По article + condition, а не по sku: артикул перестал быть уникальным,
+      // а sku у старых строк залит дословно и с нормализованным ключом не
+      // совпадает (артикулы с пунктуацией — 15 из 70 позиций каталога).
+      const existing = (await tx.part.findFirst({ where: { article, condition: "NEW" }, select: { id: true } })) as { id: string } | null;
       if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
+      if (!normalizeOem(article)) throw new OrderValidationError(`Артикул ${article} должен содержать буквы или цифры`);
+      const sku = newPartSku(article);
       const slug = slugify(`${article}-${name}`).slice(0, 80);
       // Draft-товар рождается уже связанным с номенклатурой — иначе позиция,
       // заказанная у поставщика, выпадает из справочника до ручной правки.

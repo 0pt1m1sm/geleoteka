@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { newPartSku } from "@/lib/part-sku";
+import { normalizeOem } from "@/lib/part-reference";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
@@ -81,15 +82,27 @@ export async function createPart(
     return { error: "Количество не может быть отрицательным" };
   }
 
-  // Проверяем по sku, а не по article: артикул больше не уникален (у одной
-  // детали бывают новый товар и б/у экземпляры), уникален именно торговый
-  // идентификатор. Побочно ловится случай, когда тот же номер записан с
-  // другой пунктуацией — normalizeOem сводит их к одному ключу.
-  const sku = newPartSku(article);
-  const existing = await db.part.findUnique({ where: { sku } });
+  // Ищем по article, а не по sku. Артикул больше не уникален, поэтому нужен
+  // findFirst с явным condition: у одной детали бывают новый товар и б/у
+  // экземпляры, и дубль мы ловим именно среди новых.
+  // Почему НЕ по sku: миграция залила sku дословно (sku := article), а
+  // newPartSku нормализует — для «ПОДЗАКАЗ-07» и прочих артикулов с
+  // пунктуацией ключи разошлись бы, и защита от дубля молча выключилась бы
+  // на 15 из 70 позиций боевого каталога.
+  const existing = await db.part.findFirst({
+    where: { article, condition: "NEW" },
+    select: { id: true },
+  });
   if (existing) {
     return { error: "Запчасть с таким артикулом уже существует" };
   }
+
+  // Пустой после нормализации артикул («---», «???») уронил бы newPartSku
+  // необработанным исключением — экшен обязан вернуть {error}.
+  if (!normalizeOem(article)) {
+    return { error: "Артикул должен содержать буквы или цифры" };
+  }
+  const sku = newPartSku(article);
 
   const slug = slugify(`${article}-${name}`).slice(0, 80);
 

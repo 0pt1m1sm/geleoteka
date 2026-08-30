@@ -1182,7 +1182,6 @@ model Part {
   @@index([categoryId])
   @@index([isActive])
   @@index([referenceId])
-  @@index([condition])
 }
 
 /// Номенклатурный справочник запчастей — источник автокомплита в сметах и при

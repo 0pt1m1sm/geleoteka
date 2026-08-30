@@ -34,11 +34,14 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 async function makeThrowawayPart(qty: number): Promise<string> {
+  // article и sku берутся из ОДНОЙ переменной: раздельные Math.random() дали бы
+  // фикстуру, где sku не соответствует артикулу, — прод так не бывает.
+  const article = `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
   const part = (await db.part.create({
     data: {
       slug: `verify-qr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      article: `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-      sku: `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      article,
+      sku: article,
       name: "verify-qr part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT } },

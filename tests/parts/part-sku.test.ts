@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextUsedSku, USED_SKU_SUFFIX_RE } from "@/lib/part-sku";
+import { nextUsedSku, newPartSku, USED_SKU_SUFFIX_RE } from "@/lib/part-sku";
 
 describe("nextUsedSku", () => {
   it("даёт первый суффикс, когда б/у экземпляров ещё нет", () => {
@@ -59,5 +59,22 @@ describe("USED_SKU_SUFFIX_RE", () => {
     expect(USED_SKU_SUFFIX_RE.test("A4634210098-U12")).toBe(true);
     expect(USED_SKU_SUFFIX_RE.test("A4634210098")).toBe(false);
     expect(USED_SKU_SUFFIX_RE.test("A4634210098-U")).toBe(false);
+  });
+});
+
+describe("newPartSku против дословного backfill (регрессия PR #96)", () => {
+  it("нормализованный SKU РАСХОДИТСЯ с артикулом, у которого есть пунктуация", () => {
+    // Миграция 20260830210000_part_variants залила sku ДОСЛОВНО (sku := article).
+    // Значит для таких артикулов newPartSku(article) !== сохранённый sku, и
+    // искать существующие строки по newPartSku НЕЛЬЗЯ — на проде так молча
+    // терялись 15 из 70 позиций (все ПОДЗАКАЗ-NN и MANN-C29028): защита от
+    // дубля отключалась, а повторный импорт того же прайса плодил копии.
+    // Поиск ведём по article (+ condition), см. app/actions/parts.ts,
+    // app/actions/supplier-orders.ts, app/api/parts/import/route.ts.
+    expect(newPartSku("ПОДЗАКАЗ-07")).not.toBe("ПОДЗАКАЗ-07");
+    expect(newPartSku("MANN-C29028")).not.toBe("MANN-C29028");
+    // А для артикула, уже находящегося в нормальной форме, они совпадают —
+    // именно поэтому ошибку не видно на «удобных» примерах.
+    expect(newPartSku("A4634210098")).toBe("A4634210098");
   });
 });
