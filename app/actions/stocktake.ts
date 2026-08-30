@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
-import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
+import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
 import {
   ambiguousCodeMessage,
   prismaPartCodePort,
@@ -139,7 +139,7 @@ export async function recordCountAction(
   location: string,
   countedQty: number,
 ): Promise<{ error: string | null; unknown?: boolean }> {
-  await requireRole(COUNT_ROLES);
+  const session = await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
     return { error: "Количество должно быть целым от 0 до 1 000 000" };
@@ -149,12 +149,19 @@ export async function recordCountAction(
   // количество ИЗВЕСТНОЙ позиции систематически падало бы в корзину, и
   // расхождение по ней считалось бы без него.
   if (partId && typeof partId === "object") {
-    // В аудит попасть обязано: у неопознанного скана есть recordUnknownScan, в
-    // подборе и упаковке — AMBIGUOUS_CODE, а здесь попытка исчезала бесследно.
-    await recordUnknownScan(db, {
-      sessionId,
-      location,
-      rawCode: rawItemCode,
+    // Пишем в ЖУРНАЛ сканов, а не через recordUnknownScan: последний создаёт
+    // StockCountLine с classification UNKNOWN, то есть заведомо ИЗВЕСТНЫЙ код
+    // показывался бы кладовщику в списке «Неизвестно», и после успешного
+    // пересчёта по этикетке в сессии висела бы лишняя строка.
+    const parsedAmb = parseScanCode(rawItemCode);
+    await recordScanEvent(db, {
+      userId: session.id,
+      action: "count",
+      rawCode: parsedAmb.raw,
+      parsedObjectType: parsedAmb.type,
+      parsedObjectId: "id" in parsedAmb ? parsedAmb.id : null,
+      result: "REJECTED",
+      errorCode: "AMBIGUOUS_CODE",
       tenantKey: TENANT_KEY,
     });
     return { error: partId.ambiguous };

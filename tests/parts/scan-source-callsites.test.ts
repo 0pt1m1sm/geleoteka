@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -147,12 +147,26 @@ describe("источник кода в местах вызова резолве�
   );
 
   it("новых мест вызова резолвера не появилось без ведома этого теста", () => {
-    // Если резолвер подключили где-то ещё, источник там никто не проверял.
+    // Обходим репозиторий, а не перечитываем известные файлы: иначе тест
+    // проверял бы лишь то, что вызовы никуда не делись, и седьмое место
+    // осталось бы невидимым — название обещало бы больше, чем делает.
     const known = new Set([...DERIVED_SOURCE_FILES, ...LITERAL_SOURCE_FILES.map((x) => x.file)]);
-    const found = new Set<string>();
-    for (const rel of known) {
-      if (resolverCalls(read(rel)).length > 0) found.add(rel);
-    }
-    expect(found.size).toBe(known.size);
+    const found: string[] = [];
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${e.name}`;
+        if (e.isDirectory()) {
+          if (e.name === "node_modules" || e.name === "generated") continue;
+          walk(rel);
+        } else if (/\.(ts|tsx)$/.test(e.name) && resolverCalls(read(rel)).length > 0) {
+          found.push(rel);
+        }
+      }
+    };
+    walk("app");
+    walk("lib");
+    const unknown = found.filter((f) => !known.has(f) && !f.includes("resolve-part-code"));
+    expect(unknown, "резолвер подключён там, где источник никто не проверяет").toEqual([]);
+    for (const k of known) expect(found).toContain(k);
   });
 });
