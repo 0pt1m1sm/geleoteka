@@ -286,6 +286,11 @@ export async function updatePart(
   const gtin = (formData.get("gtin") as string)?.trim() || null;
   const { ids: trimIds, error: trimErr } = await parseTrimIds(formData.get("trimIds"));
   if (trimErr) return { error: trimErr };
+  // Тексты состояния редактируются, а САМО состояние — нет: от него зависит
+  // торговый код позиции, который уже мог уехать в заказ и на этикетку.
+  const conditionNoteRaw = formData.get("conditionNote");
+  const originNoteRaw = formData.get("originNote");
+
   const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
   if (photoErr) return { error: photoErr };
 
@@ -321,12 +326,28 @@ export async function updatePart(
       // заблокировала бы updatePart НАВСЕГДА — включая правку цены и
       // активности, — и починить через интерфейс было бы нечем.
       // Фотографии при этом проверяются по-настоящему: их форма присылает.
-      const err = validateUsedPartFields(
-        current.condition,
-        photoUrls,
-        current.conditionNote ?? "не указано",
-      );
+      // Заметку проверяем ту, что прислала форма; если поле не пришло вовсе
+      // (форма нового товара), берём сохранённую и подставляем непустую —
+      // иначе б/у строка с пустым conditionNote заблокировала бы правку цены
+      // и активности навсегда, а починить через интерфейс было бы нечем.
+      const noteForCheck =
+        typeof conditionNoteRaw === "string"
+          ? conditionNoteRaw.trim()
+          : (current.conditionNote ?? "не указано");
+      const err = validateUsedPartFields(current.condition, photoUrls, noteForCheck);
       if (err) throw new PartValidationError(err);
+      if (noteForCheck.length > CONDITION_NOTE_MAX) {
+        throw new PartValidationError(
+          `Описание состояния слишком длинное (максимум ${CONDITION_NOTE_MAX} символов)`,
+        );
+      }
+      const originForSave =
+        typeof originNoteRaw === "string" ? originNoteRaw.trim() : null;
+      if (originForSave && originForSave.length > ORIGIN_NOTE_MAX) {
+        throw new PartValidationError(
+          `Описание происхождения слишком длинное (максимум ${ORIGIN_NOTE_MAX} символов)`,
+        );
+      }
     }
     const removed = (current?.photos ?? []).filter((u: string) => !photoUrls.includes(u));
     await tx.part.update({
@@ -341,6 +362,12 @@ export async function updatePart(
         categoryId: categoryId || null,
         isActive,
         photos: photoUrls,
+        ...(typeof conditionNoteRaw === "string"
+          ? { conditionNote: conditionNoteRaw.trim() || null }
+          : {}),
+        ...(typeof originNoteRaw === "string"
+          ? { originNote: originNoteRaw.trim() || null }
+          : {}),
       },
     });
 

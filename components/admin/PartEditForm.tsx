@@ -26,6 +26,9 @@ interface PartData {
   photos: string[];
   /** Официальное название по каталогу производителя (из справочника номенклатуры). */
   officialName: string | null;
+  condition: "NEW" | "USED" | "REFURBISHED";
+  conditionNote: string;
+  originNote: string;
 }
 
 interface Props {
@@ -67,6 +70,49 @@ export function PartEditForm({ part, categories, models }: Props) {
           </p>
         )}
       </div>
+
+      {part.condition !== "NEW" && (
+        <>
+          <div className="rounded border border-[var(--border)] p-3">
+            <p className="text-sm">
+              Состояние:{" "}
+              <strong>{part.condition === "USED" ? "б/у" : "восстановленная"}</strong>
+            </p>
+            <p className="mt-1 text-sm text-[var(--foreground-muted)]">
+              Состояние не меняется после создания: от него зависит торговый код
+              позиции, а он уже мог уехать в заказы и на этикетку. Ошиблись —
+              заведите позицию заново и скройте эту с витрины.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="conditionNote" className="block text-sm font-medium mb-2">
+              Состояние детали *
+            </label>
+            <textarea
+              id="conditionNote"
+              name="conditionNote"
+              required
+              maxLength={1000}
+              defaultValue={part.conditionNote}
+              className="input min-h-[80px] resize-y"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="originNote" className="block text-sm font-medium mb-2">
+              Происхождение
+            </label>
+            <input
+              id="originNote"
+              name="originNote"
+              maxLength={500}
+              defaultValue={part.originNote}
+              className="input"
+            />
+          </div>
+        </>
+      )}
 
       <div>
         <label htmlFor="description" className="block text-sm font-medium mb-2">Описание</label>

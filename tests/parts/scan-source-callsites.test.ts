@@ -67,6 +67,62 @@ function resolverCalls(src: string): string[] {
   return calls;
 }
 
+/**
+ * Инварианты, которые обязаны присутствовать в конкретных местах вызова.
+ * Каждый добавлен после того, как независимая верификация показала мутацией:
+ * дефект возвращается, а весь гейт остаётся зелёным. Тесты вокруг чистых
+ * функций такие подмены не видят — они живут не в правиле, а в его вызове.
+ */
+const CALLSITE_INVARIANTS: ReadonlyArray<{
+  file: string;
+  must: RegExp;
+  why: string;
+}> = [
+  {
+    file: "app/actions/parts.ts",
+    must: /sku:\s*\{\s*startsWith:/,
+    why:
+      "серия sku для б/у ищется по НОРМАЛИЗОВАННОМУ префиксу; поиск по " +
+      "where:{article} возвращает блокер — второй экземпляр при другой записи " +
+      "номера не завести никогда, при ложном сообщении «повторите сохранение»",
+  },
+  {
+    file: "app/actions/parts.ts",
+    must: /validateUsedPartFields\(/,
+    why: "без вызова б/у создаётся с нулём фотографий — доказательства состояния при возврате",
+  },
+  {
+    file: "app/actions/part-references.ts",
+    must: /condition:\s*"NEW"/,
+    why:
+      "без фильтра первый же б/у экземпляр помечает номенклатуру занятой и " +
+      "блокирует создание нового товара — фича ломает саму себя",
+  },
+  {
+    file: "app/(admin)/admin/parts/refs/page.tsx",
+    must: /condition:\s*"NEW"/,
+    why: "тот же запрос во втором файле: список справочника прячет «Создать товар»",
+  },
+  {
+    file: "app/sitemap.ts",
+    must: /condition:\s*"NEW"/,
+    why:
+      "до Story 5 у б/у нет ни canonical, ни noindex — из карты сайта их " +
+      "адреса уходят прямо поисковику, минуя витрину",
+  },
+  {
+    file: "app/(public)/parts/page.tsx",
+    must: /condition:\s*"NEW"/,
+    why: "витрина показала бы неподписанные дубли карточек до Story 3",
+  },
+];
+
+describe("инварианты в местах вызова", () => {
+  it.each(CALLSITE_INVARIANTS)("$file: $why", ({ file, must }) => {
+    expect(read(file)).toMatch(must);
+  });
+});
+
 describe("источник кода в местах вызова резолвера", () => {
   it.each(DERIVED_SOURCE_FILES)("%s берёт источник из scanSourceFor", (rel) => {
     const calls = resolverCalls(read(rel));
