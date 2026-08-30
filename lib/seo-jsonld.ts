@@ -9,6 +9,8 @@
  * опускаются, а не заполняются заглушками.
  */
 
+import { SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 export const ORGANIZATION_ID = `${SITE_URL}#organization`;
 
@@ -180,7 +182,10 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
     sku: p.sku,
     // OEM-номер отдельным полем: sku нормализован, а Яндексу и покупателю
     // полезен именно каталожный номер детали в исходном виде.
-    mpn: p.article,
+    // Служебные коды (ПОДЗАКАЗ-NN, VERIFY-*) номером производителя НЕ являются:
+    // на проде это 21 активная страница, и публиковать их как mpn значит
+    // отдавать поисковикам заведомо ложный идентификатор производителя.
+    ...(SERVICE_ARTICLE_RE.test(p.article) ? {} : { mpn: p.article }),
     ...(p.description ? { description: p.description } : {}),
     ...(p.image ? { image: p.image.startsWith("http") ? p.image : `${SITE_URL}${p.image}` } : {}),
     url: `${SITE_URL}/parts/${p.slug}`,

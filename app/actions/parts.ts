@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { newPartSku } from "@/lib/part-sku";
+import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import { normalizeOem } from "@/lib/part-reference";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
@@ -108,7 +108,7 @@ export async function createPart(
   // с дословным sku вместо ошибки появился бы тихий дубль.
   // Обе колонки проиндексированы (Part_article_idx, Part_sku_key).
   const existing = await db.part.findFirst({
-    where: { OR: [{ article, condition: "NEW" }, { sku }] },
+    where: duplicateNewPartWhere(article, sku),
     select: { id: true },
   });
   if (existing) {

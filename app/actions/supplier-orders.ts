@@ -2,7 +2,7 @@
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { newPartSku } from "@/lib/part-sku";
+import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import { slugify } from "@/lib/slug";
 import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
@@ -134,7 +134,7 @@ async function resolveLinesAndCost(
       const sku = newPartSku(article);
       // Оба ключа: article — потому что sku у старых строк залит дословно,
       // sku — потому что уникальный индекс стоит на нём (см. parts.ts).
-      const existing = (await tx.part.findFirst({ where: { OR: [{ article, condition: "NEW" }, { sku }] }, select: { id: true } })) as { id: string } | null;
+      const existing = (await tx.part.findFirst({ where: duplicateNewPartWhere(article, sku), select: { id: true } })) as { id: string } | null;
       if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
       const slug = slugify(`${article}-${name}`).slice(0, 80);
       // Draft-товар рождается уже связанным с номенклатурой — иначе позиция,

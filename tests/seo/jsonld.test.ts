@@ -176,3 +176,38 @@ describe("buildProductJsonLd: sku", () => {
     expect(used.sku).toBe("A4634210098-U1");
   });
 });
+
+describe("buildProductJsonLd: mpn", () => {
+  it("публикует OEM-номер как mpn для настоящих артикулов", () => {
+    const out = parse(
+      buildProductJsonLd({
+        name: "Фильтр",
+        slug: "f",
+        article: "MANN-C29028",
+        sku: "MANNC29028",
+        price: 1,
+        inStock: true,
+      }),
+    );
+    expect(out.mpn).toBe("MANN-C29028");
+    expect(out.sku).toBe("MANNC29028");
+  });
+
+  it("НЕ публикует mpn для служебных кодов", () => {
+    // «ПОДЗАКАЗ-07» не является Manufacturer Part Number. На проде это 21
+    // активная страница — публиковать такое значит отдавать поисковикам
+    // заведомо ложный идентификатор производителя.
+    const out = parse(
+      buildProductJsonLd({
+        name: "Позиция под заказ",
+        slug: "pz",
+        article: "ПОДЗАКАЗ-07",
+        sku: "ПОДЗАКАЗ-07",
+        price: 1,
+        inStock: false,
+      }),
+    );
+    expect(out.mpn).toBeUndefined();
+    expect(out.sku).toBe("ПОДЗАКАЗ-07");
+  });
+});

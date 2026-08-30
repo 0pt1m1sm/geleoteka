@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { newPartSku } from "@/lib/part-sku";
+import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import { SERVICE_ARTICLE_RE, extractModelCodes, normalizeOem } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
@@ -169,7 +169,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       // Оба ключа: article — потому что sku у старых строк залит дословно,
       // sku — потому что на нём стоит уникальный индекс (см. parts.ts).
       const existing = (await db.part.findFirst({
-        where: { OR: [{ article, condition: "NEW" }, { sku }] },
+        where: duplicateNewPartWhere(article, sku),
         select: { id: true },
       })) as { id: string } | null;
 

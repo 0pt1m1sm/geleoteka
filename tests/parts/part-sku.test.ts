@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { nextUsedSku, newPartSku, USED_SKU_SUFFIX_RE } from "@/lib/part-sku";
+import {
+  duplicateNewPartWhere,
+  nextUsedSku,
+  newPartSku,
+  USED_SKU_SUFFIX_RE,
+} from "@/lib/part-sku";
 
 describe("nextUsedSku", () => {
   it("даёт первый суффикс, когда б/у экземпляров ещё нет", () => {
@@ -104,5 +109,31 @@ describe("непересечение SKU нового товара и б/у эк
     expect(newPartSku(article)).not.toBe(used);
     // даже если артикул сам записан с дефисами
     expect(newPartSku("ПОДЗАКАЗ-07")).not.toContain("-");
+  });
+});
+
+describe("duplicateNewPartWhere — инвариант проверки обоих ключей", () => {
+  // Этот тест — сторож вызывающего кода, а не чистой функции. На ревью PR #96
+  // мутация «вернуть проверку на один ключ» дважды проходила весь гейт зелёной,
+  // потому что тесты покрывали только nextUsedSku/newPartSku.
+  it("содержит ветку по article с condition NEW", () => {
+    const w = duplicateNewPartWhere("ПОДЗАКАЗ-07", "ПОДЗАКАЗ07");
+    expect(w.OR).toContainEqual({ article: "ПОДЗАКАЗ-07", condition: "NEW" });
+  });
+
+  it("содержит ветку по sku", () => {
+    const w = duplicateNewPartWhere("A463-421-0098", "A4634210098");
+    expect(w.OR).toContainEqual({ sku: "A4634210098" });
+  });
+
+  it("ровно две ветки — ни одну нельзя выбросить", () => {
+    // Одна ветка по sku: не видно легаси-строк с дословным backfill.
+    // Одна ветка по article: не срабатывает уникальный индекс на sku.
+    expect(duplicateNewPartWhere("A4634210098", "A4634210098").OR).toHaveLength(2);
+  });
+
+  it("не фильтрует по condition в ветке sku — иначе б/у-суффикс отсёк бы проверку", () => {
+    const skuBranch = duplicateNewPartWhere("X", "X").OR.find((b) => "sku" in b);
+    expect(skuBranch).toEqual({ sku: "X" });
   });
 });
