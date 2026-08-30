@@ -52,6 +52,14 @@ function parseWeightGrams(raw: unknown): number | null {
   return Math.min(Math.round(kg * 1000), MAX_WEIGHT_GRAMS);
 }
 
+
+/** Нарушение уникального индекса Prisma. Клиент генерируется с @ts-nocheck,
+ *  поэтому типизированного PrismaClientKnownRequestError под рукой нет —
+ *  распознаём по коду, как это делается в остальных экшенах. */
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+}
+
 export async function createPart(
   _prevState: { error: string | null } | null,
   formData: FormData,
@@ -139,34 +147,45 @@ export async function createPart(
 
   // Part + its opening-balance StockItem are created atomically so a part can
   // never exist without a stock row (which would silently lose the opening qty).
-  await db.$transaction(async (tx) => {
-    const created = (await tx.part.create({
-      data: {
-        slug,
-        article,
-        sku,
-        name,
-        description,
-        price,
-        compareAtPrice,
-        weightGrams,
-        isOEM,
-        referenceId,
-        categoryId: categoryId || null,
-        photos: photoUrls,
-        partTrims: {
-          create: trimIds.map((trimId) => ({ trimId })),
+  // P2002 ловим отдельно: проверка выше и уникальный индекс — разные моменты
+  // времени, поэтому гонка двух одновременных заведений одного артикула всё
+  // равно доходит до индекса. Без этого пользователь получал бы необработанную
+  // ошибку сервер-экшена и терял заполненную форму вместе с загруженными фото.
+  try {
+    await db.$transaction(async (tx) => {
+      const created = (await tx.part.create({
+        data: {
+          slug,
+          article,
+          sku,
+          name,
+          description,
+          price,
+          compareAtPrice,
+          weightGrams,
+          isOEM,
+          referenceId,
+          categoryId: categoryId || null,
+          photos: photoUrls,
+          partTrims: {
+            create: trimIds.map((trimId) => ({ trimId })),
+          },
         },
-      },
-      select: { id: true },
-    })) as { id: string };
+        select: { id: true },
+      })) as { id: string };
 
-    // Opening balance: seed the StockItem counter directly (subsequent CHANGES
-    // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
-    await tx.stockItem.create({
-      data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
+      // Opening balance: seed the StockItem counter directly (subsequent CHANGES
+      // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
+      await tx.stockItem.create({
+        data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
+      });
     });
-  });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { error: "Запчасть с таким артикулом уже существует" };
+    }
+    throw err;
+  }
 
   await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");

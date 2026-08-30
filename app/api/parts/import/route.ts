@@ -242,7 +242,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
       }
     } catch (err) {
-      errors.push(`Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`);
+      // P2002 здесь означает, что артикул строки нормализуется в уже занятый
+      // sku (та же деталь, записанная с другой пунктуацией). Сырой текст
+      // Prisma «Unique constraint failed on the fields: (`sku`)» в отчёте о
+      // заливке прайса нечитаем.
+      const isDup =
+        typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+      errors.push(
+        isDup
+          ? `Строка ${lineNum}: артикул ${article} уже есть в каталоге под другой записью номера`
+          : `Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`,
+      );
     }
   }
 
