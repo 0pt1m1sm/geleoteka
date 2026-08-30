@@ -3,7 +3,7 @@
 Created: 2026-08-30
 Status: IN_PROGRESS
 Mode: auto
-Iterations: 0
+Iterations: 3
 Type: Feature
 
 PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утверждён владельцем 2026-08-30).
@@ -31,7 +31,7 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 
 ## Progress Tracking
 
-- [ ] Story 1: Схема, генерация SKU и миграция каталога (Status: PENDING)
+- [x] Story 1: Схема, генерация SKU и миграция каталога (Status: VERIFIED)
 - [ ] Story 2: Заведение б/у в админке (Status: PENDING)
 - [ ] Story 3: Варианты на странице товара и в корзине (Status: PENDING)
 - [ ] Story 4: Снятие проданного б/у с витрины (Status: PENDING)
@@ -42,6 +42,8 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 ## Implementation Tasks
 
 ### Story 1: Схема, генерация SKU и миграция каталога
+
+**Status: VERIFIED** — PR #96 смержен 31.08 (7 коммитов, 3 круга ревью: code-reviewer, security-reviewer, verifier). Гейт зелёный целиком, CI зелёный, миграция проверена на чистой базе и на копии прод-данных с враждебными строками, вердикт независимой верификации — готово к мержу.
 
 **Objective.** Снять блокер множественности и дать товару состояние, не сломав существующие 70 позиций.
 
