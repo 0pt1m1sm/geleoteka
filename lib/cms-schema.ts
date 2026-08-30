@@ -814,7 +814,7 @@ export const CMS_SCHEMA = {
     group: "vacancies",
     label: "Вакансии — CTA текст",
     defaultValue:
-      "Отправьте резюме на [hr@geleoteka.ru](mailto:hr@geleoteka.ru) — мы всегда рассматриваем сильных кандидатов.",
+      "Отправьте резюме на [sales@geleoteka.ru](mailto:sales@geleoteka.ru) — мы всегда рассматриваем сильных кандидатов.",
   },
   "vacancies.cta.button": {
     type: "text",
