@@ -26,8 +26,8 @@ CREATE TYPE "PartCondition" AS ENUM ('NEW', 'USED', 'REFURBISHED');
 -- AlterTable: новые колонки
 ALTER TABLE "Part" ADD COLUMN "sku" TEXT;
 ALTER TABLE "Part" ADD COLUMN "condition" "PartCondition" NOT NULL DEFAULT 'NEW';
-ALTER TABLE "Part" ADD COLUMN "conditionNote" TEXT;
-ALTER TABLE "Part" ADD COLUMN "originNote" TEXT;
+ALTER TABLE "Part" ADD COLUMN "conditionNote" VARCHAR(1000);
+ALTER TABLE "Part" ADD COLUMN "originNote" VARCHAR(500);
 
 -- Backfill: существующие товары — новые, sku равен артикулу
 UPDATE "Part" SET "sku" = "article" WHERE "sku" IS NULL;
@@ -38,7 +38,7 @@ CREATE UNIQUE INDEX "Part_sku_key" ON "Part"("sku");
 
 -- Артикул больше не уникален. Обычный индекс Part_article_idx уже существует
 -- и сохраняется — поиск по номеру детали не деградирует.
-DROP INDEX "Part_article_key";
+DROP INDEX IF EXISTS "Part_article_key";
 
 -- Индекса по condition сознательно НЕТ: колонка из трёх значений, где после
 -- backfill 100% строк — NEW. Планировщик его не возьмёт, а поддерживать при

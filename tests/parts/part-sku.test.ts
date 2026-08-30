@@ -78,3 +78,31 @@ describe("newPartSku против дословного backfill (регресс�
     expect(newPartSku("A4634210098")).toBe("A4634210098");
   });
 });
+
+describe("newPartSku", () => {
+  it("нормализует артикул к единому виду", () => {
+    expect(newPartSku("a 463 421 00 98")).toBe("A4634210098");
+    expect(newPartSku("A463-421-0098")).toBe("A4634210098");
+  });
+
+  it("отвергает артикул, пустой после нормализации", () => {
+    expect(() => newPartSku("---")).toThrow();
+    expect(() => newPartSku("   ")).toThrow();
+  });
+});
+
+describe("непересечение SKU нового товара и б/у экземпляров", () => {
+  it("вывод newPartSku никогда не может совпасть с SKU б/у", () => {
+    // newPartSku срезает дефисы (normalizeOem), а nextUsedSku всегда строит
+    // `${base}-U${n}` С дефисом — поэтому импорт прайса не может случайно
+    // перезаписать б/у экземпляр, а генератор б/у — затереть новый товар.
+    // Свойство держится на нормализации; тест ловит его поломку.
+    const article = "A4634210098";
+    const used = nextUsedSku(article, []);
+    expect(used).toContain("-U");
+    expect(newPartSku(article)).not.toContain("-");
+    expect(newPartSku(article)).not.toBe(used);
+    // даже если артикул сам записан с дефисами
+    expect(newPartSku("ПОДЗАКАЗ-07")).not.toContain("-");
+  });
+});

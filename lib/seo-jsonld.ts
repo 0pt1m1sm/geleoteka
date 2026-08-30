@@ -161,6 +161,8 @@ export interface ProductJsonLdInput {
   name: string;
   slug: string;
   article: string;
+  /** Торговый идентификатор. Отличается от article у б/у экземпляров. */
+  sku: string;
   description?: string | null;
   price: number;
   image?: string | null;
@@ -172,7 +174,10 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
     "@context": "https://schema.org",
     "@type": "Product",
     name: p.name,
-    sku: p.article,
+    // Именно sku, а не article: артикул общий у нового товара и б/у
+    // экземпляров, и две карточки опубликовали бы одинаковый sku — Google
+    // склеивает такие товары по sku+brand и выбрасывает один.
+    sku: p.sku,
     ...(p.description ? { description: p.description } : {}),
     ...(p.image ? { image: p.image.startsWith("http") ? p.image : `${SITE_URL}${p.image}` } : {}),
     url: `${SITE_URL}/parts/${p.slug}`,

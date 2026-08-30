@@ -130,6 +130,7 @@ export default async function PartDetailPage({ params }: Props) {
             name: p.name as string,
             slug: slug,
             article: p.article as string,
+            sku: p.sku as string,
             description: p.description as string | null,
             price: p.price as number,
             image: photos[0] ?? null,

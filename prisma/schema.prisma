@@ -1151,10 +1151,10 @@ model Part {
   condition      PartCondition @default(NEW)
   /// Заметка о состоянии б/у детали, показывается клиенту. Шкал и оценок нет
   /// намеренно: без писаных критериев они дают ложную точность.
-  conditionNote  String?
+  conditionNote  String?   @db.VarChar(1000)
   /// Происхождение б/у детали — с какой машины снята, пробег. Информационный
   /// текст для клиента, не связь с каталогом кузовов.
-  originNote     String?
+  originNote     String?   @db.VarChar(500)
   name           String // витринное название в магазине; официальное по каталогу производителя — reference.name
   description    String?
   referenceId    String? // номенклатурная позиция справочника; null только у служебных артикулов (ПОДЗАКАЗ-*)
