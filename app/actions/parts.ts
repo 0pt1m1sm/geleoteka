@@ -3,7 +3,14 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
+import { duplicateNewPartWhere, newPartSku, nextUsedSku } from "@/lib/part-sku";
+import {
+  isPartCondition,
+  CONDITION_NOTE_MAX,
+  ORIGIN_NOTE_MAX,
+  validateUsedPartFields,
+  type PartConditionValue,
+} from "@/lib/parts/used-part-validation";
 import { normalizeOem } from "@/lib/part-reference";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
@@ -56,6 +63,10 @@ function parseWeightGrams(raw: unknown): number | null {
 /** Нарушение уникального индекса Prisma. Клиент генерируется с @ts-nocheck,
  *  поэтому типизированного PrismaClientKnownRequestError под рукой нет —
  *  распознаём по коду, как это делается в остальных экшенах. */
+/** Ошибка бизнес-правила внутри транзакции: транзакция откатывается, а текст
+ *  доходит до пользователя как {error}, а не необработанным исключением. */
+class PartValidationError extends Error {}
+
 function isUniqueViolation(err: unknown): boolean {
   return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
 }
@@ -65,6 +76,11 @@ export async function createPart(
   formData: FormData,
 ): Promise<{ error: string | null }> {
   await requireRole(["ADMIN", "MANAGER"]);
+
+  const conditionRaw = formData.get("condition");
+  const condition: PartConditionValue = isPartCondition(conditionRaw) ? conditionRaw : "NEW";
+  const conditionNote = ((formData.get("conditionNote") as string) ?? "").trim();
+  const originNote = ((formData.get("originNote") as string) ?? "").trim();
 
   const article = (formData.get("article") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
@@ -95,9 +111,30 @@ export async function createPart(
   if (!normalizeOem(article)) {
     return { error: "Артикул должен содержать буквы или цифры" };
   }
-  const sku = newPartSku(article);
+  // SKU зависит от состояния. Новый товар: нормализованный артикул. Б/у:
+  // артикул плюс суффикс -U<N>, потому что экземпляров бывает несколько и
+  // каждый — отдельная строка с остатком 1.
+  let sku: string;
+  if (condition === "NEW") {
+    sku = newPartSku(article);
+  } else {
+    // Ищем занятые номера по НОРМАЛИЗОВАННОМУ префиксу sku, а не по тексту
+    // артикула. Иначе серия расходится: кнопка со справочника подставляет
+    // нормализованный oem, ручной ввод — произвольную запись номера, и
+    // findMany по точному тексту вернул бы пусто. Тогда nextUsedSku снова
+    // выдаёт -U1, вставка падает на Part_sku_key, и второй экземпляр НИКОГДА
+    // не завести — при этом пользователь читает «повторите сохранение».
+    const base = normalizeOem(article);
+    const siblings = (await db.part.findMany({
+      where: { sku: { startsWith: `${base}-U` } },
+      select: { sku: true },
+    })) as Array<{ sku: string }>;
+    sku = nextUsedSku(article, siblings.map((x) => x.sku));
+  }
 
-  // Проверяем ОБА ключа, потому что они разные.
+  // Дубль ищем ТОЛЬКО для нового товара: б/у экземпляр с тем же артикулом —
+  // это норма, ради неё вся инициатива. Проверяем ОБА ключа, потому что они
+  // разные.
   // По article — потому что миграция залила sku дословно (sku := article):
   // для «ПОДЗАКАЗ-07» и прочих артикулов с пунктуацией нормализованный ключ
   // не совпал бы с сохранённым, и защита молча выключилась бы на 15 из 70
@@ -107,15 +144,39 @@ export async function createPart(
   // вставка упала бы на Part_sku_key необработанным P2002; на легаси-строках
   // с дословным sku вместо ошибки появился бы тихий дубль.
   // Обе колонки проиндексированы (Part_article_idx, Part_sku_key).
-  const existing = await db.part.findFirst({
-    where: duplicateNewPartWhere(article, sku),
-    select: { id: true },
-  });
-  if (existing) {
-    return { error: "Запчасть с таким артикулом уже существует" };
+  if (condition === "NEW") {
+    const existing = await db.part.findFirst({
+      where: duplicateNewPartWhere(article, sku),
+      select: { id: true },
+    });
+    if (existing) {
+      return { error: "Запчасть с таким артикулом уже существует" };
+    }
   }
 
-  const slug = slugify(`${article}-${name}`).slice(0, 80);
+  const usedErr = validateUsedPartFields(condition, photoUrls, conditionNote);
+  if (usedErr) return { error: usedErr };
+  // Длину проверяем БЕЗУСЛОВНО: для NEW validateUsedPartFields выходит сразу,
+  // и скрафченный POST с длинной заметкой дал бы P2000 — необработанное
+  // исключение экшена вместо понятной ошибки.
+  if (conditionNote.length > CONDITION_NOTE_MAX) {
+    return { error: `Описание состояния слишком длинное (максимум ${CONDITION_NOTE_MAX} символов)` };
+  }
+  if (originNote.length > ORIGIN_NOTE_MAX) {
+    return { error: `Описание происхождения слишком длинное (максимум ${ORIGIN_NOTE_MAX} символов)` };
+  }
+
+  // Slug у б/у экземпляров обязан различаться: их несколько на один артикул, а
+  // Part_slug_key уникален. Суффикс берём из sku — он уже уникален.
+  // Суффикс приклеивается ПОСЛЕ обрезки: если база дотягивает до лимита,
+  // срезанный суффикс дал бы slug, совпадающий со slug нового товара, и
+  // экземпляр было бы не завести вовсе.
+  const slugSuffix = condition === "NEW" ? "" : `-${(sku.split("-").pop() ?? "u").toLowerCase()}`;
+  const slug = (slugify(`${article}-${name}`).slice(0, 80 - slugSuffix.length) + slugSuffix)
+    // Схлопывание повторных дефисов в slugify отрабатывает ДО склейки, поэтому
+    // база, оканчивающаяся дефисом (кириллическое название), давала бы «--u1».
+    .replace(/-+/g, "-")
+    .replace(/-$/, "");
 
   // Каждый реальный артикул пополняет номенклатурный справочник ДО создания
   // товара — товар сразу ссылается на номенклатуру (referenceId), витринное
@@ -158,6 +219,9 @@ export async function createPart(
           slug,
           article,
           sku,
+          condition,
+          conditionNote: conditionNote || null,
+          originNote: originNote || null,
           name,
           description,
           price,
@@ -182,12 +246,23 @@ export async function createPart(
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      return { error: "Запчасть с таким артикулом уже существует" };
+      // Для б/у это почти наверняка гонка: nextUsedSku читает занятые номера и
+      // считает следующий неатомарно, поэтому два одновременных заведения
+      // одной детали получают один суффикс. Просим повторить — при повторе
+      // список уже другой. Для нового товара это настоящий дубль.
+      return {
+        error:
+          condition === "NEW"
+            ? "Запчасть с таким артикулом уже существует"
+            : "Кто-то одновременно заводил этот же экземпляр — повторите сохранение",
+      };
     }
     throw err;
   }
 
-  await pingIndexNow(["/parts", `/parts/${slug}`]);
+  // Б/у в IndexNow не толкаем: до Story 5 у них нет ни canonical, ни noindex,
+  // а витрина их пока не показывает — адрес отдал бы 404 поисковику.
+  if (condition === "NEW") await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");
 }
 
@@ -211,6 +286,11 @@ export async function updatePart(
   const gtin = (formData.get("gtin") as string)?.trim() || null;
   const { ids: trimIds, error: trimErr } = await parseTrimIds(formData.get("trimIds"));
   if (trimErr) return { error: trimErr };
+  // Тексты состояния редактируются, а САМО состояние — нет: от него зависит
+  // торговый код позиции, который уже мог уехать в заказ и на этикетку.
+  const conditionNoteRaw = formData.get("conditionNote");
+  const originNoteRaw = formData.get("originNote");
+
   const { urls: photoUrls, error: photoErr } = parsePhotosFromForm(formData.get("photos"));
   if (photoErr) return { error: photoErr };
 
@@ -231,8 +311,44 @@ export async function updatePart(
     await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
     const current = (await tx.part.findUnique({
       where: { id: partId },
-      select: { photos: true },
-    })) as { photos: string[] } | null;
+      select: { photos: true, condition: true, conditionNote: true },
+    })) as {
+      photos: string[];
+      condition: PartConditionValue;
+      conditionNote: string | null;
+    } | null;
+    // Инвариант б/у действует и на РЕДАКТИРОВАНИИ: иначе с экземпляра можно
+    // снять все фотографии — то самое доказательство состояния при
+    // гарантийном возврате, ради которого правило и введено.
+    if (current) {
+      // Заметку подставляем непустой, если форма её не присылает: иначе б/у
+      // строка с пустым conditionNote (прямая правка БД, будущий импорт)
+      // заблокировала бы updatePart НАВСЕГДА — включая правку цены и
+      // активности, — и починить через интерфейс было бы нечем.
+      // Фотографии при этом проверяются по-настоящему: их форма присылает.
+      // Заметку проверяем ту, что прислала форма; если поле не пришло вовсе
+      // (форма нового товара), берём сохранённую и подставляем непустую —
+      // иначе б/у строка с пустым conditionNote заблокировала бы правку цены
+      // и активности навсегда, а починить через интерфейс было бы нечем.
+      const noteForCheck =
+        typeof conditionNoteRaw === "string"
+          ? conditionNoteRaw.trim()
+          : (current.conditionNote ?? "не указано");
+      const err = validateUsedPartFields(current.condition, photoUrls, noteForCheck);
+      if (err) throw new PartValidationError(err);
+      if (noteForCheck.length > CONDITION_NOTE_MAX) {
+        throw new PartValidationError(
+          `Описание состояния слишком длинное (максимум ${CONDITION_NOTE_MAX} символов)`,
+        );
+      }
+      const originForSave =
+        typeof originNoteRaw === "string" ? originNoteRaw.trim() : null;
+      if (originForSave && originForSave.length > ORIGIN_NOTE_MAX) {
+        throw new PartValidationError(
+          `Описание происхождения слишком длинное (максимум ${ORIGIN_NOTE_MAX} символов)`,
+        );
+      }
+    }
     const removed = (current?.photos ?? []).filter((u: string) => !photoUrls.includes(u));
     await tx.part.update({
       where: { id: partId },
@@ -246,6 +362,12 @@ export async function updatePart(
         categoryId: categoryId || null,
         isActive,
         photos: photoUrls,
+        ...(typeof conditionNoteRaw === "string"
+          ? { conditionNote: conditionNoteRaw.trim() || null }
+          : {}),
+        ...(typeof originNoteRaw === "string"
+          ? { originNote: originNoteRaw.trim() || null }
+          : {}),
       },
     });
 
@@ -284,6 +406,9 @@ export async function updatePart(
     }
     });
   } catch (e: unknown) {
+    if (e instanceof PartValidationError) {
+      return { error: e.message };
+    }
     if (e instanceof DuplicateCodeError) {
       return {
         error:

@@ -10,13 +10,18 @@ import {
 /**
  * Inline-поиск по номенклатурному справочнику для формы товара: вместо ручного
  * ввода артикула менеджер выбирает позицию, и родитель получает oem + название
- * через onPick. Позиции, уже заведённые товаром, помечаются и не выбираются —
- * артикул уникален.
+ * через onPick.
+ *
+ * `blockWhenNewExists` — позиции, у которых уже есть НОВЫЙ товар, помечаются и
+ * не выбираются. Так надо при заведении нового товара (артикул у новых
+ * уникален), но НЕ при заведении б/у экземпляра: там наличие нового — норма.
  */
 export function PartRefPicker({
   onPick,
+  blockWhenNewExists = true,
 }: {
   onPick: (ref: { oem: string; name: string }) => void;
+  blockWhenNewExists?: boolean;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -84,7 +89,11 @@ export function PartRefPicker({
       ) : (
         <ul className="max-h-56 overflow-auto divide-y divide-[var(--border)]">
           {options.map((r) => {
-            const taken = r.shopPartId !== null;
+            // Занятой считаем позицию только когда заводим НОВЫЙ товар:
+            // при заведении б/у экземпляра наличие нового — норма, ради этого
+            // всё и делается. Без этого менеджер вынужден набирать артикул
+            // руками, а расхождение записи номера ломает серию суффиксов.
+            const taken = blockWhenNewExists && r.shopPartId !== null;
             return (
               <li key={r.id}>
                 <button

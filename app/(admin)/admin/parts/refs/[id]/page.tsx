@@ -29,7 +29,14 @@ interface RefDetail {
       model: { name: string; slug: string };
     };
   }>;
-  parts: Array<{ id: string; name: string; price: number; isActive: boolean }>;
+  parts: Array<{
+    id: string;
+    name: string;
+    price: number;
+    isActive: boolean;
+    sku: string;
+    condition: "NEW" | "USED" | "REFURBISHED";
+  }>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -66,7 +73,12 @@ export default async function PartRefDetailPage({ params }: Props) {
         },
       },
       parts: {
-        select: { id: true, name: true, price: true, isActive: true },
+        // sku и condition обязательны: без них два б/у экземпляра одной детали
+        // в списке неразличимы. orderBy — чтобы порядок не был произвольным:
+        // сначала новый товар, потом экземпляры по возрастанию суффикса.
+        select: { id: true, name: true, price: true, isActive: true, sku: true, condition: true },
+        // По дате, а не по sku: лексикографически «-U10» встал бы перед «-U2».
+        orderBy: [{ condition: "asc" }, { createdAt: "asc" }],
       },
     },
   })) as RefDetail | null;
@@ -173,6 +185,9 @@ export default async function PartRefDetailPage({ params }: Props) {
                   <p className="font-medium truncate">{p.name}</p>
                   <p className="text-xs text-[var(--foreground-muted)]">
                     {formatPrice(p.price)}
+                    {p.condition === "USED" && " · б/у"}
+                    {p.condition === "REFURBISHED" && " · восстановленная"}
+                    {p.condition !== "NEW" && ` · ${p.sku}`}
                     {!p.isActive && " · скрыт с витрины"}
                   </p>
                 </div>
@@ -181,6 +196,18 @@ export default async function PartRefDetailPage({ params }: Props) {
                 </Link>
               </div>
             ))}
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <p className="text-sm text-[var(--foreground-muted)]">
+                Каждая б/у деталь заводится отдельной позицией: свои фотографии,
+                своя цена, своё место на складе.
+              </p>
+              <Link
+                href={`/admin/parts/new?ref=${ref.id}&condition=USED`}
+                className="btn btn-secondary btn-sm shrink-0"
+              >
+                Добавить б/у экземпляр
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4">

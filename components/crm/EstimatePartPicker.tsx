@@ -40,7 +40,11 @@ export function EstimatePartPicker({ estimateId }: { estimateId: string }): Reac
       setOptions(parts);
       // Позиции, уже заведённые товаром, показывает верхняя секция — в
       // справочной оставляем только то, чего в магазине ещё нет.
-      setRefOptions(refs.filter((r) => r.shopPartId === null));
+      // Раздел «под заказ» — только номенклатура, у которой в магазине НЕТ
+      // НИЧЕГО. Фильтр по shopPartId === null сюда затягивал бы позиции, у
+      // которых есть б/у экземпляр: менеджер добавил бы строку без partId,
+      // экземпляр остался бы без резерва и мог уехать вторым продажей.
+      setRefOptions(refs.filter((r) => !r.hasAnyPart));
     });
   }
 

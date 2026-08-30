@@ -48,6 +48,9 @@ export default async function EditPartPage({ params }: Props) {
     categoryId: (p.categoryId as string) ?? "",
     trimIds: partTrims.map((pt) => pt.trimId),
     photos: ((p.photos as string[]) ?? []),
+    condition: (p.condition as "NEW" | "USED" | "REFURBISHED") ?? "NEW",
+    conditionNote: (p.conditionNote as string | null) ?? "",
+    originNote: (p.originNote as string | null) ?? "",
     officialName: (p.reference as { name: string } | null)?.name ?? null,
   };
 

@@ -44,7 +44,12 @@ const REF_SELECT = {
   groupName: true,
   notes: true,
   fitments: { select: { generation: { select: { code: true } } } },
-  parts: { select: { id: true }, take: 1 },
+  // Только НОВЫЙ товар и детерминированный порядок — как в
+  // app/actions/part-references.ts. Без этого ссылка «в магазине» вела бы в
+  // произвольный вариант, а номенклатура с одним лишь б/у экземпляром
+  // показывала бы «в магазине» и прятала «Создать товар» — новый товар для
+  // неё было бы не завести из списка справочника вовсе.
+  parts: { where: { condition: "NEW" }, select: { id: true }, orderBy: { createdAt: "asc" }, take: 1 },
 } as const;
 
 function RefCard({ r }: { r: RefRow }): React.ReactElement {

@@ -45,7 +45,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const part = await getPartBySlug(slug);
   const p = part as Record<string, unknown> | null;
 
-  if (!p || !p.isActive) {
+  // condition — ВРЕМЕННО, до Story 3/5: иначе страница б/у отдаёт живой,
+  // полностью индексируемый дубль карточки нового товара без canonical.
+  if (!p || !p.isActive || p.condition !== "NEW") {
     return pageSeo({
       title: "Запчасть не найдена",
       description:
@@ -89,7 +91,8 @@ export default async function PartDetailPage({ params }: Props) {
   const { slug } = await params;
   const part = await getPartBySlug(slug);
 
-  if (!part || !(part as Record<string, unknown>).isActive) notFound();
+  const partRec = part as Record<string, unknown> | null;
+  if (!partRec || !partRec.isActive || partRec.condition !== "NEW") notFound();
 
   const p = part as Record<string, unknown>;
   const onHand = (p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0;

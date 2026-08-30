@@ -50,7 +50,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .findMany({ select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
     db.part
-      .findMany({ where: { isActive: true }, select: { slug: true, updatedAt: true } })
+      // condition NEW — ВРЕМЕННО, до Story 3 и Story 5: у б/у ещё нет ни
+      // карточки с вариантами, ни canonical/noindex. Без фильтра их адреса
+      // уходили бы прямо поисковику картой сайта, минуя витрину, и давали бы
+      // ту самую каннибализацию, ради устранения которой пишется Story 5.
+      // Снимать вместе с фильтром витрины и заглушкой в карточке.
+      .findMany({
+        where: { isActive: true, condition: "NEW" },
+        select: { slug: true, updatedAt: true },
+      })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
     db.vehicle
       .findMany({

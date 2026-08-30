@@ -62,7 +62,12 @@ export default async function PartsPage({ searchParams }: Props) {
     getCMSText("catalog.parts.subtitle"),
   ]);
 
-  const where: Record<string, unknown> = { isActive: true };
+  // ВРЕМЕННО, до Story 3 и Story 5. Б/у экземпляры уже заводятся в админке, но
+  // карточка с вариантами, корзина и SEO-контур (canonical/noindex/sitemap) ещё
+  // не сделаны. Без этого фильтра мерж Story 2 выложил бы в магазин неподписанные
+  // дубли карточек и протолкнул бы их адреса поисковикам через IndexNow.
+  // Снять в Story 3 вместе с показом вариантов.
+  const where: Record<string, unknown> = { isActive: true, condition: "NEW" };
 
   if (q) {
     // Free-text search: name + article only. PartTrim relation isn't text-searchable;

@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  prismaPartCodePort,
+  resolvePartIdByCode,
+  scanSourceFor,
+} from "@/lib/parts/resolve-part-code";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseScanCode } from "@/lib/wms/public";
@@ -41,20 +46,27 @@ export async function POST(request: Request): Promise<NextResponse> {
   const warehouseId = await resolveWarehouseId(
     typeof body.warehouseId === "string" ? body.warehouseId : undefined,
   );
-  const outcome = await resolveScan(db, parseScanCode(rawCode), TENANT_KEY, {
+  const parsedCode = parseScanCode(rawCode);
+  const outcome = await resolveScan(db, parsedCode, TENANT_KEY, {
     userId: session.id,
     action: typeof body.action === "string" && body.action ? body.action : "scan",
     deviceId: typeof body.deviceId === "string" ? body.deviceId : null,
     sessionId: typeof body.sessionId === "string" ? body.sessionId : null,
     warehouseId,
     articleResolver: async (code) => {
+      // Источник берём из типа исходного кода: resolveScan зовёт этот
+      // резолвер и для PART (наша этикетка), и для RAW (человек ввёл номер,
+      // прочитанный с самой детали). Захардкоженный "label" означал бы, что
+      // введённый вручную номер молча попадает в НОВУЮ строку — то самое
+      // движение остатка по чужой позиции, ради которого модуль и написан.
       // No isActive filter: a part deactivated in the shop still physically
       // exists in the warehouse and must be scannable (putaway/move/count).
-      const p = (await db.part.findFirst({
-        where: { article: code },
-        select: { id: true },
-      })) as { id: string } | null;
-      return p?.id ?? null;
+      const r = await resolvePartIdByCode(
+        prismaPartCodePort(db),
+        code,
+        scanSourceFor(parsedCode.type),
+      );
+      return r.status === "found" ? r.partId : null;
     },
   });
 

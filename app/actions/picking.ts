@@ -10,6 +10,12 @@ import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { revalidatePath } from "next/cache";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+  scanSourceFor,
+} from "@/lib/parts/resolve-part-code";
 import { openPickLinesForOrder, pickedLinesForOrder, applyPickLine, PickError, type OpenPickLine } from "@/lib/warehouse/pick";
 import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
@@ -23,17 +29,26 @@ export async function getPickedLines(repairOrderId: string): Promise<DoneConsume
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors stocktake's resolveItemCode. */
-async function resolveItemCode(raw: string, warehouseId: string): Promise<string | null> {
+async function resolveItemCode(raw: string, warehouseId: string): Promise<string | { ambiguous: string } | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
   const view = await lookupByCode(db, code, warehouseId, TENANT_KEY);
   if (view?.itemId) return view.itemId;
-  const byArticle = (await db.part.findFirst({
-    where: { article: code },
-    select: { id: true },
-  })) as { id: string } | null;
-  return byArticle?.id ?? null;
+  // Единый резолвер: артикул больше не уникален, «первая попавшаяся» строка
+  // означала бы списание с чужой позиции. См. lib/parts/resolve-part-code.ts.
+  const r = await resolvePartIdByCode(
+    prismaPartCodePort(db),
+    code,
+    scanSourceFor(parsed.type),
+  );
+  // Неоднозначность НЕ схлопываем в null: «не распознано» отправило бы
+  // оператора пересканировать тот же код до бесконечности, а в аудит легла бы
+  // ложная причина UNKNOWN_CODE. Причина должна дойти до человека.
+  if (r.status === "ambiguous") {
+    return { ambiguous: ambiguousCodeMessage(r.article, r.count) };
+  }
+  return r.status === "found" ? r.partId : null;
 }
 
 /** Resolve a scanned location code (typed WMS:LOC: or raw text) to a cell code. */
@@ -129,6 +144,11 @@ export async function pickRepairOrderLine(
     });
 
   const partId = await resolveItemCode(rawPartCode, warehouseId);
+  if (partId && typeof partId === "object") {
+    // Код валиден, но указывает на несколько позиций — это НЕ «не распознано».
+    await audit("REJECTED", "AMBIGUOUS_CODE");
+    return { error: partId.ambiguous };
+  }
   if (!partId) {
     await audit("REJECTED", "UNKNOWN_CODE");
     return { error: "Запчасть не распознана" };

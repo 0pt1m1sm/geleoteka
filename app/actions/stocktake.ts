@@ -8,7 +8,13 @@ import { db } from "@/lib/db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
-import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
+import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+  scanSourceFor,
+} from "@/lib/parts/resolve-part-code";
 import {
   createCountSession,
   recordCount,
@@ -36,17 +42,26 @@ const MAX_COUNT_QTY = 1_000_000;
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors app/api/warehouse/scan/route.ts resolution. */
-async function resolveItemCode(raw: string): Promise<string | null> {
+async function resolveItemCode(raw: string): Promise<string | { ambiguous: string } | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
   const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   if (view?.itemId) return view.itemId;
-  const byArticle = (await db.part.findFirst({
-    where: { article: code },
-    select: { id: true },
-  })) as { id: string } | null;
-  return byArticle?.id ?? null;
+  // Единый резолвер: артикул больше не уникален, «первая попавшаяся» строка
+  // означала бы списание с чужой позиции. См. lib/parts/resolve-part-code.ts.
+  const r = await resolvePartIdByCode(
+    prismaPartCodePort(db),
+    code,
+    scanSourceFor(parsed.type),
+  );
+  // Неоднозначность НЕ схлопываем в null: «не распознано» отправило бы
+  // оператора пересканировать тот же код до бесконечности, а в аудит легла бы
+  // ложная причина UNKNOWN_CODE. Причина должна дойти до человека.
+  if (r.status === "ambiguous") {
+    return { ambiguous: ambiguousCodeMessage(r.article, r.count) };
+  }
+  return r.status === "found" ? r.partId : null;
 }
 
 /** Resolve PART-scope scopeValue (a category slug OR comma-separated articles) to partIds. */
@@ -69,6 +84,9 @@ async function resolvePartScope(scopeValue: string): Promise<string[]> {
     .map((a) => a.trim())
     .filter(Boolean);
   if (articles.length === 0) return [];
+  // findMany, а не findFirst: если у номера есть и новый товар, и б/у
+  // экземпляры, в пересчёт должны попасть ВСЕ — оператор перечисляет номера
+  // деталей, а считает физические позиции на полках.
   const parts = (await db.part.findMany({
     where: { article: { in: articles } },
     select: { id: true },
@@ -121,12 +139,33 @@ export async function recordCountAction(
   location: string,
   countedQty: number,
 ): Promise<{ error: string | null; unknown?: boolean }> {
-  await requireRole(COUNT_ROLES);
+  const session = await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
     return { error: "Количество должно быть целым от 0 до 1 000 000" };
   }
   const partId = await resolveItemCode(rawItemCode);
+  // Неоднозначный код НЕ уходит в «неопознанное»: иначе пересчитанное
+  // количество ИЗВЕСТНОЙ позиции систематически падало бы в корзину, и
+  // расхождение по ней считалось бы без него.
+  if (partId && typeof partId === "object") {
+    // Пишем в ЖУРНАЛ сканов, а не через recordUnknownScan: последний создаёт
+    // StockCountLine с classification UNKNOWN, то есть заведомо ИЗВЕСТНЫЙ код
+    // показывался бы кладовщику в списке «Неизвестно», и после успешного
+    // пересчёта по этикетке в сессии висела бы лишняя строка.
+    const parsedAmb = parseScanCode(rawItemCode);
+    await recordScanEvent(db, {
+      userId: session.id,
+      action: "count",
+      rawCode: parsedAmb.raw,
+      parsedObjectType: parsedAmb.type,
+      parsedObjectId: "id" in parsedAmb ? parsedAmb.id : null,
+      result: "REJECTED",
+      errorCode: "AMBIGUOUS_CODE",
+      tenantKey: TENANT_KEY,
+    });
+    return { error: partId.ambiguous };
+  }
   try {
     if (!partId) {
       await recordUnknownScan(db, { sessionId, location, rawCode: rawItemCode, tenantKey: TENANT_KEY });

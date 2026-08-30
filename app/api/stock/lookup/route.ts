@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+} from "@/lib/parts/resolve-part-code";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { lookupByCode, availableStock } from "@/lib/wms/public";
@@ -29,14 +34,16 @@ export async function GET(request: Request): Promise<NextResponse> {
   const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   let itemId = view?.itemId ?? null;
 
-  // 2) Host fallback: article (catalog identity, not known to the core).
+  // 2) Host fallback: article/sku (catalog identity, not known to the core).
   if (!itemId) {
-    const byArticle = (await db.part.findFirst({
-      // No isActive filter: warehouse lookups must find shop-inactive parts too.
-      where: { article: code },
-      select: { id: true },
-    })) as { id: string } | null;
-    itemId = byArticle?.id ?? null;
+    const r = await resolvePartIdByCode(prismaPartCodePort(db), code, "raw");
+    if (r.status === "ambiguous") {
+      return NextResponse.json(
+        { error: { code: "AMBIGUOUS", message: ambiguousCodeMessage(r.article, r.count) } },
+        { status: 409 },
+      );
+    }
+    itemId = r.status === "found" ? r.partId : null;
   }
 
   if (!itemId) {
