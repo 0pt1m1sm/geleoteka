@@ -2,8 +2,7 @@
   "name": "tg-relay",
   "version": "1.0.0",
   "private": true,
-  "description": "Relay to Telegram Bot API hosted outside RU (Railway) for Geleoteka staff notifications",
-  "type": "module",
+  "description": "Verbatim source of the Telegram Bot API relay running on Railway (project tg-relay)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
