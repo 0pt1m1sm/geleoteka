@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prismaPartCodePort, resolvePartIdByCode } from "@/lib/parts/resolve-part-code";
 import { getSession } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { parseScanCode } from "@/lib/wms/public";
@@ -48,13 +49,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     sessionId: typeof body.sessionId === "string" ? body.sessionId : null,
     warehouseId,
     articleResolver: async (code) => {
+      // Единый резолвер: артикул перестал быть уникальным, и «первая
+      // попавшаяся» строка означала бы работу с чужой позицией. Источник
+      // здесь всегда наш типизированный код, поэтому "label".
       // No isActive filter: a part deactivated in the shop still physically
       // exists in the warehouse and must be scannable (putaway/move/count).
-      const p = (await db.part.findFirst({
-        where: { article: code },
-        select: { id: true },
-      })) as { id: string } | null;
-      return p?.id ?? null;
+      const r = await resolvePartIdByCode(prismaPartCodePort(db), code, "label");
+      return r.status === "found" ? r.partId : null;
     },
   });
 

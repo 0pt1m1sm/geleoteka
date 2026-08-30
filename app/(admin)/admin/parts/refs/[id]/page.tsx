@@ -181,6 +181,18 @@ export default async function PartRefDetailPage({ params }: Props) {
                 </Link>
               </div>
             ))}
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <p className="text-sm text-[var(--foreground-muted)]">
+                Каждая б/у деталь заводится отдельной позицией: свои фотографии,
+                своя цена, своё место на складе.
+              </p>
+              <Link
+                href={`/admin/parts/new?ref=${ref.id}&condition=USED`}
+                className="btn btn-secondary btn-sm shrink-0"
+              >
+                Добавить б/у экземпляр
+              </Link>
+            </div>
           </div>
         ) : (
           <div className="flex items-center justify-between gap-4">

@@ -8,16 +8,19 @@ import { PartRefPicker } from "./PartRefPicker";
 import { PartTrimPicker } from "./PartTrimPicker";
 import { PhotoUploader } from "./PhotoUploader";
 import type { VehicleModel } from "@/lib/vehicle-catalog-types";
+import { PART_CONDITIONS, type PartConditionValue } from "@/lib/parts/used-part-validation";
 
 interface Props {
   categories: { id: string; name: string }[];
   models: VehicleModel[];
   /** Предзаполнение из справочника (/admin/parts/new?ref=<id>). */
-  initial?: { article?: string; name?: string };
+  initial?: { article?: string; name?: string; condition?: PartConditionValue };
 }
 
 export function PartForm({ categories, models, initial }: Props) {
   const [state, formAction, isPending] = useActionState(createPart, null);
+  const [condition, setCondition] = useState<PartConditionValue>(initial?.condition ?? "NEW");
+  const isUsed = condition !== "NEW";
   // Артикул и название управляемые: их заполняет и выбор из справочника
   // (PartRefPicker), и предзаполнение через ?ref=.
   const [article, setArticle] = useState(initial?.article ?? "");
@@ -56,6 +59,65 @@ export function PartForm({ categories, models, initial }: Props) {
       </div>
 
       <div>
+        <label htmlFor="condition" className="block text-sm font-medium mb-2">Состояние *</label>
+        <select
+          id="condition"
+          name="condition"
+          className="input"
+          value={condition}
+          onChange={(e) => setCondition(e.target.value as PartConditionValue)}
+        >
+          {PART_CONDITIONS.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        {isUsed && (
+          <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
+            Каждый б/у экземпляр заводится отдельной позицией с остатком 1: у него
+            свои фотографии, своя цена и своё место на складе. Артикул общий с
+            новой деталью, торговый код будет сгенерирован автоматически.
+          </p>
+        )}
+      </div>
+
+      {isUsed && (
+        <>
+          <div>
+            <label htmlFor="conditionNote" className="block text-sm font-medium mb-2">
+              Состояние детали *
+            </label>
+            <textarea
+              id="conditionNote"
+              name="conditionNote"
+              required
+              maxLength={1000}
+              className="input min-h-[80px] resize-y"
+              placeholder="Потёртости на корпусе, резьба целая, следов ремонта нет"
+            />
+            <p className="mt-1 text-sm" style={{ color: "var(--color-muted)" }}>
+              Видно покупателю. Оценок и звёзд намеренно нет — состояние
+              показывают фотографии и это описание.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="originNote" className="block text-sm font-medium mb-2">
+              Происхождение
+            </label>
+            <input
+              id="originNote"
+              name="originNote"
+              maxLength={500}
+              className="input"
+              placeholder="Снята с W463 2019 г., пробег 82 000 км"
+            />
+          </div>
+        </>
+      )}
+
+      <div>
         <label htmlFor="description" className="block text-sm font-medium mb-2">Описание</label>
         <textarea id="description" name="description" className="input min-h-[80px] resize-y" placeholder="Подробное описание..." />
       </div>
@@ -85,7 +147,9 @@ export function PartForm({ categories, models, initial }: Props) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Фотографии</label>
+        <label className="block text-sm font-medium mb-2">
+          Фотографии{isUsed ? " * — этой конкретной детали" : ""}
+        </label>
         <PhotoUploader name="photos" initial={[]} />
       </div>
 

@@ -57,7 +57,17 @@ export async function searchPartReferences(query: string): Promise<PartReference
       name: true,
       groupName: true,
       fitments: { select: { generation: { select: { code: true } } } },
-      parts: { select: { id: true }, take: 1 },
+      // Только НОВЫЙ товар: б/у экземпляр не означает, что номенклатура
+      // «уже в магазине». Без фильтра первый же б/у экземпляр помечал бы
+      // позицию занятой, и PartRefPicker заблокировал бы создание нового
+      // товара из неё — то есть фича вариантов ломала бы саму себя.
+      // orderBy обязателен: без него выбор строки произволен.
+      parts: {
+        where: { condition: "NEW" },
+        select: { id: true },
+        orderBy: { createdAt: "asc" },
+        take: 1,
+      },
     },
     orderBy: { name: "asc" },
     take: 20,

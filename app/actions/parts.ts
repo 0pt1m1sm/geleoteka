@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
+import { duplicateNewPartWhere, newPartSku, nextUsedSku } from "@/lib/part-sku";
+import {
+  isPartCondition,
+  ORIGIN_NOTE_MAX,
+  validateUsedPartFields,
+  type PartConditionValue,
+} from "@/lib/parts/used-part-validation";
 import { normalizeOem } from "@/lib/part-reference";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
@@ -66,6 +72,11 @@ export async function createPart(
 ): Promise<{ error: string | null }> {
   await requireRole(["ADMIN", "MANAGER"]);
 
+  const conditionRaw = formData.get("condition");
+  const condition: PartConditionValue = isPartCondition(conditionRaw) ? conditionRaw : "NEW";
+  const conditionNote = ((formData.get("conditionNote") as string) ?? "").trim();
+  const originNote = ((formData.get("originNote") as string) ?? "").trim();
+
   const article = (formData.get("article") as string)?.trim();
   const name = (formData.get("name") as string)?.trim();
   const price = parseInt(formData.get("price") as string);
@@ -95,9 +106,23 @@ export async function createPart(
   if (!normalizeOem(article)) {
     return { error: "Артикул должен содержать буквы или цифры" };
   }
-  const sku = newPartSku(article);
+  // SKU зависит от состояния. Новый товар: нормализованный артикул. Б/у:
+  // артикул плюс суффикс -U<N>, потому что экземпляров бывает несколько и
+  // каждый — отдельная строка с остатком 1.
+  let sku: string;
+  if (condition === "NEW") {
+    sku = newPartSku(article);
+  } else {
+    const siblings = (await db.part.findMany({
+      where: { article },
+      select: { sku: true },
+    })) as Array<{ sku: string }>;
+    sku = nextUsedSku(article, siblings.map((x) => x.sku));
+  }
 
-  // Проверяем ОБА ключа, потому что они разные.
+  // Дубль ищем ТОЛЬКО для нового товара: б/у экземпляр с тем же артикулом —
+  // это норма, ради неё вся инициатива. Проверяем ОБА ключа, потому что они
+  // разные.
   // По article — потому что миграция залила sku дословно (sku := article):
   // для «ПОДЗАКАЗ-07» и прочих артикулов с пунктуацией нормализованный ключ
   // не совпал бы с сохранённым, и защита молча выключилась бы на 15 из 70
@@ -107,15 +132,27 @@ export async function createPart(
   // вставка упала бы на Part_sku_key необработанным P2002; на легаси-строках
   // с дословным sku вместо ошибки появился бы тихий дубль.
   // Обе колонки проиндексированы (Part_article_idx, Part_sku_key).
-  const existing = await db.part.findFirst({
-    where: duplicateNewPartWhere(article, sku),
-    select: { id: true },
-  });
-  if (existing) {
-    return { error: "Запчасть с таким артикулом уже существует" };
+  if (condition === "NEW") {
+    const existing = await db.part.findFirst({
+      where: duplicateNewPartWhere(article, sku),
+      select: { id: true },
+    });
+    if (existing) {
+      return { error: "Запчасть с таким артикулом уже существует" };
+    }
   }
 
-  const slug = slugify(`${article}-${name}`).slice(0, 80);
+  const usedErr = validateUsedPartFields(condition, photoUrls, conditionNote);
+  if (usedErr) return { error: usedErr };
+  if (originNote.length > ORIGIN_NOTE_MAX) {
+    return { error: `Описание происхождения слишком длинное (максимум ${ORIGIN_NOTE_MAX} символов)` };
+  }
+
+  // Slug у б/у экземпляров обязан различаться: их несколько на один артикул, а
+  // Part_slug_key уникален. Суффикс берём из sku — он уже уникален.
+  const slugBase =
+    condition === "NEW" ? `${article}-${name}` : `${article}-${name}-${sku.split("-").pop()}`;
+  const slug = slugify(slugBase).slice(0, 80);
 
   // Каждый реальный артикул пополняет номенклатурный справочник ДО создания
   // товара — товар сразу ссылается на номенклатуру (referenceId), витринное
@@ -158,6 +195,9 @@ export async function createPart(
           slug,
           article,
           sku,
+          condition,
+          conditionNote: conditionNote || null,
+          originNote: originNote || null,
           name,
           description,
           price,
@@ -182,7 +222,16 @@ export async function createPart(
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
-      return { error: "Запчасть с таким артикулом уже существует" };
+      // Для б/у это почти наверняка гонка: nextUsedSku читает занятые номера и
+      // считает следующий неатомарно, поэтому два одновременных заведения
+      // одной детали получают один суффикс. Просим повторить — при повторе
+      // список уже другой. Для нового товара это настоящий дубль.
+      return {
+        error:
+          condition === "NEW"
+            ? "Запчасть с таким артикулом уже существует"
+            : "Кто-то одновременно заводил этот же экземпляр — повторите сохранение",
+      };
     }
     throw err;
   }

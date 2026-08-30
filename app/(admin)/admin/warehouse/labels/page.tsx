@@ -49,8 +49,14 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
   if (partIds.length > 0) {
     const parts = (await db.part.findMany({
       where: { id: { in: partIds } },
-      select: { id: true, name: true, article: true },
-    })) as Array<{ id: string; name: string; article: string }>;
+      select: { id: true, name: true, article: true, sku: true, condition: true },
+    })) as Array<{
+      id: string;
+      name: string;
+      article: string;
+      sku: string;
+      condition: "NEW" | "USED" | "REFURBISHED";
+    }>;
     const byId = new Map(parts.map((p) => [p.id, p]));
     for (const id of partIds) {
       const p = byId.get(id);
@@ -59,7 +65,14 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
       // article), never a supplier barcode — every item we accept wears one
       // consistent label. A supplier barcode, if stored, still resolves on scan
       // as an alias, but it is not what we print.
-      labels.push({ qr: await qr(formatScanCode("PART", p.article)), title: p.name, sub: p.article });
+      // В коде этикетки — sku, а НЕ article: артикул общий у нового товара и
+      // б/у экземпляров, и этикетки получились бы побайтово одинаковыми —
+      // различить деталь на складе было бы нечем. Под кодом печатаем артикул,
+      // он человекочитаем и совпадает с маркировкой на самой детали.
+      // Состояние в подписи: две этикетки одной детали иначе неразличимы
+      // глазом, а перепутать новую с б/у на полке — это отгрузка не того.
+      const sub = p.condition === "NEW" ? p.article : `${p.article} · б/у`;
+      labels.push({ qr: await qr(formatScanCode("PART", p.sku)), title: p.name, sub });
     }
   }
 

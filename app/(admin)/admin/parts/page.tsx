@@ -7,10 +7,21 @@ import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { Button, Card, PageHeader } from "@/components/ui";
 
-export default async function AdminPartsPage() {
+interface Props {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function AdminPartsPage({ searchParams }: Props) {
   await requireRole(["ADMIN", "MANAGER"]);
 
+  const sp = await searchParams;
+  const condFilter =
+    sp.condition === "NEW" || sp.condition === "USED" || sp.condition === "REFURBISHED"
+      ? sp.condition
+      : null;
+
   const parts = await db.part.findMany({
+    where: condFilter ? { condition: condFilter } : undefined,
     include: {
       category: { select: { name: true } },
       stockItems: { select: { quantity: true } },
@@ -63,6 +74,8 @@ export default async function AdminPartsPage() {
                   </div>
                   <p className="text-xs text-[var(--foreground-muted)] font-mono">
                     {part.article as string}
+                    {(part.condition as string) === "USED" && " · б/у"}
+                    {(part.condition as string) === "REFURBISHED" && " · восстановленная"}
                     {cat && ` · ${cat.name}`}
                     {(part.isOEM as boolean) ? " · OEM" : " · Аналог"}
                   </p>

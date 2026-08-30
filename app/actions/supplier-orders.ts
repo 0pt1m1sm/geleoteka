@@ -3,6 +3,11 @@
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+} from "@/lib/parts/resolve-part-code";
 import { slugify } from "@/lib/slug";
 import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
@@ -511,11 +516,13 @@ export async function scanReceiveLine(
   const view = await lookupByCode(db, trimmed, await defaultWarehouseId(db), TENANT_KEY);
   let itemId = view?.itemId ?? null;
   if (!itemId) {
-    const byArticle = (await db.part.findFirst({
-      where: { article: trimmed, isActive: true },
-      select: { id: true },
-    })) as { id: string } | null;
-    itemId = byArticle?.id ?? null;
+    // Единый резолвер вместо findFirst по артикулу: он больше не уникален, а
+    // «первая попавшаяся» строка здесь означала бы приёмку в чужую позицию.
+    // Фильтр isActive убран сознательно — он всё равно не различал варианты
+    // (б/у экземпляр активен), а снятый с витрины товар принимать надо.
+    const r = await resolvePartIdByCode(prismaPartCodePort(db), trimmed, "raw");
+    if (r.status === "ambiguous") return { error: ambiguousCodeMessage(r.article, r.count) };
+    itemId = r.status === "found" ? r.partId : null;
   }
   if (!itemId) return { error: "Код не найден" };
 

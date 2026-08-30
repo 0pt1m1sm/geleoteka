@@ -9,6 +9,7 @@ import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
+import { prismaPartCodePort, resolvePartIdByCode } from "@/lib/parts/resolve-part-code";
 import {
   createCountSession,
   recordCount,
@@ -42,11 +43,14 @@ async function resolveItemCode(raw: string): Promise<string | null> {
   if (!code) return null;
   const view = await lookupByCode(db, code, await defaultWarehouseId(db), TENANT_KEY);
   if (view?.itemId) return view.itemId;
-  const byArticle = (await db.part.findFirst({
-    where: { article: code },
-    select: { id: true },
-  })) as { id: string } | null;
-  return byArticle?.id ?? null;
+  // Единый резолвер: артикул больше не уникален, «первая попавшаяся» строка
+  // означала бы списание с чужой позиции. См. lib/parts/resolve-part-code.ts.
+  const r = await resolvePartIdByCode(
+    prismaPartCodePort(db),
+    code,
+    parsed.type === "PART" ? "label" : "raw",
+  );
+  return r.status === "found" ? r.partId : null;
 }
 
 /** Resolve PART-scope scopeValue (a category slug OR comma-separated articles) to partIds. */
@@ -69,6 +73,9 @@ async function resolvePartScope(scopeValue: string): Promise<string[]> {
     .map((a) => a.trim())
     .filter(Boolean);
   if (articles.length === 0) return [];
+  // findMany, а не findFirst: если у номера есть и новый товар, и б/у
+  // экземпляры, в пересчёт должны попасть ВСЕ — оператор перечисляет номера
+  // деталей, а считает физические позиции на полках.
   const parts = (await db.part.findMany({
     where: { article: { in: articles } },
     select: { id: true },
