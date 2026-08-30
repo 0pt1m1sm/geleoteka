@@ -58,6 +58,7 @@ export async function registerAction(_prevState: { error: string | null } | null
         referralSource: "WALK_IN",
         customerProfile: { create: {} },
       },
+      select: { id: true, permissionRole: true },
     });
   } catch (err) {
     // The findFirst check above narrows the window but doesn't close it —

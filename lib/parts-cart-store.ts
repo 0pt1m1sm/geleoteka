@@ -12,7 +12,28 @@ export interface CartItem {
 
 const EMPTY_CART: CartItem[] = [];
 
-export const cartStore = createLocalStorageStore<CartItem[]>("parts-cart", EMPTY_CART);
+/** Guards against corrupted/foreign JSON in the "parts-cart" key crashing
+ * every consumer that assumes an array (PartsCart, CartIconLink, ...). */
+function validateCart(parsed: unknown): { ok: CartItem[] } | null {
+  if (!Array.isArray(parsed)) return null;
+  const items = parsed.filter(
+    (item): item is CartItem =>
+      item !== null &&
+      typeof item === "object" &&
+      typeof (item as CartItem).partId === "string" &&
+      typeof (item as CartItem).name === "string" &&
+      typeof (item as CartItem).article === "string" &&
+      typeof (item as CartItem).price === "number" &&
+      typeof (item as CartItem).qty === "number",
+  );
+  return { ok: items };
+}
+
+export const cartStore = createLocalStorageStore<CartItem[]>(
+  "parts-cart",
+  EMPTY_CART,
+  validateCart,
+);
 
 /** Total quantity across all items in cart — used by Header badge. */
 export function cartItemCount(items: CartItem[]): number {
