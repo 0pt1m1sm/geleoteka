@@ -9,7 +9,12 @@ import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode } from "@/lib/wms/public";
-import { prismaPartCodePort, resolvePartIdByCode } from "@/lib/parts/resolve-part-code";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+  scanSourceFor,
+} from "@/lib/parts/resolve-part-code";
 import {
   createCountSession,
   recordCount,
@@ -37,7 +42,7 @@ const MAX_COUNT_QTY = 1_000_000;
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors app/api/warehouse/scan/route.ts resolution. */
-async function resolveItemCode(raw: string): Promise<string | null> {
+async function resolveItemCode(raw: string): Promise<string | { ambiguous: string } | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
@@ -48,8 +53,14 @@ async function resolveItemCode(raw: string): Promise<string | null> {
   const r = await resolvePartIdByCode(
     prismaPartCodePort(db),
     code,
-    parsed.type === "PART" ? "label" : "raw",
+    scanSourceFor(parsed.type),
   );
+  // Неоднозначность НЕ схлопываем в null: «не распознано» отправило бы
+  // оператора пересканировать тот же код до бесконечности, а в аудит легла бы
+  // ложная причина UNKNOWN_CODE. Причина должна дойти до человека.
+  if (r.status === "ambiguous") {
+    return { ambiguous: ambiguousCodeMessage(r.article, r.count) };
+  }
   return r.status === "found" ? r.partId : null;
 }
 
@@ -134,6 +145,12 @@ export async function recordCountAction(
     return { error: "Количество должно быть целым от 0 до 1 000 000" };
   }
   const partId = await resolveItemCode(rawItemCode);
+  // Неоднозначный код НЕ уходит в «неопознанное»: иначе пересчитанное
+  // количество ИЗВЕСТНОЙ позиции систематически падало бы в корзину, и
+  // расхождение по ней считалось бы без него.
+  if (partId && typeof partId === "object") {
+    return { error: partId.ambiguous };
+  }
   try {
     if (!partId) {
       await recordUnknownScan(db, { sessionId, location, rawCode: rawItemCode, tenantKey: TENANT_KEY });

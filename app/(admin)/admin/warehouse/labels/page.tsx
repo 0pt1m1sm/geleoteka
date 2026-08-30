@@ -71,7 +71,11 @@ export default async function WarehouseLabelsPage({ searchParams }: Props): Prom
       // он человекочитаем и совпадает с маркировкой на самой детали.
       // Состояние в подписи: две этикетки одной детали иначе неразличимы
       // глазом, а перепутать новую с б/у на полке — это отгрузка не того.
-      const sub = p.condition === "NEW" ? p.article : `${p.article} · б/у`;
+      // Подпись обязана различать ДВА Б/У одной детали, а не только новый и
+      // б/у: у них одинаковые name и article, отличается только sku.
+      const condLabel =
+        p.condition === "NEW" ? "" : p.condition === "USED" ? " · б/у" : " · восстановленная";
+      const sub = p.condition === "NEW" ? p.article : `${p.article}${condLabel} · ${p.sku}`;
       labels.push({ qr: await qr(formatScanCode("PART", p.sku)), title: p.name, sub });
     }
   }

@@ -31,6 +31,7 @@ export function PartForm({ categories, models, initial }: Props) {
       <AdminFormShell error={state?.error}>
 
       <PartRefPicker
+        blockWhenNewExists={condition === "NEW"}
         onPick={(ref) => {
           setArticle(ref.oem);
           setName(ref.name);
@@ -74,7 +75,7 @@ export function PartForm({ categories, models, initial }: Props) {
           ))}
         </select>
         {isUsed && (
-          <p className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
+          <p className="mt-2 text-sm text-[var(--foreground-muted)]">
             Каждый б/у экземпляр заводится отдельной позицией с остатком 1: у него
             свои фотографии, своя цена и своё место на складе. Артикул общий с
             новой деталью, торговый код будет сгенерирован автоматически.
@@ -96,7 +97,7 @@ export function PartForm({ categories, models, initial }: Props) {
               className="input min-h-[80px] resize-y"
               placeholder="Потёртости на корпусе, резьба целая, следов ремонта нет"
             />
-            <p className="mt-1 text-sm" style={{ color: "var(--color-muted)" }}>
+            <p className="mt-1 text-sm text-[var(--foreground-muted)]">
               Видно покупателю. Оценок и звёзд намеренно нет — состояние
               показывают фотографии и это описание.
             </p>
@@ -133,7 +134,7 @@ export function PartForm({ categories, models, initial }: Props) {
         </div>
         <div>
           <label htmlFor="quantity" className="block text-sm font-medium mb-2">Кол-во</label>
-          <input id="quantity" name="quantity" type="number" className="input" placeholder="25" defaultValue="0" />
+          <input id="quantity" name="quantity" type="number" className="input" placeholder="25" defaultValue={isUsed ? "1" : "0"} />
         </div>
         <div>
           <label htmlFor="weightKg" className="block text-sm font-medium mb-2">Вес (кг)</label>

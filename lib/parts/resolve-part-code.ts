@@ -39,9 +39,11 @@ export type PartCodeResolution =
 
 /** Текст для оператора, когда номер детали не определяет позицию однозначно. */
 export function ambiguousCodeMessage(article: string, count: number): string {
+  // Не называем варианты «новая и б/у»: конфликтовать могут и два б/у, и
+  // нужен оператору может быть как раз новый — у его этикетки суффикса нет.
   return (
-    `Номер ${article} есть у ${count} позиций (новая и б/у) — ` +
-    `отсканируйте этикетку нужного экземпляра, на ней код с суффиксом`
+    `Номер ${article} есть у ${count} позиций каталога — ` +
+    `отсканируйте этикетку нужной, на ней уникальный код позиции`
   );
 }
 
@@ -81,11 +83,17 @@ export async function resolvePartIdByCode(
  * восьми мест и все они обязаны разрешать код одинаково — иначе один забытый
  * `findFirst({ where: { article } })` вернёт недетерминизм обратно.
  */
-// Клиент Prisma генерируется с @ts-nocheck, поэтому точный тип делегата сюда
-// не подтягивается — принимаем минимальную структуру и приводим на месте, как
-// это делается в остальном коде проекта (см. .claude/rules/geleoteka-conventions.md).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function prismaPartCodePort(client: any): PartCodeLookupPort {
+/** Минимум, который резолверу нужен от клиента Prisma. Структурный тип, а не
+ *  `any`: клиент генерируется с @ts-nocheck, точный тип делегата сюда не
+ *  подтягивается, но и терять проверку вызова незачем. */
+interface PartDelegateClient {
+  part: {
+    findUnique(args: { where: { sku: string }; select: { id: true } }): Promise<unknown>;
+    findMany(args: { where: { article: string }; select: { id: true } }): Promise<unknown>;
+  };
+}
+
+export function prismaPartCodePort(client: PartDelegateClient): PartCodeLookupPort {
   return {
     findBySku: async (sku) =>
       (await client.part.findUnique({ where: { sku }, select: { id: true } })) as
@@ -98,4 +106,19 @@ export function prismaPartCodePort(client: any): PartCodeLookupPort {
         id: string;
       }>,
   };
+}
+
+/**
+ * Источник кода по типу разобранного скана.
+ *
+ * Вынесено функцией не для красоты: ревью PR #97 поймало ровно эту ошибку —
+ * в самом ходовом месте сканирования источник был захардкожен "label", хотя
+ * тот же резолвер обслуживает и RAW. Мутация `"label"` ↔ `"raw"` в любом из
+ * шести вызовов не роняла ни один тест. Теперь правило одно и покрыто.
+ *
+ * `PART` — наш типизированный код с этикетки. Всё остальное, включая RAW, —
+ * ручной ввод: номер, прочитанный с самой детали, вариантов не различает.
+ */
+export function scanSourceFor(parsedType: string): PartCodeSource {
+  return parsedType === "PART" ? "label" : "raw";
 }

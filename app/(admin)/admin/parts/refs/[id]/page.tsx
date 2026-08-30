@@ -29,7 +29,14 @@ interface RefDetail {
       model: { name: string; slug: string };
     };
   }>;
-  parts: Array<{ id: string; name: string; price: number; isActive: boolean }>;
+  parts: Array<{
+    id: string;
+    name: string;
+    price: number;
+    isActive: boolean;
+    sku: string;
+    condition: "NEW" | "USED" | "REFURBISHED";
+  }>;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -66,7 +73,11 @@ export default async function PartRefDetailPage({ params }: Props) {
         },
       },
       parts: {
-        select: { id: true, name: true, price: true, isActive: true },
+        // sku и condition обязательны: без них два б/у экземпляра одной детали
+        // в списке неразличимы. orderBy — чтобы порядок не был произвольным:
+        // сначала новый товар, потом экземпляры по возрастанию суффикса.
+        select: { id: true, name: true, price: true, isActive: true, sku: true, condition: true },
+        orderBy: [{ condition: "asc" }, { sku: "asc" }],
       },
     },
   })) as RefDetail | null;
@@ -173,6 +184,9 @@ export default async function PartRefDetailPage({ params }: Props) {
                   <p className="font-medium truncate">{p.name}</p>
                   <p className="text-xs text-[var(--foreground-muted)]">
                     {formatPrice(p.price)}
+                    {p.condition === "USED" && " · б/у"}
+                    {p.condition === "REFURBISHED" && " · восстановленная"}
+                    {p.condition !== "NEW" && ` · ${p.sku}`}
                     {!p.isActive && " · скрыт с витрины"}
                   </p>
                 </div>

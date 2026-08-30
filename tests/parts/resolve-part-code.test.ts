@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolvePartIdByCode, type PartCodeLookupPort } from "@/lib/parts/resolve-part-code";
+import {
+  resolvePartIdByCode,
+  scanSourceFor,
+  type PartCodeLookupPort,
+} from "@/lib/parts/resolve-part-code";
 
 /**
  * Фейковый порт: минимум, который нужен резолверу. Тест намеренно проверяет
@@ -79,5 +83,25 @@ describe("resolvePartIdByCode", () => {
     };
     expect(await resolvePartIdByCode(spy, "   ")).toEqual({ status: "not_found" });
     expect(touched).toBe(false);
+  });
+});
+
+describe("scanSourceFor — сторож против захардкоженного источника", () => {
+  // Ревью PR #97 нашло, что в /api/warehouse/scan источник был прибит
+  // константой "label", хотя resolveScan зовёт резолвер и для RAW. Мутация
+  // не роняла ни одного теста, потому что источник нигде не проверялся.
+  it("наша этикетка — label", () => {
+    expect(scanSourceFor("PART")).toBe("label");
+  });
+
+  it("сырой ввод — raw: номер с детали не различает варианты", () => {
+    expect(scanSourceFor("RAW")).toBe("raw");
+  });
+
+  it("любой прочий тип трактуется как ручной ввод, а не как этикетка", () => {
+    // Безопасная сторона: ошибиться в сторону «неоднозначно» дешевле, чем
+    // молча списать остаток с чужой позиции.
+    expect(scanSourceFor("LOC")).toBe("raw");
+    expect(scanSourceFor("")).toBe("raw");
   });
 });

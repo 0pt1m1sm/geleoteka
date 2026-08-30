@@ -10,7 +10,12 @@ import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { revalidatePath } from "next/cache";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { WmsError, parseScanCode, lookupByCode, recordScanEvent } from "@/lib/wms/public";
-import { prismaPartCodePort, resolvePartIdByCode } from "@/lib/parts/resolve-part-code";
+import {
+  ambiguousCodeMessage,
+  prismaPartCodePort,
+  resolvePartIdByCode,
+  scanSourceFor,
+} from "@/lib/parts/resolve-part-code";
 import { openPickLinesForOrder, pickedLinesForOrder, applyPickLine, PickError, type OpenPickLine } from "@/lib/warehouse/pick";
 import type { DoneConsumeLine } from "@/lib/warehouse/scan-consume";
 
@@ -24,7 +29,7 @@ export async function getPickedLines(repairOrderId: string): Promise<DoneConsume
 
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors stocktake's resolveItemCode. */
-async function resolveItemCode(raw: string, warehouseId: string): Promise<string | null> {
+async function resolveItemCode(raw: string, warehouseId: string): Promise<string | { ambiguous: string } | null> {
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
@@ -35,8 +40,14 @@ async function resolveItemCode(raw: string, warehouseId: string): Promise<string
   const r = await resolvePartIdByCode(
     prismaPartCodePort(db),
     code,
-    parsed.type === "PART" ? "label" : "raw",
+    scanSourceFor(parsed.type),
   );
+  // Неоднозначность НЕ схлопываем в null: «не распознано» отправило бы
+  // оператора пересканировать тот же код до бесконечности, а в аудит легла бы
+  // ложная причина UNKNOWN_CODE. Причина должна дойти до человека.
+  if (r.status === "ambiguous") {
+    return { ambiguous: ambiguousCodeMessage(r.article, r.count) };
+  }
   return r.status === "found" ? r.partId : null;
 }
 
@@ -133,6 +144,11 @@ export async function pickRepairOrderLine(
     });
 
   const partId = await resolveItemCode(rawPartCode, warehouseId);
+  if (partId && typeof partId === "object") {
+    // Код валиден, но указывает на несколько позиций — это НЕ «не распознано».
+    await audit("REJECTED", "AMBIGUOUS_CODE");
+    return { error: partId.ambiguous };
+  }
   if (!partId) {
     await audit("REJECTED", "UNKNOWN_CODE");
     return { error: "Запчасть не распознана" };

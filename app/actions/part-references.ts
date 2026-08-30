@@ -20,7 +20,12 @@ export interface PartReferenceOption {
   /** Коды кузовов из fitments — для отображения в пикерах. */
   models: string[];
   /** id товара магазина с тем же артикулом, если он уже заведён. */
+  /** Id НОВОГО товара по этой номенклатуре, если он есть. */
   shopPartId: string | null;
+  /** Есть ли по номенклатуре хоть какой-то товар, включая б/у экземпляры.
+   *  Отдельный флаг: «нового нет» и «в магазине ничего нет» — разные факты,
+   *  и потребители делают из них разные выводы. */
+  hasAnyPart: boolean;
 }
 
 interface RefWithFitments {
@@ -30,6 +35,7 @@ interface RefWithFitments {
   groupName: string | null;
   fitments: Array<{ generation: { code: string } }>;
   parts: Array<{ id: string }>;
+  _count: { parts: number };
 }
 
 /**
@@ -68,6 +74,12 @@ export async function searchPartReferences(query: string): Promise<PartReference
         orderBy: { createdAt: "asc" },
         take: 1,
       },
+      // Отдельным счётчиком — есть ли ХОТЬ КАКОЙ-ТО товар. Смета обязана
+      // отличать «нового нет» от «в магазине ничего нет»: номенклатура, у
+      // которой лежит только б/у экземпляр, иначе попадала бы в раздел
+      // «под заказ», менеджер добавлял бы строку без partId, и физический
+      // экземпляр уехал бы без резерва — то есть мог бы продаться дважды.
+      _count: { select: { parts: true } },
     },
     orderBy: { name: "asc" },
     take: 20,
@@ -80,6 +92,7 @@ export async function searchPartReferences(query: string): Promise<PartReference
     groupName: r.groupName,
     models: r.fitments.map((f) => f.generation.code).sort(),
     shopPartId: r.parts[0]?.id ?? null,
+    hasAnyPart: r._count.parts > 0,
   }));
 }
 
