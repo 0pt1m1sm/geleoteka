@@ -14,6 +14,7 @@ import { db } from "../lib/db";
 import { TENANT_KEY, defaultWarehouseId } from "../lib/wms-host";
 import { ensurePartReference, resolveGenerationIds } from "../lib/part-reference-lookup";
 import { newPartSku } from "../lib/part-sku";
+import { normalizeOem } from "../lib/part-reference";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -33,7 +34,7 @@ async function cleanup(): Promise<void> {
     await db.stockItem.deleteMany({ where: { partId: part.id } });
     await db.part.delete({ where: { id: part.id } });
   }
-  await db.partReference.deleteMany({ where: { oem: ARTICLE } });
+  await db.partReference.deleteMany({ where: { oem: normalizeOem(ARTICLE) } });
 }
 
 async function main(): Promise<void> {

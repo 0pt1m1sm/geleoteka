@@ -178,6 +178,9 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
     // экземпляров, и две карточки опубликовали бы одинаковый sku — Google
     // склеивает такие товары по sku+brand и выбрасывает один.
     sku: p.sku,
+    // OEM-номер отдельным полем: sku нормализован, а Яндексу и покупателю
+    // полезен именно каталожный номер детали в исходном виде.
+    mpn: p.article,
     ...(p.description ? { description: p.description } : {}),
     ...(p.image ? { image: p.image.startsWith("http") ? p.image : `${SITE_URL}${p.image}` } : {}),
     url: `${SITE_URL}/parts/${p.slug}`,

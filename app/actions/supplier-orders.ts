@@ -130,10 +130,12 @@ async function resolveLinesAndCost(
       // По article + condition, а не по sku: артикул перестал быть уникальным,
       // а sku у старых строк залит дословно и с нормализованным ключом не
       // совпадает (артикулы с пунктуацией — 15 из 70 позиций каталога).
-      const existing = (await tx.part.findFirst({ where: { article, condition: "NEW" }, select: { id: true } })) as { id: string } | null;
-      if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
       if (!normalizeOem(article)) throw new OrderValidationError(`Артикул ${article} должен содержать буквы или цифры`);
       const sku = newPartSku(article);
+      // Оба ключа: article — потому что sku у старых строк залит дословно,
+      // sku — потому что уникальный индекс стоит на нём (см. parts.ts).
+      const existing = (await tx.part.findFirst({ where: { OR: [{ article, condition: "NEW" }, { sku }] }, select: { id: true } })) as { id: string } | null;
+      if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
       const slug = slugify(`${article}-${name}`).slice(0, 80);
       // Draft-товар рождается уже связанным с номенклатурой — иначе позиция,
       // заказанная у поставщика, выпадает из справочника до ручной правки.

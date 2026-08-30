@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { seedVehicleCatalog } from "./seed-vehicles";
 import { seedTrims } from "./seed-trims";
 import { CMS_SCHEMA } from "../lib/cms-schema";
+import { newPartSku } from "../lib/part-sku";
 
 const prisma = new PrismaClient();
 
@@ -436,7 +437,10 @@ async function main(): Promise<void> {
 
     // Idempotent: upsert the part, then sync its PartTrim rows.
     const part = await prisma.part.upsert({
-      where: { sku: sp.article },
+      // По slug: он уникален и задан в сиде руками. Искать по sku нельзя —
+      // на уже засеянных базах он лежит в дословном формате, а прод-код
+      // пишет нормализованный, и upsert ушёл бы в create с падением на slug.
+      where: { slug: sp.slug },
       update: {
         slug: sp.slug,
         name: sp.name,
@@ -449,7 +453,7 @@ async function main(): Promise<void> {
       create: {
         slug: sp.slug,
         article: sp.article,
-        sku: sp.article,
+        sku: newPartSku(sp.article),
         name: sp.name,
         price: sp.price,
         isOEM: sp.isOEM,

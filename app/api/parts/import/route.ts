@@ -158,11 +158,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       // с нормализованным ключом не совпадает — по нему повторный залив того
       // же прайса не нашёл бы 15 из 70 позиций и продублировал бы их.
       // Б/у экземпляры импорт не трогает: они не NEW.
-      const existing = (await db.part.findFirst({
-        where: { article, condition: "NEW" },
-        select: { id: true },
-      })) as { id: string } | null;
-
       // Внутри try: артикул, пустой после нормализации («---», разделитель в
       // CSV), уронил бы newPartSku и весь обработчик, минуя построчный отчёт.
       if (!normalizeOem(article)) {
@@ -170,6 +165,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         continue;
       }
       const sku = newPartSku(article);
+
+      // Оба ключа: article — потому что sku у старых строк залит дословно,
+      // sku — потому что на нём стоит уникальный индекс (см. parts.ts).
+      const existing = (await db.part.findFirst({
+        where: { OR: [{ article, condition: "NEW" }, { sku }] },
+        select: { id: true },
+      })) as { id: string } | null;
 
       if (existing) {
         await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
