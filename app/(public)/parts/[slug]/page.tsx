@@ -12,10 +12,13 @@ import { AddToCartButton } from "@/components/parts/AddToCartButton";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { pageSeo } from "@/lib/seo";
 import { buildProductJsonLd } from "@/lib/seo-jsonld";
+import { pickVariantHost } from "@/lib/parts/variant-host";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  /** `?v=<sku>` разворачивает конкретный вариант; в canonical не попадает. */
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
@@ -25,6 +28,29 @@ const getPartBySlug = cache(async (slug: string) => {
     include: {
       category: { select: { name: true, slug: true } },
       stockItems: { select: { quantity: true } },
+      // Варианты той же детали: новый товар и б/у экземпляры делят
+      // номенклатуру, и покупатель должен видеть выбор на одной странице.
+      reference: {
+        select: {
+          id: true,
+          parts: {
+            select: {
+              id: true,
+              slug: true,
+              sku: true,
+              name: true,
+              price: true,
+              condition: true,
+              conditionNote: true,
+              originNote: true,
+              photos: true,
+              isActive: true,
+              createdAt: true,
+              stockItems: { select: { quantity: true } },
+            },
+          },
+        },
+      },
       partTrims: {
         include: {
           trim: {
@@ -65,12 +91,23 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     });
   }
 
+  // Канонический адрес — страница ХОЗЯИНА вариантов, а не текущая: новый товар
+  // и б/у экземпляры это одна деталь, и конкурировать за один запрос они не
+  // должны. Параметр ?v= в canonical не попадает никогда.
+  const refMeta = p.reference as { parts: Array<{ slug: string; condition: "NEW" | "USED" | "REFURBISHED"; isActive: boolean; createdAt: Date }> } | null;
+  const hostMeta = pickVariantHost(refMeta?.parts ?? []);
+  const canonicalPath = `/parts/${hostMeta?.slug ?? slug}`;
+
   return pageSeo({
     title: p.name as string,
     description:
       (p.description as string | null) ??
       `${p.name as string} (артикул ${p.article as string}) для Mercedes-Benz G-Class — купить в сервисе Geleoteka.`,
-    path: `/parts/${slug}`,
+    path: canonicalPath,
+    // Не-хозяин закрывается от индексации вдобавок к canonical: б/у экземпляр
+    // живёт до первой продажи, и его адрес не должен попадать в выдачу даже
+    // временно — переиндексировать исчезнувшую страницу дороже, чем не пускать.
+    noindex: canonicalPath !== `/parts/${slug}`,
   });
 }
 
@@ -89,6 +126,21 @@ interface RawPartTrim {
   };
 }
 
+interface RawVariant {
+  id: string;
+  slug: string;
+  sku: string;
+  name: string;
+  price: number;
+  condition: "NEW" | "USED" | "REFURBISHED";
+  conditionNote: string | null;
+  originNote: string | null;
+  photos: string[];
+  isActive: boolean;
+  createdAt: Date;
+  stockItems: Array<{ quantity: number }>;
+}
+
 interface CompatibilityRow {
   modelName: string;
   modelSlug: string;
@@ -96,14 +148,26 @@ interface CompatibilityRow {
   trims: string[];
 }
 
-export default async function PartDetailPage({ params }: Props) {
+export default async function PartDetailPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const sp = searchParams ? await searchParams : {};
   const part = await getPartBySlug(slug);
 
+  // Заглушка Story 2 снята: страница б/у больше не 404, потому что теперь у
+  // детали есть карточка с вариантами и канонический адрес (см. ниже).
   const partRec = part as Record<string, unknown> | null;
-  if (!partRec || !partRec.isActive || partRec.condition !== "NEW") notFound();
+  if (!partRec || !partRec.isActive) notFound();
 
   const p = part as Record<string, unknown>;
+
+  // Варианты этой же детали. Хозяин определяет канонический адрес; сюда же
+  // приходят по ?v=<sku> с карточки в списке.
+  const ref = p.reference as { parts: RawVariant[] } | null;
+  const variants: RawVariant[] = (ref?.parts ?? []).filter((v) => v.isActive);
+  const host = pickVariantHost(variants);
+  const requestedSku = typeof sp.v === "string" ? sp.v : null;
+  const requestedMissing =
+    requestedSku !== null && !variants.some((v) => v.sku === requestedSku);
   const onHand = (p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0;
   const cat = p.category as Record<string, string> | null;
   const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
@@ -215,6 +279,76 @@ export default async function PartDetailPage({ params }: Props) {
             </div>
           </div>
 
+          {/* Варианты этой детали: новый товар и б/у экземпляры делят номер,
+              и покупатель должен видеть выбор на одной странице, а не искать
+              б/у отдельным поиском. */}
+          {variants.length > 1 && (
+            <div className="mb-8">
+              <h2 className="text-lg font-semibold mb-3">Варианты этой детали</h2>
+              {requestedMissing && (
+                <p className="mb-3 text-sm text-[var(--foreground-muted)]">
+                  Экземпляр, на который вела ссылка, уже продан. Ниже — то, что
+                  есть сейчас.
+                </p>
+              )}
+              <div className="flex flex-col gap-3">
+                {variants.map((v) => {
+                  const vQty = v.stockItems[0]?.quantity ?? 0;
+                  const current = v.slug === slug;
+                  const condLabel =
+                    v.condition === "NEW"
+                      ? "Новая"
+                      : v.condition === "USED"
+                        ? "Б/у"
+                        : "Восстановленная";
+                  return (
+                    <div
+                      key={v.id}
+                      className={`card p-4 ${current ? "border-[var(--color-accent)]" : ""}`}
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="badge text-xs">{condLabel}</span>
+                            {current && (
+                              <span className="text-xs text-[var(--foreground-muted)]">
+                                вы смотрите этот
+                              </span>
+                            )}
+                          </div>
+                          {v.conditionNote && (
+                            <p className="mt-2 text-sm">{v.conditionNote}</p>
+                          )}
+                          {v.originNote && (
+                            <p className="mt-1 text-xs text-[var(--foreground-muted)]">
+                              {v.originNote}
+                            </p>
+                          )}
+                          <p className="mt-2 text-xs text-[var(--foreground-muted)]">
+                            {vQty > 0 ? `В наличии — ${vQty} шт.` : "Под заказ"}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-bold text-[var(--color-accent)]">
+                            {formatPrice(v.price)}
+                          </p>
+                          {!current && (
+                            <Link
+                              href={`/parts/${v.slug}`}
+                              className="btn btn-secondary btn-sm mt-2 inline-block"
+                            >
+                              Открыть
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Compatible models */}
           {compatibilityRows.length > 0 && (
             <div className="mb-8">
@@ -281,6 +415,7 @@ export default async function PartDetailPage({ params }: Props) {
                 article: p.article as string,
                 price: p.price as number,
                 quantity: onHand,
+                condition: p.condition as "NEW" | "USED" | "REFURBISHED",
               }}
             />
 

@@ -12,6 +12,8 @@ interface PartInfo {
   article: string;
   price: number;
   quantity: number;
+  /** Состояние: покупатель должен видеть в корзине, что берёт б/у. */
+  condition?: "NEW" | "USED" | "REFURBISHED";
 }
 
 export function AddToCartButton({ part }: { part: PartInfo }) {
@@ -23,6 +25,7 @@ export function AddToCartButton({ part }: { part: PartInfo }) {
       name: part.name,
       article: part.article,
       price: part.price,
+      condition: part.condition,
     });
     setJustAdded(true);
     window.setTimeout(() => setJustAdded(false), 1500);

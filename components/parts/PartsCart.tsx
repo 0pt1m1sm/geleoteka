@@ -133,7 +133,14 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
           <div key={item.partId} className="card flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <div className="min-w-0 flex-1">
               <p className="font-medium">{item.name}</p>
-              <p className="mt-0.5 text-xs text-[var(--foreground-muted)] font-mono">{item.article}</p>
+              <p className="mt-0.5 text-xs text-[var(--foreground-muted)] font-mono">
+                {item.article}
+                {/* Состояние обязано быть видно в корзине: покупатель принимает
+                    решение о б/у здесь, а не только на карточке. Старые
+                    корзины без поля продолжают работать — оно необязательное. */}
+                {item.condition === "USED" && " · б/у"}
+                {item.condition === "REFURBISHED" && " · восстановленная"}
+              </p>
             </div>
             <div className="flex items-center justify-between gap-3 sm:justify-end sm:gap-4">
               <div className="flex items-center gap-2">

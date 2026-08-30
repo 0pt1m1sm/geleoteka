@@ -8,6 +8,10 @@ export interface CartItem {
   article: string;
   price: number;
   qty: number;
+  /** Состояние позиции. Необязательное: в localStorage покупателя могут лежать
+   *  корзины, собранные ДО появления вариантов, и они обязаны продолжать
+   *  работать — иначе страница упадёт на чужих данных. */
+  condition?: "NEW" | "USED" | "REFURBISHED";
 }
 
 const EMPTY_CART: CartItem[] = [];
