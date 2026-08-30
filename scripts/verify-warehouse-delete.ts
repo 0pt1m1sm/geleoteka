@@ -36,7 +36,7 @@ async function main(): Promise<void> {
         select: { id: true },
       })) as { id: string };
       const part = (await tx.part.create({
-        data: { slug: `dw-${ts}`, article: `DW-${ts}`, name: "DW part", price: 1 },
+        data: { slug: `dw-${ts}`, article: `DW-${ts}`, sku: `DW-${ts}`, name: "DW part", price: 1 },
         select: { id: true },
       })) as { id: string };
       await tx.stockLocation.create({ data: { code: "DW-1-1", warehouseId: wh.id, tenantKey: TENANT, isActive: true, isBlocked: false } });

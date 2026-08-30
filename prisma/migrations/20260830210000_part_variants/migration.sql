@@ -1,0 +1,44 @@
+-- Варианты товара: новый и б/у на один OEM-номер.
+--
+-- Блокер, который снимается: Part.article был уникален, поэтому на один
+-- OEM-номер нельзя было завести и новую позицию, и б/у экземпляр. Артикул —
+-- это номер детали, он по своей природе общий; уникальным становится
+-- отдельный торговый идентификатор sku.
+--
+-- Порядок шагов обязателен: sku добавляется nullable, заполняется, и только
+-- потом получает NOT NULL и уникальный индекс. Навесить уникальность до
+-- backfill нельзя.
+--
+-- Backfill дословный (sku := article), а НЕ нормализованный. Причина: на
+-- момент этого шага article ещё защищён уникальным индексом, поэтому
+-- уникальность sku гарантирована арифметически, независимо от того, какие
+-- данные лежат в базе. Нормализация же могла бы схлопнуть два артикула,
+-- различающихся только пунктуацией, и уронить миграцию на уникальном
+-- индексе — а миграции здесь накатываются автоматически при старте
+-- приложения, то есть падение означало бы простой прода.
+-- Новые товары получают нормализованный sku (lib/part-sku.ts); расхождение
+-- формата у старых строк безвредно — sku непрозрачен, а варианты одной
+-- детали группируются по referenceId, а не по тексту артикула.
+
+-- CreateEnum
+CREATE TYPE "PartCondition" AS ENUM ('NEW', 'USED', 'REFURBISHED');
+
+-- AlterTable: новые колонки
+ALTER TABLE "Part" ADD COLUMN "sku" TEXT;
+ALTER TABLE "Part" ADD COLUMN "condition" "PartCondition" NOT NULL DEFAULT 'NEW';
+ALTER TABLE "Part" ADD COLUMN "conditionNote" TEXT;
+ALTER TABLE "Part" ADD COLUMN "originNote" TEXT;
+
+-- Backfill: существующие товары — новые, sku равен артикулу
+UPDATE "Part" SET "sku" = "article" WHERE "sku" IS NULL;
+
+-- Уникальность переезжает с article на sku
+ALTER TABLE "Part" ALTER COLUMN "sku" SET NOT NULL;
+CREATE UNIQUE INDEX "Part_sku_key" ON "Part"("sku");
+
+-- Артикул больше не уникален. Обычный индекс Part_article_idx уже существует
+-- и сохраняется — поиск по номеру детали не деградирует.
+DROP INDEX "Part_article_key";
+
+-- Фильтр по состоянию: витрина и админский список
+CREATE INDEX "Part_condition_idx" ON "Part"("condition");

@@ -141,6 +141,7 @@ async function makePart(qty: number): Promise<string> {
     data: {
       slug: `verify-pick-${suffix}`,
       article: `VERIFY-PICK-${suffix}`,
+      sku: `VERIFY-PICK-${suffix}`,
       name: `verify pick ${suffix}`,
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },

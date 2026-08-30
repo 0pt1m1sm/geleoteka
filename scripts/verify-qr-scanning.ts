@@ -38,6 +38,7 @@ async function makeThrowawayPart(qty: number): Promise<string> {
     data: {
       slug: `verify-qr-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       article: `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+      sku: `VERIFY-QR-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
       name: "verify-qr part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT } },
@@ -231,6 +232,7 @@ async function verifyScanRouter(): Promise<void> {
     data: {
       slug: `verify-qr-sr-${Date.now()}`,
       article,
+      sku: article,
       name: "verify-qr scan-router part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 7, tenantKey: TENANT, barcode } },
@@ -269,6 +271,7 @@ async function verifyScanRouter(): Promise<void> {
     data: {
       slug: `verify-qr-sr-inact-${Date.now()}`,
       article: inactArticle,
+      sku: inactArticle,
       name: "verify-qr inactive part",
       price: 100,
       isActive: false,

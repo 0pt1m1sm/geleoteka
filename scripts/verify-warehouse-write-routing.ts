@@ -70,6 +70,7 @@ async function makePart(mainQty: number, wh2Qty: number): Promise<string> {
     data: {
       slug: `verify-wwr-${suffix}`,
       article: `${PREFIX}${suffix}`,
+      sku: `${PREFIX}${suffix}`,
       name: `verify wwr ${suffix}`,
       price: 100,
       stockItems: {

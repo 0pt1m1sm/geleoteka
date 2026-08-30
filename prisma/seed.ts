@@ -436,7 +436,7 @@ async function main(): Promise<void> {
 
     // Idempotent: upsert the part, then sync its PartTrim rows.
     const part = await prisma.part.upsert({
-      where: { article: sp.article },
+      where: { sku: sp.article },
       update: {
         slug: sp.slug,
         name: sp.name,
@@ -449,6 +449,7 @@ async function main(): Promise<void> {
       create: {
         slug: sp.slug,
         article: sp.article,
+        sku: sp.article,
         name: sp.name,
         price: sp.price,
         isOEM: sp.isOEM,

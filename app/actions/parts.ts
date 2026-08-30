@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { newPartSku } from "@/lib/part-sku";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
@@ -80,7 +81,12 @@ export async function createPart(
     return { error: "Количество не может быть отрицательным" };
   }
 
-  const existing = await db.part.findUnique({ where: { article } });
+  // Проверяем по sku, а не по article: артикул больше не уникален (у одной
+  // детали бывают новый товар и б/у экземпляры), уникален именно торговый
+  // идентификатор. Побочно ловится случай, когда тот же номер записан с
+  // другой пунктуацией — normalizeOem сводит их к одному ключу.
+  const sku = newPartSku(article);
+  const existing = await db.part.findUnique({ where: { sku } });
   if (existing) {
     return { error: "Запчасть с таким артикулом уже существует" };
   }
@@ -122,6 +128,7 @@ export async function createPart(
       data: {
         slug,
         article,
+        sku,
         name,
         description,
         price,

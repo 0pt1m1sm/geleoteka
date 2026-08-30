@@ -53,6 +53,7 @@ async function main(): Promise<void> {
     data: {
       slug: "verify-wh-part-0001",
       article: "VERIFY-WH-0001",
+      sku: "VERIFY-WH-0001",
       name: "verify-warehouse part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 10, tenantKey: TENANT } },
@@ -119,6 +120,7 @@ async function main(): Promise<void> {
     data: {
       slug: "verify-wh-part-0002",
       article: "VERIFY-WH-0002",
+      sku: "VERIFY-WH-0002",
       name: "verify-warehouse part 2",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT, barcode: "VERIFY-BC-1" } },
@@ -261,6 +263,7 @@ async function main(): Promise<void> {
     data: {
       slug: "verify-wh-recv-1",
       article: "VERIFY-WH-RECV-1",
+      sku: "VERIFY-WH-RECV-1",
       name: "verify-warehouse receive part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } },
@@ -271,6 +274,7 @@ async function main(): Promise<void> {
     data: {
       slug: "verify-wh-recv-2",
       article: "VERIFY-WH-RECV-2",
+      sku: "VERIFY-WH-RECV-2",
       name: "verify-warehouse receive part 2",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } },
@@ -380,11 +384,11 @@ async function main(): Promise<void> {
   //    orders only. rPart/rPart2's order is now RECEIVED (closed) → contributes
   //    0. Build a fresh OPEN order to exercise open-status + remaining math.
   const incPartA = (await db.part.create({
-    data: { slug: "verify-wh-inc-a", article: "VERIFY-WH-INC-A", name: "inc A", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
+    data: { slug: "verify-wh-inc-a", article: "VERIFY-WH-INC-A", sku: "VERIFY-WH-INC-A", name: "inc A", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
     select: { id: true },
   })) as { id: string };
   const incPartB = (await db.part.create({
-    data: { slug: "verify-wh-inc-b", article: "VERIFY-WH-INC-B", name: "inc B", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
+    data: { slug: "verify-wh-inc-b", article: "VERIFY-WH-INC-B", sku: "VERIFY-WH-INC-B", name: "inc B", price: 100, stockItems: { create: { warehouseId: WH, quantity: 0, tenantKey: TENANT } } },
     select: { id: true },
   })) as { id: string };
   await db.supplierOrder.create({

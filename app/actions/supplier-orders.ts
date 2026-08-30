@@ -2,6 +2,7 @@
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { newPartSku } from "@/lib/part-sku";
 import { slugify } from "@/lib/slug";
 import { lookupByCode } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
@@ -126,7 +127,10 @@ async function resolveLinesAndCost(
     if (i.type === "NEW_PART") {
       const article = i.article!.trim();
       const name = i.description.trim();
-      const existing = (await tx.part.findUnique({ where: { article }, select: { id: true } })) as { id: string } | null;
+      // По sku, а не по article: артикул перестал быть уникальным (новый товар
+      // и б/у экземпляры делят номер детали), уникален торговый идентификатор.
+      const sku = newPartSku(article);
+      const existing = (await tx.part.findUnique({ where: { sku }, select: { id: true } })) as { id: string } | null;
       if (existing) throw new OrderValidationError(`Артикул ${article} уже есть в каталоге — выберите его из списка`);
       const slug = slugify(`${article}-${name}`).slice(0, 80);
       // Draft-товар рождается уже связанным с номенклатурой — иначе позиция,
@@ -137,7 +141,7 @@ async function resolveLinesAndCost(
         generationIds: (await resolveGenerationIds(extractModelCodes(name))).ids,
       });
       const part = (await tx.part.create({
-        data: { slug, article, name, price: 0, isActive: false, referenceId },
+        data: { slug, article, sku, name, price: 0, isActive: false, referenceId },
         select: { id: true },
       })) as { id: string };
       await tx.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) } });

@@ -37,6 +37,7 @@ async function main(): Promise<void> {
     data: {
       slug: "verify-inv-part-0001",
       article: "VERIFY-INV-0001",
+      sku: "VERIFY-INV-0001",
       name: "verify-invariant part",
       price: 100,
       stockItems: { create: { warehouseId: WH, quantity: 3, tenantKey: TENANT } },
