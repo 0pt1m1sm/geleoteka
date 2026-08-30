@@ -75,7 +75,7 @@ async function main(): Promise<void> {
   // C2 — customer decline releases reservations: reserve then release a PART line's hold.
   await rolledBack(async (tx) => {
     const part = (await tx.part.create({
-      data: { slug: `crm-verify-${ts}`, article: `CRMV-${ts}`, name: "CRM Verify Part", price: 1000 },
+      data: { slug: `crm-verify-${ts}`, article: `CRMV-${ts}`, sku: `CRMV-${ts}`, name: "CRM Verify Part", price: 1000 },
       select: { id: true },
     })) as { id: string };
     const deal = (await tx.deal.create({

@@ -112,6 +112,7 @@ describe("buildProductJsonLd", () => {
         name: "Тормозной диск",
         slug: "disc",
         article: "A463",
+        sku: "A463",
         price: 12000,
         inStock: true,
       }),
@@ -120,7 +121,7 @@ describe("buildProductJsonLd", () => {
       "https://schema.org/InStock",
     );
     const out = parse(
-      buildProductJsonLd({ name: "x", slug: "x", article: "a", price: 1, inStock: false }),
+      buildProductJsonLd({ name: "x", slug: "x", article: "a", sku: "a", price: 1, inStock: false }),
     );
     expect((out.offers as Record<string, unknown>).availability).toBe(
       "https://schema.org/OutOfStock",
@@ -155,5 +156,58 @@ describe("buildFaqJsonLd", () => {
     const q = (faq.mainEntity as Array<Record<string, unknown>>)[0];
     expect(q.name).toBe("Сколько стоит ТО?");
     expect((q.acceptedAnswer as Record<string, string>).text).toBe("От 25 000 ₽.");
+  });
+});
+
+describe("buildProductJsonLd: sku", () => {
+  it("публикует торговый sku, а не артикул — иначе варианты одной детали склеятся", () => {
+    // У б/у экземпляра article общий с новым товаром, а sku свой. Одинаковый
+    // sku+brand в двух карточках Google схлопывает, выбрасывая одну.
+    const used = parse(
+      buildProductJsonLd({
+        name: "Суппорт б/у",
+        slug: "sup-bu-1",
+        article: "A4634210098",
+        sku: "A4634210098-U1",
+        price: 18000,
+        inStock: true,
+      }),
+    );
+    expect(used.sku).toBe("A4634210098-U1");
+  });
+});
+
+describe("buildProductJsonLd: mpn", () => {
+  it("публикует OEM-номер как mpn для настоящих артикулов", () => {
+    const out = parse(
+      buildProductJsonLd({
+        name: "Фильтр",
+        slug: "f",
+        article: "MANN-C29028",
+        sku: "MANNC29028",
+        price: 1,
+        inStock: true,
+      }),
+    );
+    expect(out.mpn).toBe("MANN-C29028");
+    expect(out.sku).toBe("MANNC29028");
+  });
+
+  it("НЕ публикует mpn для служебных кодов", () => {
+    // «ПОДЗАКАЗ-07» не является Manufacturer Part Number. На проде это 21
+    // активная страница — публиковать такое значит отдавать поисковикам
+    // заведомо ложный идентификатор производителя.
+    const out = parse(
+      buildProductJsonLd({
+        name: "Позиция под заказ",
+        slug: "pz",
+        article: "ПОДЗАКАЗ-07",
+        sku: "ПОДЗАКАЗ-07",
+        price: 1,
+        inStock: false,
+      }),
+    );
+    expect(out.mpn).toBeUndefined();
+    expect(out.sku).toBe("ПОДЗАКАЗ-07");
   });
 });

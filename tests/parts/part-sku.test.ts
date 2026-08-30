@@ -1,0 +1,139 @@
+import { describe, expect, it } from "vitest";
+import {
+  duplicateNewPartWhere,
+  nextUsedSku,
+  newPartSku,
+  USED_SKU_SUFFIX_RE,
+} from "@/lib/part-sku";
+
+describe("nextUsedSku", () => {
+  it("даёт первый суффикс, когда б/у экземпляров ещё нет", () => {
+    expect(nextUsedSku("A4634210098", [])).toBe("A4634210098-U1");
+    expect(nextUsedSku("A4634210098", ["A4634210098"])).toBe("A4634210098-U1");
+  });
+
+  it("продолжает нумерацию после существующих экземпляров", () => {
+    expect(nextUsedSku("A4634210098", ["A4634210098-U1"])).toBe("A4634210098-U2");
+    expect(
+      nextUsedSku("A4634210098", ["A4634210098", "A4634210098-U1", "A4634210098-U2"]),
+    ).toBe("A4634210098-U3");
+  });
+
+  it("не переиспользует номер после дыры в нумерации", () => {
+    // Экземпляр -U2 продан и его строка осталась в базе под тем же SKU:
+    // выдать -U2 повторно значило бы столкнуться с уникальным индексом.
+    expect(nextUsedSku("A4634210098", ["A4634210098-U1", "A4634210098-U3"])).toBe(
+      "A4634210098-U4",
+    );
+  });
+
+  it("нормализует артикул так же, как справочник — пробелы и дефисы не создают разных ключей", () => {
+    expect(nextUsedSku("a 463 421 00 98", [])).toBe("A4634210098-U1");
+    expect(nextUsedSku("A463-421-0098", ["A4634210098-U1"])).toBe("A4634210098-U2");
+  });
+
+  it("игнорирует чужие SKU при подсчёте", () => {
+    const existing = ["A0001112223-U7", "B9998887776-U2", "A4634210098-U1"];
+    expect(nextUsedSku("A4634210098", existing)).toBe("A4634210098-U2");
+  });
+
+  it("не путает похожий артикул-префикс с тем же самым", () => {
+    // A46342100981 — другой артикул, начинающийся так же; его экземпляры
+    // не должны сдвигать нумерацию у A4634210098.
+    expect(nextUsedSku("A4634210098", ["A46342100981-U5"])).toBe("A4634210098-U1");
+  });
+
+  it("устойчив к мусору в списке существующих", () => {
+    expect(
+      nextUsedSku("A4634210098", ["", "A4634210098-U", "A4634210098-UX", "A4634210098-U1"]),
+    ).toBe("A4634210098-U2");
+  });
+
+  it("отвергает пустой артикул", () => {
+    expect(() => nextUsedSku("   ", [])).toThrow();
+  });
+
+  it("регистр существующих SKU не важен", () => {
+    expect(nextUsedSku("A4634210098", ["a4634210098-u1"])).toBe("A4634210098-U2");
+  });
+});
+
+describe("USED_SKU_SUFFIX_RE", () => {
+  it("узнаёт SKU б/у экземпляра и не трогает SKU нового товара", () => {
+    expect(USED_SKU_SUFFIX_RE.test("A4634210098-U1")).toBe(true);
+    expect(USED_SKU_SUFFIX_RE.test("A4634210098-U12")).toBe(true);
+    expect(USED_SKU_SUFFIX_RE.test("A4634210098")).toBe(false);
+    expect(USED_SKU_SUFFIX_RE.test("A4634210098-U")).toBe(false);
+  });
+});
+
+describe("newPartSku против дословного backfill (регрессия PR #96)", () => {
+  it("нормализованный SKU РАСХОДИТСЯ с артикулом, у которого есть пунктуация", () => {
+    // Миграция 20260830210000_part_variants залила sku ДОСЛОВНО (sku := article).
+    // Значит для таких артикулов newPartSku(article) !== сохранённый sku, и
+    // искать существующие строки по newPartSku НЕЛЬЗЯ — на проде так молча
+    // терялись 15 из 70 позиций (все ПОДЗАКАЗ-NN и MANN-C29028): защита от
+    // дубля отключалась, а повторный импорт того же прайса плодил копии.
+    // Поиск ведём по article (+ condition), см. app/actions/parts.ts,
+    // app/actions/supplier-orders.ts, app/api/parts/import/route.ts.
+    expect(newPartSku("ПОДЗАКАЗ-07")).not.toBe("ПОДЗАКАЗ-07");
+    expect(newPartSku("MANN-C29028")).not.toBe("MANN-C29028");
+    // А для артикула, уже находящегося в нормальной форме, они совпадают —
+    // именно поэтому ошибку не видно на «удобных» примерах.
+    expect(newPartSku("A4634210098")).toBe("A4634210098");
+  });
+});
+
+describe("newPartSku", () => {
+  it("нормализует артикул к единому виду", () => {
+    expect(newPartSku("a 463 421 00 98")).toBe("A4634210098");
+    expect(newPartSku("A463-421-0098")).toBe("A4634210098");
+  });
+
+  it("отвергает артикул, пустой после нормализации", () => {
+    expect(() => newPartSku("---")).toThrow();
+    expect(() => newPartSku("   ")).toThrow();
+  });
+});
+
+describe("непересечение SKU нового товара и б/у экземпляров", () => {
+  it("вывод newPartSku никогда не может совпасть с SKU б/у", () => {
+    // newPartSku срезает дефисы (normalizeOem), а nextUsedSku всегда строит
+    // `${base}-U${n}` С дефисом — поэтому импорт прайса не может случайно
+    // перезаписать б/у экземпляр, а генератор б/у — затереть новый товар.
+    // Свойство держится на нормализации; тест ловит его поломку.
+    const article = "A4634210098";
+    const used = nextUsedSku(article, []);
+    expect(used).toContain("-U");
+    expect(newPartSku(article)).not.toContain("-");
+    expect(newPartSku(article)).not.toBe(used);
+    // даже если артикул сам записан с дефисами
+    expect(newPartSku("ПОДЗАКАЗ-07")).not.toContain("-");
+  });
+});
+
+describe("duplicateNewPartWhere — инвариант проверки обоих ключей", () => {
+  // Этот тест — сторож вызывающего кода, а не чистой функции. На ревью PR #96
+  // мутация «вернуть проверку на один ключ» дважды проходила весь гейт зелёной,
+  // потому что тесты покрывали только nextUsedSku/newPartSku.
+  it("содержит ветку по article с condition NEW", () => {
+    const w = duplicateNewPartWhere("ПОДЗАКАЗ-07", "ПОДЗАКАЗ07");
+    expect(w.OR).toContainEqual({ article: "ПОДЗАКАЗ-07", condition: "NEW" });
+  });
+
+  it("содержит ветку по sku", () => {
+    const w = duplicateNewPartWhere("A463-421-0098", "A4634210098");
+    expect(w.OR).toContainEqual({ sku: "A4634210098" });
+  });
+
+  it("ровно две ветки — ни одну нельзя выбросить", () => {
+    // Одна ветка по sku: не видно легаси-строк с дословным backfill.
+    // Одна ветка по article: не срабатывает уникальный индекс на sku.
+    expect(duplicateNewPartWhere("A4634210098", "A4634210098").OR).toHaveLength(2);
+  });
+
+  it("не фильтрует по condition в ветке sku — иначе б/у-суффикс отсёк бы проверку", () => {
+    const skuBranch = duplicateNewPartWhere("X", "X").OR.find((b) => "sku" in b);
+    expect(skuBranch).toEqual({ sku: "X" });
+  });
+});

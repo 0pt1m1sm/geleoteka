@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
+import { SERVICE_ARTICLE_RE, extractModelCodes, normalizeOem } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
-import { extractModelCodes, normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 import { resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 /**
@@ -152,14 +153,30 @@ export async function POST(request: Request): Promise<NextResponse> {
     const slug = slugify(`${article}-${name}`).slice(0, 80);
 
     try {
-      const existing = (await db.part.findUnique({ where: { article }, select: { id: true } })) as
-        | { id: string }
-        | null;
+      // Импорт прайса ведёт НОВЫЕ товары. Ищем по article + condition, а не по
+      // sku: артикул больше не уникален, а sku у старых строк залит дословно и
+      // с нормализованным ключом не совпадает — по нему повторный залив того
+      // же прайса не нашёл бы 15 из 70 позиций и продублировал бы их.
+      // Б/у экземпляры импорт не трогает: они не NEW.
+      // Внутри try: артикул, пустой после нормализации («---», разделитель в
+      // CSV), уронил бы newPartSku и весь обработчик, минуя построчный отчёт.
+      if (!normalizeOem(article)) {
+        errors.push(`Строка ${lineNum}: артикул должен содержать буквы или цифры`);
+        continue;
+      }
+      const sku = newPartSku(article);
+
+      // Оба ключа: article — потому что sku у старых строк залит дословно,
+      // sku — потому что на нём стоит уникальный индекс (см. parts.ts).
+      const existing = (await db.part.findFirst({
+        where: duplicateNewPartWhere(article, sku),
+        select: { id: true },
+      })) as { id: string } | null;
 
       if (existing) {
         await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
           await tx.part.update({
-            where: { article },
+            where: { id: existing.id },
             data: { name, description: description || null, price, isOEM, categoryId },
           });
           // CSV import is an authoritative stock load — set the StockItem on-hand directly.
@@ -185,6 +202,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             data: {
               slug,
               article,
+              sku,
               name,
               description: description || null,
               price,
@@ -224,7 +242,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
       }
     } catch (err) {
-      errors.push(`Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`);
+      // P2002 здесь означает, что артикул строки нормализуется в уже занятый
+      // sku (та же деталь, записанная с другой пунктуацией). Сырой текст
+      // Prisma «Unique constraint failed on the fields: (`sku`)» в отчёте о
+      // заливке прайса нечитаем.
+      const isDup =
+        typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+      errors.push(
+        isDup
+          ? `Строка ${lineNum}: артикул ${article} уже есть в каталоге под другой записью номера`
+          : `Строка ${lineNum}: ${err instanceof Error ? err.message : "неизвестная ошибка"}`,
+      );
     }
   }
 

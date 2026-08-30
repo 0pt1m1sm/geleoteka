@@ -3,6 +3,8 @@
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
+import { normalizeOem } from "@/lib/part-reference";
 import { pingIndexNow } from "@/lib/indexnow";
 import { slugify } from "@/lib/slug";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
@@ -50,6 +52,14 @@ function parseWeightGrams(raw: unknown): number | null {
   return Math.min(Math.round(kg * 1000), MAX_WEIGHT_GRAMS);
 }
 
+
+/** Нарушение уникального индекса Prisma. Клиент генерируется с @ts-nocheck,
+ *  поэтому типизированного PrismaClientKnownRequestError под рукой нет —
+ *  распознаём по коду, как это делается в остальных экшенах. */
+function isUniqueViolation(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+}
+
 export async function createPart(
   _prevState: { error: string | null } | null,
   formData: FormData,
@@ -80,7 +90,27 @@ export async function createPart(
     return { error: "Количество не может быть отрицательным" };
   }
 
-  const existing = await db.part.findUnique({ where: { article } });
+  // Пустой после нормализации артикул («---», «???») уронил бы newPartSku
+  // необработанным исключением — экшен обязан вернуть {error}.
+  if (!normalizeOem(article)) {
+    return { error: "Артикул должен содержать буквы или цифры" };
+  }
+  const sku = newPartSku(article);
+
+  // Проверяем ОБА ключа, потому что они разные.
+  // По article — потому что миграция залила sku дословно (sku := article):
+  // для «ПОДЗАКАЗ-07» и прочих артикулов с пунктуацией нормализованный ключ
+  // не совпал бы с сохранённым, и защита молча выключилась бы на 15 из 70
+  // позиций боевого каталога.
+  // По sku — потому что уникальный индекс стоит именно на нём: без этой
+  // ветки «A463-421-0098» и «A4634210098» прошли бы проверку по тексту, а
+  // вставка упала бы на Part_sku_key необработанным P2002; на легаси-строках
+  // с дословным sku вместо ошибки появился бы тихий дубль.
+  // Обе колонки проиндексированы (Part_article_idx, Part_sku_key).
+  const existing = await db.part.findFirst({
+    where: duplicateNewPartWhere(article, sku),
+    select: { id: true },
+  });
   if (existing) {
     return { error: "Запчасть с таким артикулом уже существует" };
   }
@@ -117,33 +147,45 @@ export async function createPart(
 
   // Part + its opening-balance StockItem are created atomically so a part can
   // never exist without a stock row (which would silently lose the opening qty).
-  await db.$transaction(async (tx) => {
-    const created = (await tx.part.create({
-      data: {
-        slug,
-        article,
-        name,
-        description,
-        price,
-        compareAtPrice,
-        weightGrams,
-        isOEM,
-        referenceId,
-        categoryId: categoryId || null,
-        photos: photoUrls,
-        partTrims: {
-          create: trimIds.map((trimId) => ({ trimId })),
+  // P2002 ловим отдельно: проверка выше и уникальный индекс — разные моменты
+  // времени, поэтому гонка двух одновременных заведений одного артикула всё
+  // равно доходит до индекса. Без этого пользователь получал бы необработанную
+  // ошибку сервер-экшена и терял заполненную форму вместе с загруженными фото.
+  try {
+    await db.$transaction(async (tx) => {
+      const created = (await tx.part.create({
+        data: {
+          slug,
+          article,
+          sku,
+          name,
+          description,
+          price,
+          compareAtPrice,
+          weightGrams,
+          isOEM,
+          referenceId,
+          categoryId: categoryId || null,
+          photos: photoUrls,
+          partTrims: {
+            create: trimIds.map((trimId) => ({ trimId })),
+          },
         },
-      },
-      select: { id: true },
-    })) as { id: string };
+        select: { id: true },
+      })) as { id: string };
 
-    // Opening balance: seed the StockItem counter directly (subsequent CHANGES
-    // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
-    await tx.stockItem.create({
-      data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
+      // Opening balance: seed the StockItem counter directly (subsequent CHANGES
+      // go through the ledger). Every part gets a StockItem so joins/lookup resolve.
+      await tx.stockItem.create({
+        data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
+      });
     });
-  });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { error: "Запчасть с таким артикулом уже существует" };
+    }
+    throw err;
+  }
 
   await pingIndexNow(["/parts", `/parts/${slug}`]);
   redirect("/admin/parts");

@@ -26,7 +26,7 @@ const PREFIX = "VERIFY-VAL-";
 async function makePart(tag: string, quantity: number): Promise<string> {
   const article = `${PREFIX}${tag}`;
   const part = (await db.part.create({
-    data: { slug: article.toLowerCase(), article, name: `${PREFIX}${tag}`, price: 999, isActive: true },
+    data: { slug: article.toLowerCase(), article, sku: article, name: `${PREFIX}${tag}`, price: 999, isActive: true },
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId: WH, quantity, reserved: 0 } });

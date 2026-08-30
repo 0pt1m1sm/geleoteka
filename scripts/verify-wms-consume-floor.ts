@@ -38,7 +38,7 @@ async function main(): Promise<void> {
   try {
     await db.$transaction(async (tx) => {
       const part = (await tx.part.create({
-        data: { slug: `verify-floor-${ts}`, article: `VF-${ts}`, name: "Verify Floor", price: 1000 },
+        data: { slug: `verify-floor-${ts}`, article: `VF-${ts}`, sku: `VF-${ts}`, name: "Verify Floor", price: 1000 },
         select: { id: true },
       })) as { id: string };
       await tx.stockItem.create({

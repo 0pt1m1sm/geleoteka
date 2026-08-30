@@ -48,7 +48,7 @@ async function main(): Promise<void> {
   });
 
   const part = (await db.part.create({
-    data: { slug: `${PREFIX.toLowerCase()}p1`, article: `${PREFIX}P1`, name: `${PREFIX}P1`, price: 0, isActive: true },
+    data: { slug: `${PREFIX.toLowerCase()}p1`, article: `${PREFIX}P1`, sku: `${PREFIX}P1`, name: `${PREFIX}P1`, price: 0, isActive: true },
     select: { id: true },
   })) as { id: string };
   const p = part.id;

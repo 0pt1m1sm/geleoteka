@@ -40,7 +40,7 @@ async function makePart(
 ): Promise<string> {
   const article = `${PREFIX}${tag}`;
   const part = (await db.part.create({
-    data: { slug: article.toLowerCase(), article, name: `${PREFIX}${tag}`, price: 0, isActive: true },
+    data: { slug: article.toLowerCase(), article, sku: article, name: `${PREFIX}${tag}`, price: 0, isActive: true },
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
   // F: reorderable (net 0 ≤ default) but in a DIFFERENT tenant → must be excluded
   // when the report is built for TENANT_KEY (tenant-boundary enforcement).
   const partF = (await db.part.create({
-    data: { slug: `${PREFIX}f-othertenant`, article: `${PREFIX}F-othertenant`, name: `${PREFIX}F`, price: 0, isActive: true },
+    data: { slug: `${PREFIX}f-othertenant`, article: `${PREFIX}F-othertenant`, sku: `${PREFIX}F-othertenant`, name: `${PREFIX}F`, price: 0, isActive: true },
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({

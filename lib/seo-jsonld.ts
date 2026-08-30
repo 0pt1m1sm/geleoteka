@@ -9,6 +9,8 @@
  * опускаются, а не заполняются заглушками.
  */
 
+import { SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 export const ORGANIZATION_ID = `${SITE_URL}#organization`;
 
@@ -161,6 +163,8 @@ export interface ProductJsonLdInput {
   name: string;
   slug: string;
   article: string;
+  /** Торговый идентификатор. Отличается от article у б/у экземпляров. */
+  sku: string;
   description?: string | null;
   price: number;
   image?: string | null;
@@ -172,7 +176,16 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
     "@context": "https://schema.org",
     "@type": "Product",
     name: p.name,
-    sku: p.article,
+    // Именно sku, а не article: артикул общий у нового товара и б/у
+    // экземпляров, и две карточки опубликовали бы одинаковый sku — Google
+    // склеивает такие товары по sku+brand и выбрасывает один.
+    sku: p.sku,
+    // OEM-номер отдельным полем: sku нормализован, а Яндексу и покупателю
+    // полезен именно каталожный номер детали в исходном виде.
+    // Служебные коды (ПОДЗАКАЗ-NN, VERIFY-*) номером производителя НЕ являются:
+    // на проде это 21 активная страница, и публиковать их как mpn значит
+    // отдавать поисковикам заведомо ложный идентификатор производителя.
+    ...(SERVICE_ARTICLE_RE.test(p.article) ? {} : { mpn: p.article }),
     ...(p.description ? { description: p.description } : {}),
     ...(p.image ? { image: p.image.startsWith("http") ? p.image : `${SITE_URL}${p.image}` } : {}),
     url: `${SITE_URL}/parts/${p.slug}`,

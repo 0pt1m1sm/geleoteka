@@ -64,6 +64,7 @@ async function main(): Promise<void> {
     data: {
       slug: "e2e-rcv-part",
       article: `${MARK}-001`,
+      sku: `${MARK}-001`,
       name: "E2E тестовая деталь",
       price: 1000,
       isActive: true,

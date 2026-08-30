@@ -53,7 +53,7 @@ async function main(): Promise<void> {
   })) as { id: string };
 
   const part = (await db.part.create({
-    data: { slug: "vrf-undo-part", article: `${MARK}-001`, name: "VRF undo part", price: 1, isActive: true },
+    data: { slug: "vrf-undo-part", article: `${MARK}-001`, sku: `${MARK}-001`, name: "VRF undo part", price: 1, isActive: true },
     select: { id: true },
   })) as { id: string };
   await db.stockItem.create({ data: { partId: part.id, tenantKey: TENANT_KEY, warehouseId } });

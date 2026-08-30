@@ -13,6 +13,8 @@ import "dotenv/config";
 import { db } from "../lib/db";
 import { TENANT_KEY, defaultWarehouseId } from "../lib/wms-host";
 import { ensurePartReference, resolveGenerationIds } from "../lib/part-reference-lookup";
+import { newPartSku } from "../lib/part-sku";
+import { normalizeOem } from "../lib/part-reference";
 
 function assert(cond: unknown, msg: string): asserts cond {
   if (!cond) {
@@ -22,17 +24,17 @@ function assert(cond: unknown, msg: string): asserts cond {
   console.log(`ok: ${msg}`);
 }
 
-const ARTICLE = "TESTNMTH001";
+const ARTICLE = "TEST-NMTH-001";
 
 async function cleanup(): Promise<void> {
-  const part = (await db.part.findUnique({ where: { article: ARTICLE }, select: { id: true } })) as {
+  const part = (await db.part.findUnique({ where: { sku: newPartSku(ARTICLE) }, select: { id: true } })) as {
     id: string;
   } | null;
   if (part) {
     await db.stockItem.deleteMany({ where: { partId: part.id } });
     await db.part.delete({ where: { id: part.id } });
   }
-  await db.partReference.deleteMany({ where: { oem: ARTICLE } });
+  await db.partReference.deleteMany({ where: { oem: normalizeOem(ARTICLE) } });
 }
 
 async function main(): Promise<void> {
@@ -68,7 +70,7 @@ async function main(): Promise<void> {
   await db.$transaction(async (tx) => {
     const referenceId = await ensurePartReference(tx, { article: ARTICLE, name: "Тестовая позиция нити" });
     const part = (await tx.part.create({
-      data: { slug: "test-nmth-001", article: ARTICLE, name: "Тестовая позиция нити", price: 0, isActive: false, referenceId },
+      data: { slug: "test-nmth-001", article: ARTICLE, sku: newPartSku(ARTICLE), name: "Тестовая позиция нити", price: 0, isActive: false, referenceId },
       select: { id: true },
     })) as { id: string };
     await tx.stockItem.create({
@@ -76,7 +78,7 @@ async function main(): Promise<void> {
     });
   });
   const draft = (await db.part.findUnique({
-    where: { article: ARTICLE },
+    where: { sku: newPartSku(ARTICLE) },
     select: { referenceId: true, isActive: true, price: true },
   })) as { referenceId: string | null; isActive: boolean; price: number };
   assert(draft.referenceId === refId, "draft-Part (NEW_PART) создан со связью с номенклатурой");

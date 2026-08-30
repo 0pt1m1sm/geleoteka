@@ -27,6 +27,7 @@ async function makePart(article: string, qty: number): Promise<string> {
     data: {
       slug: article.toLowerCase(),
       article,
+      sku: article,
       name: `E2E pack ${article}`,
       price: 1000,
       stockItems: { create: { warehouseId: WH, quantity: qty, tenantKey: TENANT_KEY } },

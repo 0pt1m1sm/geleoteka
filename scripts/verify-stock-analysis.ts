@@ -26,7 +26,7 @@ const WH = "wh_main_geleoteka";
 async function makePart(tag: string, quantity: number): Promise<{ partId: string; itemId: string }> {
   const article = `${PREFIX}${tag}`;
   const part = (await db.part.create({
-    data: { slug: article.toLowerCase(), article, name: `${PREFIX}${tag}`, price: 0, isActive: true },
+    data: { slug: article.toLowerCase(), article, sku: article, name: `${PREFIX}${tag}`, price: 0, isActive: true },
     select: { id: true },
   })) as { id: string };
   const si = (await db.stockItem.create({
