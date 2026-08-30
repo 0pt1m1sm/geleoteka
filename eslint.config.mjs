@@ -111,6 +111,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Отдельный деплой со своим рантаймом: tools/tg-relay/server.js — ДОСЛОВНАЯ
+    // копия того, что работает на Railway (CommonJS, zero-deps). Правила
+    // приложения к нему неприменимы, а расхождение с продом опаснее любого
+    // стилевого замечания — см. tools/tg-relay/README.md.
+    "tools/tg-relay/**",
   ]),
 ]);
 
