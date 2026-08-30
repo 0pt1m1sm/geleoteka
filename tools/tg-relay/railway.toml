@@ -1,11 +1,13 @@
 # Railway service "tg-relay" (project tg-relay). Deploy from THIS directory:
 #   cd tools/tg-relay && railway up --service tg-relay
+#
+# Healthcheck сознательно НЕ задан: у боевого релея нет отдельного эндпоинта
+# состояния — любой путь без секретного префикса отдаёт 404, и healthcheck по
+# нему валил бы деплой. Так же он и запущен сейчас.
 [build]
 builder = "RAILPACK"
 
 [deploy]
 startCommand = "node server.js"
-healthcheckPath = "/healthz"
-healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 5
