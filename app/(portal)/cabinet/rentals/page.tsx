@@ -7,8 +7,7 @@ import { formatPrice, formatDate } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
 
 const STATUS_LABELS: Record<string, string> = {
-  PENDING: "Ожидает",
-  CONFIRMED: "Подтверждена",
+  BOOKED: "Забронирована",
   ACTIVE: "Активна",
   RETURNED: "Завершена",
   CANCELLED: "Отменена",

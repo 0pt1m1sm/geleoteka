@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
-import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
+import { db } from "@/lib/db";
+import { getCMSText, getCMSRichtext } from "@/lib/cms";
 import { pageSeo } from "@/lib/seo";
 
 export const metadata = pageSeo({
@@ -13,12 +14,24 @@ export const metadata = pageSeo({
   path: "/vacancies",
 });
 
+interface VacancyListItem {
+  id: string;
+  title: string;
+  type: string;
+  description: string;
+  requirements: string[];
+}
+
 export default async function VacanciesPage(): Promise<React.ReactElement> {
-  const [eyebrow, title, description, items, ctaTitle, ctaBody, ctaButton] = await Promise.all([
+  const [eyebrow, title, description, vacancies, ctaTitle, ctaBody, ctaButton] = await Promise.all([
     getCMSText("vacancies.eyebrow"),
     getCMSText("vacancies.title"),
     getCMSText("vacancies.description"),
-    getCMSList("vacancies.items"),
+    db.vacancy.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+      select: { id: true, title: true, type: true, description: true, requirements: true },
+    }) as Promise<VacancyListItem[]>,
     getCMSText("vacancies.cta.title"),
     getCMSRichtext("vacancies.cta.body"),
     getCMSText("vacancies.cta.button"),
@@ -35,21 +48,30 @@ export default async function VacanciesPage(): Promise<React.ReactElement> {
       />
 
       <div className="space-y-6 mb-12">
-        {items.map((vacancy, i) => (
-          <div key={i} className="card">
+        {vacancies.length === 0 && (
+          <div className="card text-center py-8">
+            <p className="text-[var(--foreground-muted)]">Открытых вакансий пока нет</p>
+          </div>
+        )}
+        {vacancies.map((vacancy) => (
+          <div key={vacancy.id} className="card">
             <div className="flex items-start justify-between gap-4 mb-3">
               <h2 className="text-xl font-semibold">{vacancy.title}</h2>
               <span className="badge badge-silver text-xs shrink-0">{vacancy.type}</span>
             </div>
             <div className="text-[var(--foreground-muted)] mb-4">
-              <Markdown source={vacancy.description ?? ""} />
+              <Markdown source={vacancy.description} />
             </div>
-            <div>
-              <h3 className="text-sm font-medium mb-2">Требования:</h3>
-              <div className="text-sm text-[var(--foreground-muted)]">
-                <Markdown source={vacancy.requirements ?? ""} />
+            {vacancy.requirements.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Требования:</h3>
+                <ul className="text-sm text-[var(--foreground-muted)] list-disc list-inside space-y-1">
+                  {vacancy.requirements.map((req, i) => (
+                    <li key={i}>{req}</li>
+                  ))}
+                </ul>
               </div>
-            </div>
+            )}
           </div>
         ))}
       </div>

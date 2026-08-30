@@ -7,6 +7,10 @@ import { LOYALTY_TIERS, getNextTier, formatDate } from "@/lib/utils";
 import type { LoyaltyTier } from "@/lib/utils";
 import { Badge, Card, PageHeader } from "@/components/ui";
 
+// Server Component — `window` is never defined here, so the referral URL
+// must be built from the known site origin instead.
+const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+
 export default async function LoyaltyPage() {
   const session = await getSession();
   if (!session) redirect("/login");
@@ -92,7 +96,7 @@ export default async function LoyaltyPage() {
           <input
             type="text"
             readOnly
-            value={`${typeof window !== "undefined" ? window.location.origin : ""}/register?ref=${account.referralCode}`}
+            value={`${SITE_URL}/register?ref=${account.referralCode}`}
             className="input flex-1 text-sm"
             aria-label="Реферальная ссылка"
           />
