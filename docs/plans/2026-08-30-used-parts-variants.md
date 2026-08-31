@@ -3,7 +3,7 @@
 Created: 2026-08-30
 Status: IN_PROGRESS
 Mode: auto
-Iterations: 7
+Iterations: 11
 Type: Feature
 
 PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утверждён владельцем 2026-08-30).
@@ -33,7 +33,7 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 
 - [x] Story 1: Схема, генерация SKU и миграция каталога (Status: VERIFIED)
 - [x] Story 2: Заведение б/у в админке (Status: VERIFIED)
-- [ ] Story 3: Варианты на странице товара и в корзине (Status: PENDING)
+- [x] Story 3: Варианты на странице товара и в корзине (Status: VERIFIED)
 - [ ] Story 4: Снятие проданного б/у с витрины (Status: PENDING)
 - [ ] Story 5: SEO-контур — одна индексируемая страница на номенклатуру (Status: PENDING)
 - [ ] Story 6: Страница по номеру детали и заявки о поступлении (Status: PENDING)
@@ -109,6 +109,8 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 **DoD.** Три б/у экземпляра одной номенклатуры заводятся и получают разные SKU, фото и цены; валидация не пускает б/у без фото и заметки; фильтр и группировка работают; гейт зелёный.
 
 ### Story 3: Варианты на странице товара и в корзине
+
+**Status: VERIFIED** — PR #99 смержен 31.08 (5 коммитов, 3 круга ревью с проверкой на живом сервере). Закрыты 2 блокера и 11 major. Три заглушки Story 2 сняты вместе. Оба `loading.tsx` под `(public)/parts` удалены — они делали мягкий 404 и превращали redirect в meta refresh.
 
 **Objective.** Покупатель видит выбор «новый / б/у» на одной странице и покупает б/у обычной кнопкой.
 

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { duplicateNewPartWhere, newPartSku, nextUsedSku } from "@/lib/part-sku";
+import { syncSoldOutUsedPart } from "@/lib/parts/sold-out";
 import {
   isPartCondition,
   CONDITION_NOTE_MAX,
@@ -391,6 +392,9 @@ export async function updatePart(
         note: "Manual stock edit",
         tenantKey: TENANT_KEY,
       });
+      // Ручная корректировка тоже может обнулить б/у экземпляр — например при
+      // списании брака. Правило одно на все пути изменения остатка.
+      await syncSoldOutUsedPart(tx as never, partId);
     }
     // Assign/clear barcode + gtin on the StockItem (per-field uniqueness).
     await assignCodes(tx, partId, barcode, gtin);
