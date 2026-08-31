@@ -151,7 +151,7 @@ export interface AuditInput {
  * arrives in `x-forwarded-for`; its absence is not worth failing an operation
  * over, so it degrades to null rather than throwing.
  */
-async function clientIp(): Promise<string | null> {
+export async function clientIp(): Promise<string | null> {
   try {
     const h = await headers();
     const forwarded = h.get("x-forwarded-for");

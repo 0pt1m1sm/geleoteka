@@ -35,6 +35,10 @@ const ENTITY_EVENT_IDENTITY = {
     sourceType: "PartOrder",
     dedupePrefix: "parts-order-created",
   },
+  PART_REQUEST_CREATED: {
+    sourceType: "PartRequest",
+    dedupePrefix: "part-request-created",
+  },
   RENTAL_BOOKING_CREATED: {
     sourceType: "RentalBooking",
     dedupePrefix: "rental-booking-created",

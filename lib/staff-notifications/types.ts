@@ -48,6 +48,12 @@ export const STAFF_NOTIFICATION_EVENT_CATALOG = {
     fallbackPermission: "parts.manage",
     requiresInboundChannel: false,
   },
+  PART_REQUEST_CREATED: {
+    label: "Заявка на деталь",
+    priority: "P1",
+    fallbackPermission: "parts.manage",
+    requiresInboundChannel: false,
+  },
   RENTAL_BOOKING_CREATED: {
     label: "Бронь аренды",
     priority: "P1",

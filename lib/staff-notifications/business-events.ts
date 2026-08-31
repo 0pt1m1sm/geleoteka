@@ -48,6 +48,9 @@ const EVENT_SOURCE = {
   PARTS_ORDER_CREATED: {
     sourceType: "PartOrder",
   },
+  PART_REQUEST_CREATED: {
+    sourceType: "PartRequest",
+  },
   RENTAL_BOOKING_CREATED: {
     sourceType: "RentalBooking",
   },
@@ -133,6 +136,33 @@ export async function publishInboundMessageUnresolved(
     actionPath: makeAdminActionUrl(
       `/admin/crm/inbox/${encodeURIComponent(inboxMessageId)}`,
     ),
+    occurredAt: input.occurredAt,
+  });
+}
+
+/**
+ * Заявка «сообщить о поступлении».
+ *
+ * Уведомляется ПЕРСОНАЛ — без этого заявка лежала бы, пока кто-нибудь не
+ * откроет список в админке. Покупателю автоуведомлений по-прежнему нет: это
+ * решение владельца в PRD, и оно про появление остатка, а не про приём заявки.
+ *
+ * В тексте только номер детали: контакт — персональные данные, а сводка уходит
+ * во внешние каналы (Telegram).
+ */
+export async function publishPartRequestCreated(
+  client: StaffNotificationPublishTx,
+  input: { requestId: string; oem: string; occurredAt: Date },
+): Promise<StaffNotificationEventRecord> {
+  const requestId = requireNonBlank(input.requestId, "requestId");
+  const definition = EVENT_SOURCE.PART_REQUEST_CREATED;
+  return publishStaffNotificationEvent(client, {
+    type: "PART_REQUEST_CREATED",
+    dedupeKey: staffNotificationEntityDedupeKey("PART_REQUEST_CREATED", requestId),
+    sourceType: definition.sourceType,
+    sourceId: requestId,
+    safeSummary: `Заявка на деталь ${input.oem}`,
+    actionPath: makeAdminActionUrl("/admin/parts/requests"),
     occurredAt: input.occurredAt,
   });
 }
