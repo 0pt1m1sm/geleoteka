@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { LinkPending } from "@/components/shared/LinkPending";
 import Image from "next/image";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
@@ -268,7 +269,11 @@ export default async function PartsPage({ searchParams }: Props) {
                       )}
                     </div>
                     <h3 className="text-sm font-medium mb-1 group-hover:text-[var(--color-accent)] transition-colors flex-1">
-                      {part.name as string}
+                      {part.name as string}{" "}
+                      {/* Отклик на клик: loading.tsx удалён (он ломал статусы
+                          404 и редиректы), а глобальная полоса прогресса клики
+                          по ссылкам не покрывает. */}
+                      <LinkPending />
                     </h3>
                     <p className="text-xs text-[var(--foreground-muted)] font-mono mb-2">
                       {part.article as string}

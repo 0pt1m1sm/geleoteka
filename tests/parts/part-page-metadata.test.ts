@@ -23,9 +23,13 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NOTFOUND");
   },
-  redirect: (to: string) => {
+  // permanentRedirect (308): адрес варианта принадлежит хозяину навсегда.
+  permanentRedirect: (to: string) => {
     redirects.push(to);
     throw new Error("REDIRECT");
+  },
+  redirect: () => {
+    throw new Error("НЕОЖИДАННЫЙ ВРЕМЕННЫЙ РЕДИРЕКТ: вариант обязан отдавать 308");
   },
 }));
 

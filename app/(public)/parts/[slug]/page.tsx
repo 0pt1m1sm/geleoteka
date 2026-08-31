@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
@@ -189,7 +189,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // «Запчасть не найдена» вместо страницы детали — и сообщение «экземпляр
   // продан» было бы недостижимо по прямой ссылке в принципе.
   if (host && host.slug !== slug) {
-    redirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
+    // permanentRedirect (308), а не redirect (307): адрес варианта принадлежит
+    // хозяину НАВСЕГДА — б/у экземпляр собственной страницы не получит уже
+    // никогда. 307 говорит поисковику «временно, старый адрес сохраните», и
+    // сигналы по нему не переносятся; 308 переносит и обновляет индекс.
+    permanentRedirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
   }
 
   // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
