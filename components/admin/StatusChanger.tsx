@@ -30,6 +30,7 @@ export function StatusChanger({
     <select
       value={currentStatus}
       onChange={handleChange}
+      aria-label="Статус заказа-наряда"
       className={`input text-xs py-1 px-2 w-auto status-${currentStatus.toLowerCase()}`}
     >
       {STATUSES.map((s) => (

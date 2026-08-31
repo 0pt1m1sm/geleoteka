@@ -12,6 +12,12 @@ interface DeleteVehicleResult {
   detached?: { repairOrders: number; deals: number };
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.includes("Unique constraint")) return true;
+  return "code" in err && (err as { code?: string }).code === "P2002";
+}
+
 /**
  * Delete a customer's car.
  *
@@ -126,18 +132,25 @@ export async function addCar(
     }
   }
 
-  await db.vehicle.create({
-    data: {
-      ownershipType: "CUSTOMER",
-      ownerUserId: session.id,
-      model,
-      year: yearNum,
-      vin,
-      mileage: mileage ? parseInt(mileage) : 0,
-      color,
-      plate,
-    },
-  });
+  try {
+    await db.vehicle.create({
+      data: {
+        ownershipType: "CUSTOMER",
+        ownerUserId: session.id,
+        model,
+        year: yearNum,
+        vin,
+        mileage: mileage ? parseInt(mileage) : 0,
+        color,
+        plate,
+      },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { error: "Автомобиль с таким VIN уже зарегистрирован" };
+    }
+    throw err;
+  }
 
   redirect("/cabinet/cars");
 }

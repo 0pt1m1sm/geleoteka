@@ -25,14 +25,16 @@ export function CalendarSlotPicker() {
     ? format(new Date(data.dateTime), "HH:mm")
     : "";
 
-  const fetchSlots = useCallback(async (date: Date) => {
+  const fetchSlots = useCallback(async (date: Date, signal: AbortSignal) => {
     setLoading(true);
     setFailed(false);
     try {
       const dateStr = format(date, "yyyy-MM-dd");
-      const res = await fetch(`/api/slots?date=${dateStr}`);
+      const res = await fetch(`/api/slots?date=${dateStr}`, { signal });
+      if (signal.aborted) return;
       if (res.ok) {
         const json = await res.json();
+        if (signal.aborted) return;
         setSlots(json.slots);
       } else {
         // Availability is now shop-configurable (hours, holidays, blocks), so a
@@ -42,15 +44,21 @@ export function CalendarSlotPicker() {
         setFailed(true);
       }
     } catch {
+      if (signal.aborted) return;
       setSlots([]);
       setFailed(true);
     } finally {
-      setLoading(false);
+      if (!signal.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchSlots(selectedDate);
+    // A quick day-to-day tap can fire a new request before the previous one
+    // resolves; without this guard the older response can land last and
+    // overwrite the newly selected day's slots with the wrong day's data.
+    const controller = new AbortController();
+    fetchSlots(selectedDate, controller.signal);
+    return () => controller.abort();
   }, [selectedDate, fetchSlots]);
 
   const days = Array.from({ length: 14 }, (_, i) => addDays(new Date(), i + 1));

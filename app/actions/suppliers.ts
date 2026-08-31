@@ -16,6 +16,12 @@ interface SupplierFormData {
   isActive: boolean;
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  if (err.message.includes("Unique constraint")) return true;
+  return "code" in err && (err as { code?: string }).code === "P2002";
+}
+
 function parseSupplierForm(formData: FormData): SupplierFormData {
   const name = (formData.get("name") as string)?.trim();
   const rawEmail = (formData.get("email") as string)?.trim();
@@ -39,25 +45,32 @@ export async function createSupplier(
   const data = parseSupplierForm(formData);
   if (!data.name) return { error: "Название поставщика обязательно" };
 
-  await db.user.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      passwordHash: null,
-      permissionRole: "NONE",
-      isCustomer: false,
-      isSupplier: true,
-      supplierProfile: {
-        create: {
-          contactName: data.contactName,
-          country: data.country,
-          notes: data.notes,
-          isActive: data.isActive,
+  try {
+    await db.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        passwordHash: null,
+        permissionRole: "NONE",
+        isCustomer: false,
+        isSupplier: true,
+        supplierProfile: {
+          create: {
+            contactName: data.contactName,
+            country: data.country,
+            notes: data.notes,
+            isActive: data.isActive,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { error: "Пользователь с таким email или телефоном уже существует" };
+    }
+    throw err;
+  }
   redirect("/admin/suppliers");
 }
 
@@ -77,23 +90,30 @@ export async function updateSupplier(
   })) as { email: string } | null;
   if (!current) return { error: "Поставщик не найден" };
 
-  await db.user.update({
-    where: { id: supplierUserId },
-    data: {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      ...resetEmailVerificationOnChange(current.email, data.email),
-      supplierProfile: {
-        update: {
-          contactName: data.contactName,
-          country: data.country,
-          notes: data.notes,
-          isActive: data.isActive,
+  try {
+    await db.user.update({
+      where: { id: supplierUserId },
+      data: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        ...resetEmailVerificationOnChange(current.email, data.email),
+        supplierProfile: {
+          update: {
+            contactName: data.contactName,
+            country: data.country,
+            notes: data.notes,
+            isActive: data.isActive,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      return { error: "Пользователь с таким email или телефоном уже существует" };
+    }
+    throw err;
+  }
   redirect("/admin/suppliers");
 }
 

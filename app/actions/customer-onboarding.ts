@@ -1,10 +1,10 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import crypto from "node:crypto";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { isValidPassword } from "@/lib/customer-onboarding";
+import { tokensMatch } from "@/lib/tokens";
 
 type OrderKind = "booking" | "cart" | "rental";
 
@@ -13,14 +13,6 @@ function destinationFor(orderKind: OrderKind, role: string): string {
   if (orderKind === "booking") return "/cabinet";
   if (orderKind === "rental") return "/cabinet/rentals";
   return "/cabinet/orders";
-}
-
-function tokensMatch(a: string | null | undefined, b: string | null | undefined): boolean {
-  if (!a || !b) return false;
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  if (aBuf.length !== bBuf.length) return false;
-  return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
 export type SetPasswordResult =
