@@ -118,6 +118,15 @@ export default async function ModelPage({ params }: Props): Promise<React.ReactE
                   {generationLabel(g)}
                   <LinkPending />
                 </Link>
+                {/* Описание кузова, если оно есть: страница модели была 1315
+                    знаков — код, годы и прайс, — а у поколений теперь лежит
+                    настоящий текст. Показать его здесь дешевле и честнее, чем
+                    сочинять для модели отдельный. */}
+                {g.description && (
+                  <p className="text-xs text-[var(--foreground-muted)] mt-1 font-normal">
+                    {g.description}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

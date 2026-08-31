@@ -28,6 +28,9 @@ export interface Generation {
   code: string;
   yearFrom: number;
   yearTo: number | null;
+  /** Текст про кузов: болячки и особенности. Показывается и на своей странице,
+   *  и списком на странице модели. */
+  description?: string | null;
   /** Populated only by trim-aware queries (`getActiveModelsWithTrims`). */
   trims?: Trim[];
   /** Default trim id for the generation, populated by trim-aware queries. */

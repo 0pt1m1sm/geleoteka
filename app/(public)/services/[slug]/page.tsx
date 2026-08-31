@@ -13,6 +13,7 @@ import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Markdown } from "@/components/shared/Markdown";
 import { normalizeFaq } from "@/lib/service-content";
+import { postsForService } from "@/lib/models/related-content";
 
 interface ServiceDetail {
   slug: string;
@@ -69,6 +70,10 @@ export default async function ServicePage({ params }: Props) {
   if (!service) notFound();
 
   const faq = normalizeFaq(service.faq);
+  // Статьи по теме услуги: страница услуги отвечает «что делаем и почём»,
+  // а статья — «почему так и что будет, если тянуть». Порознь это два
+  // документа про одно и то же без единой ссылки друг на друга.
+  const posts = await postsForService(slug);
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
@@ -156,6 +161,22 @@ export default async function ServicePage({ params }: Props) {
           />
         </div>
       ) : null}
+
+      {posts.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold mb-3">Разбираем подробно</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {posts.map((post) => (
+              <Link key={post.slug} href={`/blog/${post.slug}`} className="card card-hover p-4">
+                <p className="font-medium">{post.title}</p>
+                {post.excerpt && (
+                  <p className="text-sm text-[var(--foreground-muted)] mt-1">{post.excerpt}</p>
+                )}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {service.applicableModels.length > 0 && (
         <div className="card mb-8">

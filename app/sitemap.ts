@@ -30,7 +30,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
   { path: "/rentals", priority: 0.7, changeFrequency: "weekly" },
   { path: "/about", priority: 0.6, changeFrequency: "monthly" },
   { path: "/contacts", priority: 0.6, changeFrequency: "monthly" },
-  { path: "/vacancies", priority: 0.5, changeFrequency: "weekly" },
+  // /vacancies убрана: HR-объявление на 717 знаков, в индекс не просится
+  // (см. noindex на самой странице).
   { path: "/blog", priority: 0.6, changeFrequency: "weekly" },
   { path: "/booking", priority: 0.9, changeFrequency: "monthly" },
 ];

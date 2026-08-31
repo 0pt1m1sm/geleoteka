@@ -10,7 +10,7 @@ import { Markdown } from "@/components/shared/Markdown";
 import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
 import { buildArticleJsonLd } from "@/lib/seo-jsonld";
-import { generationsForPost } from "@/lib/models/related-content";
+import { generationsForPost, servicesForPost } from "@/lib/models/related-content";
 
 interface BlogPostRow {
   slug: string;
@@ -73,7 +73,13 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
   if (!post) notFound();
   // Кузова, упомянутые в тексте: читателю есть куда пойти за деталями и
   // ценами, а два документа про одно и то же перестают быть одинокими.
-  const generations = await generationsForPost(post);
+  // Услуги по теме статьи и кузова из текста — оба направления одной связи:
+  // читатель дочитал про болячку и должен попасть к цене и к запчастям, а не
+  // в тупик.
+  const [generations, services] = await Promise.all([
+    generationsForPost(post),
+    servicesForPost(post),
+  ]);
 
 
   return (
@@ -129,6 +135,23 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
           ),
         }}
       />
+
+      {services.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-semibold mb-3">Что мы делаем по этой теме</h2>
+          <div className="flex flex-wrap gap-2">
+            {services.map((svc) => (
+              <Link
+                key={svc.slug}
+                href={`/services/${svc.slug}`}
+                className="card card-hover px-4 py-2 text-sm font-medium"
+              >
+                {svc.name}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {generations.length > 0 && (
         <div className="mt-10">

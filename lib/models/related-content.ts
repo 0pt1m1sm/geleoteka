@@ -72,3 +72,65 @@ export async function generationsForPost(
     take: limit,
   })) as RelatedGeneration[];
 }
+
+/**
+ * Ключевые слова услуг для связи со статьями.
+ *
+ * Отдельного поля у услуги нет, и заводить его ради этого не стоит: у статей
+ * уже есть теги, и редактор их ставит. Список ниже — мост между слагом услуги и
+ * тем, как про неё пишут в текстах. Он ЯВНЫЙ, а не выведенный из названия:
+ * «Двигатель» по названию не совпадёт со статьёй про АКПП, а по смыслу статья
+ * «пинки и толчки» относится к трансмиссии, и это должен решать человек.
+ *
+ * Услуга «Другое» намеренно пустая: под неё подошло бы всё, и подборка
+ * перестала бы что-либо значить.
+ */
+const SERVICE_KEYWORDS: Record<string, readonly string[]> = {
+  to: ["ТО", "техобслуживание", "обслуживание", "регламент", "интервал"],
+  transmission: ["АКПП", "трансмиссия", "коробка", "раздатка", "722.6", "722.9", "9G-Tronic"],
+  repair: ["двигатель", "мотор", "ГРМ", "турбина"],
+  suspension: ["подвеска", "амортизатор", "пневмо", "рычаг"],
+  brakes: ["тормоз", "колодки", "диски"],
+  body: ["кузов", "коррозия", "антикор", "рама", "покраска"],
+  electric: ["электрика", "проводка", "аккумулятор", "блок управления"],
+  conditioner: ["кондиционер", "климат", "заправка"],
+  diagnostic: ["диагностика", "ошибки", "проверка", "перед покупкой"],
+  other: [],
+};
+
+/** Статьи по теме услуги — по тегам и заголовку. */
+export async function postsForService(slug: string, limit = 4): Promise<RelatedPost[]> {
+  const words = SERVICE_KEYWORDS[slug] ?? [];
+  if (words.length === 0) return [];
+
+  return (await db.blogPost.findMany({
+    where: {
+      published: true,
+      OR: words.flatMap((w) => [
+        { tags: { has: w } },
+        { title: { contains: w, mode: "insensitive" as const } },
+      ]),
+    },
+    select: { slug: true, title: true, excerpt: true },
+    orderBy: { publishedAt: "desc" },
+    take: limit,
+  })) as RelatedPost[];
+}
+
+/** Услуги, к которым относится статья: обратная сторона той же связи. */
+export async function servicesForPost(
+  input: { title: string; tags: string[] },
+  limit = 3,
+): Promise<Array<{ slug: string; name: string }>> {
+  const haystack = `${input.title} ${input.tags.join(" ")}`.toLowerCase();
+  const slugs = Object.entries(SERVICE_KEYWORDS)
+    .filter(([, words]) => words.some((w) => haystack.includes(w.toLowerCase())))
+    .map(([slug]) => slug);
+  if (slugs.length === 0) return [];
+
+  return (await db.service.findMany({
+    where: { slug: { in: slugs } },
+    select: { slug: true, name: true },
+    take: limit,
+  })) as Array<{ slug: string; name: string }>;
+}
