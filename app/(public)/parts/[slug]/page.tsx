@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
@@ -34,6 +34,11 @@ const getPartBySlug = cache(async (slug: string) => {
         select: {
           id: true,
           parts: {
+            // Только активные: строки проданных экземпляров остаются в базе
+            // навсегда (на них ссылаются заказы), и без фильтра ходовая деталь
+            // через год тянула бы десятки мёртвых строк на каждый просмотр.
+            // photos не выбираем — блок вариантов их не рендерит.
+            where: { isActive: true },
             select: {
               id: true,
               slug: true,
@@ -43,7 +48,6 @@ const getPartBySlug = cache(async (slug: string) => {
               condition: true,
               conditionNote: true,
               originNote: true,
-              photos: true,
               isActive: true,
               createdAt: true,
               stockItems: { select: { quantity: true } },
@@ -73,7 +77,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   // condition — ВРЕМЕННО, до Story 3/5: иначе страница б/у отдаёт живой,
   // полностью индексируемый дубль карточки нового товара без canonical.
-  if (!p || !p.isActive || p.condition !== "NEW") {
+  if (!p || !p.isActive) {
     return pageSeo({
       title: "Запчасть не найдена",
       description:
@@ -135,7 +139,6 @@ interface RawVariant {
   condition: "NEW" | "USED" | "REFURBISHED";
   conditionNote: string | null;
   originNote: string | null;
-  photos: string[];
   isActive: boolean;
   createdAt: Date;
   stockItems: Array<{ quantity: number }>;
@@ -165,10 +168,35 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   const ref = p.reference as { parts: RawVariant[] } | null;
   const variants: RawVariant[] = (ref?.parts ?? []).filter((v) => v.isActive);
   const host = pickVariantHost(variants);
+
+  // У б/у экземпляра НЕТ собственной страницы — так задумано в PRD: экземпляр
+  // это движение склада, а не контент, и десяток почти одинаковых адресов
+  // конкурировал бы сам с собой. Открытый напрямую вариант уводит на страницу
+  // хозяина с параметром, который разворачивает именно его.
+  if (host && host.slug !== slug) {
+    redirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
+  }
+
   const requestedSku = typeof sp.v === "string" ? sp.v : null;
-  const requestedMissing =
-    requestedSku !== null && !variants.some((v) => v.sku === requestedSku);
-  const onHand = (p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0;
+  const selected = requestedSku ? variants.find((v) => v.sku === requestedSku) : undefined;
+  // Ссылка на проданный экземпляр не должна ронять страницу и не должна врать:
+  // сообщаем, что его больше нет, и показываем то, что есть.
+  const requestedMissing = requestedSku !== null && !selected;
+
+  // Панель покупки показывает ВЫБРАННЫЙ вариант: иначе параметр разворачивал бы
+  // блок, но купить всё равно предлагалось бы хозяина — то есть не то, по чему
+  // покупатель пришёл.
+  const shown = selected ?? null;
+  const onHand = shown
+    ? (shown.stockItems[0]?.quantity ?? 0)
+    : ((p.stockItems as Array<{ quantity: number }>)[0]?.quantity ?? 0);
+  const shownPrice = shown ? shown.price : (p.price as number);
+  const shownId = shown ? shown.id : (p.id as string);
+  const shownSlug = shown ? shown.slug : slug;
+  const shownName = shown ? shown.name : (p.name as string);
+  const shownCondition = shown
+    ? shown.condition
+    : (p.condition as "NEW" | "USED" | "REFURBISHED");
   const cat = p.category as Record<string, string> | null;
   const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
   const photos = p.photos as string[];
@@ -206,7 +234,8 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             name: p.name as string,
             slug: slug,
             article: p.article as string,
-            sku: p.sku as string,
+            sku: (shown ? shown.sku : (p.sku as string)),
+            condition: shownCondition,
             description: p.description as string | null,
             price: p.price as number,
             image: photos[0] ?? null,
@@ -273,7 +302,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
               <div className="flex justify-between py-3">
                 <span className="text-sm text-[var(--foreground-muted)]">Наличие</span>
                 <span className={`text-sm font-medium ${onHand > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
-                  {onHand > 0 ? `В наличии — ${onHand} шт.` : "Под заказ"}
+                  {onHand > 0
+                    ? `В наличии — ${onHand} шт.`
+                    : shownCondition === "NEW"
+                      ? "Под заказ"
+                      : "Продан"}
                 </span>
               </div>
             </div>
@@ -282,15 +315,19 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
           {/* Варианты этой детали: новый товар и б/у экземпляры делят номер,
               и покупатель должен видеть выбор на одной странице, а не искать
               б/у отдельным поиском. */}
+          {/* Сообщение об устаревшей ссылке — ВНЕ блока вариантов: самый частый
+              случай «б/у продан, остался только новый» даёт ровно один вариант,
+              и внутри блока сообщение бы не показалось. */}
+          {requestedMissing && (
+            <p className="mb-4 text-sm text-[var(--foreground-muted)]">
+              Экземпляр, на который вела ссылка, уже продан. Ниже — то, что есть
+              сейчас.
+            </p>
+          )}
+
           {variants.length > 1 && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold mb-3">Варианты этой детали</h2>
-              {requestedMissing && (
-                <p className="mb-3 text-sm text-[var(--foreground-muted)]">
-                  Экземпляр, на который вела ссылка, уже продан. Ниже — то, что
-                  есть сейчас.
-                </p>
-              )}
               <div className="flex flex-col gap-3">
                 {variants.map((v) => {
                   const vQty = v.stockItems[0]?.quantity ?? 0;
@@ -325,7 +362,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                             </p>
                           )}
                           <p className="mt-2 text-xs text-[var(--foreground-muted)]">
-                            {vQty > 0 ? `В наличии — ${vQty} шт.` : "Под заказ"}
+                            {vQty > 0
+                              ? `В наличии — ${vQty} шт.`
+                              : v.condition === "NEW"
+                                ? "Под заказ"
+                                : "Продан"}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
@@ -385,7 +426,7 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             <div className="mb-4">
               <div className="flex items-baseline gap-3">
                 <span className="text-3xl font-bold text-[var(--color-accent)]">
-                  {formatPrice(p.price as number)}
+                  {formatPrice(shownPrice)}
                 </span>
                 {(p.compareAtPrice as number) ? (
                   <span className="text-lg text-[var(--foreground-muted)] line-through">
@@ -409,13 +450,13 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             {/* Add to cart */}
             <AddToCartButton
               part={{
-                id: p.id as string,
-                slug: p.slug as string,
-                name: p.name as string,
+                id: shownId,
+                slug: shownSlug,
+                name: shownName,
                 article: p.article as string,
-                price: p.price as number,
+                price: shownPrice,
                 quantity: onHand,
-                condition: p.condition as "NEW" | "USED" | "REFURBISHED",
+                condition: shownCondition,
               }}
             />
 

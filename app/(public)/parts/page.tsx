@@ -156,6 +156,7 @@ export default async function PartsPage({ searchParams }: Props) {
     if (model) sp.set("model", model);
     if (generation) sp.set("generation", generation);
     if (trimParam) sp.set("trim", trimParam);
+    if (condParam) sp.set("condition", condParam);
     if (showAll) sp.set("showAll", "1");
     if (page > 1) sp.set("page", String(page));
     const qs = sp.toString();
