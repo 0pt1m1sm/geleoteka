@@ -4,6 +4,7 @@
 // the manager review→post gate. Thin wrappers over lib/wms/public/stocktake;
 // counting is WAREHOUSE_WORKER-allowed, posting is ADMIN/MANAGER only.
 import { requireRole } from "@/lib/auth";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { db } from "@/lib/db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
@@ -225,7 +226,38 @@ export async function postCountSessionAction(sessionId: string): Promise<{
 }> {
   const session = await requireRole(POST_ROLES);
   try {
-    await postCountSession(db, { sessionId, actorId: actorId(session), tenantKey: TENANT_KEY });
+    // ОДНА транзакция на проводку и снятие с витрины. Раньше цикл шёл после
+    // postCountSession на db, снаружи её собственной транзакции — и это была
+    // единственная из семи врезок, чей отказ ПЕРЕЖИВАЛ откат: пересчёт уже
+    // проведён, сессия POSTED, экран ушёл в режим просмотра без кнопки
+    // повтора, а пользователь получил вводящее в заблуждение «не удалось
+    // провести». Проданная деталь осталась бы на витрине навсегда и молча.
+    //
+    // timeout/maxWait ОБЯЗАТЕЛЬНЫ и не декоративны: postCountSession ставит их
+    // у себя, потому что полная проводка в проде уже превышала дефолтные 5 с
+    // и падала с P2028. Обернуть без опций — вернуть тот инцидент.
+    await db.$transaction(
+      async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+        // Позиции читаем ДО проводки: после неё строки могут быть недоступны,
+        // а нам нужны id товаров, чьи остатки изменились.
+        const counted = (await tx.stockCountLine.findMany({
+          where: { sessionId, itemId: { not: null } },
+          select: { itemId: true },
+        })) as Array<{ itemId: string | null }>;
+
+        // postCountSession, получив tx, свою транзакцию не открывает.
+        await postCountSession(tx, { sessionId, actorId: actorId(session), tenantKey: TENANT_KEY });
+
+        // Пересчёт не нашёл б/у в ячейке — остаток ушёл в ноль, и на витрине
+        // висела бы деталь, которой физически нет. Врезка на стороне
+        // приложения, а НЕ в ядре WMS: ядро оперирует количествами и о
+        // состоянии товара не знает.
+        for (const id of new Set(counted.map((c) => c.itemId).filter((x): x is string => !!x))) {
+          await syncSoldOutUsedPart(tx as unknown as SoldOutClient, id);
+        }
+      },
+      { timeout: 30_000, maxWait: 10_000 },
+    );
     return { error: null };
   } catch (e) {
     if (e instanceof WmsError) {

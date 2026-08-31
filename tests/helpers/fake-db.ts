@@ -74,6 +74,9 @@ export interface FakePart {
   id: string;
   name: string;
   article: string;
+  /** Состояние: правило снятия проданного б/у смотрит именно на него. */
+  condition?: "NEW" | "USED" | "REFURBISHED";
+  isActive?: boolean;
 }
 
 export interface FakeSupplierOrder {
@@ -350,7 +353,34 @@ export class FakeDb {
         if (!ids) unsupported("part", "findMany", args);
         return this.parts.filter((p) => ids!.includes(p.id)).map((p) => ({ ...p }));
       },
-      findUnique: async (args: unknown) => unsupported("part", "findUnique", args),
+      // Форма запроса из lib/parts/sold-out.ts: правило читает состояние,
+      // активность и остатки по ВСЕМ складам. Фейк намеренно строгий —
+      // незнакомая форма падает, а не возвращает молча пустоту.
+      findUnique: async (args: {
+        where?: { id?: string };
+        select?: { condition?: boolean; isActive?: boolean; stockItems?: unknown };
+      }) => {
+        const id = args?.where?.id;
+        const sel = args?.select;
+        if (!id || !sel?.condition || !sel?.isActive || !sel?.stockItems) {
+          unsupported("part", "findUnique", args);
+        }
+        const part = this.parts.find((x) => x.id === id);
+        if (!part) return null;
+        return {
+          condition: part.condition ?? "NEW",
+          isActive: part.isActive ?? true,
+          stockItems: this.stockItems
+            .filter((i: FakeStockItem) => i.partId === id)
+            .map((i: FakeStockItem) => ({ quantity: i.quantity })),
+        };
+      },
+      update: async (args: { where: { id: string }; data: { isActive?: boolean } }) => {
+        const part = this.parts.find((x) => x.id === args.where.id);
+        if (!part) unsupported("part", "update", args);
+        if (args.data.isActive !== undefined) part!.isActive = args.data.isActive;
+        return { ...part! };
+      },
     };
   }
 

@@ -1,4 +1,5 @@
 import { recordMovement, binsForItem, type DbClientPort } from "@/lib/wms/public";
+import { syncSoldOutUsedPart, type SoldOutClient } from "../parts/sold-out";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export interface AdjustResult {
@@ -57,6 +58,7 @@ export async function applyAdjustment(
     tenantKey: TENANT_KEY,
   });
 
+
   if (result.quantity < placed) {
     // Reducing on-hand below placed would strand stock in bins it no longer
     // covers — correct inventory at the bin/location instead. Throwing aborts the tx.
@@ -67,6 +69,10 @@ export async function applyAdjustment(
     // drive on-hand below 0 / below reserved. Throwing aborts the tx.
     throw new Error("NEGATIVE_ON_HAND");
   }
+
+  // ПОСЛЕ гардов PLACED_EXCEEDS_ONHAND и NEGATIVE_ON_HAND: вызов принадлежит
+  // месту, где исход окончателен, а не месту, откуда его ещё могут отменить.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, partId);
 
   return { quantity: result.quantity, reserved: result.reserved, available: result.available };
 }

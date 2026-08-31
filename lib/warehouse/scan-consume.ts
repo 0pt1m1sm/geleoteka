@@ -6,6 +6,7 @@
 // statuses, and (pack-only) downstream ship/notify. Those differences stay in the
 // thin pick.ts / pack.ts wrappers; this module owns the duplicated mechanic.
 import { binsForItem, consumeStock, type DbClientPort, type BinPlacement } from "@/lib/wms/public";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { TENANT_KEY } from "@/lib/wms-host";
 
 /** A required order line reduced to what the consume mechanic needs: a stable key
@@ -161,5 +162,9 @@ export async function applyScanConsume(
     actorId: input.actorId,
     tenantKey: TENANT_KEY,
   });
+
+  // Тот же инвариант, что и при продаже через магазин: б/у экземпляр,
+  // списанный со склада, физически кончился и на витрине не место.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, input.partId);
   return { requiredQty: line.requiredQty };
 }

@@ -165,6 +165,9 @@ export function PartEditForm({ part, categories, models }: Props) {
           <span className="text-sm">OEM</span>
         </label>
         <label className="flex items-center gap-3 cursor-pointer">
+          {/* Значение чекбокса читается как === "on". Скрытого дублёра не нужно:
+            незачёканный чекбокс браузер не шлёт, и сервер получает отсутствие
+            поля — это и есть «снято». */}
           <input type="checkbox" name="isActive" defaultChecked={part.isActive} className="w-4 h-4 accent-[var(--color-accent)]" />
           <span className="text-sm">Активна</span>
         </label>
