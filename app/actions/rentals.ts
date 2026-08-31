@@ -11,6 +11,7 @@ import { createDeal } from "@/lib/crm/public";
 import { nextRentalBookingNumber } from "@/lib/crm/public";
 import { publishRentalBookingCreated } from "@/lib/staff-notifications/business-events";
 import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
+import { isChecked } from "@/lib/forms";
 
 interface VehicleFormData {
   model: string;
@@ -24,8 +25,9 @@ interface VehicleFormData {
   horsepower: number | null;
   transmission: string | null;
   seats: number;
-  isAvailable: boolean;
   features: string[];
+  // isAvailable сюда НЕ входит: чекбокс есть только в форме правки, а у
+  // создания его нет. Значение задаёт вызывающий — см. createRentalCar.
 }
 
 function parseCarFormData(formData: FormData): VehicleFormData {
@@ -40,11 +42,10 @@ function parseCarFormData(formData: FormData): VehicleFormData {
   const horsepower = parseInt(formData.get("horsepower") as string) || null;
   const transmission = (formData.get("transmission") as string)?.trim() || null;
   const seats = parseInt(formData.get("seats") as string) || 5;
-  const isAvailable = formData.get("isAvailable") !== "off";
   const featuresRaw = (formData.get("features") as string) || "";
   const features = featuresRaw.split("\n").map((f) => f.trim()).filter(Boolean);
 
-  return { model, year, dailyRate, description, color, plate, mileage, engine, horsepower, transmission, seats, isAvailable, features };
+  return { model, year, dailyRate, description, color, plate, mileage, engine, horsepower, transmission, seats, features };
 }
 
 export async function createRentalCar(
@@ -62,7 +63,11 @@ export async function createRentalCar(
   }
 
   await db.vehicle.create({
-    data: { ...data, ownershipType: "RENTAL", photos: photoUrls },
+    // Доступность задаётся здесь, а не разбором формы: в форме заведения
+    // машины такого чекбокса НЕТ, а снятая галка и отсутствующее поле для
+    // браузера неразличимы — читать его тут значило бы заводить каждую новую
+    // машину скрытой. Снять с проката можно на карточке.
+    data: { ...data, isAvailable: true, ownershipType: "RENTAL", photos: photoUrls },
   });
 
   await pingIndexNow(["/rentals"]);
@@ -94,7 +99,8 @@ export async function updateRentalCar(
     const removed = (current?.photos ?? []).filter((u: string) => !photoUrls.includes(u));
     await tx.vehicle.update({
       where: { id: carId },
-      data: { ...data, photos: photoUrls },
+      // Чекбокс есть только в форме правки — здесь его и читаем.
+      data: { ...data, isAvailable: isChecked(formData, "isAvailable"), photos: photoUrls },
     });
     if (removed.length > 0) {
       await deleteOrphanImages(removed, tx);
