@@ -49,9 +49,17 @@ describe("дефект не вернулся ни в одном из мест", 
     // не будет проверен. Сторож по исходнику, а не по поведению: серверные
     // действия ходят в базу, и разворачивать их ради одной строки разбора
     // дороже, чем поймать саму строку. Поведение проверки закрыто выше.
+    // РЕКУРСИВНО. Плоский readdirSync молча выбрасывал подкаталоги, а в
+    // app/actions/crm лежат десять файлов, включая сметы и сделки — то есть
+    // сторож выглядел обходом каталога, а покрывал 44 файла из 54. Это тот же
+    // промах, что и список файлов, просто уровнем глубже.
     const dir = "app/actions";
-    const files = readdirSync(dir).filter((f) => f.endsWith(".ts"));
-    expect(files.length).toBeGreaterThan(5);
+    const files = readdirSync(dir, { recursive: true })
+      .map(String)
+      .filter((f) => f.endsWith(".ts"));
+    // Пустой обход молчал бы так же убедительно, как полный.
+    expect(files.length).toBeGreaterThan(40);
+    expect(files.some((f) => f.includes("crm/")), "подкаталоги не попали в обход").toBe(true);
 
     const bad: string[] = [];
     for (const file of files) {
