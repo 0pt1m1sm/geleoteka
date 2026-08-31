@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
+import { isChecked } from "@/lib/forms";
 
 interface SupplierFormData {
   name: string;
@@ -25,7 +26,7 @@ function parseSupplierForm(formData: FormData): SupplierFormData {
   const contactName = (formData.get("contactName") as string)?.trim() || null;
   const country = (formData.get("country") as string)?.trim() || null;
   const notes = (formData.get("notes") as string)?.trim() || null;
-  const isActive = formData.get("isActive") !== "off";
+  const isActive = isChecked(formData, "isActive");
   return { name, email, phone, contactName, country, notes, isActive };
 }
 

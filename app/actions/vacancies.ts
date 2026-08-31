@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isChecked } from "@/lib/forms";
 
 interface VacancyFormData {
   title: string;
@@ -23,7 +24,7 @@ function parseVacancyFormData(formData: FormData): VacancyFormData {
     .split("\n")
     .map((r) => r.trim())
     .filter(Boolean);
-  const isActive = formData.get("isActive") !== "off";
+  const isActive = isChecked(formData, "isActive");
   const sortOrderRaw = (formData.get("sortOrder") as string) || "0";
   const sortOrder = parseInt(sortOrderRaw, 10) || 0;
   return { title, type, description, requirements, isActive, sortOrder };

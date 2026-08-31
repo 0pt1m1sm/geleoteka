@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isChecked } from "@/lib/forms";
 
 /**
  * The team roster shown on «О нас» — site content, edited the same way as
@@ -44,7 +45,7 @@ function parseFormData(formData: FormData): TeamMemberFormData {
       .split("\n")
       .map((c) => c.trim())
       .filter(Boolean),
-    isActive: formData.get("isActive") !== "off",
+    isActive: isChecked(formData, "isActive"),
     sortOrder: Number.parseInt(str("sortOrder") || "0", 10) || 0,
   };
 }
