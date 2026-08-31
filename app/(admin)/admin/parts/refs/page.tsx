@@ -7,7 +7,7 @@ import { expandGenerationCodes, normalizeOem } from "@/lib/part-reference";
 import { Card, PageHeader } from "@/components/ui";
 import { PartRefAddForm } from "@/components/admin/PartRefAddForm";
 import { PartRefImportForm } from "@/components/admin/PartRefImportForm";
-import { PartRefDeleteButton } from "@/components/admin/PartRefDeleteButton";
+import { PartRefRowActions } from "@/components/admin/PartRefRowActions";
 import {
   PartRefFilterBar,
   type ModelFilterOption,
@@ -67,32 +67,25 @@ function RefCard({ r }: { r: RefRow }): React.ReactElement {
         </p>
       </Link>
       <div className="flex items-center gap-2 shrink-0">
-        {shopPartId ? (
+        {/* «В магазине» — прежде всего состояние позиции: значок остаётся
+            видимым, чтобы список читался без раскрытия каждой строки. Но быть
+            состоянием не мешает быть и коротким путём к объекту, который этим
+            состоянием описан, — поэтому ссылка, а не просто текст. Ширины она
+            не добавляет, а «Открыть товар» всё равно продублировано в меню:
+            это два разных человека — знающий про шорткат и тот, кто ищет
+            действие там, где действия лежат.
+            Подчёркивание при наведении обязательно: у `.badge` нет ни своего
+            hover, ни курсора, и раньше этот путь можно было найти только
+            наугад ткнув мышью. */}
+        {shopPartId && (
           <Link
             href={`/admin/parts/${shopPartId}`}
-            className="badge bg-[var(--color-success-bg)] text-[var(--color-success)]"
+            className="badge bg-[var(--color-success-bg)] text-[var(--color-success)] hover:underline"
           >
             в магазине
           </Link>
-        ) : (
-          // Оба пути и здесь: у номенклатуры чистого разбора нового товара нет
-          // и не появится, а завести б/у экземпляр надо.
-          <div className="flex gap-1">
-            <Link
-              href={`/admin/parts/new?ref=${r.id}&condition=USED`}
-              className="btn btn-secondary btn-sm text-xs"
-            >
-              Б/у
-            </Link>
-            <Link
-              href={`/admin/parts/new?ref=${r.id}`}
-              className="btn btn-secondary btn-sm text-xs"
-            >
-              Создать товар
-            </Link>
-          </div>
         )}
-        <PartRefDeleteButton id={r.id} name={r.name} />
+        <PartRefRowActions id={r.id} name={r.name} shopPartId={shopPartId} />
       </div>
     </div>
   );

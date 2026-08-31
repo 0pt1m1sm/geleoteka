@@ -196,21 +196,24 @@ export default async function PartRefDetailPage({ params }: Props) {
                 </Link>
               </div>
             ))}
-            <div className="flex items-center justify-between gap-4 pt-2">
+            {/* Колонкой на телефоне, строкой с планшета. Раньше здесь было
+                `flex … shrink-0` без переноса: кнопка держала свою ширину, и
+                на узком экране пояснению оставалась колонка в одно слово. */}
+            <div className="flex flex-col gap-3 pt-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <p className="text-sm text-[var(--foreground-muted)]">
                 Каждая б/у деталь заводится отдельной позицией: свои фотографии,
                 своя цена, своё место на складе.
               </p>
               <Link
                 href={`/admin/parts/new?ref=${ref.id}&condition=USED`}
-                className="btn btn-secondary btn-sm shrink-0"
+                className="btn btn-secondary btn-sm self-start sm:self-auto sm:shrink-0"
               >
                 Добавить б/у экземпляр
               </Link>
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <p className="text-sm text-[var(--foreground-muted)]">
               Товара с этим номером в магазине ещё нет.
             </p>
@@ -220,7 +223,7 @@ export default async function PartRefDetailPage({ params }: Props) {
                 Раньше отсюда предлагалось только «Создать товар», и путь к
                 б/у существовал лишь через ручное переключение состояния в
                 форме — то есть интерфейс вёл мимо главного сценария. */}
-            <div className="flex gap-2 shrink-0">
+            <div className="flex flex-wrap gap-2 sm:shrink-0">
               <Link
                 href={`/admin/parts/new?ref=${ref.id}&condition=USED`}
                 className="btn btn-secondary btn-sm"
