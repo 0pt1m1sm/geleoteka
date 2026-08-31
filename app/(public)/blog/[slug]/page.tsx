@@ -10,6 +10,7 @@ import { Markdown } from "@/components/shared/Markdown";
 import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
 import { buildArticleJsonLd } from "@/lib/seo-jsonld";
+import { generationsForPost } from "@/lib/models/related-content";
 
 interface BlogPostRow {
   slug: string;
@@ -18,6 +19,7 @@ interface BlogPostRow {
   content: string;
   publishedAt: Date | null;
   updatedAt: Date;
+  tags: string[];
 }
 
 interface Props {
@@ -35,6 +37,7 @@ const getPublishedPost = cache(async (slug: string): Promise<BlogPostRow | null>
       content: true,
       publishedAt: true,
       updatedAt: true,
+      tags: true,
     },
   })) as BlogPostRow | null;
 });
@@ -68,6 +71,10 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
   const { slug } = await params;
   const post = await getPublishedPost(slug);
   if (!post) notFound();
+  // Кузова, упомянутые в тексте: читателю есть куда пойти за деталями и
+  // ценами, а два документа про одно и то же перестают быть одинокими.
+  const generations = await generationsForPost(post);
+
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
@@ -122,6 +129,29 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
           ),
         }}
       />
+
+      {generations.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-xl font-semibold mb-3">Про эти кузова</h2>
+          <div className="flex flex-wrap gap-2">
+            {generations.map((g) => (
+              <Link
+                key={`${g.model.slug}-${g.code}`}
+                href={`/models/${g.model.slug}/${g.code}`}
+                className="card card-hover px-4 py-2 text-sm"
+              >
+                <span className="font-medium">
+                  {g.model.name} {g.code}
+                </span>
+                <span className="text-[var(--foreground-muted)]">
+                  {" "}
+                  · {g.yearFrom}–{g.yearTo ?? "н.в."}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mt-12 card text-center">
         <p className="text-sm text-[var(--foreground-muted)] mb-4">
