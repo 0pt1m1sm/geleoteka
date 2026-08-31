@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { isGenerationIndexable } from "@/lib/models/index-policy";
+import { postsForGeneration } from "@/lib/models/related-content";
 import { LinkPending } from "@/components/shared/LinkPending";
 
 interface Props {
@@ -118,6 +119,9 @@ export default async function GenerationPage({ params }: Props) {
   if (!g) notFound();
 
   const engineList = engines(g);
+  // Статьи про этот кузов: без них страница кузова и текст про его болячки
+  // остаются двумя одинокими документами про одно и то же.
+  const posts = await postsForGeneration(g.code);
   // Детали этого кузова, сгруппированные по узлу: список из трёхсот строк
   // подряд нечитаем, а по группам он превращается в оглавление.
   const byGroup = new Map<string, Array<{ oem: string; name: string }>>();
@@ -197,6 +201,25 @@ export default async function GenerationPage({ params }: Props) {
                   ))}
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {posts.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold mb-3">Статьи про {g.code}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {posts.map((post) => (
+              <Link key={post.slug} href={`/blog/${post.slug}`} className="card card-hover p-4">
+                <p className="font-medium">
+                  {post.title}
+                  <LinkPending />
+                </p>
+                {post.excerpt && (
+                  <p className="text-sm text-[var(--foreground-muted)] mt-1">{post.excerpt}</p>
+                )}
+              </Link>
             ))}
           </div>
         </div>
