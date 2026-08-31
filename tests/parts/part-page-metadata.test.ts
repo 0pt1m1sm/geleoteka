@@ -27,6 +27,12 @@ vi.mock("next/navigation", () => ({
     redirects.push(to);
     throw new Error("REDIRECT");
   },
+  // Постоянный редирект здесь — ошибка: хозяин выбирается динамически, и
+  // «навсегда» разворачивается, когда новый товар снимают с витрины.
+  // Станет допустим в Story 6, когда хозяином будет страница по номеру детали.
+  permanentRedirect: () => {
+    throw new Error("ПОСТОЯННЫЙ РЕДИРЕКТ ВАРИАНТА: хозяин меняется, 308 будет ложью");
+  },
 }));
 
 type Fixture = {
@@ -112,6 +118,20 @@ describe("generateMetadata карточки товара", () => {
     expect(meta.alternates?.canonical).toBe("/parts/support-new");
   });
 
+  it("ПУСТОЙ ?v= — это отсутствие выбора, а не выбор пустого sku", async () => {
+    // Обрезанная при пересылке ссылка вида /parts/xxx?v= — голый адрес
+    // хозяина. Раньше проверка «это строка» считала "" выбором, и такой адрес
+    // получал noindex, хотя индексировать надо именно его.
+    findUnique.mockResolvedValue(withReference(NEW_PART, [NEW_PART, USED_PART]));
+    const { generateMetadata } = await import("@/app/(public)/parts/[slug]/page");
+    const meta = await generateMetadata({
+      params: Promise.resolve({ slug: "support-new" }),
+      searchParams: Promise.resolve({ v: "" }),
+    });
+    expect(meta.robots).toBeFalsy();
+    expect(meta.alternates?.canonical).toBe("/parts/support-new");
+  });
+
   it("несуществующий или снятый товар остаётся «не найден» и закрыт от индексации", async () => {
     findUnique.mockResolvedValue(null);
     const { generateMetadata } = await import("@/app/(public)/parts/[slug]/page");
@@ -156,6 +176,10 @@ describe("поведение страницы: редирект варианто
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === "REDIRECT") return `REDIRECT:${redirects[0]}`;
       if (msg === "NOTFOUND") return "NOTFOUND";
+      // Сообщения сторожей пробрасываем: иначе регресс к постоянному редиректу
+      // упал бы с бесполезным «ожидал REDIRECT, получил RENDER», а написанный
+      // текст про причину проглотился бы.
+      if (msg.startsWith("ПОСТОЯННЫЙ РЕДИРЕКТ")) throw e;
       // Рендер JSX в узле может упасть по другой причине — для нас это
       // означает, что до рендера дошли, то есть ни редиректа, ни 404.
       return "RENDER";
@@ -167,14 +191,21 @@ describe("поведение страницы: редирект варианто
     expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
   });
 
+  it("ЖИВОЙ вариант уводит на хозяина С параметром — иначе выбор потеряется", async () => {
+    findUnique.mockResolvedValue(withReference(USED_PART, [NEW_PART, USED_PART]));
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
+  });
+
   it("цель редиректа рендерится — цикла нет", async () => {
     findUnique.mockResolvedValue(withReference(NEW_PART, [NEW_PART, USED_PART]));
     expect(await visit("support-new", "A4634210098-U1")).toBe("RENDER");
   });
 
-  it("ПРОДАННЫЙ экземпляр тоже доводит до хозяина, а не в «не найдена»", async () => {
+  it("ПРОДАННЫЙ экземпляр доводит до хозяина С параметром — чтобы прочитать «продан»", async () => {
     // Б/у одноразовый: расшаренная ссылка переживает продажу, и упираться ей
-    // в 404 нельзя — иначе сообщение «экземпляр продан» недостижимо.
+    // в 404 нельзя. Параметр здесь НУЖЕН — экземпляр действительно кончился,
+    // и пришедший по ссылке должен это прочитать, а не гадать, почему видит
+    // другой товар.
     const sold = { ...USED_PART, isActive: false };
     findUnique.mockResolvedValue(withReference(sold, [NEW_PART, sold]));
     expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
@@ -183,7 +214,16 @@ describe("поведение страницы: редирект варианто
   it("когда новый снят, хозяином становится б/у", async () => {
     const soldNew = { ...NEW_PART, isActive: false };
     findUnique.mockResolvedValue(withReference(soldNew, [soldNew, USED_PART]));
-    expect(await visit("support-new")).toBe("REDIRECT:/parts/support-used-1?v=A4634210098");
+    // Снятый НОВЫЙ товар — без параметра: он не «продан», он спрятан, и
+    // сообщение «экземпляр продан» было бы про него ложью.
+    expect(await visit("support-new")).toBe("REDIRECT:/parts/support-used-1");
+  });
+
+  it("ВОССТАНОВЛЕННАЯ ведёт себя как б/у, а не как новый товар", async () => {
+    // Она тоже экземпляр в одном лице: кончилась — значит кончилась.
+    const sold = { ...USED_PART, condition: "REFURBISHED" as const, isActive: false };
+    findUnique.mockResolvedValue(withReference(sold, [NEW_PART, sold]));
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
   });
 
   it("деталь без активных вариантов вовсе — «не найдена»", async () => {

@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { LinkPending } from "@/components/shared/LinkPending";
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
@@ -19,6 +20,21 @@ interface Props {
   params: Promise<{ slug: string }>;
   /** `?v=<sku>` разворачивает конкретный вариант; в canonical не попадает. */
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+/**
+ * `?v=<sku>` из адреса, либо null.
+ *
+ * Пустой параметр (`?v=`) — это ОТСУТСТВИЕ выбора, а не выбор пустого sku.
+ * Проверка «это строка» считала `""` выбором, и голый адрес хозяина с
+ * обрезанным при пересылке хвостом получал noindex и ложное «экземпляр
+ * продан». Одно место на обоих потребителей, чтобы правило не разъезжалось.
+ */
+function requestedVariantSku(
+  sp: { [key: string]: string | string[] | undefined } | undefined,
+): string | null {
+  const v = sp?.v;
+  return typeof v === "string" && v !== "" ? v : null;
 }
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
@@ -120,7 +136,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     // sku и ценой ВАРИАНТА, а canonical ведёт на голый адрес хозяина, где
     // Product другой. Canonical это склеит, но подстраховаться дешевле, чем
     // разбираться потом, почему в выдаче цена не та.
-    noindex: canonicalPath !== `/parts/${slug}` || typeof sp?.v === "string",
+    noindex: canonicalPath !== `/parts/${slug}` || requestedVariantSku(sp) !== null,
   });
 }
 
@@ -182,20 +198,51 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // У б/у экземпляра НЕТ собственной страницы — так задумано в PRD: экземпляр
   // это движение склада, а не контент, и десяток почти одинаковых адресов
   // конкурировал бы сам с собой. Открытый напрямую вариант уводит на страницу
-  // хозяина с параметром, который разворачивает именно его.
+  // хозяина; параметр, разворачивающий именно его, клеится не всегда — см.
+  // разбор ниже.
   // Редирект СТОИТ ВЫШЕ проверки активности намеренно. Б/у экземпляр
   // одноразовый: после продажи он гаснет, а расшаренная на него ссылка живёт.
-  // Если сначала отсекать неактивные, любая такая ссылка упиралась бы в
-  // «Запчасть не найдена» вместо страницы детали — и сообщение «экземпляр
-  // продан» было бы недостижимо по прямой ссылке в принципе.
+  // Если сначала отсекать неактивные, такая ссылка упиралась бы в «Запчасть не
+  // найдена» вместо страницы детали, где видно и саму деталь, и что стало с
+  // экземпляром.
   if (host && host.slug !== slug) {
-    redirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
+    // redirect (307), а НЕ permanentRedirect (308) — и это принципиально.
+    // Постоянный редирект утверждает вечность, а хозяин выбирается динамически:
+    // сняли новый товар с витрины (вручную или продажей последнего экземпляра
+    // по Story 4) — хозяином становится другой вариант, и вчерашний «навсегда»
+    // разворачивается в обратную сторону. Два адреса по очереди заявили бы
+    // поисковику «я навсегда переехал на соседа».
+    // Постоянным редирект станет в Story 6, когда хозяином будет долговечная
+    // страница по номеру детали, а не одноразовый экземпляр. Так и записано в
+    // ledger, в разделе Story 4.
+    //
+    // Клеить ли ?v=, решает СМЫСЛ сообщения на той стороне, а не активность.
+    // Параметр разворачивает вариант, а если его больше нет среди живых —
+    // страница пишет «экземпляр продан».
+    //
+    //  • живой вариант — параметр обязателен, иначе выбор потеряется;
+    //  • проданный б/у (или восстановленный) — параметр НУЖЕН: экземпляр
+    //    действительно кончился, и человек, пришедший по расшаренной ссылке,
+    //    должен это прочитать, а не гадать, почему видит другой товар;
+    //  • снятый с витрины НОВЫЙ товар — параметра быть НЕ должно: он не
+    //    «продан», он спрятан, и сообщение было бы ложью.
+    //
+    // Сигналами не рискуем: адрес с параметром помечен noindex осознанно
+    // (см. generateMetadata), адреса экземпляров не в карте сайта и в выдачу
+    // не заявлялись — терять там нечего.
+    const soldInstance = !p.isActive && p.condition !== "NEW";
+    const keepVariantParam = (p.isActive as boolean) || soldInstance;
+    redirect(
+      keepVariantParam
+        ? `/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`
+        : `/parts/${host.slug}`,
+    );
   }
 
   // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
   if (!p.isActive) notFound();
 
-  const requestedSku = typeof sp.v === "string" ? sp.v : null;
+  const requestedSku = requestedVariantSku(sp);
   const selected = requestedSku ? variants.find((v) => v.sku === requestedSku) : undefined;
   // Ссылка на проданный экземпляр не должна ронять страницу и не должна врать:
   // сообщаем, что его больше нет, и показываем то, что есть.
@@ -405,6 +452,7 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                               className="btn btn-secondary btn-sm mt-2 inline-block"
                             >
                               Открыть
+                              <LinkPending />
                             </Link>
                           )}
                         </div>

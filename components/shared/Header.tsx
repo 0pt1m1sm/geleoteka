@@ -9,6 +9,7 @@ import { ThemeToggle } from "./ThemeToggle";
 import { MobileNav } from "./MobileNav";
 import { Sidebar } from "./Sidebar";
 import { CartIconLink } from "./CartIconLink";
+import { LinkPending } from "./LinkPending";
 import type { AdminNavEntry } from "@/lib/admin-nav";
 
 export interface PublicHeaderProps {
@@ -72,9 +73,10 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap"
+              className="link-pending-host text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap"
             >
               {item.label}
+              <LinkPending />
             </Link>
           ))}
           <CartIconLink />
@@ -124,6 +126,7 @@ function PublicMobileMenu({
                 className="block px-3 py-3 rounded-[var(--radius-lg)] text-sm hover:bg-[var(--card-hover)] active:bg-[var(--color-secondary)] transition-colors"
               >
                 {item.label}
+                <LinkPending />
               </Link>
             ))}
           </div>
