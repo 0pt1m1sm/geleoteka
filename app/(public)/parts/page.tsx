@@ -207,6 +207,7 @@ export default async function PartsPage({ searchParams }: Props) {
                     className="btn btn-primary"
                   >
                     Показать все запчасти
+                    <LinkPending />
                   </Link>
                   <Link href="/booking" className="btn btn-secondary">
                     Заказать через сервис

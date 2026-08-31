@@ -211,3 +211,37 @@
 @media (prefers-reduced-motion: reduce) {
   .scan-flash { animation: none !important; }
 }
+
+/* Индикатор ожидания внутри <Link> (components/shared/LinkPending.tsx).
+   Отрисован ВСЕГДА и занимает место: возврат null до клика двигал бы вёрстку
+   в момент нажатия — документация Next называет это анти-паттерном, а в
+   карточке каталога лишний элемент дал бы переносе строки и растянул всю
+   строку сетки. Появление отложено, чтобы на быстрых переходах не мигало. */
+.link-pending-hint {
+  display: inline-block;
+  width: 0.6em;
+  height: 0.6em;
+  margin-left: 0.25rem;
+  border-radius: 9999px;
+  background: currentColor;
+  opacity: 0;
+  visibility: hidden;
+  vertical-align: baseline;
+}
+.link-pending-hint[data-pending] {
+  visibility: visible;
+  animation: link-hint-in 200ms ease 100ms forwards, link-hint-pulse 1s ease-in-out 100ms infinite;
+}
+@keyframes link-hint-in {
+  to { opacity: 0.65; }
+}
+@keyframes link-hint-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.35); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-pending-hint[data-pending] {
+    animation: none;
+    opacity: 0.65;
+  }
+}

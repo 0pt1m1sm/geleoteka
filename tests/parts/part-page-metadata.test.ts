@@ -23,13 +23,15 @@ vi.mock("next/navigation", () => ({
   notFound: () => {
     throw new Error("NOTFOUND");
   },
-  // permanentRedirect (308): адрес варианта принадлежит хозяину навсегда.
-  permanentRedirect: (to: string) => {
+  redirect: (to: string) => {
     redirects.push(to);
     throw new Error("REDIRECT");
   },
-  redirect: () => {
-    throw new Error("НЕОЖИДАННЫЙ ВРЕМЕННЫЙ РЕДИРЕКТ: вариант обязан отдавать 308");
+  // Постоянный редирект здесь — ошибка: хозяин выбирается динамически, и
+  // «навсегда» разворачивается, когда новый товар снимают с витрины.
+  // Станет допустим в Story 6, когда хозяином будет страница по номеру детали.
+  permanentRedirect: () => {
+    throw new Error("ПОСТОЯННЫЙ РЕДИРЕКТ ВАРИАНТА: хозяин меняется, 308 будет ложью");
   },
 }));
 
@@ -160,6 +162,10 @@ describe("поведение страницы: редирект варианто
       const msg = e instanceof Error ? e.message : String(e);
       if (msg === "REDIRECT") return `REDIRECT:${redirects[0]}`;
       if (msg === "NOTFOUND") return "NOTFOUND";
+      // Сообщения сторожей пробрасываем: иначе регресс к постоянному редиректу
+      // упал бы с бесполезным «ожидал REDIRECT, получил RENDER», а написанный
+      // текст про причину проглотился бы.
+      if (msg.startsWith("ПОСТОЯННЫЙ РЕДИРЕКТ")) throw e;
       // Рендер JSX в узле может упасть по другой причине — для нас это
       // означает, что до рендера дошли, то есть ни редиректа, ни 404.
       return "RENDER";
@@ -171,23 +177,31 @@ describe("поведение страницы: редирект варианто
     expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
   });
 
+  it("ЖИВОЙ вариант уводит на хозяина С параметром — иначе выбор потеряется", async () => {
+    findUnique.mockResolvedValue(withReference(USED_PART, [NEW_PART, USED_PART]));
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
+  });
+
   it("цель редиректа рендерится — цикла нет", async () => {
     findUnique.mockResolvedValue(withReference(NEW_PART, [NEW_PART, USED_PART]));
     expect(await visit("support-new", "A4634210098-U1")).toBe("RENDER");
   });
 
-  it("ПРОДАННЫЙ экземпляр тоже доводит до хозяина, а не в «не найдена»", async () => {
+  it("ПРОДАННЫЙ экземпляр доводит до хозяина, и БЕЗ ?v=", async () => {
     // Б/у одноразовый: расшаренная ссылка переживает продажу, и упираться ей
-    // в 404 нельзя — иначе сообщение «экземпляр продан» недостижимо.
+    // в 404 нельзя. Но и параметр клеить нельзя — адрес с ?v= помечен noindex,
+    // то есть редирект вёл бы сигналы в никуда, а страница сказала бы
+    // «экземпляр продан» про то, что просто снято с витрины.
     const sold = { ...USED_PART, isActive: false };
     findUnique.mockResolvedValue(withReference(sold, [NEW_PART, sold]));
-    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new");
   });
 
   it("когда новый снят, хозяином становится б/у", async () => {
     const soldNew = { ...NEW_PART, isActive: false };
     findUnique.mockResolvedValue(withReference(soldNew, [soldNew, USED_PART]));
-    expect(await visit("support-new")).toBe("REDIRECT:/parts/support-used-1?v=A4634210098");
+    // Снятый новый товар — тоже не живой вариант, значит без параметра.
+    expect(await visit("support-new")).toBe("REDIRECT:/parts/support-used-1");
   });
 
   it("деталь без активных вариантов вовсе — «не найдена»", async () => {

@@ -3,7 +3,8 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
+import { LinkPending } from "@/components/shared/LinkPending";
+import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
@@ -189,11 +190,26 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // «Запчасть не найдена» вместо страницы детали — и сообщение «экземпляр
   // продан» было бы недостижимо по прямой ссылке в принципе.
   if (host && host.slug !== slug) {
-    // permanentRedirect (308), а не redirect (307): адрес варианта принадлежит
-    // хозяину НАВСЕГДА — б/у экземпляр собственной страницы не получит уже
-    // никогда. 307 говорит поисковику «временно, старый адрес сохраните», и
-    // сигналы по нему не переносятся; 308 переносит и обновляет индекс.
-    permanentRedirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
+    // redirect (307), а НЕ permanentRedirect (308) — и это принципиально.
+    // Постоянный редирект утверждает вечность, а хозяин выбирается динамически:
+    // сняли новый товар с витрины (вручную или продажей последнего экземпляра
+    // по Story 4) — хозяином становится другой вариант, и вчерашний «навсегда»
+    // разворачивается в обратную сторону. Два адреса по очереди заявили бы
+    // поисковику «я навсегда переехал на соседа».
+    // Постоянным редирект станет в Story 6, когда хозяином будет долговечная
+    // страница по номеру детали, а не одноразовый экземпляр. Так и записано в
+    // ledger, в разделе Story 4.
+    //
+    // ?v= клеим ТОЛЬКО когда запрошенная позиция ещё живой вариант. Иначе
+    // редирект вёл бы на адрес с параметром, а такой адрес сам помечен
+    // noindex — то есть сигналы уходили бы в никуда, — и показывал бы
+    // «экземпляр продан» про товар, который просто снят с витрины.
+    const stillAVariant = variants.some((v) => v.sku === (p.sku as string));
+    redirect(
+      stillAVariant
+        ? `/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`
+        : `/parts/${host.slug}`,
+    );
   }
 
   // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
@@ -409,6 +425,7 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                               className="btn btn-secondary btn-sm mt-2 inline-block"
                             >
                               Открыть
+                              <LinkPending />
                             </Link>
                           )}
                         </div>

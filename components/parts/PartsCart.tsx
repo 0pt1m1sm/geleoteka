@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LinkPending } from "@/components/shared/LinkPending";
 import { formatPrice } from "@/lib/utils";
 import { createPartOrder } from "@/app/actions/part-orders";
 import { cartStore, EMPTY_PARTS_CART } from "@/lib/parts-cart-store";
@@ -101,7 +102,10 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
           heading="Заказ оформлен!"
           message="Мы свяжемся с вами для подтверждения. Оплата при получении или по реквизитам."
         >
-          <Link href="/parts" className="btn btn-secondary">Продолжить покупки</Link>
+          <Link href="/parts" className="btn btn-secondary">
+            Продолжить покупки
+            <LinkPending />
+          </Link>
           <Link href="/cabinet/orders" className="btn btn-primary">Мои заказы</Link>
         </SuccessCard>
         {showPanel ? (
@@ -121,7 +125,10 @@ export function PartsCart({ defaultContact, currentUserId }: PartsCartProps = {}
     return (
       <div className="card text-center py-12">
         <p className="text-[var(--foreground-muted)] mb-4">Корзина пуста</p>
-        <Link href="/parts" className="btn btn-primary">Перейти в каталог</Link>
+        <Link href="/parts" className="btn btn-primary">
+          Перейти в каталог
+          <LinkPending />
+        </Link>
       </div>
     );
   }
