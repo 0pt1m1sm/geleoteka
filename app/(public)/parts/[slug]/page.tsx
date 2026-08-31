@@ -74,8 +74,9 @@ const getPartBySlug = cache(async (slug: string) => {
   });
 });
 
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Props): Promise<Metadata> {
   const { slug } = await params;
+  const sp = searchParams ? await searchParams : {};
   const part = await getPartBySlug(slug);
   const p = part as Record<string, unknown> | null;
 
@@ -115,7 +116,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Не-хозяин закрывается от индексации вдобавок к canonical: б/у экземпляр
     // живёт до первой продажи, и его адрес не должен попадать в выдачу даже
     // временно — переиндексировать исчезнувшую страницу дороже, чем не пускать.
-    noindex: canonicalPath !== `/parts/${slug}`,
+    // noindex и при непустом ?v=: страница с параметром публикует Product с
+    // sku и ценой ВАРИАНТА, а canonical ведёт на голый адрес хозяина, где
+    // Product другой. Canonical это склеит, но подстраховаться дешевле, чем
+    // разбираться потом, почему в выдаче цена не та.
+    noindex: canonicalPath !== `/parts/${slug}` || typeof sp?.v === "string",
   });
 }
 
