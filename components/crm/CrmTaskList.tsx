@@ -3,10 +3,11 @@
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCircle2, Plus, RotateCcw, UserPlus, X } from "lucide-react";
+import { CheckCircle2, Plus, RotateCcw, Trash2, UserPlus, X } from "lucide-react";
 import { Alert, Button, Input, Textarea } from "@/components/ui";
 import {
   cancelCrmTask,
+  deleteCrmTask,
   claimCrmTask,
   completeCrmTask,
   createCrmTask,
@@ -52,6 +53,10 @@ interface Props {
   canCreate?: boolean;
   /** When true, render customer/deal back-links per row (for the /admin/crm/tasks page). */
   showLinks?: boolean;
+  /** Удаление доступно только ADMIN. Менеджеру кнопку не показываем вовсе:
+   *  кнопка, которая всегда отказывает, хуже её отсутствия (та же логика, что
+   *  у стирания клиента в /admin/users). */
+  canDelete?: boolean;
   emptyText?: string;
 }
 
@@ -64,6 +69,7 @@ export function CrmTaskList({
   dealId,
   canCreate = true,
   showLinks = false,
+  canDelete = false,
   emptyText = "Задач нет.",
 }: Props): React.ReactElement {
   const [showForm, setShowForm] = useState(false);
@@ -101,7 +107,7 @@ export function CrmTaskList({
       {tasks.length > 0 ? (
         <ul className="mt-3 divide-y divide-[var(--border)]">
           {tasks.map((t) => (
-            <TaskRow key={t.id} task={t} nowMs={nowMs} showLinks={showLinks} />
+            <TaskRow key={t.id} task={t} nowMs={nowMs} showLinks={showLinks} canDelete={canDelete} />
           ))}
         </ul>
       ) : null}
@@ -371,10 +377,12 @@ function TaskRow({
   task,
   nowMs,
   showLinks,
+  canDelete,
 }: {
   task: TaskView;
   nowMs: number;
   showLinks: boolean;
+  canDelete: boolean;
 }): React.ReactElement {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -576,6 +584,33 @@ function TaskRow({
             <RotateCcw size={14} />
           </button>
         ) : null}
+
+        {/* Удаление — отдельно от отмены и рядом с ней. Отмена оставляет
+            задачу в списке: видно, что её заводили и передумали. Для мусора и
+            ошибочных задач это не годится — список зарастает. */}
+        {canDelete && (
+          <button
+            type="button"
+            onClick={async () => {
+              const ok = await confirm({
+                message: `Удалить задачу «${task.title}» насовсем? Отмена оставляет её в списке, удаление — нет.`,
+                danger: true,
+                confirmText: "Удалить",
+                cancelText: "Не удалять",
+              });
+              if (!ok) return;
+              run(() => deleteCrmTask(task.id), "Задача удалена");
+            }}
+            disabled={pending}
+            data-loading={pending || undefined}
+            aria-busy={pending || undefined}
+            className="btn-icon shrink-0 hover:text-[var(--color-error)]"
+            aria-label={`Удалить задачу: ${task.title}`}
+            title="Удалить"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     </li>
   );

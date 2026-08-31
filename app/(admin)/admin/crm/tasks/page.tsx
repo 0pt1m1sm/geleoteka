@@ -184,7 +184,12 @@ export default async function CrmTasksPage({ searchParams }: Props) {
       </div>
 
       <Card>
-        <CrmTaskList tasks={tasks} nowMs={new Date().valueOf()} showLinks />
+        <CrmTaskList
+          tasks={tasks}
+          nowMs={new Date().valueOf()}
+          showLinks
+          canDelete={session.permissionRole === "ADMIN"}
+        />
       </Card>
     </div>
   );

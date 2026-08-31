@@ -26,10 +26,22 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
 
   const [isDeleting, startDelete] = useTransition();
   async function handleDelete() {
-    if (!(await confirm({ message: `Деактивировать поставщика "${supplier.name}"?`, danger: true, confirmText: "Деактивировать" }))) return;
+    // Формулировка честная: что произойдёт, зависит от того, есть ли заказы, и
+    // человек должен узнать это ДО нажатия, а не из сообщения после.
+    const ok = await confirm({
+      message:
+        `Убрать поставщика «${supplier.name}»? Если по нему есть заказы, ` +
+        `он будет скрыт — история закупок не должна остаться без имени. ` +
+        `Если заказов нет, запись удалится полностью.`,
+      danger: true,
+      confirmText: "Убрать",
+    });
+    if (!ok) return;
     startDelete(async () => {
-      await deleteSupplier(supplier.id);
-      toast.success("Поставщик деактивирован");
+      const res = await deleteSupplier(supplier.id);
+      toast.success(
+        res.removed === "deleted" ? "Поставщик удалён" : "Поставщик скрыт — по нему есть заказы",
+      );
       nav.push("/admin/suppliers");
     });
   }

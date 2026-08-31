@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice, formatDate } from "@/lib/utils";
+import { DeleteSupplierOrderButton } from "@/components/admin/DeleteSupplierOrderButton";
 import { Button, Card, PageHeader } from "@/components/ui";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -184,14 +185,20 @@ export default async function SupplierOrdersListPage({ searchParams }: Props) {
             const supplierRow = o.supplier as Record<string, string>;
             const itemCount = (o._count as { items: number }).items;
             return (
-              <Link
+              // Карточка — div, а ссылка внутри: класть кнопку удаления в
+              // растянутую ссылку нельзя, клик по ней открывал бы заказ.
+              <div
                 key={o.id as string}
-                href={`/admin/suppliers/orders/${o.id as string}`}
-                className="card card-hover flex items-start justify-between gap-4"
+                className="card flex items-start justify-between gap-4"
               >
-                <div className="flex-1 min-w-0">
+                <Link
+                  href={`/admin/suppliers/orders/${o.id as string}`}
+                  className="flex-1 min-w-0 group"
+                >
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-medium">{supplierRow.name}</p>
+                    <p className="font-medium group-hover:text-[var(--color-accent)]">
+                      {supplierRow.name}
+                    </p>
                     <span className={`badge text-[10px] ${STATUS_COLORS[o.status as string]}`}>
                       {STATUS_LABELS[o.status as string] ?? (o.status as string)}
                     </span>
@@ -201,16 +208,21 @@ export default async function SupplierOrdersListPage({ searchParams }: Props) {
                     {formatDate(o.orderDate as Date)} · {itemCount} позиций
                     {o.trackingNumber ? ` · трекинг: ${o.trackingNumber as string}` : ""}
                   </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <p className="font-bold text-[var(--color-accent)]">{formatPrice(o.totalCost as number)}</p>
-                  {(o.estimatedProfit as number) > 0 && (
-                    <p className="text-xs text-[var(--color-success)]">
-                      +{formatPrice(o.estimatedProfit as number)} прибыль
+                </Link>
+                <div className="flex items-start gap-3 shrink-0">
+                  <div className="text-right">
+                    <p className="font-bold text-[var(--color-accent)]">
+                      {formatPrice(o.totalCost as number)}
                     </p>
-                  )}
+                    {(o.estimatedProfit as number) > 0 && (
+                      <p className="text-xs text-[var(--color-success)]">
+                        +{formatPrice(o.estimatedProfit as number)} прибыль
+                      </p>
+                    )}
+                  </div>
+                  <DeleteSupplierOrderButton orderId={o.id as string} />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canDeleteOrder,
+  canForceDeleteOrder,
   canEditOrderMeta,
   canFullyEditOrder,
   isOrphanDraftPart,
@@ -22,11 +23,32 @@ describe("order lifecycle gates", () => {
     expect(canEditOrderMeta("CANCELLED")).toBe(false);
   });
 
-  it("delete requires DRAFT and zero receipts on every line (belt-and-suspenders)", () => {
+  it("удаление решает ПРИЁМКА, а не статус", () => {
+    // Раньше требовался ещё и статус DRAFT. Условие было произвольным: заказ,
+    // размещённый у поставщика и потом отменённый, ничего не принял, и держать
+    // его в списке навсегда незачем. Настоящий предмет защиты — приёмка: если
+    // по строке что-то приняли, документ описывает движение товара.
     expect(canDeleteOrder("DRAFT", [{ receivedQuantity: 0 }, { receivedQuantity: 0 }])).toBe(true);
     expect(canDeleteOrder("DRAFT", [])).toBe(true);
+    expect(canDeleteOrder("ORDERED", [{ receivedQuantity: 0 }])).toBe(true);
+    expect(canDeleteOrder("CANCELLED", [{ receivedQuantity: 0 }])).toBe(true);
+  });
+
+  it("любая приёмка на любой строке закрывает обычное удаление", () => {
     expect(canDeleteOrder("DRAFT", [{ receivedQuantity: 1 }])).toBe(false);
-    expect(canDeleteOrder("ORDERED", [{ receivedQuantity: 0 }])).toBe(false);
+    expect(canDeleteOrder("PARTIAL", [{ receivedQuantity: 0 }, { receivedQuantity: 2 }])).toBe(false);
+    expect(canDeleteOrder("RECEIVED", [{ receivedQuantity: 5 }])).toBe(false);
+  });
+
+  it("заказ С приёмками удаляет только ADMIN", () => {
+    // Оставить такой заказ неудаляемым нельзя — тестовые и ошибочные висят
+    // вечно. Но и отдавать любому менеджеру неправильно: это учётный документ,
+    // объясняющий, откуда на складе взялся товар.
+    expect(canForceDeleteOrder("ADMIN")).toBe(true);
+    expect(canForceDeleteOrder("MANAGER")).toBe(false);
+    expect(canForceDeleteOrder("WAREHOUSE_WORKER")).toBe(false);
+    expect(canForceDeleteOrder("CLIENT")).toBe(false);
+    expect(canForceDeleteOrder("")).toBe(false);
   });
 });
 
