@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
-import { SERVICE_ARTICLE_RE, extractModelCodes, normalizeOem } from "@/lib/part-reference";
+import { SERVICE_ARTICLE_RE, extractModelCodes, isLatinOem, normalizeOem, oemKey } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
 import { defaultWarehouseId } from "@/lib/wms-host";
 import { resolveGenerationIds } from "@/lib/part-reference-lookup";
@@ -220,8 +220,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         created++;
       }
       if (!SERVICE_ARTICLE_RE.test(article)) {
-        const oem = normalizeOem(article);
-        if (oem) {
+        // oemKey + isLatinOem: здесь строится ключ СПРАВОЧНИКА. Обычная
+        // нормализация сохраняла кириллицу, и артикул из русской раскладки
+        // заводил вторую номенклатуру на тот же номер, а товар оказывался
+        // привязан к двойнику — на странице своего номера его не было.
+        const oem = oemKey(article);
+        if (oem && isLatinOem(oem)) {
           const trimGens = trimIds.length
             ? ((await db.vehicleTrim.findMany({
                 where: { id: { in: trimIds } },
