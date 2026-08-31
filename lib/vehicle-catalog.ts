@@ -26,7 +26,7 @@ const loadActiveModels = cache(async (): Promise<VehicleModel[]> => {
       generations: {
         where: { isActive: true },
         orderBy: [{ sortOrder: "asc" }, { yearFrom: "asc" }],
-        select: { id: true, code: true, yearFrom: true, yearTo: true },
+        select: { id: true, code: true, yearFrom: true, yearTo: true, description: true },
       },
     },
   })) as VehicleModel[];
@@ -52,6 +52,7 @@ const loadActiveModelsWithTrims = cache(async (): Promise<VehicleModel[]> => {
           code: true,
           yearFrom: true,
           yearTo: true,
+          description: true,
           trims: {
             where: { isActive: true },
             orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { code: "asc" }],
