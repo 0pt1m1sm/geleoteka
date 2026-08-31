@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
+import { SupplierRemoveButton } from "@/components/admin/SupplierRemoveButton";
 import { Button, PageHeader } from "@/components/ui";
 
 export default async function SuppliersPage() {
@@ -63,12 +64,13 @@ export default async function SuppliersPage() {
             const totalSpent = orders.reduce((sum, o) => sum + o.totalCost, 0);
 
             return (
-              <Link
-                key={s.id as string}
-                href={`/admin/suppliers/${s.id as string}`}
-                className="card card-hover flex items-center gap-4"
-              >
-                <div className="flex-1 min-w-0">
+              // Карточка — div, ссылка внутри: кнопка удаления в растянутой
+              // ссылке открывала бы поставщика по клику.
+              <div key={s.id as string} className="card flex items-center gap-4">
+                <Link
+                  href={`/admin/suppliers/${s.id as string}`}
+                  className="flex-1 min-w-0 group"
+                >
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-medium">{s.name as string}</p>
                     {!profile?.isActive && (
@@ -86,14 +88,19 @@ export default async function SuppliersPage() {
                     {orders.length} заказов
                     {profile?.contactName ? ` · ${profile.contactName}` : ""}
                   </p>
-                </div>
+                </Link>
                 <div className="text-right shrink-0">
                   <p className="text-sm text-[var(--foreground-muted)]">Всего потрачено</p>
                   <p className="font-bold text-[var(--color-accent)]">
                     {formatPrice(totalSpent)}
                   </p>
                 </div>
-              </Link>
+                <SupplierRemoveButton
+                  id={s.id as string}
+                  name={s.name as string}
+                  orderCount={orders.length}
+                />
+              </div>
             );
           })}
         </div>

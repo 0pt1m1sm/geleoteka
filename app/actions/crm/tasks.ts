@@ -21,6 +21,7 @@ interface CrmTaskMutationTx extends StaffNotificationPublishTx {
     create(args: Record<string, unknown>): Promise<unknown>;
     update(args: Record<string, unknown>): Promise<unknown>;
     updateMany(args: Record<string, unknown>): Promise<unknown>;
+    delete(args: Record<string, unknown>): Promise<unknown>;
   };
   auditLog: {
     create(args: Record<string, unknown>): Promise<unknown>;
@@ -291,6 +292,38 @@ export async function cancelCrmTask(id: string): Promise<TaskResult> {
       data: { status: "CANCELLED" },
     });
     await writeTaskAudit(tx, session, "task.cancel", id);
+  });
+  revalidateTaskPaths(existing);
+  return { error: null, id };
+}
+
+/**
+ * Удалить задачу насовсем.
+ *
+ * Отмена (`cancelCrmTask`) оставляет строку в списке — это правильно для
+ * рабочей задачи, которую передумали делать: видно, что её заводили. Но
+ * тестовый мусор и задачи, созданные по ошибке, отменой не убрать, и список
+ * зарастает. Удаление — ADMIN: строка несёт след действий менеджера, и стирать
+ * его должен тот, кто отвечает за данные, а не любой сотрудник.
+ *
+ * На задачу ничем не ссылаются, поэтому удаление простое.
+ */
+export async function deleteCrmTask(id: string): Promise<TaskResult> {
+  const session = await requireRole(["ADMIN"]);
+  const existing = (await db.crmTask.findUnique({
+    where: { id },
+    select: { customerUserId: true, dealId: true },
+  })) as { customerUserId: string | null; dealId: string | null } | null;
+  if (!existing) return { error: "Задача не найдена" };
+
+  const transactionalDb = db as unknown as {
+    $transaction<T>(callback: (tx: CrmTaskMutationTx) => Promise<T>): Promise<T>;
+  };
+  await transactionalDb.$transaction(async (tx) => {
+    // Журнал пишем ДО удаления: после него строки уже нет, а след действия
+    // остаться должен.
+    await writeTaskAudit(tx, session, "task.delete", id);
+    await tx.crmTask.delete({ where: { id } });
   });
   revalidateTaskPaths(existing);
   return { error: null, id };

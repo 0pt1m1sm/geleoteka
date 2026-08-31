@@ -16,10 +16,29 @@ export function canEditOrderMeta(status: string): boolean {
   return status !== "COMPLETED" && status !== "CANCELLED";
 }
 
-/** Deletion — DRAFT only, and belt-and-suspenders: no line may carry receipts
- *  (a DRAFT cannot be received since Story 2, but a legacy row might). */
-export function canDeleteOrder(status: string, lines: Array<{ receivedQuantity: number }>): boolean {
-  return status === "DRAFT" && lines.every((l) => l.receivedQuantity === 0);
+/**
+ * Удаление БЕЗ следов приёмки — доступно любому, кто ведёт закупки.
+ *
+ * Раньше требовался ещё и статус DRAFT, но это условие было произвольным:
+ * заказ, размещённый у поставщика и потом отменённый, ничего не принял, и
+ * держать его в списке навсегда незачем. Настоящий предмет защиты — приёмка:
+ * если по строке что-то приняли, документ описывает движение товара, и стирать
+ * его молча нельзя.
+ */
+export function canDeleteOrder(_status: string, lines: Array<{ receivedQuantity: number }>): boolean {
+  return lines.every((l) => l.receivedQuantity === 0);
+}
+
+/**
+ * Удаление заказа, по которому УЖЕ принимали, — только ADMIN.
+ *
+ * Такой заказ это учётный документ: он объясняет, откуда на складе взялся
+ * товар. Оставить его неудаляемым нельзя (тестовые и ошибочные заказы иначе
+ * висят вечно), но и отдавать любому менеджеру неправильно — удаляет тот, кто
+ * отвечает за данные. Интерфейс обязан прямо сказать, что приёмки были.
+ */
+export function canForceDeleteOrder(permissionRole: string): boolean {
+  return permissionRole === "ADMIN";
 }
 
 export interface DraftPartRefCounts {

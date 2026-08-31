@@ -17,7 +17,12 @@ import { applyScanReceiveOrderLine } from "@/lib/warehouse/scan-receive";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
 import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
 import { resolveLandedCost } from "@/lib/suppliers/resolve-landed-cost";
-import { canDeleteOrder, canFullyEditOrder, isOrphanDraftPart } from "@/lib/suppliers/order-lifecycle";
+import {
+  canDeleteOrder,
+  canForceDeleteOrder,
+  canFullyEditOrder,
+  isOrphanDraftPart,
+} from "@/lib/suppliers/order-lifecycle";
 import { extractModelCodes, normalizeOem } from "@/lib/part-reference";
 import { ensurePartReference, resolveGenerationIds } from "@/lib/part-reference-lookup";
 
@@ -380,7 +385,7 @@ export async function updateSupplierOrderMeta(
  * receipts on every line. Lines cascade; orphaned NEW_PART drafts are GC'd.
  */
 export async function deleteSupplierOrder(orderId: string): Promise<OrderResult> {
-  await requireRole(["ADMIN", "MANAGER"]);
+  const session = await requireRole(["ADMIN", "MANAGER"]);
   try {
     await db.$transaction(async (tx) => {
       const order = (await tx.supplierOrder.findUnique({
@@ -389,7 +394,14 @@ export async function deleteSupplierOrder(orderId: string): Promise<OrderResult>
       })) as { status: string; items: Array<{ partId: string | null; receivedQuantity: number }> } | null;
       if (!order) throw new OrderValidationError("Заказ не найден");
       if (!canDeleteOrder(order.status, order.items)) {
-        throw new OrderValidationError("Удалить можно только черновик без приёмок");
+        // По заказу принимали: это учётный документ, объясняющий происхождение
+        // товара на складе. Удалять такой может только ADMIN — см.
+        // canForceDeleteOrder.
+        if (!canForceDeleteOrder(session.permissionRole)) {
+          throw new OrderValidationError(
+            "По заказу были приёмки — удалить его может только администратор",
+          );
+        }
       }
       const partIds = order.items.map((i) => i.partId);
       await tx.supplierOrder.delete({ where: { id: orderId } });

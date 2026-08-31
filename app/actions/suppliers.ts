@@ -117,10 +117,37 @@ export async function updateSupplier(
   redirect("/admin/suppliers");
 }
 
-export async function deleteSupplier(supplierUserId: string): Promise<void> {
+/**
+ * Убрать поставщика.
+ *
+ * Раньше это всегда было мягким скрытием (isActive=false), и запись оставалась
+ * навсегда — тестового поставщика убрать было нечем. Теперь по факту связей:
+ *
+ *  • есть заказы — только скрываем. Заказ поставщику это учётный документ, а
+ *    `SupplierOrder.userId` объявлен RESTRICT: база и не дала бы удалить, и
+ *    правильно — иначе история закупок осталась бы без имени;
+ *  • заказов нет — удаляем запись целиком. Профиль уходит каскадом.
+ *
+ * Возвращаем, что именно произошло: интерфейс обязан сказать правду, а не
+ * рапортовать «удалено» о скрытии.
+ */
+export async function deleteSupplier(
+  supplierUserId: string,
+): Promise<{ error: string | null; removed?: "deleted" | "hidden" }> {
   await requireRole(["ADMIN"]);
-  await db.supplierProfile.update({
+
+  const orders = (await db.supplierOrder.count({
     where: { userId: supplierUserId },
-    data: { isActive: false },
-  });
+  })) as number;
+
+  if (orders > 0) {
+    await db.supplierProfile.update({
+      where: { userId: supplierUserId },
+      data: { isActive: false },
+    });
+    return { error: null, removed: "hidden" };
+  }
+
+  await db.user.delete({ where: { id: supplierUserId } });
+  return { error: null, removed: "deleted" };
 }
