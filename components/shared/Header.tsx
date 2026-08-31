@@ -73,7 +73,7 @@ function PublicHeader({ cabinetHref, cabinetLabel }: PublicHeaderProps): React.R
             <Link
               key={item.href}
               href={item.href}
-              className="text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap"
+              className="link-pending-host text-sm text-[var(--foreground-muted)] hover:text-[var(--foreground)] transition-colors whitespace-nowrap"
             >
               {item.label}
               <LinkPending />
