@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isChecked } from "@/lib/forms";
 
@@ -42,24 +43,29 @@ describe("isChecked", () => {
 });
 
 describe("дефект не вернулся ни в одном из мест", () => {
-  const FILES = [
-    "app/actions/team-members.ts",
-    "app/actions/vacancies.ts",
-    "app/actions/suppliers.ts",
-    "app/actions/rentals.ts",
-    "app/actions/parts.ts",
-  ];
+  it("нигде в серверных действиях нет сравнения чекбокса с «off»", () => {
+    // Обход КАТАЛОГА, а не списка файлов: перечисление руками устаревает
+    // молча, а новый экран с чекбоксом рано или поздно появится, и именно он
+    // не будет проверен. Сторож по исходнику, а не по поведению: серверные
+    // действия ходят в базу, и разворачивать их ради одной строки разбора
+    // дороже, чем поймать саму строку. Поведение проверки закрыто выше.
+    const dir = "app/actions";
+    const files = readdirSync(dir).filter((f) => f.endsWith(".ts"));
+    expect(files.length).toBeGreaterThan(5);
 
-  it("нигде не осталось сравнения чекбокса с «off»", () => {
-    // Сторож по исходнику, а не по поведению: серверные действия ходят в базу,
-    // и разворачивать их ради одной строки разбора дороже, чем поймать саму
-    // строку. Поведение самой проверки закрыто тестами выше.
-    for (const file of FILES) {
-      const src = readFileSync(file, "utf8");
-      expect(src, `${file}: сравнение с "off" читает снятую галку как поднятую`).not.toMatch(
-        /formData\.get\([^)]*\)\s*!==\s*"off"/,
-      );
+    const bad: string[] = [];
+    for (const file of files) {
+      const src = readFileSync(join(dir, file), "utf8");
+      for (const [i, line] of src.split("\n").entries()) {
+        // Приёмник любой, не только `formData`: в другом файле переменную
+        // назовут `fd` или `data`, и привязка к имени пропустила бы дефект —
+        // проверено мутантом, первая версия регулярки именно так и промолчала.
+        if (/\.get\([^)]*\)\s*!==\s*"off"/.test(line)) {
+          bad.push(`${dir}/${file}:${i + 1}`);
+        }
+      }
     }
+    expect(bad, "сравнение с «off» читает снятую галку как поднятую").toEqual([]);
   });
 
   it("создание арендной машины НЕ читает чекбокс, которого нет в его форме", () => {
@@ -72,3 +78,13 @@ describe("дефект не вернулся ни в одном из мест", 
     expect(body).not.toContain('isChecked(formData, "isAvailable")');
   });
 });
+
+/**
+ * На заметку следующему, кто будет здесь искать такой же дефект.
+ *
+ * `blacklisted` у клиента выглядит как та же дыра в худшем виде: разметки с
+ * `name="blacklisted"` в проекте нет вовсе, то есть флаг будто бы сбрасывался
+ * бы при каждом сохранении карточки. Это ЛОЖНАЯ ТРЕВОГА: CustomerEditForm
+ * собирает FormData вручную и кладёт поле только когда флаг включён — контрол
+ * управляемый и атрибута name не имеет. Проверка `=== "on"` там корректна.
+ */
