@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   expandGenerationCodes,
   extractModelCodes,
+  isLatinOem,
   normalizeOem,
+  oemKey,
   parseReferenceCsv,
   SERVICE_ARTICLE_RE,
 } from "@/lib/part-reference";
@@ -120,5 +122,41 @@ describe("parseReferenceCsv", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe("Диск тормозной");
+  });
+});
+
+describe("oemKey: кириллица в номере (находка ревью PR #109)", () => {
+  it("русский двойник сводится к латинскому — иначе один номер даёт два ключа", () => {
+    // Все номера Mercedes начинаются с «A», менеджеры работают в русской
+    // раскладке, «А» и «A» неразличимы на глаз. Пока двойники сохранялись,
+    // в уникальном индексе появлялась вторая номенклатура на тот же номер, а
+    // канонический адрес живой карточки вёл на страницу, которой нет.
+    expect(oemKey("А4634210098")).toBe("A4634210098");
+    expect(oemKey("А4634210098")).toBe(oemKey("A4634210098"));
+  });
+
+  it("сводятся все двойники, а не только «А»", () => {
+    expect(oemKey("АВЕКМНОРСТУХ")).toBe("ABEKMHOPCTYX");
+  });
+
+  it("смешанная раскладка в одном номере тоже сходится", () => {
+    expect(oemKey("А463С210098")).toBe("A463C210098");
+  });
+
+  it("normalizeOem НЕ транслитерует — на ней держатся служебные артикулы", () => {
+    // Из артикула строится sku: «ПОДЗАКАЗ-01» → база «ПОДЗАКАЗ01». Двойник
+    // есть не у каждой буквы, поэтому транслитерация внутри normalizeOem
+    // превратила бы код в «ПOДЗAКAЗ» и сменила бы sku у живых товаров.
+    expect(normalizeOem("подзаказ-01")).toBe("ПОДЗАКАЗ01");
+    expect(oemKey("подзаказ-01")).not.toBe(normalizeOem("подзаказ-01"));
+  });
+
+  it("ключ справочника обязан быть латинским", () => {
+    // Адрес страницы по номеру принимает только латиницу: нелатинский ключ
+    // дал бы канонический адрес, ведущий на 404, и такой же адрес в карте.
+    expect(isLatinOem(oemKey("А4634210098"))).toBe(true);
+    expect(isLatinOem(oemKey("ДЕТАЛЬ123"))).toBe(false);
+    expect(isLatinOem(oemKey("подзаказ-01"))).toBe(false);
+    expect(isLatinOem("")).toBe(false);
   });
 });

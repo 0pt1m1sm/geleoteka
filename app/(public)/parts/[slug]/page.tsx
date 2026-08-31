@@ -3,17 +3,16 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LinkPending } from "@/components/shared/LinkPending";
-import { notFound, redirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
 import { trimLabel } from "@/lib/vehicle-catalog-types";
 import { AddToCartButton } from "@/components/parts/AddToCartButton";
+import { VariantList } from "@/components/parts/VariantList";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { pageSeo } from "@/lib/seo";
 import { buildProductJsonLd } from "@/lib/seo-jsonld";
-import { pickVariantHost } from "@/lib/parts/variant-host";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 
 interface Props {
@@ -49,6 +48,8 @@ const getPartBySlug = cache(async (slug: string) => {
       reference: {
         select: {
           id: true,
+          // Номер номенклатуры — канонический адрес детали (решение Р1).
+          oem: true,
           parts: {
             // Только активные: строки проданных экземпляров остаются в базе
             // навсегда (на них ссылаются заказы), и без фильтра ходовая деталь
@@ -70,7 +71,8 @@ const getPartBySlug = cache(async (slug: string) => {
               photos: true,
               isActive: true,
               createdAt: true,
-              stockItems: { select: { quantity: true } },
+              // reserved — для показа доступного у штучных позиций (Р8).
+              stockItems: { select: { quantity: true, reserved: true } },
             },
           },
         },
@@ -119,9 +121,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   // Канонический адрес — страница ХОЗЯИНА вариантов, а не текущая: новый товар
   // и б/у экземпляры это одна деталь, и конкурировать за один запрос они не
   // должны. Параметр ?v= в canonical не попадает никогда.
-  const refMeta = p.reference as { parts: Array<{ slug: string; condition: "NEW" | "USED" | "REFURBISHED"; isActive: boolean; createdAt: Date }> } | null;
-  const hostMeta = pickVariantHost(refMeta?.parts ?? []);
-  const canonicalPath = `/parts/${hostMeta?.slug ?? slug}`;
+  // Р1: канонический адрес номенклатуры — ВСЕГДА страница по номеру детали.
+  // Не «хозяин среди товаров»: тот зависел от наличия активного нового товара,
+  // а оно меняется во времени — и канонический адрес переезжал бы вслед за
+  // складом. Товары без номенклатуры (служебные артикулы «под заказ») своей
+  // страницы по номеру не имеют и остаются сами себе каноном.
+  const refMeta = p.reference as { oem: string } | null;
+  const canonicalPath = refMeta ? `/parts/oem/${refMeta.oem}` : `/parts/${slug}`;
 
   return pageSeo({
     title: p.name as string,
@@ -129,14 +135,15 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
       (p.description as string | null) ??
       `${p.name as string} (артикул ${p.article as string}) для Mercedes-Benz G-Class — купить в сервисе Geleoteka.`,
     path: canonicalPath,
-    // Не-хозяин закрывается от индексации вдобавок к canonical: б/у экземпляр
-    // живёт до первой продажи, и его адрес не должен попадать в выдачу даже
-    // временно — переиндексировать исчезнувшую страницу дороже, чем не пускать.
-    // noindex и при непустом ?v=: страница с параметром публикует Product с
-    // sku и ценой ВАРИАНТА, а canonical ведёт на голый адрес хозяина, где
-    // Product другой. Canonical это склеит, но подстраховаться дешевле, чем
-    // разбираться потом, почему в выдаче цена не та.
-    noindex: canonicalPath !== `/parts/${slug}` || requestedVariantSku(sp) !== null,
+    // ВАЖНО: noindex здесь НЕ выводится из «canonical не на себя». После Р1
+    // канонический адрес не на себя у КАЖДОГО товара с номенклатурой, и
+    // прежняя формула закрыла бы от индексации весь каталог разом. Хуже того,
+    // canonical и noindex вместе — противоречивые указания: поисковик вправе
+    // тогда проигнорировать canonical, и склейки не случится. Консолидирует
+    // именно canonical, а noindex остаётся там, где адрес обречён:
+    //  • б/у экземпляр — его страница умрёт с продажей;
+    //  • адрес с ?v= — показывает конкретный экземпляр, а не деталь.
+    noindex: (p.condition as string) !== "NEW" || requestedVariantSku(sp) !== null,
   });
 }
 
@@ -193,50 +200,49 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // приходят по ?v=<sku> с карточки в списке.
   const ref = p.reference as { parts: RawVariant[] } | null;
   const variants: RawVariant[] = (ref?.parts ?? []).filter((v) => v.isActive);
-  const host = pickVariantHost(variants);
 
-  // У б/у экземпляра НЕТ собственной страницы — так задумано в PRD: экземпляр
-  // это движение склада, а не контент, и десяток почти одинаковых адресов
-  // конкурировал бы сам с собой. Открытый напрямую вариант уводит на страницу
-  // хозяина; параметр, разворачивающий именно его, клеится не всегда — см.
-  // разбор ниже.
-  // Редирект СТОИТ ВЫШЕ проверки активности намеренно. Б/у экземпляр
-  // одноразовый: после продажи он гаснет, а расшаренная на него ссылка живёт.
-  // Если сначала отсекать неактивные, такая ссылка упиралась бы в «Запчасть не
-  // найдена» вместо страницы детали, где видно и саму деталь, и что стало с
-  // экземпляром.
-  if (host && host.slug !== slug) {
-    // redirect (307), а НЕ permanentRedirect (308) — и это принципиально.
-    // Постоянный редирект утверждает вечность, а хозяин выбирается динамически:
-    // сняли новый товар с витрины (вручную или продажей последнего экземпляра
-    // по Story 4) — хозяином становится другой вариант, и вчерашний «навсегда»
-    // разворачивается в обратную сторону. Два адреса по очереди заявили бы
-    // поисковику «я навсегда переехал на соседа».
-    // Постоянным редирект станет в Story 6, когда хозяином будет долговечная
-    // страница по номеру детали, а не одноразовый экземпляр. Так и записано в
-    // ledger, в разделе Story 4.
-    //
-    // Клеить ли ?v=, решает СМЫСЛ сообщения на той стороне, а не активность.
-    // Параметр разворачивает вариант, а если его больше нет среди живых —
-    // страница пишет «экземпляр продан».
-    //
-    //  • живой вариант — параметр обязателен, иначе выбор потеряется;
-    //  • проданный б/у (или восстановленный) — параметр НУЖЕН: экземпляр
-    //    действительно кончился, и человек, пришедший по расшаренной ссылке,
-    //    должен это прочитать, а не гадать, почему видит другой товар;
-    //  • снятый с витрины НОВЫЙ товар — параметра быть НЕ должно: он не
-    //    «продан», он спрятан, и сообщение было бы ложью.
-    //
-    // Сигналами не рискуем: адрес с параметром помечен noindex осознанно
-    // (см. generateMetadata), адреса экземпляров не в карте сайта и в выдачу
-    // не заявлялись — терять там нечего.
-    const soldInstance = !p.isActive && p.condition !== "NEW";
-    const keepVariantParam = (p.isActive as boolean) || soldInstance;
-    redirect(
-      keepVariantParam
-        ? `/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`
-        : `/parts/${host.slug}`,
-    );
+  // Р1 ЗАМЕНИЛ ПРАВИЛО. Раньше «хозяином» был активный новый товар среди
+  // вариантов, и адрес детали переезжал вслед за складом. Теперь долговечный
+  // адрес — страница по номеру, и сюда сходятся все следствия.
+  //
+  // Редирект СТОИТ ВЫШЕ проверки активности намеренно: б/у экземпляр
+  // одноразовый, после продажи он гаснет, а расшаренная на него ссылка живёт.
+  // Если сначала отсекать неактивные, такая ссылка упиралась бы в «Запчасть
+  // не найдена» вместо страницы детали.
+  const refOem = (p.reference as { oem: string } | null)?.oem ?? null;
+  if (refOem) {
+    const oemPath = `/parts/oem/${refOem}`;
+    const isNew = (p.condition as string) === "NEW";
+
+    if (!isNew) {
+      // Р2 с поправкой ревью PR #109. Страница-цель после Р1 действительно не
+      // переезжает — но АДРЕС цели переезжает, и это видно прямо здесь: пока
+      // экземпляр жив, мы ведём на `?v=<sku>`, а после продажи — на голый
+      // адрес. Переход гарантирован конструкцией: продажа гасит экземпляр
+      // (Story 4), значит она случится у каждого. Заявлять «навсегда» о
+      // цели, про смену которой известно из соседней строки, — то же
+      // противоречие, из-за которого в Story 5 пришлось откатывать 308.
+      //
+      // Поэтому по сроку жизни цели, а не по факту переезда страницы:
+      if (p.isActive) {
+        // Экземпляр жив: адрес цели ещё изменится, когда его продадут.
+        redirect(`${oemPath}?v=${encodeURIComponent(p.sku as string)}`);
+      }
+      // Продан: sku не переиспользуется, экземпляр не воскресает, цель
+      // заморожена навсегда — вот теперь «навсегда» правда.
+      permanentRedirect(oemPath);
+    }
+
+    if (!p.isActive) {
+      // Р2: снятый с витрины НОВЫЙ товар — временно. Его включают обратно той
+      // же галкой в админке, и «навсегда» оказалось бы ложью, которую уже не
+      // отозвать: постоянный редирект кэшируется браузером и переиндексируется
+      // поисковиком.
+      redirect(oemPath);
+    }
+    // Активный новый товар РЕНДЕРИТСЯ: это полноценная карточка с описанием и
+    // фотографиями, а склейку с адресом по номеру делает canonical. Закрывать
+    // её редиректом значило бы выкинуть контент, ради которого её и заводили.
   }
 
   // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
@@ -395,73 +401,17 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             </p>
           )}
 
-          {variants.length > 1 && (
-            <div className="mb-8">
-              <h2 className="text-lg font-semibold mb-3">Варианты этой детали</h2>
-              <div className="flex flex-col gap-3">
-                {variants.map((v) => {
-                  const vQty = v.stockItems[0]?.quantity ?? 0;
-                  const current = v.slug === slug;
-                  const condLabel =
-                    v.condition === "NEW"
-                      ? "Новая"
-                      : v.condition === "USED"
-                        ? "Б/у"
-                        : "Восстановленная";
-                  return (
-                    <div
-                      key={v.id}
-                      className={`card p-4 ${current ? "border-[var(--color-accent)]" : ""}`}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="badge text-xs">{condLabel}</span>
-                            {current && (
-                              <span className="text-xs text-[var(--foreground-muted)]">
-                                вы смотрите этот
-                              </span>
-                            )}
-                          </div>
-                          {v.conditionNote && (
-                            <p className="mt-2 text-sm">{v.conditionNote}</p>
-                          )}
-                          {v.originNote && (
-                            <p className="mt-1 text-xs text-[var(--foreground-muted)]">
-                              {v.originNote}
-                            </p>
-                          )}
-                          <p className="mt-2 text-xs text-[var(--foreground-muted)]">
-                            {vQty > 0
-                              ? `В наличии — ${vQty} шт.`
-                              : v.condition === "NEW"
-                                ? "Под заказ"
-                                : "Продан"}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-bold text-[var(--color-accent)]">
-                            {formatPrice(v.price)}
-                          </p>
-                          {!current && (
-                            <Link
-                              // Сразу на хозяина с параметром: ссылка на
-                              // собственный адрес варианта тут же отскочила бы
-                              // редиректом обратно, добавив лишний запрос.
-                              href={`/parts/${slug}?v=${encodeURIComponent(v.sku)}`}
-                              className="btn btn-secondary btn-sm mt-2 inline-block"
-                            >
-                              Открыть
-                              <LinkPending />
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {/* Общий компонент с страницей по номеру: показывать одну деталь
+              двумя разными способами значит гарантированно их рассинхронизировать.
+              Ссылки ведут на страницу по номеру — после Р1 именно она
+              разворачивает варианты, и вести на собственный адрес варианта
+              значило бы отправлять человека в редирект. */}
+          {refOem && variants.length > 1 && (
+            <VariantList
+              variants={variants}
+              currentSku={p.sku as string}
+              hrefFor={(v) => `/parts/oem/${refOem}?v=${encodeURIComponent(v.sku)}`}
+            />
           )}
 
           {/* Compatible models */}
