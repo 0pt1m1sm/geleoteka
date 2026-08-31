@@ -472,6 +472,7 @@ model User {
   @@index([isCustomer, permissionRole])
   @@index([deletedAt])
   @@index([managerUserId])
+  handledPartRequests PartRequest[] @relation("PartRequestHandledBy") // заявки «сообщить о поступлении», закрытые этим сотрудником
 }
 
 model CustomerProfile {
@@ -1212,8 +1213,38 @@ model PartReference {
   fitments      PartReferenceFitment[]
   parts         Part[] // товары по этой номенклатуре; НЕСКОЛЬКО — норма (каждый б/у экземпляр уникален: состояние/цвет/фото), блокер множественности — уникальность Part.article (см. SKU-инициативу)
   estimateLines EstimateLine[] // строки смет, привязанные к номенклатуре (в т.ч. «под заказ» без товара)
+  requests      PartRequest[] // заявки «сообщить о поступлении»
 
   @@index([name])
+}
+
+/// Заявка «сообщить о поступлении»: посетитель нашёл деталь по номеру, а в
+/// наличии её нет. Хранит контакт и СНИМОК номера с названием.
+///
+/// Снимок, а не только связь, — по той же причине, что и в строке сметы: это
+/// исторический след обращения, и он обязан читаться, даже если номенклатуру
+/// потом удалят. Связь поэтому onDelete: SetNull, а не Cascade: удаление
+/// справочной позиции не должно стирать входящие обращения.
+///
+/// НИКАКИХ автоуведомлений покупателю при появлении остатка — решение владельца
+/// в PRD. Здесь только приём и список в админке; сотрудник связывается сам.
+model PartRequest {
+  id          String    @id @default(cuid())
+  referenceId String?
+  oem         String // снимок номера на момент обращения
+  partName    String // снимок названия
+  contact     String    @db.VarChar(200) // телефон или почта — как ввёл человек
+  note        String?   @db.VarChar(500)
+  createdAt   DateTime  @default(now())
+  handledAt   DateTime? // когда сотрудник закрыл обращение
+  handledById String?
+
+  reference PartReference? @relation(fields: [referenceId], references: [id], onDelete: SetNull)
+  handledBy User?          @relation("PartRequestHandledBy", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([referenceId])
+  @@index([createdAt])
+  @@index([handledAt])
 }
 
 /// Применяемость позиции справочника к кузову: та же ось каталога

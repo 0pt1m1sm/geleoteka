@@ -1,5 +1,7 @@
 import "server-only";
 
+import { SlidingWindow } from "@/lib/rate-limit";
+
 /**
  * Троттлинг подбора пароля на входе.
  *
@@ -17,45 +19,32 @@ import "server-only";
 export const LOGIN_MAX_FAILURES = 8;
 export const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 
-const failures = new Map<string, number[]>();
+// Механика окна вынесена в lib/rate-limit.ts, чтобы её можно было
+// переиспользовать (Story 6 требовала троттлинг для публичной формы, а
+// «образца» в проекте не было). Поведение и публичный интерфейс здесь не
+// менялись: те же ключ, окно и лимит.
+const window = new SlidingWindow(LOGIN_MAX_FAILURES, LOGIN_WINDOW_MS);
 
 function normalize(identifier: string): string {
   return identifier.trim().toLowerCase();
 }
 
-function prune(times: number[], now: number): number[] {
-  const cutoff = now - LOGIN_WINDOW_MS;
-  return times.filter((t) => t > cutoff);
-}
-
 /** true, если по идентификатору уже накоплен лимит провалов в текущем окне. */
 export function isLoginBlocked(identifier: string, now: number = Date.now()): boolean {
-  const key = normalize(identifier);
-  const times = failures.get(key);
-  if (!times) return false;
-  const fresh = prune(times, now);
-  if (fresh.length === 0) {
-    failures.delete(key);
-    return false;
-  }
-  failures.set(key, fresh);
-  return fresh.length >= LOGIN_MAX_FAILURES;
+  return window.isBlocked(normalize(identifier), now);
 }
 
 /** Зафиксировать неудачную попытку входа. */
 export function registerFailedLogin(identifier: string, now: number = Date.now()): void {
-  const key = normalize(identifier);
-  const times = prune(failures.get(key) ?? [], now);
-  times.push(now);
-  failures.set(key, times);
+  window.register(normalize(identifier), now);
 }
 
 /** Сбросить счётчик после успешного входа. */
 export function clearLoginFailures(identifier: string): void {
-  failures.delete(normalize(identifier));
+  window.clear(normalize(identifier));
 }
 
 /** Тестовый сброс общего состояния. */
 export function __resetLoginThrottle(): void {
-  failures.clear();
+  window.reset();
 }

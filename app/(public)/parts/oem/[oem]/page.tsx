@@ -9,6 +9,7 @@ import { pageSeo } from "@/lib/seo";
 import { resolveOemSegment } from "@/lib/parts/oem-route";
 import { VariantList, availableQty, type VariantForList } from "@/components/parts/VariantList";
 import { AddToCartButton } from "@/components/parts/AddToCartButton";
+import { PartRequestForm } from "@/components/parts/PartRequestForm";
 import { ImageGallery } from "@/components/shared/ImageGallery";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { formatPrice } from "@/lib/utils";
@@ -141,10 +142,13 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
     path,
     // Закрываем от индексации два случая, и НИ ОДИН из них не про остаток:
     //  • адрес с ?v= — он показывает конкретный экземпляр, а не деталь;
-    //  • номенклатура без единого живого товара — пока на странице только
-    //    название и номер, это тонкий контент, а таких позиций в справочнике
-    //    сотни, и полутысяча пустых адресов вредит домену целиком. Индексация
-    //    вернётся вместе с формой заявки — Story 6, часть 2.
+    //  • номенклатура без единого живого товара. Форма заявки на такой
+    //    странице уже есть, но контент от этого не появился: название, номер и
+    //    та же форма на сотнях адресов — это по-прежнему тонкий контент, и
+    //    полутысяча таких страниц вредит домену целиком. Открывать их стоит
+    //    только когда на них будет чем отличаться друг от друга (применяемость
+    //    заполнена не везде), и это отдельное решение, а не побочный эффект
+    //    появления формы.
     // Нулевой остаток НЕ закрывает: «под заказ» — законное предложение с ценой,
     // описанием и применяемостью, и это ровно тот длинный хвост запросов по
     // номеру, ради которого история и затевалась. Отсекать его значило бы
@@ -239,9 +243,7 @@ export default async function PartByOemPage({ params, searchParams }: Props) {
               />
             </>
           ) : (
-            <div className="alert-error text-sm">
-              Сейчас этой детали нет в наличии. Напишите нам — привезём под заказ.
-            </div>
+            <PartRequestForm oem={ref.oem} />
           )}
         </div>
       </div>

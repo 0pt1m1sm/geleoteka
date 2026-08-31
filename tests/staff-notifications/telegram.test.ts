@@ -96,6 +96,7 @@ describe("Telegram runtime config", () => {
       ESTIMATE_CUSTOMER_APPROVED: "Клиент согласовал смету",
       ESTIMATE_CUSTOMER_DECLINED: "Клиент отклонил смету",
       PARTS_ORDER_CREATED: "Заказ запчастей",
+      PART_REQUEST_CREATED: "Заявка на деталь",
       RENTAL_BOOKING_CREATED: "Бронь аренды",
       INBOUND_MESSAGE_UNRESOLVED: "Сообщение не разобрано",
       CRM_TASK_OVERDUE: "Просроченная задача",
