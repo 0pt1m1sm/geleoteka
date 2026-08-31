@@ -1,5 +1,4 @@
 import type { MetadataRoute } from "next";
-import { pickVariantHost } from "@/lib/parts/variant-host";
 
 import { db } from "@/lib/db";
 import { getActiveModels } from "@/lib/vehicle-catalog";
@@ -46,35 +45,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }));
 
-  const [services, parts, rentals, models, posts] = await Promise.all([
+  const [services, refs, looseParts, rentals, models, posts] = await Promise.all([
     db.service
       .findMany({ select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
-    db.part
-      // Только ХОЗЯЕВА вариантов. Фильтр по condition здесь был бы неверен
-      // дважды: он выбросил бы номенклатуру, у которой нового товара нет
-      // (чистый разбор) — она осталась бы вообще без индексируемого адреса, —
-      // и впустил бы второй активный NEW под той же номенклатурой, который
-      // сам отдаёт noindex. Хозяин вычисляется тем же правилом, что и
-      // canonical на карточке, иначе карта сайта и страницы разошлись бы.
+    // Р1: в карте сайта — АДРЕСА ПО НОМЕРУ, а не слаги товаров. Канонический
+    // адрес номенклатуры теперь всегда страница по номеру, и карта обязана
+    // перечислять именно её, иначе она заявляла бы поисковику адреса, которые
+    // сами указывают canonical на другой.
+    db.partReference
       .findMany({
-        where: { isActive: true },
+        where: { parts: { some: { isActive: true } } },
         select: {
-          slug: true,
+          oem: true,
           updatedAt: true,
-          condition: true,
-          isActive: true,
-          createdAt: true,
-          referenceId: true,
-          reference: {
-            select: {
-              parts: {
-                where: { isActive: true },
-                select: { slug: true, condition: true, isActive: true, createdAt: true },
-              },
-            },
-          },
         },
+      })
+      .catch(() => [] as SitemapRef[]),
+    // Товары БЕЗ номенклатуры (служебные артикулы «под заказ») страницы по
+    // номеру не имеют и остаются сами себе каноном — их адреса в карте свои.
+    db.part
+      .findMany({
+        where: { isActive: true, referenceId: null },
+        select: { slug: true, updatedAt: true },
       })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
     db.vehicle
@@ -109,43 +102,28 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  type SitemapPart = {
-    slug: string;
-    updatedAt: Date;
-    condition: "NEW" | "USED" | "REFURBISHED";
-    isActive: boolean;
-    createdAt: Date;
-    referenceId: string | null;
-    reference: {
-      parts: Array<{
-        slug: string;
-        condition: "NEW" | "USED" | "REFURBISHED";
-        isActive: boolean;
-        createdAt: Date;
-      }>;
-    } | null;
-  };
+  type SitemapRef = { oem: string; updatedAt: Date };
 
-  // Хозяин считается ОДИН РАЗ на номенклатуру: без кэша для семьи из N
-  // вариантов один и тот же список обходился бы N раз.
-  const hostByRef = new Map<string, string | null>();
-  const hostSlugs = (parts as SitemapPart[]).filter((p) => {
-    // Без номенклатуры вариантов не бывает — товар сам себе хозяин
-    // (служебные артикулы «под заказ»).
-    if (!p.referenceId || !p.reference) return true;
-    if (!hostByRef.has(p.referenceId)) {
-      hostByRef.set(p.referenceId, pickVariantHost(p.reference.parts)?.slug ?? null);
-    }
-    const hostSlug = hostByRef.get(p.referenceId) ?? null;
-    return hostSlug === null || hostSlug === p.slug;
-  });
+  // Условие в самом запросе: номенклатура с хотя бы одним живым товаром. По
+  // остатку НЕ фильтруем — «под заказ» это предложение, а не пустая страница,
+  // и это ровно тот хвост запросов по номеру, ради которого история затевалась.
+  // Пустые же номенклатуры сама страница отдаёт с noindex, и заявлять их в
+  // карте значило бы ей противоречить.
+  for (const r of refs as SitemapRef[]) {
+    entries.push({
+      url: `${SITE_URL}/parts/oem/${r.oem}`,
+      lastModified: r.updatedAt,
+      changeFrequency: "weekly",
+      priority: 0.6,
+    });
+  }
 
-  for (const p of hostSlugs) {
+  for (const p of looseParts as Array<{ slug: string; updatedAt: Date }>) {
     entries.push({
       url: `${SITE_URL}/parts/${p.slug}`,
       lastModified: p.updatedAt,
       changeFrequency: "weekly",
-      priority: 0.6,
+      priority: 0.5,
     });
   }
 
