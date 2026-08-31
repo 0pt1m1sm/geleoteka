@@ -71,7 +71,18 @@ describe("карта сайта: адреса по номеру детали", (
     partFindMany.mockResolvedValue([{ slug: "podzakaz-07", updatedAt: NOW }]);
     expect((await urls()).some((u) => u.endsWith("/parts/podzakaz-07"))).toBe(true);
     expect(partFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true, referenceId: null } }),
+      expect.objectContaining({
+        where: { isActive: true, referenceId: null, condition: "NEW" },
+      }),
     );
+  });
+
+  it("бесхозный Б/У в карту НЕ идёт — его страница сама себя закрывает", async () => {
+    // Страница ставит noindex всему, что не новое: адрес экземпляра умрёт с
+    // продажей. Без фильтра карта заявляла бы поисковику адреса, которые сами
+    // себя закрывают. Проверяем условие запроса, потому что отбор делает БД.
+    await urls();
+    const where = (partFindMany.mock.calls[0]?.[0] ?? {}) as { where?: Record<string, unknown> };
+    expect(where.where?.condition).toBe("NEW");
   });
 });

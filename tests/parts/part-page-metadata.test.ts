@@ -181,12 +181,25 @@ describe("поведение страницы: редиректы (Р1, Р2)", (
     }
   }
 
-  it("живой б/у уходит на страницу по номеру ПОСТОЯННЫМ редиректом", async () => {
-    // Постоянный тут честен: своей страницы у экземпляра нет и не будет, а
-    // цель — адрес по номеру — больше не переезжает (в отличие от «хозяина»
-    // среди товаров, из-за чего в Story 5 пришлось вернуть временный).
+  it("ЖИВОЙ б/у — ВРЕМЕННЫЙ редирект: адрес цели ещё изменится", async () => {
+    // Пока экземпляр жив, ведём на ?v=<sku>; после продажи — на голый адрес.
+    // То есть один и тот же исходный адрес даёт две разные цели, и заявлять
+    // о первой «навсегда» нельзя. Переход гарантирован конструкцией: продажа
+    // гасит экземпляр, значит она случится у каждого.
     findUnique.mockResolvedValue(withReference(USED_PART, [NEW_PART, USED_PART]));
-    expect(await visit("support-used-1")).toBe(`308:/parts/oem/${OEM}?v=${OEM}-U1`);
+    expect(await visit("support-used-1")).toBe(`307:/parts/oem/${OEM}?v=${OEM}-U1`);
+  });
+
+  it("живой и проданный б/у дают РАЗНЫЕ коды — иначе одно из «навсегда» ложь", async () => {
+    findUnique.mockResolvedValue(withReference(USED_PART, [NEW_PART, USED_PART]));
+    const alive = await visit("support-used-1");
+    calls.length = 0;
+    vi.resetModules();
+    const sold = { ...USED_PART, isActive: false };
+    findUnique.mockResolvedValue(withReference(sold, [NEW_PART]));
+    const dead = await visit("support-used-1");
+    expect(alive.slice(0, 3)).toBe("307");
+    expect(dead.slice(0, 3)).toBe("308");
   });
 
   it("ПРОДАННЫЙ экземпляр доводит до страницы по номеру, и БЕЗ параметра", async () => {
@@ -194,13 +207,15 @@ describe("поведение страницы: редиректы (Р1, Р2)", (
     // развернул бы карточку, которой уже нет.
     const sold = { ...USED_PART, isActive: false };
     findUnique.mockResolvedValue(withReference(sold, [NEW_PART]));
+    // Постоянный: sku не переиспользуется, экземпляр не воскресает — вот
+    // теперь цель заморожена навсегда.
     expect(await visit("support-used-1")).toBe(`308:/parts/oem/${OEM}`);
   });
 
   it("ВОССТАНОВЛЕННАЯ ведёт себя как б/у, а не как новый товар", async () => {
     const refurb = { ...USED_PART, condition: "REFURBISHED" as const };
     findUnique.mockResolvedValue(withReference(refurb, [NEW_PART, refurb]));
-    expect(await visit("support-used-1")).toBe(`308:/parts/oem/${OEM}?v=${OEM}-U1`);
+    expect(await visit("support-used-1")).toBe(`307:/parts/oem/${OEM}?v=${OEM}-U1`);
   });
 
   it("СНЯТЫЙ С ВИТРИНЫ новый товар — ВРЕМЕННЫЙ редирект, не постоянный", async () => {

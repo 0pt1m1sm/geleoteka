@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import {
-  normalizeOem,
+  oemKey,
+  isLatinOem,
   parseReferenceCsv,
   SERVICE_ARTICLE_RE,
 } from "@/lib/part-reference";
@@ -45,7 +46,9 @@ interface RefWithFitments {
 export async function searchPartReferences(query: string): Promise<PartReferenceOption[]> {
   await requireRole(["ADMIN", "MANAGER"]);
   const q = query.trim();
-  const qOem = normalizeOem(q);
+  // Поиск тоже через oemKey: набранный в русской раскладке номер должен
+  // находить латинскую позицию.
+  const qOem = oemKey(q);
 
   const refs = (await db.partReference.findMany({
     where: q
@@ -110,10 +113,17 @@ export async function createPartReference(
   const groupName = ((formData.get("groupName") as string | null) ?? "").trim() || null;
   const modelsRaw = ((formData.get("models") as string | null) ?? "").trim();
 
-  const oem = normalizeOem(oemRaw);
+  const oem = oemKey(oemRaw);
   if (!oem || !name) return { error: "Номер и название обязательны" };
   if (SERVICE_ARTICLE_RE.test(oemRaw)) {
     return { error: "Служебные коды (ПОДЗАКАЗ-*, VERIFY-*) в справочник не заводятся" };
+  }
+  // Ключ справочника обязан быть латинским: адрес страницы по номеру принимает
+  // только латиницу, и нелатинский ключ дал бы канонический адрес живой
+  // карточки, ведущий на 404, плюс такой же адрес в карте сайта. Двойники
+  // («А» вместо «A») нормализация уже перевела — сюда доходит грубая ошибка.
+  if (!isLatinOem(oem)) {
+    return { error: "Номер детали записывается латиницей и цифрами" };
   }
 
   const codes = modelsRaw

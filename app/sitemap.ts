@@ -64,9 +64,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .catch(() => [] as SitemapRef[]),
     // Товары БЕЗ номенклатуры (служебные артикулы «под заказ») страницы по
     // номеру не имеют и остаются сами себе каноном — их адреса в карте свои.
+    // condition: "NEW" ОБЯЗАТЕЛЕН: страница закрывает от индексации всё, что не
+    // новое (адрес экземпляра умрёт с продажей), и без фильтра карта заявляла
+    // бы поисковику адреса, которые сами себя закрывают. Найдено ревью #109.
     db.part
       .findMany({
-        where: { isActive: true, referenceId: null },
+        where: { isActive: true, referenceId: null, condition: "NEW" },
         select: { slug: true, updatedAt: true },
       })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
