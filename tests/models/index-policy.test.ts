@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { GENERATION_MIN_PARTS, isGenerationIndexable } from "@/lib/models/generation-index";
+import {
+  GENERATION_MIN_PARTS,
+  MODEL_MIN_DESCRIPTION,
+  isGenerationIndexable,
+  isModelIndexable,
+} from "@/lib/models/index-policy";
 
 /**
  * Кого пускаем в индекс среди страниц поколений.
@@ -36,5 +41,30 @@ describe("isGenerationIndexable", () => {
 
   it("пусто по обоим признакам — точно нет", () => {
     expect(isGenerationIndexable({ description: null, partsCount: 0 })).toBe(false);
+  });
+});
+
+describe("isModelIndexable", () => {
+  it("одна строчка описания — НЕ содержание", () => {
+    // У всех 22 моделей описание 69–163 знака, одинаковое по форме. Именно за
+    // это Яндекс исключил 16 страниц моделей из 35.
+    expect(isModelIndexable({ description: "Компактный хэтчбек с турбо-мотором.", partsCount: 0 })).toBe(false);
+  });
+
+  it("настоящий абзац — содержание", () => {
+    expect(isModelIndexable({ description: "я".repeat(MODEL_MIN_DESCRIPTION), partsCount: 0 })).toBe(true);
+  });
+
+  it("свой набор запчастей тоже делает страницу нужной", () => {
+    // У G-Class 523 привязки: страница перестаёт быть шаблоном.
+    expect(isModelIndexable({ description: "Коротко.", partsCount: 523 })).toBe(true);
+  });
+
+  it("несколько деталей не спасают шаблон", () => {
+    expect(isModelIndexable({ description: "Коротко.", partsCount: 3 })).toBe(false);
+  });
+
+  it("описания нет вовсе — нет", () => {
+    expect(isModelIndexable({ description: null, partsCount: 0 })).toBe(false);
   });
 });

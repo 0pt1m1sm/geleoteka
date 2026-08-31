@@ -7,7 +7,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { isGenerationIndexable } from "@/lib/models/generation-index";
+import { isGenerationIndexable } from "@/lib/models/index-policy";
 import { LinkPending } from "@/components/shared/LinkPending";
 
 interface Props {

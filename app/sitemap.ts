@@ -1,8 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { db } from "@/lib/db";
-import { isGenerationIndexable } from "@/lib/models/generation-index";
-import { getActiveModels } from "@/lib/vehicle-catalog";
+import { isGenerationIndexable, isModelIndexable } from "@/lib/models/index-policy";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
@@ -92,7 +91,26 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         select: { id: true, updatedAt: true },
       })
       .catch(() => [] as Array<{ id: string; updatedAt: Date }>),
-    getActiveModels().catch(() => [] as Array<{ slug: string }>),
+    // Считаем детали здесь же: решение об индексации модели зависит от них,
+    // а getActiveModels их не отдаёт.
+    db.vehicleModel
+      .findMany({
+        where: { isActive: true },
+        select: {
+          slug: true,
+          description: true,
+          _count: { select: { generations: true } },
+          generations: { select: { _count: { select: { partReferenceFitments: true } } } },
+        },
+      })
+      .then((rows: Array<{ slug: string; description: string | null; generations: Array<{ _count: { partReferenceFitments: number } }> }>) =>
+        rows.map((m) => ({
+          slug: m.slug,
+          description: m.description,
+          partsCount: m.generations.reduce((sum, g) => sum + g._count.partReferenceFitments, 0),
+        })),
+      )
+      .catch(() => [] as SitemapModel[]),
     db.blogPost
       .findMany({ where: { published: true }, select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
@@ -122,9 +140,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  for (const m of models as Array<{ slug: string }>) {
-    // Сервис обслуживает все Mercedes (профильно G-Class), поэтому в sitemap
-    // все модели. G-Class приоритетнее прочих — приоритет ниже у остальных.
+  // Модели: та же логика, что у поколений. Шаблонная страница без своего
+  // содержания в карту не идёт — она сама отдаёт noindex.
+  for (const m of models as SitemapModel[]) {
+    // Раньше сюда шли ВСЕ модели: «сервис обслуживает все Mercedes». Но
+    // страница без своего содержания этого не доказывает — она повторяет
+    // соседнюю, и Яндекс исключил 16 таких из 35. Что сервис работает со всем
+    // модельным рядом, говорит раздел /models: он остаётся в карте.
+    if (!isModelIndexable({ description: m.description, partsCount: m.partsCount })) continue;
     entries.push({
       url: `${SITE_URL}/models/${m.slug}`,
       lastModified: now,
@@ -134,6 +157,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   type SitemapRef = { oem: string; updatedAt: Date };
+  type SitemapModel = { slug: string; description: string | null; partsCount: number };
   type SitemapGeneration = {
     code: string;
     updatedAt: Date;
