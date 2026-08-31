@@ -15,7 +15,7 @@ interface Props {
 
 const PRESERVED_PARAMS = ["model", "generation", "showAll", "q"] as const;
 
-type FacetKey = "category" | "oem" | "inStock" | "minPrice" | "maxPrice";
+type FacetKey = "category" | "oem" | "inStock" | "minPrice" | "maxPrice" | "condition";
 
 /**
  * 4-facet filter sidebar (desktop) + mobile drawer.
@@ -31,6 +31,7 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
   const currentCategory = searchParams.get("category") ?? "";
   const oemOnly = searchParams.get("oem") === "true";
   const inStockOnly = searchParams.get("inStock") === "true";
+  const conditionValue = searchParams.get("condition") ?? "";
   const minPriceStr = searchParams.get("minPrice") ?? "";
   const maxPriceStr = searchParams.get("maxPrice") ?? "";
 
@@ -39,10 +40,11 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
     if (currentCategory) n++;
     if (oemOnly) n++;
     if (inStockOnly) n++;
+    if (conditionValue) n++;
     if (minPriceStr) n++;
     if (maxPriceStr) n++;
     return n;
-  }, [currentCategory, oemOnly, inStockOnly, minPriceStr, maxPriceStr]);
+  }, [currentCategory, oemOnly, inStockOnly, conditionValue, minPriceStr, maxPriceStr]);
 
   // Body scroll lock while drawer is open. Restored on close + on unmount.
   useEffect(() => {
@@ -115,6 +117,23 @@ export function PartsFilterSidebar({ categories }: Props): React.ReactElement {
         />
         Только в наличии
       </label>
+
+      <div>
+        <label htmlFor="condition-filter" className="block text-sm font-medium mb-1">
+          Состояние
+        </label>
+        <select
+          id="condition-filter"
+          value={conditionValue}
+          onChange={(e) => pushWith({ condition: e.target.value || null })}
+          className="input"
+        >
+          <option value="">Любое</option>
+          <option value="NEW">Новые</option>
+          <option value="USED">Б/у</option>
+          <option value="REFURBISHED">Восстановленные</option>
+        </select>
+      </div>
 
       <div>
         <label className="block text-sm font-medium mb-1">Цена, ₽</label>
@@ -232,6 +251,12 @@ export function PartsFilterChips({ categories }: ChipProps): React.ReactElement 
   if (minP) chips.push({ key: "minPrice", label: `от ${minP} ₽` });
   const maxP = searchParams.get("maxPrice");
   if (maxP) chips.push({ key: "maxPrice", label: `до ${maxP} ₽` });
+  // Состояние обязано быть видимым и снимаемым чипсом: иначе покупатель не
+  // может ни понять, почему список короткий, ни вернуться ко всем позициям.
+  const cond = searchParams.get("condition");
+  if (cond === "NEW") chips.push({ key: "condition", label: "Только новые" });
+  if (cond === "USED") chips.push({ key: "condition", label: "Только б/у" });
+  if (cond === "REFURBISHED") chips.push({ key: "condition", label: "Восстановленные" });
 
   if (chips.length === 0) return null;
 

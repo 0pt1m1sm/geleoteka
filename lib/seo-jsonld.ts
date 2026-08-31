@@ -165,6 +165,9 @@ export interface ProductJsonLdInput {
   article: string;
   /** Торговый идентификатор. Отличается от article у б/у экземпляров. */
   sku: string;
+  /** Состояние. Без него б/у публикуется как новый — прямая дезинформация
+   *  поисковика и покупателя, читающего сниппет. */
+  condition?: "NEW" | "USED" | "REFURBISHED";
   description?: string | null;
   price: number;
   image?: string | null;
@@ -186,6 +189,12 @@ export function buildProductJsonLd(p: ProductJsonLdInput): string {
     // на проде это 21 активная страница, и публиковать их как mpn значит
     // отдавать поисковикам заведомо ложный идентификатор производителя.
     ...(SERVICE_ARTICLE_RE.test(p.article) ? {} : { mpn: p.article }),
+    itemCondition:
+      p.condition === "USED"
+        ? "https://schema.org/UsedCondition"
+        : p.condition === "REFURBISHED"
+          ? "https://schema.org/RefurbishedCondition"
+          : "https://schema.org/NewCondition",
     ...(p.description ? { description: p.description } : {}),
     ...(p.image ? { image: p.image.startsWith("http") ? p.image : `${SITE_URL}${p.image}` } : {}),
     url: `${SITE_URL}/parts/${p.slug}`,

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { pickVariantHost } from "@/lib/parts/variant-host";
 
 import { db } from "@/lib/db";
 import { getActiveModels } from "@/lib/vehicle-catalog";
@@ -50,14 +51,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       .findMany({ select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
     db.part
-      // condition NEW — ВРЕМЕННО, до Story 3 и Story 5: у б/у ещё нет ни
-      // карточки с вариантами, ни canonical/noindex. Без фильтра их адреса
-      // уходили бы прямо поисковику картой сайта, минуя витрину, и давали бы
-      // ту самую каннибализацию, ради устранения которой пишется Story 5.
-      // Снимать вместе с фильтром витрины и заглушкой в карточке.
+      // Только ХОЗЯЕВА вариантов. Фильтр по condition здесь был бы неверен
+      // дважды: он выбросил бы номенклатуру, у которой нового товара нет
+      // (чистый разбор) — она осталась бы вообще без индексируемого адреса, —
+      // и впустил бы второй активный NEW под той же номенклатурой, который
+      // сам отдаёт noindex. Хозяин вычисляется тем же правилом, что и
+      // canonical на карточке, иначе карта сайта и страницы разошлись бы.
       .findMany({
-        where: { isActive: true, condition: "NEW" },
-        select: { slug: true, updatedAt: true },
+        where: { isActive: true },
+        select: {
+          slug: true,
+          updatedAt: true,
+          condition: true,
+          isActive: true,
+          createdAt: true,
+          referenceId: true,
+          reference: {
+            select: {
+              parts: {
+                where: { isActive: true },
+                select: { slug: true, condition: true, isActive: true, createdAt: true },
+              },
+            },
+          },
+        },
       })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
     db.vehicle
@@ -92,7 +109,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
-  for (const p of parts as Array<{ slug: string; updatedAt: Date }>) {
+  type SitemapPart = {
+    slug: string;
+    updatedAt: Date;
+    condition: "NEW" | "USED" | "REFURBISHED";
+    isActive: boolean;
+    createdAt: Date;
+    referenceId: string | null;
+    reference: {
+      parts: Array<{
+        slug: string;
+        condition: "NEW" | "USED" | "REFURBISHED";
+        isActive: boolean;
+        createdAt: Date;
+      }>;
+    } | null;
+  };
+
+  // Хозяин считается ОДИН РАЗ на номенклатуру: без кэша для семьи из N
+  // вариантов один и тот же список обходился бы N раз.
+  const hostByRef = new Map<string, string | null>();
+  const hostSlugs = (parts as SitemapPart[]).filter((p) => {
+    // Без номенклатуры вариантов не бывает — товар сам себе хозяин
+    // (служебные артикулы «под заказ»).
+    if (!p.referenceId || !p.reference) return true;
+    if (!hostByRef.has(p.referenceId)) {
+      hostByRef.set(p.referenceId, pickVariantHost(p.reference.parts)?.slug ?? null);
+    }
+    const hostSlug = hostByRef.get(p.referenceId) ?? null;
+    return hostSlug === null || hostSlug === p.slug;
+  });
+
+  for (const p of hostSlugs) {
     entries.push({
       url: `${SITE_URL}/parts/${p.slug}`,
       lastModified: p.updatedAt,

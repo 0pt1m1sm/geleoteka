@@ -27,6 +27,7 @@ interface Props {
     q?: string;
     category?: string;
     oem?: string;
+    condition?: string;
     inStock?: string;
     minPrice?: string;
     maxPrice?: string;
@@ -62,12 +63,9 @@ export default async function PartsPage({ searchParams }: Props) {
     getCMSText("catalog.parts.subtitle"),
   ]);
 
-  // ВРЕМЕННО, до Story 3 и Story 5. Б/у экземпляры уже заводятся в админке, но
-  // карточка с вариантами, корзина и SEO-контур (canonical/noindex/sitemap) ещё
-  // не сделаны. Без этого фильтра мерж Story 2 выложил бы в магазин неподписанные
-  // дубли карточек и протолкнул бы их адреса поисковикам через IndexNow.
-  // Снять в Story 3 вместе с показом вариантов.
-  const where: Record<string, unknown> = { isActive: true, condition: "NEW" };
+  // Заглушка Story 2 снята: б/у показываются, у них есть карточка с вариантами
+  // и canonical на хозяина.
+  const where: Record<string, unknown> = { isActive: true };
 
   if (q) {
     // Free-text search: name + article only. PartTrim relation isn't text-searchable;
@@ -108,6 +106,12 @@ export default async function PartsPage({ searchParams }: Props) {
   }
 
   if (oemOnly) where.isOEM = true;
+  // Фильтр по состоянию: покупателю, ищущему подешевле, нужен способ показать
+  // только б/у, а ищущему новое — отсечь его.
+  const condParam = typeof params.condition === "string" ? params.condition : null;
+  if (condParam === "NEW" || condParam === "USED" || condParam === "REFURBISHED") {
+    where.condition = condParam;
+  }
   // In-stock = on-hand > 0 (StockItem.quantity). Available (− reserved) needs a
   // column-to-column compare Prisma can't express in a where, so the storefront
   // filter uses on-hand; reservations are an internal concept.
@@ -152,6 +156,7 @@ export default async function PartsPage({ searchParams }: Props) {
     if (model) sp.set("model", model);
     if (generation) sp.set("generation", generation);
     if (trimParam) sp.set("trim", trimParam);
+    if (condParam) sp.set("condition", condParam);
     if (showAll) sp.set("showAll", "1");
     if (page > 1) sp.set("page", String(page));
     const qs = sp.toString();
@@ -249,6 +254,13 @@ export default async function PartsPage({ searchParams }: Props) {
                       >
                         {(part.isOEM as boolean) ? "OEM" : "Аналог"}
                       </span>
+                      {/* Состояние обязано быть видно в списке: иначе б/у
+                          выглядит как подозрительно дешёвый новый товар. */}
+                      {(part.condition as string) !== "NEW" && (
+                        <span className="badge badge-silver text-[10px]">
+                          {(part.condition as string) === "USED" ? "Б/у" : "Восстановленная"}
+                        </span>
+                      )}
                       {cat && (
                         <span className="text-[10px] text-[var(--foreground-muted)]">
                           {cat.name}
