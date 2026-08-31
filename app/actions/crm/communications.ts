@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { parseOccurredAt } from "@/lib/crm/occurred-at";
 import { bumpLastTouch } from "@/lib/crm/public";
+import { isOutcomeAllowed } from "@/lib/crm-labels";
 
 interface CommResult {
   error: string | null;
@@ -24,6 +25,12 @@ export async function logCommunication(
   if (!channel) return { error: "Выберите канал" };
 
   const outcome = ((formData.get("outcome") as string | null) ?? "N_A").trim();
+  // Список в форме — подсказка, а не защита: форма клиентская, и прислать
+  // можно что угодно. «Не доставлено» на личном визите оседает в истории
+  // клиента навсегда и потом попадает в статистику.
+  if (!isOutcomeAllowed(channel, outcome)) {
+    return { error: "Такой результат не подходит выбранному каналу" };
+  }
   const body = ((formData.get("body") as string | null) ?? "").trim() || null;
   const dealIdRaw = ((formData.get("dealId") as string | null) ?? "").trim();
   const dealId = dealIdRaw || null;

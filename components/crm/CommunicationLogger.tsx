@@ -15,6 +15,8 @@ import { toast } from "@/lib/ui/toast";
 import {
   COMM_CHANNEL_LABELS,
   COMM_OUTCOME_LABELS,
+  outcomesForChannel,
+  isOutcomeAllowed,
   DROPDOWN_CHANNELS,
   isEmailChannel,
   isInboundEmailChannel,
@@ -61,7 +63,6 @@ interface Props {
 }
 
 const CHANNEL_OPTIONS = DROPDOWN_CHANNELS;
-const OUTCOME_OPTIONS = Object.keys(COMM_OUTCOME_LABELS);
 
 /**
  * Inline communications log for a customer (Customer 360 tab) or a
@@ -180,6 +181,8 @@ function LogForm({
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(logCommunication, null);
   const [channel, setChannel] = useState("PHONE_INBOUND");
+  const [outcome, setOutcome] = useState("N_A");
+  const allowedOutcomes = outcomesForChannel(channel);
 
   // Notify parent + refresh after the action completes. Calling parent's
   // setState during render would trip React 19's strict cross-component
@@ -209,7 +212,13 @@ function LogForm({
             id="comm-channel"
             name="channel"
             value={channel}
-            onChange={(e) => setChannel(e.target.value)}
+            onChange={(e) => {
+              const next = e.target.value;
+              setChannel(next);
+              // Сбрасываем результат, если для нового канала он бессмыслен:
+              // иначе «не доставлено» уехало бы в базу вместе с личным визитом.
+              if (!isOutcomeAllowed(next, outcome)) setOutcome("N_A");
+            }}
             className="input text-sm"
           >
             {CHANNEL_OPTIONS.map((c) => (
@@ -223,8 +232,19 @@ function LogForm({
           <label className="text-sm font-medium" htmlFor="comm-outcome">
             Результат
           </label>
-          <select id="comm-outcome" name="outcome" defaultValue="N_A" className="input text-sm">
-            {OUTCOME_OPTIONS.map((o) => (
+          {/* Список зависит от канала: для личного визита «не ответил» и
+              «не доставлено» бессмысленны, а менеджер выбирает из того, что
+              видит. Значение УПРАВЛЯЕМОЕ и сбрасывается при смене канала —
+              иначе выбранный ранее результат уехал бы в базу вместе с каналом,
+              которому он не подходит. */}
+          <select
+            id="comm-outcome"
+            name="outcome"
+            value={outcome}
+            onChange={(e) => setOutcome(e.target.value)}
+            className="input text-sm"
+          >
+            {allowedOutcomes.map((o) => (
               <option key={o} value={o}>
                 {COMM_OUTCOME_LABELS[o] ?? o}
               </option>

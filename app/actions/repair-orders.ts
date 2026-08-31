@@ -101,10 +101,27 @@ export async function createRepairOrderManually(
         data: { roNumber, dealId: dealId as string, userId: customerUserId, vehicleId, dateTime, concern },
         select: { id: true, roNumber: true },
       })) as { id: string; roNumber: string | null };
-      await reserveServiceBaySlot(tx as unknown as ServiceBayAllocationTx, {
-        repairOrderId: created.id,
-        dateTime,
-      });
+      try {
+        await reserveServiceBaySlot(tx as unknown as ServiceBayAllocationTx, {
+          repairOrderId: created.id,
+          dateTime,
+        });
+      } catch (error) {
+        // ПРОШЕДШИЙ визит записываем даже без свободного поста.
+        //
+        // Распределение постов существует, чтобы не занять одну и ту же
+        // мощность дважды В БУДУЩЕМ. Визит, который уже состоялся, — это факт,
+        // а не бронь: машина приезжала независимо от того, что показывает
+        // расписание задним числом. Менеджер, заносящий вручную клиента,
+        // который просто пришёл, упирался здесь в отказ «нет свободного поста»
+        // из-за конфликта, которого давно нет, и записать историю не мог.
+        //
+        // Для БУДУЩЕЙ записи поведение прежнее: конфликт — это отказ, иначе мы
+        // пообещали бы клиенту время, которого нет.
+        if (!(isServiceBayAllocationConflict(error) && dateTime.getTime() < Date.now())) {
+          throw error;
+        }
+      }
       return created;
     });
   } catch (error) {

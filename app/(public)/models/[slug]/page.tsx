@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { LinkPending } from "@/components/shared/LinkPending";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -86,10 +87,19 @@ export default async function ModelPage({ params }: Props): Promise<React.ReactE
           <h3 className="text-sm font-medium text-[var(--foreground-muted)] mb-2">
             Поколения
           </h3>
+          {/* Ссылки, а не текст: у каждого кузова своя страница с болячками
+              и запчастями именно под него, и спрос в поиске идёт по кузову
+              («слабые места W463»), а не по модели вообще. */}
           <ul className="space-y-1">
             {model.generations.map((g) => (
               <li key={g.code} className="text-sm font-medium">
-                {generationLabel(g)}
+                <Link
+                  href={`/models/${model.slug}/${g.code}`}
+                  className="hover:text-[var(--color-accent)]"
+                >
+                  {generationLabel(g)}
+                  <LinkPending />
+                </Link>
               </li>
             ))}
           </ul>

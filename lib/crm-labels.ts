@@ -122,6 +122,63 @@ export const CRM_TASK_KIND_LABELS: Record<string, string> = {
   GENERIC: "Задача",
 };
 
+
+/**
+ * Какие результаты вообще осмысленны для канала.
+ *
+ * Раньше список был один на всё, и для личного визита предлагалось «не
+ * ответил», «голосовая почта», «не доставлено». Это не косметика: менеджер
+ * выбирает из того, что видит, и в истории клиента оседает бессмыслица,
+ * по которой потом считают статистику.
+ *
+ * Правило простое — результат описывает СУДЬБУ ПОПЫТКИ, а судьба зависит от
+ * способа связи:
+ *  • звонок: подняли трубку, не ответили, попали на голосовую почту;
+ *  • отправленное сообщение: принято к отправке, доставлено, не доставлено,
+ *    получен ответ;
+ *  • ВХОДЯЩЕЕ сообщение: оно уже пришло — судьбы доставки у него нет, есть
+ *    только «мы ответили»;
+ *  • личный визит: человек пришёл, и единственное содержательное значение —
+ *    «состоялось». Ни доставки, ни дозвона тут не бывает.
+ *
+ * `N_A` доступен везде: это «не отмечено», а не результат.
+ */
+const CALL_OUTCOMES = ["ANSWERED", "NO_ANSWER", "VOICEMAIL", "N_A"] as const;
+const SENT_OUTCOMES = ["ACCEPTED", "DELIVERED", "FAILED", "REPLIED", "N_A"] as const;
+const RECEIVED_OUTCOMES = ["REPLIED", "N_A"] as const;
+const VISIT_OUTCOMES = ["N_A"] as const;
+
+const OUTCOMES_BY_CHANNEL: Record<string, readonly string[]> = {
+  PHONE_INBOUND: CALL_OUTCOMES,
+  PHONE_OUTBOUND: CALL_OUTCOMES,
+  SMS_OUTBOUND: SENT_OUTCOMES,
+  EMAIL_OUTBOUND: SENT_OUTCOMES,
+  WHATSAPP_OUTBOUND: SENT_OUTCOMES,
+  TELEGRAM_OUTBOUND: SENT_OUTCOMES,
+  MAX_OUTBOUND: SENT_OUTCOMES,
+  SMS_INBOUND: RECEIVED_OUTCOMES,
+  EMAIL_INBOUND: RECEIVED_OUTCOMES,
+  WHATSAPP_INBOUND: RECEIVED_OUTCOMES,
+  TELEGRAM_INBOUND: RECEIVED_OUTCOMES,
+  MAX_INBOUND: RECEIVED_OUTCOMES,
+  IN_PERSON: VISIT_OUTCOMES,
+};
+
+/**
+ * Допустимые результаты для канала. Неизвестный канал (в том числе устаревшие
+ * значения enum и «Другое») не ограничиваем: запретить больше, чем знаем, —
+ * значит потерять запись, которую человек хотел сохранить.
+ */
+export function outcomesForChannel(channel: string): readonly string[] {
+  return OUTCOMES_BY_CHANNEL[channel] ?? Object.keys(COMM_OUTCOME_LABELS);
+}
+
+/** Сочетаются ли канал и результат. Проверяется и на сервере: список в форме
+ *  — подсказка, а не защита. */
+export function isOutcomeAllowed(channel: string, outcome: string): boolean {
+  return outcomesForChannel(channel).includes(outcome);
+}
+
 const PHONE_CHANNELS = new Set(["PHONE_INBOUND", "PHONE_OUTBOUND"]);
 export function isPhoneChannel(channel: string): boolean {
   return PHONE_CHANNELS.has(channel);
