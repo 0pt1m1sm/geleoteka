@@ -10,6 +10,7 @@ import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { LinkPending } from "@/components/shared/LinkPending";
+import { isModelIndexable } from "@/lib/models/index-policy";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -17,6 +18,14 @@ interface Props {
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
 const getCachedModelBySlug = cache(getModelBySlug);
+
+/** Сколько позиций справочника привязано к поколениям этой модели. Нужен для
+ *  решения об индексации — см. lib/models/index-policy.ts. */
+const countModelParts = cache(async (slug: string): Promise<number> => {
+  return (await db.partReferenceFitment.count({
+    where: { generation: { model: { slug } } },
+  })) as number;
+});
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
@@ -37,6 +46,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       model.description ??
       `Mercedes-Benz ${model.name}: поколения, двигатели, особенности и услуги сервиса для этого автомобиля в Geleoteka.`,
     path: `/models/${slug}`,
+    // Модель без своего содержания — шаблон: название, годы поколений и тот же
+    // прайс, что у соседа. Из 35 страниц моделей Яндекс исключил 16 именно
+    // поэтому. Страница остаётся доступной, в выдачу не просится; сказать
+    // «обслуживаем весь модельный ряд» есть кому — у раздела /models своя
+    // страница на 4600 знаков.
+    noindex: !isModelIndexable({
+      description: model.description ?? null,
+      partsCount: await countModelParts(slug),
+    }),
   });
 }
 

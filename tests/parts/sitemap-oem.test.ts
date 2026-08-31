@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const refFindMany = vi.fn();
 const partFindMany = vi.fn();
 const genFindMany = vi.fn();
+const modelFindMany = vi.fn();
 const emptyList = () => ({ findMany: vi.fn().mockResolvedValue([]) });
 
 vi.mock("@/lib/db", () => ({
@@ -22,12 +23,14 @@ vi.mock("@/lib/db", () => ({
     // Поколения появились вместе со страницами кузовов; без заглушки карта
     // падает целиком и тесты про запчасти краснеют не по делу.
     vehicleGeneration: { findMany: (...a: unknown[]) => genFindMany(...a) },
+    // Модели теперь читаются напрямую (нужен счёт деталей), а не через
+    // getActiveModels — без заглушки карта падает целиком.
+    vehicleModel: { findMany: (...a: unknown[]) => modelFindMany(...a) },
     service: emptyList(),
     vehicle: emptyList(),
     blogPost: emptyList(),
   },
 }));
-vi.mock("@/lib/vehicle-catalog", () => ({ getActiveModels: vi.fn().mockResolvedValue([]) }));
 
 const NOW = new Date("2026-08-31");
 
@@ -45,6 +48,8 @@ describe("карта сайта: адреса по номеру детали", (
     partFindMany.mockResolvedValue([]);
     genFindMany.mockReset();
     genFindMany.mockResolvedValue([]);
+    modelFindMany.mockReset();
+    modelFindMany.mockResolvedValue([]);
     vi.resetModules();
   });
 
@@ -114,5 +119,18 @@ describe("карта сайта: адреса по номеру детали", (
     const list = await urls();
     expect(list.some((u) => u.endsWith("/models/g-class/W463"))).toBe(true);
     expect(list.some((u) => u.endsWith("/models/g-class/W465"))).toBe(false);
+  });
+
+  it("ШАБЛОННАЯ модель в карту не идёт, а наполненная идёт", async () => {
+    // У всех моделей описание в одну строку; отличается только G-Class своим
+    // набором запчастей. Заявлять близнецов значит повторять ту же ошибку, за
+    // которую Яндекс исключил 16 страниц моделей из 35.
+    modelFindMany.mockResolvedValue([
+      { slug: "g-class", description: "Коротко.", generations: [{ _count: { partReferenceFitments: 523 } }] },
+      { slug: "b-class", description: "Компактвэн.", generations: [{ _count: { partReferenceFitments: 0 } }] },
+    ]);
+    const list = await urls();
+    expect(list.some((u) => u.endsWith("/models/g-class"))).toBe(true);
+    expect(list.some((u) => u.endsWith("/models/b-class"))).toBe(false);
   });
 });
