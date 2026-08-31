@@ -74,7 +74,7 @@ export default async function PartRequestsPage() {
             ) : (
               <div className="space-y-2">
                 {open.map((r) => (
-                  <Row key={r.id} r={r} userId={session.id} />
+                  <Row key={r.id} r={r} />
                 ))}
               </div>
             )}
@@ -87,7 +87,7 @@ export default async function PartRequestsPage() {
               </h2>
               <div className="space-y-2 opacity-70">
                 {done.map((r) => (
-                  <Row key={r.id} r={r} userId={session.id} />
+                  <Row key={r.id} r={r} />
                 ))}
               </div>
             </section>
@@ -98,7 +98,7 @@ export default async function PartRequestsPage() {
   );
 }
 
-function Row({ r, userId }: { r: RequestRow; userId: string }): React.ReactElement {
+function Row({ r }: { r: RequestRow }): React.ReactElement {
   return (
     <div className="card flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0">
@@ -123,7 +123,7 @@ function Row({ r, userId }: { r: RequestRow; userId: string }): React.ReactEleme
             Позиция
           </Link>
         )}
-        {r.handledAt === null && <PartRequestHandleButton id={r.id} userId={userId} />}
+        {r.handledAt === null && <PartRequestHandleButton id={r.id} />}
       </div>
     </div>
   );

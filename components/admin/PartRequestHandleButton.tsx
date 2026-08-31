@@ -6,13 +6,7 @@ import { markPartRequestHandled } from "@/app/actions/part-requests";
 import { toast } from "@/lib/ui/toast";
 
 /** Отметить заявку обработанной. Сотрудник связался — строка уходит вниз. */
-export function PartRequestHandleButton({
-  id,
-  userId,
-}: {
-  id: string;
-  userId: string;
-}): React.ReactElement {
+export function PartRequestHandleButton({ id }: { id: string }): React.ReactElement {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -22,7 +16,7 @@ export function PartRequestHandleButton({
       disabled={pending}
       onClick={() =>
         startTransition(async () => {
-          await markPartRequestHandled(id, userId);
+          await markPartRequestHandled(id);
           toast.success("Заявка отмечена обработанной");
           router.refresh();
         })

@@ -14,6 +14,15 @@ import "server-only";
  * Цель — замедлить автоматику, а не построить распределённый лимитер; для него
  * нужна таблица в БД. Знать это важно: после деплоя окно пустое.
  */
+/**
+ * Сколько ключей терпим до уборки. Записи выбывают лениво — только когда по
+ * ключу снова спросили. При вращении ключей второго обращения не бывает, и
+ * карта росла бы вечно: тридцать запросов с одной машины оставляли тридцать
+ * записей (найдено ревью PR #110). Сама по себе это медленная утечка, но ключ
+ * задаётся снаружи, так что мять его дёшево.
+ */
+const SWEEP_AT = 1000;
+
 export class SlidingWindow {
   private readonly hits = new Map<string, number[]>();
 
@@ -21,6 +30,16 @@ export class SlidingWindow {
     private readonly limit: number,
     private readonly windowMs: number,
   ) {}
+
+  /** Выбросить ключи, у которых окно опустело. */
+  private sweep(now: number): void {
+    const cutoff = now - this.windowMs;
+    for (const [key, times] of this.hits) {
+      if (times.length === 0 || times[times.length - 1] <= cutoff) {
+        this.hits.delete(key);
+      }
+    }
+  }
 
   private fresh(key: string, now: number): number[] {
     const cutoff = now - this.windowMs;
@@ -40,9 +59,17 @@ export class SlidingWindow {
 
   /** Засчитать попытку. */
   register(key: string, now: number = Date.now()): void {
+    // Уборка ДО вставки: иначе на пороге карта разрасталась бы на один ключ
+    // сверх лимита при каждом обращении.
+    if (this.hits.size >= SWEEP_AT) this.sweep(now);
     const times = this.fresh(key, now);
     times.push(now);
     this.hits.set(key, times);
+  }
+
+  /** Сколько ключей сейчас в памяти — для тестов и диагностики. */
+  size(): number {
+    return this.hits.size;
   }
 
   /** Сбросить счётчик по ключу (например, после успешного входа). */

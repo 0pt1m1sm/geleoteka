@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { requireRole } from "@/lib/auth";
 import { clientIp } from "@/lib/audit";
 import { oemKey } from "@/lib/part-reference";
 import { partRequestThrottle } from "@/lib/rate-limit";
@@ -35,7 +36,7 @@ export async function createPartRequest(
   // Honeypot. Поле спрятано от человека, поэтому заполнить его может только
   // автомат. Отвечаем как при успехе: сказать боту «ты распознан» — значит
   // подсказать, что именно поправить.
-  const trap = ((formData.get("website") as string | null) ?? "").trim();
+  const trap = ((formData.get("contact_confirm_url") as string | null) ?? "").trim();
   if (trap) return { error: null, success: true };
 
   const ip = (await clientIp()) ?? "unknown";
@@ -85,10 +86,23 @@ export async function createPartRequest(
   return { error: null, success: true };
 }
 
-/** Отметить заявку обработанной (админка). */
-export async function markPartRequestHandled(id: string, userId: string): Promise<void> {
+/**
+ * Отметить заявку обработанной.
+ *
+ * `requireRole` обязателен: файл объявлен «use server», значит КАЖДЫЙ экспорт
+ * здесь — сетевая точка входа, а не внутренняя функция страницы. Без проверки
+ * отметить заявку мог кто угодно без сессии, зная id (найдено ревью PR #110).
+ * Закрытая страница-список этого не спасает: страница и действие — разные
+ * входы, и закрыт был только один.
+ *
+ * Автор берётся ИЗ СЕССИИ, а не из параметра. Параметром его передавал клиент,
+ * то есть авторство подделывалось: в `handledById` можно было записать любого
+ * сотрудника.
+ */
+export async function markPartRequestHandled(id: string): Promise<void> {
+  const session = await requireRole(["ADMIN", "MANAGER"]);
   await db.partRequest.update({
     where: { id },
-    data: { handledAt: new Date(), handledById: userId },
+    data: { handledAt: new Date(), handledById: session.id },
   });
 }

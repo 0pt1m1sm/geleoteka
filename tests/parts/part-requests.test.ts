@@ -86,7 +86,7 @@ describe("createPartRequest", () => {
 
   it("HONEYPOT: заполненная ловушка не создаёт строку, но отвечает как успех", async () => {
     // Сказать боту «ты распознан» значит подсказать, что поправить.
-    const res = await submit({ ...GOOD, website: "http://spam.example" });
+    const res = await submit({ ...GOOD, contact_confirm_url: "http://spam.example" });
     expect(res).toEqual({ error: null, success: true });
     expect(create).not.toHaveBeenCalled();
   });

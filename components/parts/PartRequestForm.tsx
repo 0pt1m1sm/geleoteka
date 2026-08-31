@@ -35,10 +35,15 @@ export function PartRequestForm({ oem }: { oem: string }): React.ReactElement {
       <input type="hidden" name="oem" value={oem} />
 
       {/* Honeypot: спрятан от человека и от скринридера, заполнить его может
-          только автомат. Не `type="hidden"` — такие поля боты пропускают. */}
+          только автомат. Не `type="hidden"` — такие поля боты пропускают.
+          Имя НЕ «website»: менеджеры паролей и автозаполнение такие имена знают
+          и иногда заполняют вопреки autocomplete="off". У живого человека это
+          дало бы вид успеха без заявки, причём он никогда бы не узнал — отказ
+          здесь молчаливый по устройству, поэтому цена ложного срабатывания
+          выше обычной. */}
       <div aria-hidden="true" className="absolute w-px h-px overflow-hidden -left-[9999px]">
-        <label htmlFor="website">Не заполняйте это поле</label>
-        <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" />
+        <label htmlFor="contact_confirm_url">Не заполняйте это поле</label>
+        <input id="contact_confirm_url" name="contact_confirm_url" type="text" tabIndex={-1} autoComplete="off" />
       </div>
 
       <div>
