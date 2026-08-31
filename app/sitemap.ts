@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { db } from "@/lib/db";
+import { isGenerationIndexable } from "@/lib/models/generation-index";
 import { getActiveModels } from "@/lib/vehicle-catalog";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
@@ -45,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: r.priority,
   }));
 
-  const [services, refs, looseParts, rentals, models, posts] = await Promise.all([
+  const [services, generations, refs, looseParts, rentals, models, posts] = await Promise.all([
     db.service
       .findMany({ select: { slug: true, updatedAt: true } })
       .catch(() => [] as Array<{ slug: string; updatedAt: Date }>),
@@ -53,6 +54,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // адрес номенклатуры теперь всегда страница по номеру, и карта обязана
     // перечислять именно её, иначе она заявляла бы поисковику адреса, которые
     // сами указывают canonical на другой.
+    db.vehicleGeneration
+      .findMany({
+        where: { isActive: true, model: { isActive: true } },
+        select: {
+          code: true,
+          updatedAt: true,
+          description: true,
+          model: { select: { slug: true } },
+          _count: { select: { partReferenceFitments: true } },
+        },
+      })
+      .catch(() => [] as SitemapGeneration[]),
     db.partReference
       .findMany({
         where: { parts: { some: { isActive: true } } },
@@ -94,6 +107,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   }
 
+  // Страницы ПОКОЛЕНИЙ: у каждого кузова свой набор запчастей и своих болячек,
+  // и спрос в поиске идёт именно по кузову. Заявляем только те, где есть
+  // содержание — описание или привязанные детали; пустые страница сама отдаёт
+  // с noindex, и заявлять их значило бы ей противоречить.
+  for (const g of generations as SitemapGeneration[]) {
+    if (!isGenerationIndexable({ description: g.description, partsCount: g._count.partReferenceFitments }))
+      continue;
+    entries.push({
+      url: `${SITE_URL}/models/${g.model.slug}/${g.code}`,
+      lastModified: g.updatedAt,
+      changeFrequency: "monthly",
+      priority: 0.7,
+    });
+  }
+
   for (const m of models as Array<{ slug: string }>) {
     // Сервис обслуживает все Mercedes (профильно G-Class), поэтому в sitemap
     // все модели. G-Class приоритетнее прочих — приоритет ниже у остальных.
@@ -106,6 +134,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   type SitemapRef = { oem: string; updatedAt: Date };
+  type SitemapGeneration = {
+    code: string;
+    updatedAt: Date;
+    description: string | null;
+    model: { slug: string };
+    _count: { partReferenceFitments: number };
+  };
 
   // Условие в самом запросе: номенклатура с хотя бы одним живым товаром. По
   // остатку НЕ фильтруем — «под заказ» это предложение, а не пустая страница,

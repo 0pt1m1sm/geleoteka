@@ -12,12 +12,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const refFindMany = vi.fn();
 const partFindMany = vi.fn();
+const genFindMany = vi.fn();
 const emptyList = () => ({ findMany: vi.fn().mockResolvedValue([]) });
 
 vi.mock("@/lib/db", () => ({
   db: {
     partReference: { findMany: (...a: unknown[]) => refFindMany(...a) },
     part: { findMany: (...a: unknown[]) => partFindMany(...a) },
+    // Поколения появились вместе со страницами кузовов; без заглушки карта
+    // падает целиком и тесты про запчасти краснеют не по делу.
+    vehicleGeneration: { findMany: (...a: unknown[]) => genFindMany(...a) },
     service: emptyList(),
     vehicle: emptyList(),
     blogPost: emptyList(),
@@ -39,6 +43,8 @@ describe("карта сайта: адреса по номеру детали", (
     partFindMany.mockReset();
     refFindMany.mockResolvedValue([]);
     partFindMany.mockResolvedValue([]);
+    genFindMany.mockReset();
+    genFindMany.mockResolvedValue([]);
     vi.resetModules();
   });
 
@@ -84,5 +90,29 @@ describe("карта сайта: адреса по номеру детали", (
     await urls();
     const where = (partFindMany.mock.calls[0]?.[0] ?? {}) as { where?: Record<string, unknown> };
     expect(where.where?.condition).toBe("NEW");
+  });
+
+  it("страница ПОКОЛЕНИЯ попадает в карту, когда ей есть что показать", async () => {
+    genFindMany.mockResolvedValue([
+      {
+        code: "W463",
+        updatedAt: NOW,
+        description: "Самое массовое поколение",
+        model: { slug: "g-class" },
+        _count: { partReferenceFitments: 351 },
+      },
+      // Пустая: ни описания, ни деталей — сама отдаёт noindex, и заявлять её
+      // значило бы противоречить собственной странице.
+      {
+        code: "W465",
+        updatedAt: NOW,
+        description: null,
+        model: { slug: "g-class" },
+        _count: { partReferenceFitments: 0 },
+      },
+    ]);
+    const list = await urls();
+    expect(list.some((u) => u.endsWith("/models/g-class/W463"))).toBe(true);
+    expect(list.some((u) => u.endsWith("/models/g-class/W465"))).toBe(false);
   });
 });

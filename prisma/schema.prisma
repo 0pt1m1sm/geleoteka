@@ -1789,6 +1789,13 @@ model VehicleGeneration {
   code      String
   yearFrom  Int
   yearTo    Int?
+  /// Содержание страницы поколения. Без него страница остаётся набором
+  /// справочных полей, одинаковым у всех кузовов, — а Яндекс исключает такие
+  /// как малоценные (41 страница из 113 на 31.08.2026).
+  description String?
+  /// Типичные слабые места кузова. Отдельным списком, а не текстом: они же
+  /// нужны структурированно для перелинковки со статьями и услугами.
+  commonIssues String[]   @default([])
   modelId   String
   sortOrder Int           @default(0)
   isActive  Boolean       @default(true)
