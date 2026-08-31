@@ -37,7 +37,10 @@ const getPartBySlug = cache(async (slug: string) => {
             // Только активные: строки проданных экземпляров остаются в базе
             // навсегда (на них ссылаются заказы), и без фильтра ходовая деталь
             // через год тянула бы десятки мёртвых строк на каждый просмотр.
-            // photos не выбираем — блок вариантов их не рендерит.
+            // photos НУЖНЫ: при выбранном ?v= галерея показывает фотографии
+            // именно этого экземпляра. Их наличие обязательно при заведении
+            // б/у (доказательство состояния при возврате) — не показывать их
+            // покупателю значит обесценить это правило.
             where: { isActive: true },
             select: {
               id: true,
@@ -48,6 +51,7 @@ const getPartBySlug = cache(async (slug: string) => {
               condition: true,
               conditionNote: true,
               originNote: true,
+              photos: true,
               isActive: true,
               createdAt: true,
               stockItems: { select: { quantity: true } },
@@ -139,6 +143,7 @@ interface RawVariant {
   condition: "NEW" | "USED" | "REFURBISHED";
   conditionNote: string | null;
   originNote: string | null;
+  photos: string[];
   isActive: boolean;
   createdAt: Date;
   stockItems: Array<{ quantity: number }>;
@@ -159,7 +164,7 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // Заглушка Story 2 снята: страница б/у больше не 404, потому что теперь у
   // детали есть карточка с вариантами и канонический адрес (см. ниже).
   const partRec = part as Record<string, unknown> | null;
-  if (!partRec || !partRec.isActive) notFound();
+  if (!partRec) notFound();
 
   const p = part as Record<string, unknown>;
 
@@ -173,9 +178,17 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // это движение склада, а не контент, и десяток почти одинаковых адресов
   // конкурировал бы сам с собой. Открытый напрямую вариант уводит на страницу
   // хозяина с параметром, который разворачивает именно его.
+  // Редирект СТОИТ ВЫШЕ проверки активности намеренно. Б/у экземпляр
+  // одноразовый: после продажи он гаснет, а расшаренная на него ссылка живёт.
+  // Если сначала отсекать неактивные, любая такая ссылка упиралась бы в
+  // «Запчасть не найдена» вместо страницы детали — и сообщение «экземпляр
+  // продан» было бы недостижимо по прямой ссылке в принципе.
   if (host && host.slug !== slug) {
     redirect(`/parts/${host.slug}?v=${encodeURIComponent(p.sku as string)}`);
   }
+
+  // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
+  if (!p.isActive) notFound();
 
   const requestedSku = typeof sp.v === "string" ? sp.v : null;
   const selected = requestedSku ? variants.find((v) => v.sku === requestedSku) : undefined;
@@ -197,9 +210,14 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   const shownCondition = shown
     ? shown.condition
     : (p.condition as "NEW" | "USED" | "REFURBISHED");
+  // Частично применённый выбор хуже неприменённого: страница продавала бы
+  // экземпляр по фотографиям и цене ДРУГОГО товара. Всё, что видит покупатель
+  // и читает поисковик, берётся из одного источника.
+  const shownPhotos = shown ? shown.photos : (p.photos as string[]);
+  const shownCompareAt = shown ? null : (p.compareAtPrice as number | null);
+  const shownSku = shown ? shown.sku : (p.sku as string);
   const cat = p.category as Record<string, string> | null;
   const partTrims = (p.partTrims as RawPartTrim[]) ?? [];
-  const photos = p.photos as string[];
 
   // Group by (model, generation). Default-trim rows surface as "Все варианты"
   // so the customer can tell whether the part is generation-wide or specific.
@@ -234,11 +252,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             name: p.name as string,
             slug: slug,
             article: p.article as string,
-            sku: (shown ? shown.sku : (p.sku as string)),
+            sku: shownSku,
             condition: shownCondition,
             description: p.description as string | null,
-            price: p.price as number,
-            image: photos[0] ?? null,
+            price: shownPrice,
+            image: shownPhotos[0] ?? null,
             inStock: onHand > 0,
           }),
         }}
@@ -257,7 +275,7 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
         <div>
           {/* Product gallery */}
           <div className="mb-8">
-            <ImageGallery images={photos} alt={p.name as string} aspectRatio="4/3" />
+            <ImageGallery images={shownPhotos} alt={shownName} aspectRatio="4/3" />
           </div>
 
           {/* Product title + meta */}
@@ -375,7 +393,10 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                           </p>
                           {!current && (
                             <Link
-                              href={`/parts/${v.slug}`}
+                              // Сразу на хозяина с параметром: ссылка на
+                              // собственный адрес варианта тут же отскочила бы
+                              // редиректом обратно, добавив лишний запрос.
+                              href={`/parts/${slug}?v=${encodeURIComponent(v.sku)}`}
                               className="btn btn-secondary btn-sm mt-2 inline-block"
                             >
                               Открыть
@@ -428,15 +449,15 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                 <span className="text-3xl font-bold text-[var(--color-accent)]">
                   {formatPrice(shownPrice)}
                 </span>
-                {(p.compareAtPrice as number) ? (
+                {shownCompareAt ? (
                   <span className="text-lg text-[var(--foreground-muted)] line-through">
-                    {formatPrice(p.compareAtPrice as number)}
+                    {formatPrice(shownCompareAt)}
                   </span>
                 ) : null}
               </div>
-              {(p.compareAtPrice as number) ? (
+              {shownCompareAt ? (
                 <p className="text-sm text-[var(--color-success)] mt-1">
-                  Экономия: {formatPrice((p.compareAtPrice as number) - (p.price as number))}
+                  Экономия: {formatPrice(shownCompareAt - shownPrice)}
                 </p>
               ) : null}
             </div>
@@ -444,7 +465,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
             {/* Availability */}
             <div className={`flex items-center gap-2 mb-6 text-sm ${onHand > 0 ? "text-[var(--color-success)]" : "text-[var(--foreground-muted)]"}`}>
               <span className={`w-2.5 h-2.5 rounded-full ${onHand > 0 ? "bg-[var(--color-success)]" : "bg-[var(--foreground-muted)]"}`} />
-              {onHand > 0 ? `В наличии — ${onHand} шт.` : "Под заказ (3-5 дней)"}
+              {onHand > 0
+                ? `В наличии — ${onHand} шт.`
+                : shownCondition === "NEW"
+                  ? "Под заказ (3-5 дней)"
+                  : "Продан"}
             </div>
 
             {/* Add to cart */}

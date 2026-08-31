@@ -126,12 +126,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     } | null;
   };
 
+  // Хозяин считается ОДИН РАЗ на номенклатуру: без кэша для семьи из N
+  // вариантов один и тот же список обходился бы N раз.
+  const hostByRef = new Map<string, string | null>();
   const hostSlugs = (parts as SitemapPart[]).filter((p) => {
     // Без номенклатуры вариантов не бывает — товар сам себе хозяин
     // (служебные артикулы «под заказ»).
     if (!p.referenceId || !p.reference) return true;
-    const host = pickVariantHost(p.reference.parts);
-    return host === null || host.slug === p.slug;
+    if (!hostByRef.has(p.referenceId)) {
+      hostByRef.set(p.referenceId, pickVariantHost(p.reference.parts)?.slug ?? null);
+    }
+    const hostSlug = hostByRef.get(p.referenceId) ?? null;
+    return hostSlug === null || hostSlug === p.slug;
   });
 
   for (const p of hostSlugs) {

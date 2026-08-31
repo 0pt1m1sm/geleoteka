@@ -17,6 +17,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const findUnique = vi.fn();
 vi.mock("@/lib/db", () => ({ db: { part: { findUnique: (...a: unknown[]) => findUnique(...a) } } }));
 
+/** notFound/redirect бросают — так их и различаем в тестах поведения. */
+const redirects: string[] = [];
+vi.mock("next/navigation", () => ({
+  notFound: () => {
+    throw new Error("NOTFOUND");
+  },
+  redirect: (to: string) => {
+    redirects.push(to);
+    throw new Error("REDIRECT");
+  },
+}));
+
 type Fixture = {
   id: string;
   slug: string;
@@ -121,5 +133,62 @@ describe("generateMetadata карточки товара", () => {
     const { generateMetadata } = await import("@/app/(public)/parts/[slug]/page");
     const meta = await generateMetadata({ params: Promise.resolve({ slug: "podzakaz-01" }) });
     expect(meta.alternates?.canonical).toBe("/parts/podzakaz-01");
+  });
+});
+
+describe("поведение страницы: редирект вариантов", () => {
+  beforeEach(() => {
+    findUnique.mockReset();
+    redirects.length = 0;
+    vi.resetModules();
+  });
+
+  /** Возвращает "RENDER" | "REDIRECT:<куда>" | "NOTFOUND". */
+  async function visit(slug: string, v?: string): Promise<string> {
+    const { default: Page } = await import("@/app/(public)/parts/[slug]/page");
+    try {
+      await Page({
+        params: Promise.resolve({ slug }),
+        searchParams: Promise.resolve(v ? { v } : {}),
+      });
+      return "RENDER";
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === "REDIRECT") return `REDIRECT:${redirects[0]}`;
+      if (msg === "NOTFOUND") return "NOTFOUND";
+      // Рендер JSX в узле может упасть по другой причине — для нас это
+      // означает, что до рендера дошли, то есть ни редиректа, ни 404.
+      return "RENDER";
+    }
+  }
+
+  it("прямой заход на б/у уводит на хозяина с ?v=", async () => {
+    findUnique.mockResolvedValue(withReference(USED_PART, [NEW_PART, USED_PART]));
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
+  });
+
+  it("цель редиректа рендерится — цикла нет", async () => {
+    findUnique.mockResolvedValue(withReference(NEW_PART, [NEW_PART, USED_PART]));
+    expect(await visit("support-new", "A4634210098-U1")).toBe("RENDER");
+  });
+
+  it("ПРОДАННЫЙ экземпляр тоже доводит до хозяина, а не в «не найдена»", async () => {
+    // Б/у одноразовый: расшаренная ссылка переживает продажу, и упираться ей
+    // в 404 нельзя — иначе сообщение «экземпляр продан» недостижимо.
+    const sold = { ...USED_PART, isActive: false };
+    findUnique.mockResolvedValue(withReference(sold, [NEW_PART, sold]));
+    expect(await visit("support-used-1")).toBe("REDIRECT:/parts/support-new?v=A4634210098-U1");
+  });
+
+  it("когда новый снят, хозяином становится б/у", async () => {
+    const soldNew = { ...NEW_PART, isActive: false };
+    findUnique.mockResolvedValue(withReference(soldNew, [soldNew, USED_PART]));
+    expect(await visit("support-new")).toBe("REDIRECT:/parts/support-used-1?v=A4634210098");
+  });
+
+  it("деталь без активных вариантов вовсе — «не найдена»", async () => {
+    const soldNew = { ...NEW_PART, isActive: false };
+    findUnique.mockResolvedValue(withReference(soldNew, [soldNew]));
+    expect(await visit("support-new")).toBe("NOTFOUND");
   });
 });
