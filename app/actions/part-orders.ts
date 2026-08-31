@@ -1,7 +1,7 @@
 "use server";
 
 import { db } from "@/lib/db";
-import { syncSoldOutUsedPart } from "@/lib/parts/sold-out";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { getSession } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
@@ -178,7 +178,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
         // Б/у экземпляр физически один: после списания он продан, а не «под
         // заказ». Снимаем с витрины в ТОЙ ЖЕ транзакции — иначе между
         // списанием и снятием второй покупатель видит уже проданную деталь.
-        await syncSoldOutUsedPart(tx as never, item.partId);
+        await syncSoldOutUsedPart(tx as unknown as SoldOutClient, item.partId);
       }
 
       const customer = (await tx.user.findUnique({

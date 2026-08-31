@@ -4,6 +4,7 @@
 // the manager review→post gate. Thin wrappers over lib/wms/public/stocktake;
 // counting is WAREHOUSE_WORKER-allowed, posting is ADMIN/MANAGER only.
 import { requireRole } from "@/lib/auth";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { db } from "@/lib/db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
@@ -225,7 +226,23 @@ export async function postCountSessionAction(sessionId: string): Promise<{
 }> {
   const session = await requireRole(POST_ROLES);
   try {
+    // Позиции сессии читаем ДО проводки: после неё строки могут быть
+    // недоступны, а нам нужны id товаров, чьи остатки изменились.
+    const counted = (await db.stockCountLine.findMany({
+      where: { sessionId, itemId: { not: null } },
+      select: { itemId: true },
+    })) as Array<{ itemId: string | null }>;
+
     await postCountSession(db, { sessionId, actorId: actorId(session), tenantKey: TENANT_KEY });
+
+    // Пересчёт не нашёл б/у в ячейке — остаток ушёл в ноль, и на витрине
+    // висела бы деталь, которой физически нет. Ровно тот случай, ради
+    // которого правило вводилось.
+    // Врезка на стороне приложения, а НЕ в ядре WMS: ядро оперирует
+    // количествами и о состоянии товара не знает.
+    for (const id of new Set(counted.map((c) => c.itemId).filter((x): x is string => !!x))) {
+      await syncSoldOutUsedPart(db as unknown as SoldOutClient, id);
+    }
     return { error: null };
   } catch (e) {
     if (e instanceof WmsError) {

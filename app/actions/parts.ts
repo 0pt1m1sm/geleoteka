@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { duplicateNewPartWhere, newPartSku, nextUsedSku } from "@/lib/part-sku";
-import { syncSoldOutUsedPart } from "@/lib/parts/sold-out";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import {
   isPartCondition,
   CONDITION_NOTE_MAX,
@@ -244,6 +244,9 @@ export async function createPart(
       await tx.stockItem.create({
         data: { partId: created.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
       });
+      // Б/у, заведённый с нулевым остатком, попал бы на витрину активным и
+      // пустым: форма ставит 1 по умолчанию, но нуля не запрещает.
+      await syncSoldOutUsedPart(tx as unknown as SoldOutClient, created.id);
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -282,7 +285,12 @@ export async function updatePart(
   const description = (formData.get("description") as string)?.trim() || null;
   const compareAtPrice = parseInt(formData.get("compareAtPrice") as string) || null;
   const weightGrams = parseWeightGrams(formData.get("weightKg"));
-  const isActive = formData.get("isActive") !== "off";
+  // === "on", а НЕ !== "off": незачёканный чекбокс браузер не отправляет
+  // вовсе, поэтому прежняя проверка всегда давала true — снять товар с витрины
+  // через форму было нельзя в принципе. После Story 4 это стало опаснее:
+  // isActive несёт признак «продано», и любая правка карточки возвращала
+  // проданный экземпляр в продажу. Соседнее поле isOEM написано правильно.
+  const isActive = formData.get("isActive") === "on";
   const barcode = (formData.get("barcode") as string)?.trim() || null;
   const gtin = (formData.get("gtin") as string)?.trim() || null;
   const { ids: trimIds, error: trimErr } = await parseTrimIds(formData.get("trimIds"));
@@ -394,8 +402,13 @@ export async function updatePart(
       });
       // Ручная корректировка тоже может обнулить б/у экземпляр — например при
       // списании брака. Правило одно на все пути изменения остатка.
-      await syncSoldOutUsedPart(tx as never, partId);
+
     }
+
+    // Безусловно, а не внутри if (delta !== 0): у проданного экземпляра
+    // остаток уже ноль, дельта нулевая, и синхронизация не запускалась бы —
+    // то есть правка карточки молча возвращала бы его на витрину.
+    await syncSoldOutUsedPart(tx as unknown as SoldOutClient, partId);
     // Assign/clear barcode + gtin on the StockItem (per-field uniqueness).
     await assignCodes(tx, partId, barcode, gtin);
     await tx.partTrim.deleteMany({ where: { partId } });

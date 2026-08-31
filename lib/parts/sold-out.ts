@@ -27,7 +27,7 @@ export function shouldDeactivateSoldOut({
 }
 
 /** Минимум, который нужен от клиента Prisma (клиент генерируется с @ts-nocheck). */
-interface SoldOutClient {
+export interface SoldOutClient {
   part: {
     findUnique(args: unknown): Promise<unknown>;
     update(args: unknown): Promise<unknown>;

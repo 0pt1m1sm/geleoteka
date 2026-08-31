@@ -1,4 +1,5 @@
 import { recordMovement, placeStock, removeFromBin, WmsError, type DbClientPort } from "@/lib/wms/public";
+import { syncSoldOutUsedPart, type SoldOutClient } from "../parts/sold-out";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export type SupplierOrderStatus =
@@ -130,6 +131,7 @@ export async function applyReceive(client: DbClientPort, input: ApplyReceiveInpu
     actorId,
     tenantKey: TENANT_KEY,
   });
+
   // Defense-in-depth: a no-op here means the ledger refused the write while the
   // CAS already advanced — abort so the caller's transaction rolls everything back.
   if (!mv.applied) throw WmsError.duplicateOperation();
@@ -269,6 +271,11 @@ export async function applyUndoReceive(
     actorId,
     tenantKey: TENANT_KEY,
   });
+
+  // Сторно уводит остаток ВНИЗ: б/у, оприходованный по ошибке, не должен
+  // остаться на витрине с нулём. В приёмке врезка не нужна — она остаток
+  // только увеличивает.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, line.partId);
   if (!mv.applied) throw WmsError.duplicateOperation();
   // Post-image re-check: the pre-image reserved guard above can be raced by a
   // concurrent RESERVATION; recordMovement returns the post-delta counters, so

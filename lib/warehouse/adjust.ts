@@ -1,4 +1,5 @@
 import { recordMovement, binsForItem, type DbClientPort } from "@/lib/wms/public";
+import { syncSoldOutUsedPart, type SoldOutClient } from "../parts/sold-out";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 export interface AdjustResult {
@@ -56,6 +57,10 @@ export async function applyAdjustment(
     idempotencyKey,
     tenantKey: TENANT_KEY,
   });
+
+  // Кладовщик, выставляющий 0 после боя или утери, тоже продаёт экземпляр «в
+  // ноль» — с витрины его надо убрать так же, как после продажи.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, partId);
 
   if (result.quantity < placed) {
     // Reducing on-hand below placed would strand stock in bins it no longer

@@ -2,6 +2,7 @@
 // movements. Bridges CRM (the deal's APPROVED estimate PART lines) and the WMS
 // core (recordMovement). NOT part of lib/wms — it knows about Estimate/Deal.
 import { consumeStock, type DbClientPort } from "@/lib/wms/public";
+import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
 interface ConsumeInput {
@@ -53,5 +54,9 @@ export async function consumeApprovedEstimateParts(
       actorId: input.actorId,
       tenantKey: TENANT_KEY,
     });
+    // Главный путь расхода для сервиса: б/у узел ставят клиенту по ремонт-
+    // ордеру. Без снятия с витрины следующий покупатель кладёт проданную
+    // деталь в корзину и упирается в «недостаточно на складе» на оформлении.
+    await syncSoldOutUsedPart(client as unknown as SoldOutClient, line.partId);
   }
 }
