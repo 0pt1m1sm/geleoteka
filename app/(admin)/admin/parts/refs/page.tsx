@@ -75,12 +75,22 @@ function RefCard({ r }: { r: RefRow }): React.ReactElement {
             в магазине
           </Link>
         ) : (
-          <Link
-            href={`/admin/parts/new?ref=${r.id}`}
-            className="btn btn-secondary btn-sm text-xs"
-          >
-            Создать товар
-          </Link>
+          // Оба пути и здесь: у номенклатуры чистого разбора нового товара нет
+          // и не появится, а завести б/у экземпляр надо.
+          <div className="flex gap-1">
+            <Link
+              href={`/admin/parts/new?ref=${r.id}&condition=USED`}
+              className="btn btn-secondary btn-sm text-xs"
+            >
+              Б/у
+            </Link>
+            <Link
+              href={`/admin/parts/new?ref=${r.id}`}
+              className="btn btn-secondary btn-sm text-xs"
+            >
+              Создать товар
+            </Link>
+          </div>
         )}
         <PartRefDeleteButton id={r.id} name={r.name} />
       </div>

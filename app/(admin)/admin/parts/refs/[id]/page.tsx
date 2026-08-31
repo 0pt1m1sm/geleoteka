@@ -214,9 +214,23 @@ export default async function PartRefDetailPage({ params }: Props) {
             <p className="text-sm text-[var(--foreground-muted)]">
               Товара с этим номером в магазине ещё нет.
             </p>
-            <Link href={`/admin/parts/new?ref=${ref.id}`} className="btn btn-primary btn-sm shrink-0">
-              Создать товар
-            </Link>
+            {/* Оба пути, а не только «новый». Деталь, которой у нас нет и не
+                будет новой, — это ТИПИЧНЫЙ случай разбора: у номенклатуры нет
+                и никогда не появится нового товара, а б/у экземпляры есть.
+                Раньше отсюда предлагалось только «Создать товар», и путь к
+                б/у существовал лишь через ручное переключение состояния в
+                форме — то есть интерфейс вёл мимо главного сценария. */}
+            <div className="flex gap-2 shrink-0">
+              <Link
+                href={`/admin/parts/new?ref=${ref.id}&condition=USED`}
+                className="btn btn-secondary btn-sm"
+              >
+                Добавить б/у экземпляр
+              </Link>
+              <Link href={`/admin/parts/new?ref=${ref.id}`} className="btn btn-primary btn-sm">
+                Создать товар
+              </Link>
+            </div>
           </div>
         )}
       </Card>
