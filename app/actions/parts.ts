@@ -60,7 +60,6 @@ function parseWeightGrams(raw: unknown): number | null {
   return Math.min(Math.round(kg * 1000), MAX_WEIGHT_GRAMS);
 }
 
-
 /** Нарушение уникального индекса Prisma. Клиент генерируется с @ts-nocheck,
  *  поэтому типизированного PrismaClientKnownRequestError под рукой нет —
  *  распознаём по коду, как это делается в остальных экшенах. */

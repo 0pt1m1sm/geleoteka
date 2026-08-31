@@ -38,7 +38,20 @@ describe("полнота охвата правила снятия проданн
   it.each(MUST_SYNC)("%s зовёт syncSoldOutUsedPart", (rel) => {
     expect(read(rel)).toContain("syncSoldOutUsedPart(");
   });
+});
 
+/**
+ * Файлы с движением остатка, которые правило НЕ зовут — и это верно, потому что
+ * они остаток только увеличивают либо трогают резерв, а не количество.
+ * Список закрытый: любой новый файл с движением обязан попасть либо сюда, либо
+ * в MUST_SYNC — осознанно, а не по умолчанию.
+ */
+const REVIEWED_INCREASE_ONLY = [
+  "lib/fulfillment/reservations.ts", // RESERVATION/RELEASE меняют reserved, не quantity
+  "lib/warehouse/scan-receive.ts", // приёмка по скану только увеличивает
+];
+
+describe("замыкание списка путей", () => {
   it("новых путей расхода не появилось без ведома этого теста", () => {
     // Обходим прикладной слой в поисках движений остатка вниз. Ядро WMS
     // (lib/wms) исключено намеренно: правило туда не кладём.
@@ -53,14 +66,31 @@ describe("полнота охвата правила снятия проданн
           // consumeStock всегда уменьшает остаток; recordMovement может и
           // увеличивать, поэтому его одного мало для вывода — но файл с ним
           // обязан быть осознанно рассмотрен.
-          if (src.includes("consumeStock(") && !src.includes("syncSoldOutUsedPart(")) {
-            found.push(rel);
-          }
+          // Ищем ОБА примитива, а не только consumeStock: из четырёх дефектов,
+          // ради которых написан этот сторож, три шли через recordMovement —
+          // проверка по одному consumeStock поймала бы лишь один.
+          const moves = src.includes("consumeStock(") || src.includes("recordMovement(");
+          if (moves && !src.includes("syncSoldOutUsedPart(")) found.push(rel);
         }
       }
     };
     for (const d of suspects) walk(d);
-    const unknown = found.filter((f) => !MUST_SYNC.includes(f));
-    expect(unknown, "списание остатка без снятия проданного б/у с витрины").toEqual([]);
+    const unknown = found.filter(
+      (f) => !MUST_SYNC.includes(f) && !REVIEWED_INCREASE_ONLY.includes(f),
+    );
+    expect(
+      unknown,
+      "движение остатка без снятия проданного б/у: добавьте вызов правила либо " +
+        "внесите файл в REVIEWED_INCREASE_ONLY с обоснованием",
+    ).toEqual([]);
+  });
+
+  it("слепое пятно названо явно, чтобы список не считали полным автоматически", () => {
+    // Прикладной файл может двигать остаток, НЕ называя ни один примитив —
+    // так делает app/actions/stocktake.ts, где движение живёт в ядре WMS.
+    // Такой путь sweep не найдёт: его обязан заметить человек.
+    expect(MUST_SYNC).toContain("app/actions/stocktake.ts");
+    const src = read("app/actions/stocktake.ts");
+    expect(src.includes("consumeStock(") || src.includes("recordMovement(")).toBe(false);
   });
 });

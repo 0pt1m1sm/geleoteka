@@ -271,11 +271,6 @@ export async function applyUndoReceive(
     actorId,
     tenantKey: TENANT_KEY,
   });
-
-  // Сторно уводит остаток ВНИЗ: б/у, оприходованный по ошибке, не должен
-  // остаться на витрине с нулём. В приёмке врезка не нужна — она остаток
-  // только увеличивает.
-  await syncSoldOutUsedPart(client as unknown as SoldOutClient, line.partId);
   if (!mv.applied) throw WmsError.duplicateOperation();
   // Post-image re-check: the pre-image reserved guard above can be raced by a
   // concurrent RESERVATION; recordMovement returns the post-delta counters, so
@@ -283,6 +278,12 @@ export async function applyUndoReceive(
   // hold (security-review hardening — no physical loss either way, the DB
   // CHECK floors quantity at 0).
   if (mv.quantity < mv.reserved) throw WmsError.reconcileBlocked(line.partId);
+
+  // ПОСЛЕ обоих гардов (идемпотентность и post-image): вызов принадлежит
+  // месту, где исход окончателен, а не месту, откуда его ещё могут отменить.
+  // Сторно уводит остаток ВНИЗ — в самой приёмке врезка не нужна, она остаток
+  // только увеличивает.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, line.partId);
 
   const lines = (await client.supplierOrderItem.findMany({
     where: { orderId, type: "PART" },

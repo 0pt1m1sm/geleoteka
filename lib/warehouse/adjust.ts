@@ -58,9 +58,6 @@ export async function applyAdjustment(
     tenantKey: TENANT_KEY,
   });
 
-  // Кладовщик, выставляющий 0 после боя или утери, тоже продаёт экземпляр «в
-  // ноль» — с витрины его надо убрать так же, как после продажи.
-  await syncSoldOutUsedPart(client as unknown as SoldOutClient, partId);
 
   if (result.quantity < placed) {
     // Reducing on-hand below placed would strand stock in bins it no longer
@@ -72,6 +69,10 @@ export async function applyAdjustment(
     // drive on-hand below 0 / below reserved. Throwing aborts the tx.
     throw new Error("NEGATIVE_ON_HAND");
   }
+
+  // ПОСЛЕ гардов PLACED_EXCEEDS_ONHAND и NEGATIVE_ON_HAND: вызов принадлежит
+  // месту, где исход окончателен, а не месту, откуда его ещё могут отменить.
+  await syncSoldOutUsedPart(client as unknown as SoldOutClient, partId);
 
   return { quantity: result.quantity, reserved: result.reserved, available: result.available };
 }
