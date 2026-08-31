@@ -151,7 +151,10 @@ describe("staff notification router", () => {
       staffNotificationTypesForPermissions(
         new Set(["notifications.view", "parts.manage"]),
       ),
-    ).toEqual(["PARTS_ORDER_CREATED"]);
+      // Обе категории живут на праве parts.manage: заказ запчастей и заявка
+      // «сообщить о поступлении». Список исчерпывающий намеренно — новая
+      // категория обязана быть замечена здесь, а не появиться молча.
+    ).toEqual(["PARTS_ORDER_CREATED", "PART_REQUEST_CREATED"]);
     expect(staffNotificationTypesForPermissions(new Set(["parts.manage"]))).toEqual([]);
   });
 
