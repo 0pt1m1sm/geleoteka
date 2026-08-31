@@ -9,6 +9,9 @@ export interface ResolvedGenerations {
   ids: string[];
   /** Коды, которых нет в каталоге (в нормализованном виде). */
   unknown: string[];
+  /** Тот же результат с привязкой id к конкретному коду — нужно там, где
+   *  применяемость сохраняется отдельно на каждый код (батч-импорт). */
+  byCode: Map<string, string>;
 }
 
 /**
@@ -58,7 +61,7 @@ export async function ensurePartReference(
 
 export async function resolveGenerationIds(codes: readonly string[]): Promise<ResolvedGenerations> {
   const normalized = [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))];
-  if (normalized.length === 0) return { ids: [], unknown: [] };
+  if (normalized.length === 0) return { ids: [], unknown: [], byCode: new Map() };
 
   const candidates = expandGenerationCodes(normalized);
   const gens = (await db.vehicleGeneration.findMany({
@@ -68,11 +71,13 @@ export async function resolveGenerationIds(codes: readonly string[]): Promise<Re
   const byCode = new Map(gens.map((g) => [g.code.toUpperCase(), g]));
 
   const ids = new Set<string>();
+  const resultByCode = new Map<string, string>();
   const unknown: string[] = [];
   for (const code of normalized) {
     const exact = byCode.get(code);
     if (exact) {
       ids.add(exact.id);
+      resultByCode.set(code, exact.id);
       continue;
     }
     const viaAlias = expandGenerationCodes([code])
@@ -80,9 +85,10 @@ export async function resolveGenerationIds(codes: readonly string[]): Promise<Re
       .find(Boolean);
     if (viaAlias) {
       ids.add(viaAlias.id);
+      resultByCode.set(code, viaAlias.id);
     } else {
       unknown.push(code);
     }
   }
-  return { ids: [...ids], unknown };
+  return { ids: [...ids], unknown, byCode: resultByCode };
 }

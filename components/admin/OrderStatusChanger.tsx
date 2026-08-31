@@ -35,6 +35,7 @@ export function OrderStatusChanger({
     <select
       value={currentStatus}
       onChange={handleChange}
+      aria-label="Статус заказа запчастей"
       className="input text-xs py-1 px-2 w-auto"
     >
       {STATUSES.map((s) => (

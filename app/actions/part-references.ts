@@ -176,16 +176,10 @@ export async function importPartReferencesCsv(
 
   // Один резолв на весь батч: собрать все коды, спросить каталог один раз.
   const allCodes = [...new Set(rows.flatMap((r) => r.models.map((c) => c.toUpperCase())))];
-  const resolvedByCode = new Map<string, string>();
-  const unknownCodes = new Set<string>();
-  for (const code of allCodes) {
-    const { ids, unknown } = await resolveGenerationIds([code]);
-    if (ids.length > 0) resolvedByCode.set(code, ids[0]);
-    for (const u of unknown) unknownCodes.add(u);
-  }
-  if (unknownCodes.size > 0) {
+  const { byCode: resolvedByCode, unknown: unknownCodes } = await resolveGenerationIds(allCodes);
+  if (unknownCodes.length > 0) {
     errors.push(
-      `Кузовов нет в каталоге, применяемость пропущена: ${[...unknownCodes].join(", ")}`,
+      `Кузовов нет в каталоге, применяемость пропущена: ${unknownCodes.join(", ")}`,
     );
   }
 

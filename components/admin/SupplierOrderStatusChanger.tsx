@@ -29,8 +29,12 @@ export function SupplierOrderStatusChanger({
   const router = useRouter();
 
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    await updateSupplierOrderStatus(orderId, e.target.value);
-    toast.success("Статус заказа обновлён");
+    try {
+      await updateSupplierOrderStatus(orderId, e.target.value);
+      toast.success("Статус заказа обновлён");
+    } catch {
+      toast.error("Не удалось обновить статус заказа");
+    }
     router.refresh();
   }
 
@@ -44,7 +48,12 @@ export function SupplierOrderStatusChanger({
   }
 
   return (
-    <select value={currentStatus} onChange={handleChange} className="input text-sm w-auto">
+    <select
+      value={currentStatus}
+      onChange={handleChange}
+      aria-label="Статус заказа поставщику"
+      className="input text-sm w-auto"
+    >
       {STATUSES.map((s) => (
         <option key={s} value={s}>
           {LABELS[s]}

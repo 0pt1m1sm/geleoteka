@@ -26,7 +26,12 @@ export function RentalStatusChanger({ bookingId, currentStatus }: { bookingId: s
   }
 
   return (
-    <select value={currentStatus} onChange={handleChange} className="input text-xs py-1 px-2 w-auto mt-1">
+    <select
+      value={currentStatus}
+      onChange={handleChange}
+      aria-label="Статус бронирования аренды"
+      className="input text-xs py-1 px-2 w-auto mt-1"
+    >
       {STATUSES.map((s) => (
         <option key={s} value={s}>{LABELS[s]}</option>
       ))}
