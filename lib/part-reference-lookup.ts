@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { expandGenerationCodes, normalizeOem, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+import { expandGenerationCodes, isLatinOem, oemKey, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 
 /** Транзакционный или глобальный клиент Prisma — хелперам достаточно делегатов моделей. */
 type DbLike = typeof db | Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -40,8 +40,17 @@ export async function ensurePartReference(
   { article, name, groupName, generationIds }: EnsureReferenceInput,
 ): Promise<string | null> {
   if (SERVICE_ARTICLE_RE.test(article)) return null;
-  const oem = normalizeOem(article);
-  if (!oem) return null;
+  // oemKey, а НЕ normalizeOem: здесь строится ключ справочника, а не база sku.
+  // Через эту функцию проходит основной путь — заведение товара, включая «завести
+  // б/у». Пока тут стояла обычная нормализация, артикул, набранный в русской
+  // раскладке, создавал ВТОРУЮ номенклатуру на тот же номер (в уникальном
+  // индексе «А» и «A» разные ключи), и товар оказывался привязан к двойнику:
+  // заведение выглядело успешным, а на странице своего номера позиции не было.
+  const oem = oemKey(article);
+  // Кириллица без латинского двойника — грубая ошибка ввода. Молча заводить по
+  // такому ключу нельзя: адрес страницы по номеру принимает только латиницу, и
+  // canonical карточки повёл бы на 404.
+  if (!oem || !isLatinOem(oem)) return null;
   const ref = (await client.partReference.upsert({
     where: { oem },
     create: {
