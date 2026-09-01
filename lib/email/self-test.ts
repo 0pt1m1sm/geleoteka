@@ -48,7 +48,19 @@ interface VerifiableTransporter {
 export interface ReachabilityDeps {
   /** Подменяется в тестах; по умолчанию — nodemailer. */
   createTransporter?: (options: Record<string, unknown>) => Promise<VerifiableTransporter> | VerifiableTransporter;
+  /**
+   * Проверить другой порт вместо настроенного. Нужно, когда провайдер режет
+   * один порт и пропускает другой: 465 может молчать, а 587 работать, и это
+   * выясняется пробой, а не догадкой.
+   *
+   * ХОСТ подменить нельзя намеренно: иначе внутренняя ручка превратилась бы в
+   * сканер чужих портов нашими руками. Порт — только из списка почтовых.
+   */
+  portOverride?: number;
 }
+
+/** Порты, на которые вообще имеет смысл стучаться почтой. */
+export const PROBE_PORTS: readonly number[] = [465, 587, 2525, 25];
 
 /** Ошибку приводим к классу по коду nodemailer/сокета, а не по тексту. */
 export function classifyVerifyError(err: unknown): ReachabilityCode {
@@ -104,8 +116,22 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
   }
 
   const host = hostRaw?.trim() || DEFAULT_SMTP_HOST;
-  const port = parsePort(portRaw);
-  const secure = secureRaw === undefined || secureRaw === null ? port === 465 : parseBool(secureRaw, port === 465);
+  const configuredPort = parsePort(portRaw);
+  const override = deps.portOverride;
+  if (override !== undefined && !PROBE_PORTS.includes(override)) {
+    return { transport, host, port: null, code: "not_applicable", ok: false };
+  }
+  const port = override ?? configuredPort;
+  // Неявный TLS только на 465; на прочих портах соединение начинается открытым
+  // и обязано подняться через STARTTLS — иначе доступы ушли бы по чистому
+  // каналу. Настройка secure учитывается лишь для настроенного порта: у пробы
+  // режим определяет сам порт.
+  const secure =
+    override !== undefined
+      ? override === 465
+      : secureRaw === undefined || secureRaw === null
+        ? port === 465
+        : parseBool(secureRaw, port === 465);
 
   const make = deps.createTransporter ?? defaultCreateTransporter;
   try {
