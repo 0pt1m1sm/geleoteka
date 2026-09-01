@@ -1,5 +1,6 @@
 import "server-only";
 import { getSetting } from "@/lib/settings";
+import { getCMSText } from "@/lib/cms";
 
 interface SmsSendResult {
   success: boolean;
@@ -85,8 +86,18 @@ export async function sendReminder(
   daysBefore: number,
 ): Promise<SmsSendResult> {
   const prefix = daysBefore === 0 ? "Сегодня" : "Завтра";
-  return sendSms(
-    phone,
-    `Geleoteka: ${prefix} у вас запись на ${timeStr}. Ждём вас по адресу: Химки, Пролетарская ул., 18к1. Тел: +7(963)768-06-42`,
-  );
+  // Адрес и телефон БЕРУТСЯ ИЗ CMS, а не вписаны сюда.
+  //
+  // Раньше они были зашиты в текст. Для сайта устаревший адрес — неточность,
+  // которую видно и можно поправить; в напоминании это хуже всего, что бывает:
+  // человек садится в машину и едет по нему. При переезде сервиса такое СМС
+  // продолжало бы отправлять клиентов на старое место, пока кто-нибудь не
+  // вспомнит про эту строку, — а вспомнить про неё неоткуда, она не на виду.
+  const [address, phoneNumber] = await Promise.all([
+    getCMSText("contacts.address"),
+    getCMSText("contacts.phone.service"),
+  ]);
+  const where = address ? ` Ждём вас по адресу: ${address}.` : "";
+  const tel = phoneNumber ? ` Тел: ${phoneNumber}` : "";
+  return sendSms(phone, `Geleoteka: ${prefix} у вас запись на ${timeStr}.${where}${tel}`);
 }
