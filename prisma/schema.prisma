@@ -219,6 +219,33 @@ model InboundAttempt {
 /// falls back to process.env when the row is missing — so existing
 /// env-var-driven config keeps working until an admin overrides it
 /// through /admin/settings/integrations.
+// ============================================
+// АРЕНДАТОРЫ ПЛАТФОРМЫ
+// ============================================
+
+enum TenantStatus {
+  ACTIVE // обслуживается
+  SUSPENDED // доступ приостановлен, данные сохранены
+}
+
+/// Автосервис на платформе. Текущая установка — первая строка этой таблицы.
+///
+/// `key` — стабильный внешний ключ («geleoteka»), тот же, что раньше жил
+/// константой в lib/tenant.ts и значением по умолчанию у колонок tenantKey.
+/// Он остаётся человекочитаемым нарочно: по нему сходятся конфиг, домен и
+/// логи. Внутренние связи в следующих историях пойдут по `id`, а не по нему —
+/// переименование сервиса не должно означать миграцию всех таблиц.
+model Tenant {
+  id        String       @id @default(cuid())
+  key       String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @default(now()) @updatedAt
+
+  @@index([status])
+}
+
 model Setting {
   id              String   @id @default(cuid())
   key             String   @unique

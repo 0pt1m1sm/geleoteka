@@ -44,6 +44,7 @@ const C = (parent: string, why?: string): ModelClassification => ({
 
 export const MODEL_CLASSIFICATION: Readonly<Record<string, ModelClassification>> = {
   // ── Справочники платформы ──────────────────────────────────────────────────
+  Tenant: G("реестр арендаторов: сам по себе не принадлежит ни одному из них"),
   Manufacturer: G("марка автомобиля одинакова для всех сервисов"),
   VehicleModel: G(),
   VehicleGeneration: G(),

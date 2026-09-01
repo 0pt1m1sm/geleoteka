@@ -30,7 +30,7 @@ Type: Architecture
 ## Progress Tracking
 
 - [x] Story 1: Классификация моделей и сторож на неклассифицированные   (Status: VERIFIED — 79 моделей размечены, сторож читает схему и падает на новой таблице без класса; три мутанта проверены)
-- [ ] Story 2: Модель `Tenant` и запись «geleoteka»   (Status: PENDING)
+- [x] Story 2: Модель `Tenant` и запись «geleoteka»   (Status: VERIFIED — таблица заведена аддитивно, строка вставляется миграцией идемпотентно, резолвер с кэшем и внятным отказом при недокатанной миграции; три мутанта)
 - [ ] Story 3: `tenantId` аддитивно на корневых сущностях   (Status: PENDING)
 - [ ] Story 4: `tenantId` на дочерних + составные ключи   (Status: PENDING)
 - [ ] Story 5: Шов изоляции `withTenant` и негативные тесты   (Status: PENDING)

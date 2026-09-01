@@ -175,6 +175,15 @@ const cmsBlocks: CMSSeedRow[] = (Object.keys(CMS_SCHEMA) as Array<keyof typeof C
 );
 
 async function main(): Promise<void> {
+  // Арендатор установки — первым: на него будут ссылаться остальные данные.
+  // Идемпотентно, чтобы сид можно было гонять поверх боевой базы.
+  await prisma.tenant.upsert({
+    where: { key: "geleoteka" },
+    update: {},
+    create: { id: "tenant_geleoteka", key: "geleoteka", name: "Гелеотека" },
+  });
+  console.log("Tenant geleoteka ensured");
+
   console.log("Seeding database...");
 
   // Services
