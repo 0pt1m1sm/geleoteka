@@ -57,12 +57,16 @@ export async function addEstimateLine(
   // Номенклатурная связь строки: приходит от пикера справочника; для строки
   // с товаром выводится из самого товара, чтобы нить не зависела от клиента.
   let referenceId = ((formData.get("referenceId") as string | null) ?? "").trim() || null;
-  if (!referenceId && partId) {
+  // Состояние берётся СНИМКОМ и с сервера, а не из формы: клиент прислал бы
+  // что угодно, а строка сметы — исторический документ.
+  let conditionSnapshot: "NEW" | "USED" | "REFURBISHED" | null = null;
+  if (partId) {
     const part = (await db.part.findUnique({
       where: { id: partId },
-      select: { referenceId: true },
-    })) as { referenceId: string | null } | null;
-    referenceId = part?.referenceId ?? null;
+      select: { referenceId: true, condition: true },
+    })) as { referenceId: string | null; condition: "NEW" | "USED" | "REFURBISHED" } | null;
+    referenceId = referenceId ?? part?.referenceId ?? null;
+    conditionSnapshot = part?.condition ?? null;
   }
 
   const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
@@ -76,7 +80,18 @@ export async function addEstimateLine(
 
   await db.$transaction(async (tx) => {
     const line = (await tx.estimateLine.create({
-      data: { estimateId, sortOrder, type: type as never, description, qty, unitPrice, total, partId, referenceId },
+      data: {
+        estimateId,
+        sortOrder,
+        type: type as never,
+        description,
+        qty,
+        unitPrice,
+        total,
+        partId,
+        referenceId,
+        conditionSnapshot: conditionSnapshot as never,
+      },
       select: { id: true },
     })) as { id: string };
     // A catalog PART line holds reserved stock equal to its qty.

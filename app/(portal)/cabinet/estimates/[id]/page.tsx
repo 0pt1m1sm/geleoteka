@@ -77,6 +77,9 @@ export default async function CabinetEstimateDetailPage({ params }: Props) {
           qty: true,
           unitPrice: true,
           total: true,
+          // Клиент обязан видеть, что согласовывает б/у: для такой детали
+          // состояние и есть предмет согласования.
+          conditionSnapshot: true,
         },
       },
       deal: {

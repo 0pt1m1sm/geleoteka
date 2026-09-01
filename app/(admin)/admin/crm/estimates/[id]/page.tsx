@@ -106,6 +106,9 @@ export default async function EstimateDetailPage({ params }: Props) {
           qty: true,
           unitPrice: true,
           total: true,
+          // Менеджер должен видеть состояние в собранной смете, а не только в
+          // момент выбора: артикул у нового и у б/у один и тот же.
+          conditionSnapshot: true,
         },
       },
       revisions: {

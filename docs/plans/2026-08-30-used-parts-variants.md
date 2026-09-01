@@ -1,7 +1,7 @@
 # Продажа б/у запчастей через варианты товара — Implementation Plan
 
 Created: 2026-08-30
-Status: IN_PROGRESS
+Status: VERIFIED
 Mode: auto
 Iterations: 14
 Type: Feature
@@ -37,7 +37,7 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 - [x] Story 4: Снятие проданного б/у с витрины (Status: VERIFIED)
 - [x] Story 5: SEO-контур — одна индексируемая страница на номенклатуру (Status: VERIFIED)
 - [x] Story 6: Страница по номеру детали и заявки о поступлении (Status: VERIFIED)
-- [ ] Story 7: Б/у в смете (Status: PENDING)
+- [x] Story 7: Б/у в смете (Status: VERIFIED)
 
 ## Implementation Tasks
 
@@ -228,6 +228,8 @@ PRD: `docs/prd/2026-08-30-used-parts-variants.md` (Status: Final, утвержд
 
 
 ### Story 7: Б/у в смете
+
+**Status: VERIFIED** — сделана 01.09. Пикер отдаёт состояние, sku и заметку; строка сметы хранит СНИМОК состояния (миграция `20260901120000_estimate_line_condition`, nullable, без backfill); состояние видно менеджеру в редакторе и клиенту в форме согласования. Обе половины проверены мутантами: с потерянным состоянием в пикере краснеют три теста, с непишущимся снимком — два.
 
 **ПОСТАНОВКА ЗАКРЫТА 2026-08-31.** Прежний DoD выполнялся уже сегодня — см. Р6.
 

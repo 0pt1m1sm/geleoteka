@@ -20,6 +20,10 @@ interface EstimateLine {
   qty: number;
   unitPrice: number;
   total: number;
+  /** Снимок состояния на момент добавления. Клиент обязан видеть, что
+   *  согласовывает б/у: для б/у детали состояние и есть предмет согласования,
+   *  и цена в строке — цена ИМЕННО за неё. */
+  conditionSnapshot?: "NEW" | "USED" | "REFURBISHED" | null;
 }
 
 interface EstimateView {
@@ -159,7 +163,14 @@ export function CustomerEstimateView({
                 <td className="px-4 py-2 text-xs text-[var(--foreground-muted)]">
                   {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
                 </td>
-                <td className="px-4 py-2">{line.description}</td>
+                <td className="px-4 py-2">
+                  {line.description}
+                  {line.conditionSnapshot && line.conditionSnapshot !== "NEW" && (
+                    <span className="badge text-[10px] ml-2 align-middle">
+                      {line.conditionSnapshot === "USED" ? "Б/у" : "Восстановленная"}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-2 text-right tabular-nums">{line.qty}</td>
                 <td className="px-4 py-2 text-right tabular-nums">
                   {formatPrice(line.unitPrice)}

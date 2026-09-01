@@ -160,8 +160,28 @@ export function EstimatePartPicker({ estimateId }: { estimateId: string }): Reac
                     className="w-full text-left py-2 px-1 flex items-center justify-between gap-3 hover:bg-[var(--background-secondary)] disabled:opacity-50"
                   >
                     <span className="min-w-0">
-                      <span className="block text-sm truncate">{o.name}</span>
-                      <span className="block text-xs font-mono text-[var(--foreground-muted)]">{o.article}</span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm truncate">{o.name}</span>
+                        {/* Состояние — не украшение. Артикул у нового товара и
+                            у каждого б/у экземпляра ОДИН И ТОТ ЖЕ (так задумано
+                            схемой), а поиск идёт в том числе по нему: без метки
+                            механик видел несколько почти одинаковых строк и
+                            выбирал наугад. */}
+                        {o.condition !== "NEW" && (
+                          <span className="badge text-[10px] shrink-0">
+                            {o.condition === "USED" ? "Б/у" : "Восстановленная"}
+                          </span>
+                        )}
+                      </span>
+                      <span className="block text-xs font-mono text-[var(--foreground-muted)]">
+                        {/* У двух б/у экземпляров совпадает всё, кроме sku. */}
+                        {o.condition === "NEW" ? o.article : o.sku}
+                      </span>
+                      {o.conditionNote && (
+                        <span className="block text-xs text-[var(--foreground-muted)] truncate">
+                          {o.conditionNote}
+                        </span>
+                      )}
                     </span>
                     <span className="text-right shrink-0">
                       <span className="block text-sm tabular-nums">{formatPrice(o.price)}</span>
