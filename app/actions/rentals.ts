@@ -370,7 +370,7 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
         },
         { getCMSText },
       ] = await Promise.all([import("@/lib/email"), import("@/lib/cms")]);
-      const pickupAddress = (await getCMSText("contacts.address")) || "Москва, ул. Примерная, 15";
+      const pickupAddress = (await getCMSText("contacts.address")) || "";
       const vehicleSummary = `${vehicle.make ?? "Mercedes-Benz"} ${vehicle.model}${vehicle.year ? ` ${vehicle.year} г.` : ""}`;
       const subject = "Geleoteka — бронь автомобиля подтверждена";
       const bodyText = `Здравствуйте, ${contactName}. Бронь ${vehicleSummary} на ${days} дн. подтверждена. Сумма: ${(totalCost / 100).toLocaleString("ru-RU")} ₽.`;

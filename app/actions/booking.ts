@@ -212,10 +212,13 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
         { sendBookingConfirmationEmail, generateOutboundMessageId, recordOutboundEmail, markOutboundEmailFailed, markOutboundEmailSent, isPlausibleEmail },
         { getCMSText },
       ] = await Promise.all([import("@/lib/email"), import("@/lib/cms")]);
-      const address = (await getCMSText("contacts.address")) || "Москва, ул. Примерная, 15";
+      const address = (await getCMSText("contacts.address")) || "";
       const dateLabel = `${bookingDay} в ${bookingTime}`;
       const subject = `Geleoteka — запись на ${dateLabel}`;
-      const bodyText = `Здравствуйте, ${name}. Записываем ваш ${model} ${year} г. на ${dateLabel} по адресу: ${address}. Услуги: ${services.map((s: { name: string }) => s.name).join(", ")}.`;
+      // Адрес подставляется, ТОЛЬКО если он задан: «по адресу: .» в письме
+      // клиенту выглядит как сбой, а во время переезда поле может быть пустым.
+      const where = address ? ` по адресу: ${address}` : "";
+      const bodyText = `Здравствуйте, ${name}. Записываем ваш ${model} ${year} г. на ${dateLabel}${where}. Услуги: ${services.map((s: { name: string }) => s.name).join(", ")}.`;
       const messageId = generateOutboundMessageId();
       // Persist FIRST so a fast customer reply can match externalId
       // before our post-send write would otherwise land.

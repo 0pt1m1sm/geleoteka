@@ -248,6 +248,11 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
   // Сюда доходит либо хозяин, либо деталь без активных вариантов вовсе.
   if (!p.isActive) notFound();
 
+  // Адрес самовывоза читаем ПОСЛЕ редиректов: запросу, который уходит на
+  // другой адрес, он не нужен, а лишний поход в CMS на каждый такой запрос —
+  // это работа впустую.
+  const pickupAddress = await getCMS("contacts.address", "");
+
   const requestedSku = requestedVariantSku(sp);
   const selected = requestedSku ? variants.find((v) => v.sku === requestedSku) : undefined;
   // Ссылка на проданный экземпляр не должна ронять страницу и не должна врать:
@@ -502,13 +507,18 @@ export default async function PartDetailPage({ params, searchParams }: Props) {
                 </svg>
                 Оплата при получении или переводом
               </div>
-              <div className="flex items-center gap-3 text-xs text-[var(--foreground-muted)]">
-                <svg className="w-4 h-4 text-[var(--color-accent)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Самовывоз — {await getCMS("contacts.address", "Москва, ул. Примерная, 15")}
-              </div>
+              {/* Пустой адрес не рисуем: подпись «Самовывоз —» без значения
+                  читается как поломка, а во время переезда поле может быть
+                  пустым. */}
+              {pickupAddress && (
+                <div className="flex items-center gap-3 text-xs text-[var(--foreground-muted)]">
+                  <svg className="w-4 h-4 text-[var(--color-accent)] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Самовывоз — {pickupAddress}
+                </div>
+              )}
             </div>
           </div>
         </div>
