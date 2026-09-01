@@ -2,7 +2,13 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { checkOutboundReachability, FOREIGN_PROBE_HOSTS, PROBE_PORTS } from "@/lib/email/self-test";
+import { sendEmail } from "@/lib/email/send";
+import {
+  checkOutboundReachability,
+  FOREIGN_PROBE_HOSTS,
+  PROBE_PORTS,
+  sendSelfTestLetter,
+} from "@/lib/email/self-test";
 
 export const dynamic = "force-dynamic";
 
@@ -44,8 +50,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   // настроенный, и только из списка почтовых портов.
   let portOverride: number | undefined;
   let hostOverride: string | undefined;
+  let doSend = false;
   try {
-    const body = (await request.json()) as { port?: unknown; host?: unknown };
+    const body = (await request.json()) as { port?: unknown; host?: unknown; send?: unknown };
+    doSend = body?.send === true;
     if (typeof body?.port === "number" && PROBE_PORTS.includes(body.port)) {
       portOverride = body.port;
     }
@@ -55,6 +63,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
   } catch {
     // Пустое тело — обычный случай: проверяем настроенный хост и порт.
+  }
+
+  // {"send": true} — настоящая отправка на СВОЙ ящик. Адресата в запросе нет
+  // и быть не может: см. комментарий у sendSelfTestLetter.
+  if (doSend) {
+    const sent = await sendSelfTestLetter(async (message) => {
+      const r = await sendEmail({
+        to: message.to,
+        subject: message.subject,
+        // html обязателен по контракту отправки; тело служебное, без разметки.
+        html: `<p>${message.text.replace(/\n/g, "<br>")}</p>`,
+        text: message.text,
+      });
+      return r.success
+        ? { success: true, messageId: r.messageId ?? null, error: null }
+        : { success: false, messageId: null, error: r.error };
+    });
+    return NextResponse.json(sent, { status: sent.accepted ? 200 : 502 });
   }
 
   const result = await checkOutboundReachability({ portOverride, hostOverride });

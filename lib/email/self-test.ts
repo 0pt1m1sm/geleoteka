@@ -32,6 +32,17 @@ export type ReachabilityCode =
   | "unknown_error"
   | "not_applicable";
 
+export interface SelfSendResult {
+  /** Приняло ли отправку соединение с сервером. */
+  accepted: boolean;
+  /** Кому ушло — всегда свой же ящик, см. `sendSelfTestLetter`. */
+  to: string | null;
+  /** Идентификатор письма от сервера, если он его вернул. */
+  messageId: string | null;
+  /** Класс исхода: ok | not_configured | rejected | unknown. */
+  code: string;
+}
+
 export interface OutboundReachability {
   transport: "smtp" | "resend";
   /** Хост и порт — не секрет: это публичные имена инфраструктуры. */
@@ -200,4 +211,45 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
     }
     return { transport, host, port, code, ok: false, authenticated };
   }
+}
+
+/**
+ * Отправка диагностического письма САМИМ ПРИЛОЖЕНИЕМ.
+ *
+ * Достижимость и авторизация ещё не означают доставку: сервер может пускать
+ * нас и всё равно отклонять письмо. Проверяется это только настоящей отправкой.
+ *
+ * Получателя выбрать НЕЛЬЗЯ — письмо всегда уходит на собственный ящик
+ * отправки (`SMTP_USER`). Это намеренно: ручка с произвольным адресатом за
+ * общим секретом стала бы отправлялкой чужой почты с нашего домена.
+ *
+ * Письмо приходит на наш же ящик, откуда его забирает почтовый синхронизатор —
+ * то есть доставка подтверждается не обещанием сервера, а появлением письма.
+ */
+export async function sendSelfTestLetter(
+  send: (message: {
+    to: string;
+    subject: string;
+    text: string;
+  }) => Promise<{ success: boolean; messageId?: string | null; error?: string | null }>,
+): Promise<SelfSendResult> {
+  const to = (await getSetting("SMTP_USER"))?.trim() ?? null;
+  if (!to) {
+    return { accepted: false, to: null, messageId: null, code: "not_configured" };
+  }
+  const stamp = new Date().toISOString();
+  const res = await send({
+    to,
+    subject: `Проверка отправки — ${stamp}`,
+    text:
+      "Это служебное письмо проверяет, что отправка почты из приложения работает.\n" +
+      `Отправлено: ${stamp}\n` +
+      "Отвечать на него не нужно.",
+  });
+  return {
+    accepted: res.success,
+    to,
+    messageId: res.messageId ?? null,
+    code: res.success ? "ok" : res.error ? "rejected" : "unknown",
+  };
 }
