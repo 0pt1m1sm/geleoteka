@@ -197,6 +197,9 @@ enum InboxMessageStatus {
 /// recipient, missing secret) without Railway log access. Rows live ~30
 /// days; cleanup is manual or via a future cron.
 model InboundAttempt {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id         String   @id @default(cuid())
   receivedAt DateTime @default(now())
   httpStatus Int
@@ -211,6 +214,7 @@ model InboundAttempt {
 
   @@index([receivedAt])
   @@index([outcome])
+  @@index([tenantId])
 }
 
 /// Key-value store for runtime-mutable settings: integration secrets,
@@ -247,6 +251,9 @@ model Tenant {
 }
 
 model Setting {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String   @id @default(cuid())
   key             String   @unique
   value           String   @db.Text
@@ -256,6 +263,7 @@ model Setting {
   updatedBy User? @relation("SettingUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
 
   @@index([key])
+  @@index([tenantId])
 }
 
 enum CommOutcome {
@@ -371,6 +379,9 @@ enum ReferralSource {
 // ============================================
 
 model User {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String             @id @default(cuid())
   email           String             @unique
   // NULL means the current primary email has not been verified. Existing
@@ -500,6 +511,7 @@ model User {
   @@index([deletedAt])
   @@index([managerUserId])
   handledPartRequests PartRequest[] @relation("PartRequestHandledBy") // заявки «сообщить о поступлении», закрытые этим сотрудником
+  @@index([tenantId])
 }
 
 model CustomerProfile {
@@ -565,6 +577,9 @@ model CustomerNote {
 // CRM segment label. Color is a slug from the fixed 8-color palette
 // (lib/customer-tags.ts → TAG_COLOR_PALETTE) — never a free-form hex.
 model CustomerTag {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   name      String   @unique
   colorSlug String
@@ -573,6 +588,7 @@ model CustomerTag {
   assignments CustomerTagAssignment[]
 
   @@index([name])
+  @@index([tenantId])
 }
 
 // Many-to-many between User (isCustomer=true) and CustomerTag.
@@ -673,6 +689,9 @@ model OAuthAccount {
 // ============================================
 
 model Vehicle {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id            String               @id @default(cuid())
   ownershipType VehicleOwnershipType @default(CUSTOMER)
   ownerUserId   String? // Required for CUSTOMER, null for RENTAL/LOANER
@@ -715,6 +734,7 @@ model Vehicle {
   @@index([ownershipType])
   @@index([isAvailable])
   @@index([isArchived])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -722,6 +742,9 @@ model Vehicle {
 // ============================================
 
 model Service {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id               String   @id @default(cuid())
   slug             String   @unique
   name             String
@@ -738,6 +761,7 @@ model Service {
   updatedAt        DateTime @updatedAt
 
   @@index([slug])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -745,6 +769,9 @@ model Service {
 // ============================================
 
 model RepairOrder {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id           String            @id @default(cuid())
   roNumber     String?           @unique // Human-friendly sequential number
   /// NULL when the customer was erased — the service record is kept, detached.
@@ -813,6 +840,7 @@ model RepairOrder {
   @@index([dateTime])
   @@index([claimToken])
   @@index([dealId])
+  @@index([tenantId])
 }
 
 /// Photo attached by a master/manager to a RepairOrder showing work
@@ -840,6 +868,9 @@ model RepairOrderPhoto {
 /// Active bays are the schedule capacity; there is no second numeric setting
 /// that can drift away from the storage model.
 model ServiceBay {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   name      String
   isActive  Boolean  @default(true)
@@ -852,12 +883,16 @@ model ServiceBay {
 
   @@unique([tenantKey, name])
   @@index([tenantKey, isActive, sortOrder])
+  @@index([tenantId])
 }
 
 // Slot locking: one row per scheduled car and physical bay. The compound
 // unique key is the database backstop for concurrent attempts at the same
 // instant: two cars may start together only when they own different bays.
 model Slot {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id            String   @id @default(cuid())
   dateTime      DateTime
   repairOrderId String   @unique
@@ -869,6 +904,7 @@ model Slot {
 
   @@unique([dateTime, bayId])
   @@index([bayId])
+  @@index([tenantId])
 }
 
 // ─── Schedule configuration ────────────────────────────────────────────────
@@ -883,17 +919,24 @@ model Slot {
 
 /// Recurring weekly hours; one row per weekday.
 model WorkingHours {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   /// 0 = Sunday … 6 = Saturday (JS getDay() convention).
   dayOfWeek   Int      @id
   isOpen      Boolean  @default(true)
   openMinute  Int      @default(540) // 09:00
   closeMinute Int      @default(1140) // 19:00
   updatedAt   DateTime @updatedAt
+  @@index([tenantId])
 }
 
 /// A single date that overrides the weekly rule — holiday, closure, or special
 /// hours. `isClosed` wins; custom hours apply only when it is false.
 model ScheduleException {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String   @id @default(cuid())
   /// Calendar day in business time, stored at midnight UTC of that day.
   date        DateTime @unique @db.Date
@@ -904,11 +947,15 @@ model ScheduleException {
   createdAt   DateTime @default(now())
 
   @@index([date])
+  @@index([tenantId])
 }
 
 /// An arbitrary unavailable range (maintenance, lunch, a car left overnight).
 /// Half-open [startAt, endAt): a block ending at 11:00 leaves 11:00 bookable.
 model BlockedInterval {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   startAt   DateTime
   endAt     DateTime
@@ -916,6 +963,7 @@ model BlockedInterval {
   createdAt DateTime @default(now())
 
   @@index([startAt, endAt])
+  @@index([tenantId])
 }
 
 model JobLine {
@@ -983,6 +1031,9 @@ model PartLine {
 // ============================================
 
 model LoyaltyAccount {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id            String      @id @default(cuid())
   userId        String      @unique
   points        Int         @default(0)
@@ -997,6 +1048,7 @@ model LoyaltyAccount {
 
   @@index([referralCode])
   @@index([tier])
+  @@index([tenantId])
 }
 
 model LoyaltyTransaction {
@@ -1019,6 +1071,9 @@ model LoyaltyTransaction {
 // ============================================
 
 model Notification {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id       String           @id @default(cuid())
   userId   String
   type     NotificationType
@@ -1031,6 +1086,7 @@ model Notification {
 
   @@index([userId])
   @@index([sentAt])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1050,6 +1106,9 @@ enum ImageVisibility {
 }
 
 model UploadedImage {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String          @id @default(cuid())
   visibility  ImageVisibility @default(PUBLIC)
   bytes       Bytes
@@ -1065,6 +1124,7 @@ model UploadedImage {
   @@index([createdAt])
   @@index([createdById])
   @@index([visibility])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1078,6 +1138,9 @@ model UploadedImage {
 // The set of keys, their `type`, and the per-list row shape are defined in
 // `lib/cms-schema.ts`. The server action validates writes against that schema.
 model CMSBlock {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   key       String   @unique
   type      String   @default("text")
@@ -1085,11 +1148,15 @@ model CMSBlock {
   updatedAt DateTime @updatedAt
 
   @@index([key])
+  @@index([tenantId])
 }
 
 /// Слепок SEO-состояния для панели /admin/seo: техметрики собирает сервер,
 /// indexedPages и note вносятся вручную при замерах выдачи.
 model SeoSnapshot {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id                     String   @id @default(cuid())
   tenantKey              String   @default("geleoteka")
   createdAt              DateTime @default(now())
@@ -1115,9 +1182,13 @@ model SeoSnapshot {
 
   @@index([tenantKey, createdAt])
   @@index([tenantKey, source, createdAt])
+  @@index([tenantId])
 }
 
 model BlogPost {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String    @id @default(cuid())
   slug        String    @unique
   title       String
@@ -1136,6 +1207,7 @@ model BlogPost {
   @@index([slug])
   @@index([published])
   @@index([authorId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1143,6 +1215,9 @@ model BlogPost {
 // ============================================
 
 model PartCategory {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
@@ -1152,6 +1227,7 @@ model PartCategory {
   parts Part[]
 
   @@index([slug])
+  @@index([tenantId])
 }
 
 /// Состояние товара. Б/у экземпляр — ОТДЕЛЬНАЯ строка Part с остатком 1: свои
@@ -1167,6 +1243,9 @@ enum PartCondition {
 }
 
 model Part {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id             String   @id @default(cuid())
   slug           String   @unique
   /// OEM-номер детали. НЕ уникален: он общий у нового товара и у каждого б/у
@@ -1218,6 +1297,7 @@ model Part {
   //     обеспечивал снятый Part_article_key. Б/у экземплярам не мешает.
   //     Миграция 20260830210000_part_variants.
   //   Part_photos_gin_idx  — GIN(photos), миграция 20260505123839.
+  @@index([tenantId])
 }
 
 /// Номенклатурный справочник запчастей — источник автокомплита в сметах и при
@@ -1256,6 +1336,9 @@ model PartReference {
 /// НИКАКИХ автоуведомлений покупателю при появлении остатка — решение владельца
 /// в PRD. Здесь только приём и список в админке; сотрудник связывается сам.
 model PartRequest {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String    @id @default(cuid())
   referenceId String?
   oem         String // снимок номера на момент обращения
@@ -1272,6 +1355,7 @@ model PartRequest {
   @@index([referenceId])
   @@index([createdAt])
   @@index([handledAt])
+  @@index([tenantId])
 }
 
 /// Применяемость позиции справочника к кузову: та же ось каталога
@@ -1312,6 +1396,9 @@ enum StockMovementReason {
 // (seeded "MAIN") receives all pre-Phase-6 stock and every host call that does
 // not specify a warehouse.
 model Warehouse {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   code      String
   name      String
@@ -1329,6 +1416,7 @@ model Warehouse {
 
   @@unique([tenantKey, code])
   @@index([tenantKey, isDefault])
+  @@index([tenantId])
 }
 
 model StockItem {
@@ -1478,6 +1566,9 @@ enum ScanResult {
 }
 
 model ScanEvent {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id               String     @id @default(cuid())
   userId           String?
   deviceId         String?
@@ -1493,6 +1584,7 @@ model ScanEvent {
 
   @@index([tenantKey, createdAt])
   @@index([tenantKey, userId, createdAt])
+  @@index([tenantId])
 }
 
 // Stocktake / инвентаризация (Phase 3 of the warehouse roadmap). A count session
@@ -1524,6 +1616,9 @@ enum StockCountClassification {
 }
 
 model StockCountSession {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String           @id @default(cuid())
   status          StockCountStatus @default(OPEN)
   scope           StockCountScope
@@ -1546,6 +1641,7 @@ model StockCountSession {
   lines     StockCountLine[]
 
   @@index([tenantKey, status, createdAt])
+  @@index([tenantId])
 }
 
 model StockCountLine {
@@ -1571,6 +1667,9 @@ model StockCountLine {
 // PartOrder (the Deal is now the "order"); @@map keeps the DB table "PartOrder"
 // so no data moves. The PO-NNNN number + PartOrder_number_seq are unchanged.
 model PartShipment {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id           String          @id @default(cuid())
   // Human-readable PO-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
@@ -1603,6 +1702,7 @@ model PartShipment {
   @@index([claimToken])
   @@index([dealId])
   @@map("PartOrder")
+  @@index([tenantId])
 }
 
 model PartOrderItem {
@@ -1629,6 +1729,9 @@ model PartOrderItem {
 // ============================================
 
 model RentalBooking {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id            String              @id @default(cuid())
   // Human-readable RB-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
@@ -1667,6 +1770,7 @@ model RentalBooking {
   @@index([status])
   @@index([claimToken])
   @@index([dealId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1683,6 +1787,9 @@ model RentalBooking {
 /// never revoke a technician's access, and a departing technician does not
 /// silently vanish from the site.
 model TeamMember {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String   @id @default(cuid())
   name            String
   role            String?
@@ -1697,9 +1804,13 @@ model TeamMember {
 
   @@index([isActive])
   @@index([sortOrder])
+  @@index([tenantId])
 }
 
 model Vacancy {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id           String   @id @default(cuid())
   title        String
   type         String   @default("Полная занятость")
@@ -1711,6 +1822,7 @@ model Vacancy {
   updatedAt    DateTime @updatedAt
 
   @@index([isActive])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1718,6 +1830,9 @@ model Vacancy {
 // ============================================
 
 model SupplierOrder {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String              @id @default(cuid())
   userId          String // Was supplierId — references User (isSupplier=true)
   orderNumber     String?
@@ -1752,6 +1867,7 @@ model SupplierOrder {
   @@index([userId])
   @@index([status])
   @@index([orderDate])
+  @@index([tenantId])
 }
 
 model SupplierOrderItem {
@@ -1907,6 +2023,9 @@ model PartTrim {
 /// Estimate's EstimateLine[] and is the source of truth for total revenue.
 /// See docs/prd/2026-05-10-deal-fulfillment-architecture.md.
 model Deal {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id             String            @id @default(cuid())
   number         String?           @unique
   /// NULL when the customer was erased: the commercial record survives
@@ -1958,6 +2077,7 @@ model Deal {
   @@index([channel])
   @@index([claimToken])
   @@index([createdAt])
+  @@index([tenantId])
 }
 
 // DealLine model removed (refactor 2026-05-18). The active non-SUPERSEDED
@@ -1970,6 +2090,9 @@ model Deal {
 /// Estimate is captured at SENT time and is the historical contract; the
 /// Deal continues evolving independently.
 model Estimate {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id               String        @id @default(cuid())
   number           String?       @unique
   dealId           String
@@ -2007,6 +2130,7 @@ model Estimate {
   // (findFirst dealId + stage="DRAFT" and dealId + stage != "SUPERSEDED")
   // without forcing Postgres to pick a single-column index and post-filter.
   @@index([dealId, stage])
+  @@index([tenantId])
 }
 
 model EstimateLine {
@@ -2051,6 +2175,9 @@ model EstimateLine {
 /// attached to a customer; optionally pinned to a specific Deal so
 /// per-deal timelines stay coherent.
 model CommunicationLog {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id             String      @id @default(cuid())
   customerUserId String
   authorUserId   String? // Manager who logged it; null = system / inbound webhook
@@ -2093,6 +2220,7 @@ model CommunicationLog {
   @@index([resendEmailId])
   @@index([customerUserId, channel, readAt])
   @@index([emailMessageId])
+  @@index([tenantId])
 }
 
 /// Bucket for inbound emails from unknown senders (no User.email match, no
@@ -2101,6 +2229,9 @@ model CommunicationLog {
 /// the row into CommunicationLog (channel EMAIL_INBOUND) and flips status
 /// to ASSIGNED — the InboxMessage row itself is never deleted (audit).
 model InboxMessage {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id                       String             @id @default(cuid())
   fromEmail                String
   fromName                 String?
@@ -2137,6 +2268,7 @@ model InboxMessage {
   @@index([fromEmail])
   @@index([emailMessageId])
   @@index([status, direction])
+  @@index([tenantId])
 }
 
 /// Canonical, provider-neutral record of a single email. Both the Resend webhook
@@ -2152,6 +2284,9 @@ model InboxMessage {
 ///     UID columns NULL, where Postgres treats every row as distinct — those
 ///     rely on `rfcMessageId` alone, which is exactly the intent.
 model EmailMessage {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String         @id @default(cuid())
   provider  EmailProvider
   direction EmailDirection
@@ -2212,6 +2347,7 @@ model EmailMessage {
   @@index([ingestStatus, occurredAt])
   @@index([fromEmail])
   @@index([inReplyTo])
+  @@index([tenantId])
 }
 
 /// Per-(mailbox, folder) IMAP replay position. The cursor only advances past a
@@ -2222,6 +2358,9 @@ model EmailMessage {
 /// replicas: a worker claims the source for a bounded window and a crashed
 /// worker's lease simply expires.
 model MailboxSyncCursor {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id      String      @id @default(cuid())
   mailbox String
   folder  String
@@ -2243,6 +2382,7 @@ model MailboxSyncCursor {
 
   @@unique([mailbox, folder])
   @@index([role])
+  @@index([tenantId])
 }
 
 /// Explicit registry of addresses that belong to us. This is what decides
@@ -2251,6 +2391,9 @@ model MailboxSyncCursor {
 ///
 /// Holds no credentials — mailbox passwords live only in secret env.
 model MailIdentity {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id       String           @id @default(cuid())
   /// Stored lower-cased; callers must normalize before lookup.
   address  String           @unique
@@ -2267,12 +2410,16 @@ model MailIdentity {
 
   @@index([userId])
   @@index([isActive])
+  @@index([tenantId])
 }
 
 /// CRM task — a reminder/follow-up assigned to a manager. May be linked
 /// to a customer and/or a specific deal so the Customer 360 and Deal
 /// detail pages can show outstanding work.
 model CrmTask {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id                   String        @id @default(cuid())
   title                String
   body                 String?
@@ -2305,6 +2452,7 @@ model CrmTask {
   @@index([dealId])
   @@index([lastInboundCommLogId])
   @@index([dueAt])
+  @@index([tenantId])
 }
 
 /// What a role may open, once an admin has edited it.
@@ -2318,6 +2466,9 @@ model CrmTask {
 /// ADMIN is never stored. A role that edits roles must not be able to lock
 /// itself out, so authz.ts short-circuits it before ever reading this table.
 model RolePermission {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id         String   @id @default(cuid())
   tenantKey  String   @default("geleoteka")
   role       String
@@ -2328,6 +2479,7 @@ model RolePermission {
 
   @@unique([tenantKey, role, permission])
   @@index([tenantKey, role])
+  @@index([tenantId])
 }
 
 /// Who did what, and to whom.
@@ -2341,6 +2493,9 @@ model RolePermission {
 ///
 /// Append-only by convention: nothing in the app updates or deletes a row.
 model AuditLog {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String   @id @default(cuid())
   tenantKey   String   @default("geleoteka")
   /// Null only for system-initiated actions (cron, worker).
@@ -2363,6 +2518,7 @@ model AuditLog {
   @@index([tenantKey, actorUserId, createdAt])
   @@index([tenantKey, targetType, targetId])
   @@index([tenantKey, action, createdAt])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -2375,6 +2531,9 @@ model AuditLog {
 /// strings validated by the closed TypeScript catalog in
 /// lib/staff-notifications/types.ts so extending the catalog stays additive.
 model StaffNotificationEvent {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id                    String    @id @default(cuid())
   tenantKey             String    @default("geleoteka")
   type                  String
@@ -2409,6 +2568,7 @@ model StaffNotificationEvent {
   @@index([tenantKey, occurredAt])
   @@index([tenantKey, type, occurredAt])
   @@index([tenantKey, sourceType, sourceId])
+  @@index([tenantId])
 }
 
 /// Per-employee read state. Reading a notification never mutates the CRM task
@@ -2432,6 +2592,9 @@ model StaffNotificationReceipt {
 /// The router still checks role permissions first; these rows can only narrow
 /// that permission-derived recipient set.
 model StaffNotificationOptOut {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id        String   @id @default(cuid())
   tenantKey String   @default("geleoteka")
   userId    String
@@ -2440,6 +2603,7 @@ model StaffNotificationOptOut {
 
   @@unique([tenantKey, userId, eventType], map: "StaffNotificationOptOut_tenant_user_event_key")
   @@index([tenantKey, userId], map: "StaffNotificationOptOut_tenant_user_idx")
+  @@index([tenantId])
 }
 
 /// One attempt stream for one event/channel/destination tuple. destinationKey
@@ -2470,6 +2634,9 @@ model StaffNotificationDelivery {
 /// A Telegram address verified by the webhook flow implemented in Story 4.
 /// kind stays a TS-validated string so adapter policy can evolve additively.
 model TelegramDestination {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id             String    @id @default(cuid())
   tenantKey      String    @default("geleoteka")
   kind           String
@@ -2487,11 +2654,15 @@ model TelegramDestination {
   @@unique([tenantKey, chatId])
   @@unique([tenantKey, userId, kind])
   @@index([tenantKey, kind, isActive])
+  @@index([tenantId])
 }
 
 /// Short-lived one-time Telegram link token. Only tokenHash is persisted;
 /// generation and claiming deliberately belong to Story 4.
 model TelegramLinkToken {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id              String    @id @default(cuid())
   tenantKey       String    @default("geleoteka")
   userId          String?
@@ -2504,11 +2675,15 @@ model TelegramLinkToken {
 
   @@unique([tenantKey, tokenHash])
   @@index([tenantKey, expiresAt, usedAt])
+  @@index([tenantId])
 }
 
 /// Idempotency receipt for Telegram update_id. The webhook itself is Story 4;
 /// this table is inert until then.
 model TelegramUpdateReceipt {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id          String   @id @default(cuid())
   tenantKey   String   @default("geleoteka")
   updateId    String
@@ -2516,12 +2691,16 @@ model TelegramUpdateReceipt {
 
   @@unique([tenantKey, updateId])
   @@index([tenantKey, processedAt])
+  @@index([tenantId])
 }
 
 /// One secret-free observation of an outbound Telegram Bot API call. This
 /// model deliberately has no destination, message, token, URL or provider
 /// payload columns: it answers only whether the external channel is healthy.
 model TelegramSendAttempt {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   id         String   @id @default(cuid())
   tenantKey  String   @default("geleoteka")
   operation  String
@@ -2532,6 +2711,7 @@ model TelegramSendAttempt {
   createdAt  DateTime @default(now())
 
   @@index([tenantKey, createdAt])
+  @@index([tenantId])
 }
 
 /// getUpdates polling cursor: one row per tenant. nextOffset is Telegram's
@@ -2540,6 +2720,9 @@ model TelegramSendAttempt {
 /// is a cooldown stamp, not a lock — concurrent drains stay correct because
 /// processing is idempotent and the offset is guarded monotonic.
 model TelegramPollState {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   tenantKey          String    @id @default("geleoteka")
   nextOffset         BigInt    @default(0)
   lastDrainStartedAt DateTime?
@@ -2554,14 +2737,19 @@ model TelegramPollState {
   /// протухший перехватывается по времени.
   leaseUntil         DateTime?
   updatedAt          DateTime  @default(now()) @updatedAt
+  @@index([tenantId])
 }
 
 /// One atomic, server-side cooldown per person pressing a Telegram test
 /// button. It stores no Telegram destination or message data.
 model TelegramTestSendThrottle {
+  /// Арендатор-владелец. Фаза expand: пока необязательное, значение
+  /// проставляется умолчанием на стороне базы и backfill-ом.
+  tenantId String?
   tenantKey   String   @default("geleoteka")
   actorUserId String
   attemptedAt DateTime @default(now())
 
   @@id([tenantKey, actorUserId])
+  @@index([tenantId])
 }
