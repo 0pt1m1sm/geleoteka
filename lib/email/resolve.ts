@@ -3,7 +3,7 @@ import type { EmailIngestTx } from "@/lib/email/db-port";
 import type { EmailAttachmentMeta, ParsedEmail } from "@/lib/email/types";
 import { publishInboundMessageUnresolved } from "@/lib/staff-notifications/business-events";
 
-export type ResolveKind = "thread" | "customer" | "inbox";
+export type ResolveKind = "thread" | "customer" | "inbox" | "ignored";
 
 /** Channel-neutral facts published with the new CommunicationLog. */
 export interface FollowUpContext {
@@ -23,7 +23,11 @@ export interface FollowUpContext {
 
 export interface ResolveResult {
   kind: ResolveKind;
-  /** CommunicationLog.id for thread/customer, InboxMessage.id for inbox. */
+  /**
+   * CommunicationLog.id for thread/customer, InboxMessage.id for inbox.
+   * Для `ignored` — идентификатор письма: строки CRM для него не создаётся,
+   * само письмо остаётся в журнале.
+   */
   id: string;
   /**
    * Non-null only when a NEW inbound message landed on a known customer.
@@ -230,6 +234,16 @@ export async function resolveOutboundEmail(input: {
     };
   }
 
+  // ── 3а. Письмо самим себе ──────────────────────────────────────────────────
+  // Все получатели — наши же почтовые ящики, значит переписки с клиентом здесь
+  // нет и разбирать человеку нечего. Такое письмо в очередь не кладём: очередь
+  // существует ради писем, на которые кто-то должен ответить, а не ради
+  // служебных. Сюда попадают, например, диагностические письма приложения и
+  // переписка сотрудников между рабочими ящиками.
+  if (await allRecipientsAreOwnMailboxes(parsed, client)) {
+    return { kind: "ignored", id: emailMessageId ?? "", followUp: null, staffNotificationEventId: null };
+  }
+
   // ── 3. Ambiguous or unknown recipient ───────────────────────────────────────
   const inbox = await createUnresolvedInboxMessage({ parsed, client, emailMessageId });
   return {
@@ -238,6 +252,29 @@ export async function resolveOutboundEmail(input: {
     followUp: null,
     staffNotificationEventId: null,
   };
+}
+
+/**
+ * Все ли получатели письма — наши собственные ящики.
+ *
+ * «Наш ящик» — запись в `MailIdentity`: тот же справочник, по которому
+ * определяется автор исходящего. Пустой список получателей своим не считается:
+ * письмо без адресата — это странность, и пусть на неё посмотрит человек.
+ */
+async function allRecipientsAreOwnMailboxes(
+  parsed: ParsedEmail,
+  client: EmailIngestTx,
+): Promise<boolean> {
+  const recipients = [...parsed.to, ...parsed.cc].map((a) => a.email.trim().toLowerCase());
+  if (recipients.length === 0) return false;
+  for (const address of new Set(recipients)) {
+    const identity = (await client.mailIdentity.findUnique({
+      where: { address },
+      select: { isActive: true },
+    })) as { isActive: boolean } | null;
+    if (!identity) return false;
+  }
+  return true;
 }
 
 /**
