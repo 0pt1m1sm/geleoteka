@@ -15,7 +15,13 @@ import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { applyUndoReceive, isReceivingStatus, type ReceiveResult } from "@/lib/warehouse/receive";
 import { applyScanReceiveOrderLine } from "@/lib/warehouse/scan-receive";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
-import { isWithinLandedCostBounds, validateOrderLines, costResultWithinBounds, type CustomsMode } from "@/lib/suppliers/landed-cost";
+import {
+  allocateLandedCost,
+  isWithinLandedCostBounds,
+  validateOrderLines,
+  costResultWithinBounds,
+  type CustomsMode,
+} from "@/lib/suppliers/landed-cost";
 import { resolveLandedCost } from "@/lib/suppliers/resolve-landed-cost";
 import {
   canDeleteOrder,
@@ -80,6 +86,10 @@ interface ResolvedOrderLine {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  /** Себестоимость с учётом ввоза; проставляется разнесением после расчёта
+   *  доставки и таможни. Только у PART-строк: услуги товаром не являются. */
+  landedUnitCost?: number;
+  landedTotalCost?: number;
 }
 
 /** Pre-transaction validation shared by create and full-edit. Returns a
@@ -187,6 +197,32 @@ async function resolveLinesAndCost(
   if (!costResultWithinBounds(cost)) {
     throw new OrderValidationError("Итоговая стоимость или вес вне допустимых пределов");
   }
+
+  // Разносим доставку и таможню НА ПОЗИЦИИ. Без этого себестоимостью строки
+  // остаётся голая цена закупки, а оценка запасов берёт именно её: склад
+  // числится дешевле, чем стоил, и наценка выглядит больше, чем есть.
+  // Разносим только по PART-строкам: услуги и прочие типы товаром не являются
+  // и ввозных затрат не несут.
+  const allocatable = lines
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => l.type === "PART");
+  const allocated = allocateLandedCost({
+    lines: allocatable.map(({ l, i }) => ({
+      key: String(i),
+      quantity: l.quantity,
+      unitCost: l.unitCost,
+      weightGrams: l.partId ? (cost.weightById.get(l.partId) ?? null) : null,
+    })),
+    shippingCost: cost.shippingCost,
+    customsCost: cost.customsCost,
+    customsMode,
+  });
+  for (const a of allocated) {
+    const line = lines[Number(a.key)];
+    line.landedUnitCost = a.landedUnitCost;
+    line.landedTotalCost = a.landedTotalCost;
+  }
+
   return { lines, itemsCost, cost };
 }
 
