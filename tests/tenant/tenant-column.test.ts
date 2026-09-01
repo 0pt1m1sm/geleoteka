@@ -26,6 +26,16 @@ const hasTenantId = (body: string): boolean => /^\s+tenantId\s/m.test(body);
 describe("колонка арендатора в схеме", () => {
   const blocks = modelBlocks();
 
+  it("у каждой дочерней строки тоже есть tenantId", () => {
+    // Колонка у ребёнка — половина защиты; вторая половина, составной внешний
+    // ключ, без неё невозможна.
+    const missing = Object.entries(MODEL_CLASSIFICATION)
+      .filter(([, e]) => e.kind === "TENANT_CHILD")
+      .map(([name]) => name)
+      .filter((name) => !hasTenantId(blocks.get(name) ?? ""));
+    expect(missing, `без tenantId: ${missing.join(", ")}`).toEqual([]);
+  });
+
   it("у каждой корневой сущности сервиса есть tenantId", () => {
     const missing = Object.entries(MODEL_CLASSIFICATION)
       .filter(([, e]) => e.kind === "TENANT")
@@ -92,6 +102,22 @@ describe("миграция колонки арендатора", () => {
       .filter(({ table }) => !migration.includes(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "tenantId"`))
       .map(({ model, table }) => `${model} (таблица ${table})`);
     expect(missed, `не покрыты миграцией: ${missed.join(", ")}`).toEqual([]);
+  });
+
+  it("каждая дочерняя таблица получает составной внешний ключ", () => {
+    // Ради этого ключа всё и делалось: одна колонка — пометка, которую код
+    // может проставить неверно; ключ (родитель + арендатор) делает привязку к
+    // чужому родителю невозможной на уровне базы.
+    const children = readFileSync(
+      join(process.cwd(), "prisma/migrations/20260902040000_tenant_id_on_children/migration.sql"),
+      "utf8",
+    );
+    const missed = Object.entries(MODEL_CLASSIFICATION)
+      .filter(([, e]) => e.kind === "TENANT_CHILD")
+      .map(([name]) => ({ model: name, table: tableNameOf(name) }))
+      .filter(({ table }) => !children.includes(`ALTER TABLE "${table}" ADD CONSTRAINT "${table}_tenant_parent_fkey"`))
+      .map(({ model }) => model);
+    expect(missed, `без составного ключа: ${missed.join(", ")}`).toEqual([]);
   });
 
   it("не обращается к имени модели там, где имя таблицы другое", () => {
