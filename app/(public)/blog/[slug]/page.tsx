@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { pageSeo } from "@/lib/seo";
 import { buildArticleJsonLd } from "@/lib/seo-jsonld";
 import { generationsForPost, servicesForPost } from "@/lib/models/related-content";
+import { formatPrice } from "@/lib/utils";
 
 interface BlogPostRow {
   slug: string;
@@ -24,6 +25,12 @@ interface BlogPostRow {
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+/** Время чтения в минутах. 900 знаков в минуту — обычный темп для русского
+ *  текста; округляем вверх, чтобы «1 мин» не обещала меньше, чем есть. */
+function readingMinutes(content: string): number {
+  return Math.max(1, Math.ceil(content.length / 900));
 }
 
 /** Shared with generateMetadata so the lookup runs once per request. */
@@ -105,14 +112,56 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
       />
 
       <h1 className="text-display text-3xl sm:text-4xl font-bold mb-4">{post.title}</h1>
-      {post.publishedAt ? (
-        <time
-          dateTime={post.publishedAt.toISOString()}
-          className="block text-sm text-[var(--foreground-muted)] mb-8"
-        >
-          {DATE_FMT.format(post.publishedAt)}
-        </time>
-      ) : null}
+      {/* Дата и время чтения одной строкой. Время чтения — не украшение:
+          оно отвечает на «сколько это займёт» до того, как человек начнёт
+          скроллить, и снимает часть отказов «выглядит длинно, закрою». */}
+      <p className="flex flex-wrap items-center gap-x-3 text-sm text-[var(--foreground-muted)] mb-6">
+        {post.publishedAt ? (
+          <time dateTime={post.publishedAt.toISOString()}>
+            {DATE_FMT.format(post.publishedAt)}
+          </time>
+        ) : null}
+        <span>{readingMinutes(post.content)} мин чтения</span>
+      </p>
+
+      {/* Ответ ПЕРЕД текстом, а не после него.
+          Человек приходит из поиска с конкретным вопросом и решает за секунды,
+          та ли это страница. Раньше он видел заголовок и сразу простыню, а
+          короткий ответ (excerpt) не показывался вовсе, услуги и цены лежали
+          внизу — куда при высоком показателе отказов никто не доходит. */}
+      {post.excerpt && (
+        <p className="text-lg leading-relaxed mb-6 border-l-2 border-[var(--color-accent)] pl-4">
+          {post.excerpt}
+        </p>
+      )}
+
+      {services.length > 0 && (
+        <div className="card mb-8 py-4">
+          <p className="text-xs uppercase tracking-wide text-[var(--foreground-muted)] mb-2">
+            Что мы с этим делаем
+          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+            {services.map((svc) => (
+              <Link
+                key={svc.slug}
+                href={`/services/${svc.slug}`}
+                className="hover:text-[var(--color-accent)]"
+              >
+                {svc.name}
+                {svc.priceMin ? (
+                  <span className="text-[var(--foreground-muted)]">
+                    {" "}
+                    — от {formatPrice(svc.priceMin)}
+                  </span>
+                ) : null}
+              </Link>
+            ))}
+            <Link href="/booking" className="btn btn-primary btn-sm">
+              Записаться
+            </Link>
+          </div>
+        </div>
+      )}
 
       <Markdown
         source={post.content}
@@ -135,23 +184,6 @@ export default async function BlogPostPage({ params }: Props): Promise<React.Rea
           ),
         }}
       />
-
-      {services.length > 0 && (
-        <div className="mt-10">
-          <h2 className="text-xl font-semibold mb-3">Что мы делаем по этой теме</h2>
-          <div className="flex flex-wrap gap-2">
-            {services.map((svc) => (
-              <Link
-                key={svc.slug}
-                href={`/services/${svc.slug}`}
-                className="card card-hover px-4 py-2 text-sm font-medium"
-              >
-                {svc.name}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
 
       {generations.length > 0 && (
         <div className="mt-10">

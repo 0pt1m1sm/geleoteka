@@ -121,7 +121,7 @@ export async function postsForService(slug: string, limit = 4): Promise<RelatedP
 export async function servicesForPost(
   input: { title: string; tags: string[] },
   limit = 3,
-): Promise<Array<{ slug: string; name: string }>> {
+): Promise<Array<{ slug: string; name: string; priceMin: number | null }>> {
   const haystack = `${input.title} ${input.tags.join(" ")}`.toLowerCase();
   const slugs = Object.entries(SERVICE_KEYWORDS)
     .filter(([, words]) => words.some((w) => haystack.includes(w.toLowerCase())))
@@ -130,7 +130,9 @@ export async function servicesForPost(
 
   return (await db.service.findMany({
     where: { slug: { in: slugs } },
-    select: { slug: true, name: true },
+    // priceMin нужен наверху статьи: «от 5 000 ₽» — это ответ на вопрос,
+    // который читатель задаёт сразу после «что у меня сломалось».
+    select: { slug: true, name: true, priceMin: true },
     take: limit,
-  })) as Array<{ slug: string; name: string }>;
+  })) as Array<{ slug: string; name: string; priceMin: number | null }>;
 }
