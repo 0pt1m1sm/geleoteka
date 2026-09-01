@@ -515,6 +515,10 @@ model User {
 }
 
 model CustomerProfile {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   userId                String  @id @unique
   preferredMasterUserId String?
   blacklisted           Boolean @default(false)
@@ -529,6 +533,7 @@ model CustomerProfile {
   lifetimeValue Int       @default(0) // Σ WON deal totals, kopecks
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([tenantId])
 }
 
 enum ContactType {
@@ -542,6 +547,10 @@ enum ContactType {
 // against User.email OR a CustomerContact EMAIL value, so a known customer
 // writing from a new address is auto-attached once that address is added.
 model CustomerContact {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id        String      @id @default(cuid())
   userId    String
   type      ContactType
@@ -555,12 +564,17 @@ model CustomerContact {
   // the same address pointing at two customers.
   @@unique([type, value])
   @@index([userId])
+  @@index([tenantId])
 }
 
 // CRM — manager-authored timeline notes attached to a customer User.
 // Distinct from CustomerProfile.notes (a single free-form scratchpad).
 // Body holds raw markdown source; rendered with react-markdown in the UI.
 model CustomerNote {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String   @id @default(cuid())
   customerUserId String
   authorUserId   String?
@@ -572,6 +586,7 @@ model CustomerNote {
 
   @@index([customerUserId])
   @@index([authorUserId])
+  @@index([tenantId])
 }
 
 // CRM segment label. Color is a slug from the fixed 8-color palette
@@ -594,6 +609,10 @@ model CustomerTag {
 // Many-to-many between User (isCustomer=true) and CustomerTag.
 // Composite primary key on (customerUserId, tagId) prevents duplicate assignments.
 model CustomerTagAssignment {
+  /// Арендатор-владелец, унаследованный от родителя (CustomerTag).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   customerUserId String
   tagId          String
   createdAt      DateTime @default(now())
@@ -603,9 +622,14 @@ model CustomerTagAssignment {
 
   @@id([customerUserId, tagId])
   @@index([tagId])
+  @@index([tenantId])
 }
 
 model MasterProfile {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   userId          String   @id @unique
   specialty       String?
   yearsExperience Int?
@@ -619,9 +643,14 @@ model MasterProfile {
 
   @@index([isActive])
   @@index([sortOrder])
+  @@index([tenantId])
 }
 
 model SupplierProfile {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   userId      String  @id @unique
   contactName String?
   country     String?
@@ -631,9 +660,14 @@ model SupplierProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([isActive])
+  @@index([tenantId])
 }
 
 model PasswordReset {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String    @id @default(cuid())
   userId         String
   codeVerifier   String    @db.VarChar(60)
@@ -645,6 +679,7 @@ model PasswordReset {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
+  @@index([tenantId])
 }
 
 /// Short-lived, one-time email verification token. The raw token is delivered
@@ -652,6 +687,10 @@ model PasswordReset {
 /// snapshots the address that received the link so an old link cannot verify a
 /// newly changed primary address.
 model EmailVerificationToken {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id        String    @id @default(cuid())
   tenantKey String    @default("geleoteka")
   userId    String
@@ -666,12 +705,17 @@ model EmailVerificationToken {
   @@unique([tenantKey, tokenHash])
   @@index([tenantKey, userId, createdAt])
   @@index([tenantKey, expiresAt, usedAt])
+  @@index([tenantId])
 }
 
 // Привязка внешнего входа (Яндекс ID / VK ID) к локальному аккаунту.
 // providerUserId — стабильный идентификатор пользователя у провайдера;
 // матчинг при входе: сперва эта таблица, затем email/телефон из профиля.
 model OAuthAccount {
+  /// Арендатор-владелец, унаследованный от родителя (User).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String   @id @default(cuid())
   provider       String // "yandex" | "vk"
   providerUserId String
@@ -682,6 +726,7 @@ model OAuthAccount {
 
   @@unique([provider, providerUserId])
   @@index([userId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -848,6 +893,10 @@ model RepairOrder {
 /// filled"). Visible to the customer in their tracking view and to
 /// admins in the order detail.
 model RepairOrderPhoto {
+  /// Арендатор-владелец, унаследованный от родителя (RepairOrder).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id            String   @id @default(cuid())
   repairOrderId String
   url           String
@@ -861,6 +910,7 @@ model RepairOrderPhoto {
   @@index([repairOrderId])
   @@index([uploadedById])
   @@index([createdAt])
+  @@index([tenantId])
 }
 
 /// A physical workshop resource. Masters remain a separate assignment on
@@ -967,6 +1017,10 @@ model BlockedInterval {
 }
 
 model JobLine {
+  /// Арендатор-владелец, унаследованный от родителя (RepairOrder).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id            String        @id @default(cuid())
   repairOrderId String
   sortOrder     Int           @default(0)
@@ -986,9 +1040,14 @@ model JobLine {
 
   @@index([repairOrderId])
   @@index([status])
+  @@index([tenantId])
 }
 
 model LaborLine {
+  /// Арендатор-владелец, унаследованный от родителя (JobLine).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id               String  @id @default(cuid())
   jobLineId        String
   description      String
@@ -1004,9 +1063,14 @@ model LaborLine {
   technician User?   @relation("LaborLineTechnician", fields: [technicianUserId], references: [id], onDelete: SetNull)
 
   @@index([jobLineId])
+  @@index([tenantId])
 }
 
 model PartLine {
+  /// Арендатор-владелец, унаследованный от родителя (JobLine).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String         @id @default(cuid())
   jobLineId      String
   partId         String? // Nullable — free-text for special-order / non-catalog parts
@@ -1024,6 +1088,7 @@ model PartLine {
 
   @@index([jobLineId])
   @@index([partId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1052,6 +1117,10 @@ model LoyaltyAccount {
 }
 
 model LoyaltyTransaction {
+  /// Арендатор-владелец, унаследованный от родителя (LoyaltyAccount).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id            String                 @id @default(cuid())
   accountId     String
   amount        Int
@@ -1064,6 +1133,7 @@ model LoyaltyTransaction {
   repairOrder RepairOrder?   @relation(fields: [repairOrderId], references: [id], onDelete: SetNull)
 
   @@index([accountId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1420,6 +1490,10 @@ model Warehouse {
 }
 
 model StockItem {
+  /// Арендатор-владелец, унаследованный от родителя (Warehouse).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id           String   @id @default(cuid())
   partId       String
   warehouseId  String
@@ -1449,9 +1523,14 @@ model StockItem {
   @@unique([partId, warehouseId])
   @@index([tenantKey, partId])
   @@index([barcode])
+  @@index([tenantId])
 }
 
 model StockMovement {
+  /// Арендатор-владелец, унаследованный от родителя (StockItem).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String              @id @default(cuid())
   itemId         String
   reason         StockMovementReason
@@ -1480,6 +1559,7 @@ model StockMovement {
   @@unique([tenantKey, sourceType, sourceId, reason, warehouseId])
   @@unique([tenantKey, idempotencyKey])
   @@index([tenantKey, itemId, createdAt])
+  @@index([tenantId])
 }
 
 // Multi-bin placement layer over the aggregate StockItem (Phase 1 of the
@@ -1496,6 +1576,10 @@ enum StockBinMovementReason {
 }
 
 model StockBin {
+  /// Арендатор-владелец, унаследованный от родителя (Warehouse).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id          String   @id @default(cuid())
   itemId      String
   warehouseId String
@@ -1510,9 +1594,14 @@ model StockBin {
 
   @@unique([tenantKey, itemId, location])
   @@index([tenantKey, location])
+  @@index([tenantId])
 }
 
 model StockBinMovement {
+  /// Арендатор-владелец, унаследованный от родителя (StockItem).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String                 @id @default(cuid())
   itemId         String
   reason         StockBinMovementReason
@@ -1531,6 +1620,7 @@ model StockBinMovement {
 
   @@unique([tenantKey, idempotencyKey])
   @@index([tenantKey, itemId, createdAt])
+  @@index([tenantId])
 }
 
 // Registry of physical warehouse locations (cells/bins addresses), WMS-owned and
@@ -1539,6 +1629,10 @@ model StockBinMovement {
 // ALL items. `code` is normalized upper/trimmed by callers. LOCATION_BLOCKED
 // (putaway/transfer-in rejection) checks isActive/isBlocked here.
 model StockLocation {
+  /// Арендатор-владелец, унаследованный от родителя (Warehouse).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id          String   @id @default(cuid())
   code        String
   warehouseId String
@@ -1555,6 +1649,7 @@ model StockLocation {
   // must not affect the same code in another.
   @@unique([tenantKey, warehouseId, code])
   @@index([tenantKey])
+  @@index([tenantId])
 }
 
 // Append-only audit of every scan, including failures. WMS-owned, tenant-scoped.
@@ -1645,6 +1740,10 @@ model StockCountSession {
 }
 
 model StockCountLine {
+  /// Арендатор-владелец, унаследованный от родителя (StockCountSession).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id             String                    @id @default(cuid())
   sessionId      String
   itemId         String? // host partId; null for UNKNOWN lines
@@ -1661,6 +1760,7 @@ model StockCountLine {
   session StockCountSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([tenantKey, sessionId])
+  @@index([tenantId])
 }
 
 // Parts fulfillment / shipment for a Deal (channel PARTS_*). Renamed from
@@ -1706,6 +1806,10 @@ model PartShipment {
 }
 
 model PartOrderItem {
+  /// Арендатор-владелец, унаследованный от родителя (PartShipment).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id        String @id @default(cuid())
   orderId   String
   partId    String
@@ -1722,6 +1826,7 @@ model PartOrderItem {
   @@unique([orderId, partId])
   @@index([orderId])
   @@index([partId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -1871,6 +1976,10 @@ model SupplierOrder {
 }
 
 model SupplierOrderItem {
+  /// Арендатор-владелец, унаследованный от родителя (SupplierOrder).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id               String                @id @default(cuid())
   orderId          String
   type             SupplierOrderItemType @default(PART)
@@ -1899,6 +2008,7 @@ model SupplierOrderItem {
 
   @@index([orderId])
   @@index([partId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -2002,6 +2112,10 @@ model VehicleTrim {
 // trimId) prevents duplicates. Cascade from both sides — deleting a part or
 // trim drops the link without leaving orphan rows.
 model PartTrim {
+  /// Арендатор-владелец, унаследованный от родителя (Part).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   partId String
   trimId String
 
@@ -2010,6 +2124,7 @@ model PartTrim {
 
   @@id([partId, trimId])
   @@index([trimId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -2134,6 +2249,10 @@ model Estimate {
 }
 
 model EstimateLine {
+  /// Арендатор-владелец, унаследованный от родителя (Estimate).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id          String       @id @default(cuid())
   estimateId  String
   sortOrder   Int          @default(0)
@@ -2163,6 +2282,7 @@ model EstimateLine {
   @@index([estimateId, sortOrder])
   @@index([partId])
   @@index([referenceId])
+  @@index([tenantId])
 }
 
 // ============================================
@@ -2574,6 +2694,10 @@ model StaffNotificationEvent {
 /// Per-employee read state. Reading a notification never mutates the CRM task
 /// or the underlying CommunicationLog.
 model StaffNotificationReceipt {
+  /// Арендатор-владелец, унаследованный от родителя (StaffNotificationEvent).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id        String    @id @default(cuid())
   tenantKey String    @default("geleoteka")
   eventId   String
@@ -2585,6 +2709,7 @@ model StaffNotificationReceipt {
 
   @@unique([tenantKey, eventId, userId], map: "StaffNotificationReceipt_tenant_event_user_key")
   @@index([tenantKey, userId, readAt, createdAt], map: "StaffNotificationReceipt_user_read_created_idx")
+  @@index([tenantId])
 }
 
 /// Explicit per-employee opt-outs. Absence means the category is enabled, so
@@ -2610,6 +2735,10 @@ model StaffNotificationOptOut {
 /// is an internal adapter key (for Telegram it will be TelegramDestination.id),
 /// never an address accepted from a browser.
 model StaffNotificationDelivery {
+  /// Арендатор-владелец, унаследованный от родителя (StaffNotificationEvent).
+  /// Хранится строкой, а не выводится связью: составной внешний ключ
+  /// (родитель + арендатор) не даст привязать строку к чужому родителю.
+  tenantId String?
   id                String                          @id @default(cuid())
   tenantKey         String                          @default("geleoteka")
   eventId           String
@@ -2629,6 +2758,7 @@ model StaffNotificationDelivery {
   @@unique([tenantKey, eventId, channel, destinationKey], map: "StaffNotificationDelivery_tenant_event_channel_dest_key")
   @@index([tenantKey, status, nextAttemptAt], map: "StaffNotificationDelivery_status_due_idx")
   @@index([tenantKey, leaseUntil])
+  @@index([tenantId])
 }
 
 /// A Telegram address verified by the webhook flow implemented in Story 4.
