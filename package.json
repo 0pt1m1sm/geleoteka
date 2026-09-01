@@ -83,6 +83,7 @@
   "overrides": {
     "sharp": "$sharp",
     "postcss": "^8.5.23",
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "deepmerge-ts": "^8.0.0"
   }
 }
