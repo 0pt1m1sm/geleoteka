@@ -126,7 +126,14 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
 
   // Для Resend проверять нечего: это HTTPS-запрос к чужому API, и его
   // доступность не говорит о нашем SMTP. Отвечаем честным «не применимо».
-  if (transport === "resend") {
+  //
+  // НО только когда проба не запрошена явно. Вопрос «выпускает ли сеть
+  // исходящий SMTP» от выбранного транспорта не зависит: именно его и надо
+  // выяснять, СИДЯ на Resend, — чтобы понять, есть ли куда уходить. Первая
+  // версия замыкалась здесь всегда и на любую пробу отвечала «не применимо»,
+  // то есть молчала ровно в том случае, ради которого делалась.
+  const probeRequested = deps.hostOverride !== undefined || deps.portOverride !== undefined;
+  if (transport === "resend" && !probeRequested) {
     return { transport, host: null, port: null, code: "not_applicable", ok: false, authenticated: false };
   }
 

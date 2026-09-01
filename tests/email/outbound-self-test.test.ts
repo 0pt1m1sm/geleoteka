@@ -229,3 +229,45 @@ describe("проба чужого почтового сервера", () => {
     expect(res).toMatchObject({ ok: false, code: "timeout" });
   });
 });
+
+describe("проба работает и когда транспорт не SMTP", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    settings.clear();
+    settings.set("EMAIL_TRANSPORT", "resend"); // прод сейчас именно такой
+    settings.set("SMTP_HOST", "smtp.timeweb.ru");
+    settings.set("SMTP_PORT", "465");
+    settings.set("SMTP_USER", "sales@geleoteka.ru");
+    process.env.SMTP_PASSWORD = "секрет";
+  });
+
+  async function run(deps: Record<string, unknown>) {
+    const seen: Record<string, unknown>[] = [];
+    const { checkOutboundReachability } = await import("@/lib/email/self-test");
+    const res = await checkOutboundReachability({
+      ...deps,
+      createTransporter: ((o: Record<string, unknown>) => {
+        seen.push(o);
+        return { verify: async () => true };
+      }) as never,
+    } as never);
+    return { res, opts: seen[0] };
+  }
+
+  it("явная проба выполняется, сидя на Resend", async () => {
+    // Ровно тот случай, ради которого проверка и нужна: мы ушли на Resend
+    // из-за блокировки и хотим знать, открылось ли что-нибудь. Первая версия
+    // здесь отвечала «не применимо» и молчала.
+    const { res, opts } = await run({ hostOverride: "smtp.gmail.com", portOverride: 587 });
+    expect(res.code).toBe("ok");
+    expect(res.host).toBe("smtp.gmail.com");
+    expect(opts.port).toBe(587);
+  });
+
+  it("без пробы на Resend по-прежнему «не применимо»", async () => {
+    // Доступность чужого HTTPS-API ничего не говорит о нашем SMTP.
+    const { res, opts } = await run({});
+    expect(res.code).toBe("not_applicable");
+    expect(opts).toBeUndefined();
+  });
+});
