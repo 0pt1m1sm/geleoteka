@@ -3,7 +3,7 @@
 Created: 2026-07-12
 Author: aleksandr.spiskov@gmail.com
 Agent: Claude Code
-Status: PENDING
+Status: PENDING — не начат, годен как есть; в бэклоге это O1 (docs/ROADMAP.md)
 Approved: No
 Iterations: 0
 Worktree: No

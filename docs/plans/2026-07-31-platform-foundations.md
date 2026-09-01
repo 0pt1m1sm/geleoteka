@@ -1,7 +1,7 @@
 # Основания платформы: чинить сегодняшнее в правильной форме
 
 Created: 2026-07-31
-Status: IN_PROGRESS
+Status: ЗАКРЫТ 2026-09-01 — девять историй из десяти; Story 8 вынесена в docs/ROADMAP.md как O3
 Mode: auto
 Iterations: 0
 Type: Feature+Bugfix+Security
@@ -57,10 +57,10 @@ Account (глобальный) ── AuthIdentity (подтверждённые
 - [x] Story 0: Проверить прод после PR #13   (Status: VERIFIED)
 - [x] Story 4: Журнал действий администратора   (Status: VERIFIED, PR #15)
 - [x] Story 3: Приватные фото работ закрыть авторизацией   (Status: VERIFIED, PR #19)
-- [ ] Story 5: Подтверждение email   (Status: PENDING)
+- [x] Story 5: Подтверждение email   (Status: СДЕЛАНО — установлено сверкой по коду 2026-09-01: `lib/email-verification/core.ts` + `send.ts`, модель `EmailVerificationToken`, подключено в `app/actions/register.ts` и `profile.ts`. Галочку не проставили в своё время)
 - [x] Story 7: Создание из контекста — сделка из карточки клиента, заказ-наряд вручную   (Status: VERIFIED, PR #20)
-- [ ] Story 8: Сбор дефектов с живых устройств   (Status: PENDING)
-- [ ] Story 2: Ресурсная модель расписания   (Status: PENDING, GATED)
+- [ ] Story 8: Сбор дефектов с живых устройств   (Status: НЕ НАЧАТА → вынесена в docs/ROADMAP.md как O3; постановка ниже годна как есть)
+- [x] Story 2: Ресурсная модель расписания   (Status: СДЕЛАНО — установлено сверкой 2026-09-01: миграция `20260801190000_service_bay_resource_model`, модель `ServiceBay`, `lib/scheduling/service-bays.ts` с проверкой пересечений по длительности, тесты `tests/scheduling/`)
 
 ## Implementation Tasks
 
