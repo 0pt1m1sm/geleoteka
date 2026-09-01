@@ -271,3 +271,39 @@ describe("проба работает и когда транспорт не SMTP
     expect(opts).toBeUndefined();
   });
 });
+
+describe("отправка диагностического письма", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    settings.clear();
+    settings.set("SMTP_USER", "sales@geleoteka.ru");
+  });
+
+  it("письмо уходит на СВОЙ ящик, адресата выбрать нельзя", async () => {
+    // Ручка за общим секретом с произвольным адресатом стала бы отправлялкой
+    // чужой почты с нашего домена. Поэтому получатель берётся из конфига.
+    const { sendSelfTestLetter } = await import("@/lib/email/self-test");
+    let seen: { to: string; subject: string } | null = null;
+    const res = await sendSelfTestLetter(async (m) => {
+      seen = m;
+      return { success: true, messageId: "<id@geleoteka.ru>" };
+    });
+    expect(seen!.to).toBe("sales@geleoteka.ru");
+    expect(res).toMatchObject({ accepted: true, to: "sales@geleoteka.ru", code: "ok" });
+  });
+
+  it("отказ сервера не выдаётся за успех", async () => {
+    const { sendSelfTestLetter } = await import("@/lib/email/self-test");
+    const res = await sendSelfTestLetter(async () => ({ success: false, error: "550 rejected" }));
+    expect(res).toMatchObject({ accepted: false, code: "rejected" });
+  });
+
+  it("без настроенного ящика не отправляет вовсе", async () => {
+    settings.clear();
+    const { sendSelfTestLetter } = await import("@/lib/email/self-test");
+    const send = vi.fn();
+    const res = await sendSelfTestLetter(send as never);
+    expect(res.code).toBe("not_configured");
+    expect(send).not.toHaveBeenCalled();
+  });
+});
