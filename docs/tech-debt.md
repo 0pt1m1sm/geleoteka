@@ -1,12 +1,20 @@
 # Technical Debt
 
+Действующий бэклог — `docs/ROADMAP.md`; здесь только долг, не попавший в линии работ.
+Статусы сверены 2026-09-01.
+
 Tracked items not on the active backlog. When picking one up, copy its block into a fresh `docs/plans/YYYY-MM-DD-<slug>.md` and run `/spec`.
 
 ---
 
 ## TD-001: Warehouse / inventory management
 
-**Status:** DEFERRED
+**Status:** ЗАКРЫТ 2026-09-01 — долг снят построенным WMS. `StockMovement` как
+append-only журнал, `StockItem` по складам, адресное хранение `StockBin`, приёмка сканером,
+инвентаризация, отчёты и себестоимость с учётом ввоза выкачены в прод. Описание ниже —
+состояние на май 2026, оставлено для истории.
+
+**Прежний статус:** DEFERRED
 **Logged:** 2026-05-12
 **Trigger to revisit:** before scaling the retail-parts channel beyond the current single-operator-flow (manager manually edits `Part.quantity` per receipt).
 
@@ -62,7 +70,11 @@ The current single-operator flow works: the manager owns the stock and edits `Pa
 
 ## TD-002: Claim-token TTL + invalidate-on-claim
 
-**Status:** DEFERRED
+**Status:** НАПОЛОВИНУ ЗАКРЫТ (сверено 2026-09-01) — гашение токена при клейме сделано
+(`app/actions/customer-onboarding.ts` обнуляет `claimToken` на всех трёх путях). Остаётся
+**срок жизни**: невостребованный токен живёт вечно. В бэклоге это X8.
+
+**Прежний статус:** DEFERRED
 **Logged:** 2026-05-12
 **Trigger to revisit:** before retail-volume scales OR if a token-misdelivery security incident occurs.
 
@@ -97,7 +109,7 @@ Current SMS already transmits the same long-lived token; email is not a new expo
 
 ## TD-003: Link-based guest claim-account flow
 
-**Status:** DEFERRED
+**Status:** DEFERRED — актуален, в бэклоге X9
 **Logged:** 2026-05-12
 **Trigger to revisit:** when SMTP email goes live and customers ask "I missed the post-checkout panel — how do I claim my order from the email?"
 

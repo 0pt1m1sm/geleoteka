@@ -253,7 +253,7 @@ mail-sync worker ──IMAPS/UID replay──> provider-neutral ingest
 - [x] Story 3 (Task 3): CRM resolution входящих/исходящих + задачи   (Status: VERIFIED — 58 тестов + 4 verify PASS, все ворота зелёные; инлайн high-risk verify PASS 2026-07-20: outbound привязывается только при РОВНО одном известном получателе, иначе park — cross-customer-leak закрыт. Шов Story 1 (кейс 6) закрыт.)
 - [x] Story 4 (Task 4): Provider-neutral attachments, inbox/timeline UI и diagnostics   (Status: VERIFIED — 177 тестов, все ворота зелёные; инлайн high-risk verify PASS 2026-07-20: attachment-роут — auth-first, локатор из БД, allow-list attachmentId, санитизация filename (traversal+header injection), 410/502, nosniff; replay ADMIN-only идемпотентен.)
 - [x] Story 5 (Task 5): Outbound transport abstraction — generic SMTP primary, Resend как удаляемый legacy-адаптер (RESCOPED 2026-07-28)   (Status: VERIFIED — 189 тестов, все ворота зелёные; инлайн high-risk verify PASS 2026-07-20: selectTransport без failover (нет двойной отправки), ACCEPTED≠DELIVERED, timeout→UNKNOWN/N_A (не переслеп), SMTP-пароль только env, API 5 call sites неизменен. ⚠️ дефолт EMAIL_TRANSPORT=smtp — см. операционную заметку ниже.)
-- [ ] Task 6 (ВНЕ автопрогона): Timeweb mailbox/DNS cutover без потери писем
+- [ ] Task 6 (ВНЕ автопрогона): Timeweb mailbox/DNS cutover без потери писем   (в бэклоге — X1: на проде всё ещё `EMAIL_TRANSPORT=resend` при заданных SMTP-доступах)
 - [ ] Task 7 (ВНЕ автопрогона): Soak, outage drill, rollback readiness и legacy cleanup decision
 
 ## Implementation Tasks

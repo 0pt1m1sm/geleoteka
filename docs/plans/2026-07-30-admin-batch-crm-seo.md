@@ -1,7 +1,7 @@
 # Админ-панель: пачка фиксов + фич (CRM, календарь, доступы, SEO)
 
 Created: 2026-07-30
-Status: IN_PROGRESS
+Status: ЗАКРЫТ 2026-09-01 — десять историй VERIFIED; Story 7 выросла в отдельную работу и вошла в мультиарендность
 Mode: auto
 Iterations: 0
 Type: Feature+Bugfix
@@ -37,7 +37,7 @@ Engine: ultraralph (durable plan-as-ledger)
 - [x] Story 9 (НОВАЯ): Два бага аутентификации из плана Account   (Status: VERIFIED, commit 08fc846)
 - [x] Story 10 (НОВАЯ): Сетка слотов в админском календаре   (Status: VERIFIED, commit 25acf77)
 - [x] Story 6: SEO-оптимизация публичного сайта   (Status: VERIFIED, commit 8999df2)
-- [ ] Story 7 (НОВАЯ, одобрена юзером): Выделение `Account` — учётка отдельно от человека   (Status: PENDING — 8–12 дней, отдельная инициатива)
+- [x] Story 7 (НОВАЯ, одобрена юзером): Выделение `Account` — учётка отдельно от человека   (Status: ПЕРЕДАНА — оформлена планом `2026-07-30-account-split.md`, который 01.09 поглощён вехой идентичности в `2026-07-31-multi-tenant-platform.md`; см. docs/ROADMAP.md, P1)
 
 ## Implementation Tasks
 
