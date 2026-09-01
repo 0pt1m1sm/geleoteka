@@ -24,6 +24,9 @@ interface EstimateLineView {
   unitPrice: number;
   total: number;
   sortOrder: number;
+  /** Снимок состояния на момент добавления — не join к товару: строка сметы
+   *  неизменна, а товар могут удалить. */
+  conditionSnapshot?: "NEW" | "USED" | "REFURBISHED" | null;
 }
 
 interface Props {
@@ -573,7 +576,14 @@ function ReadOnlyRow({
       <span className="text-xs text-[var(--foreground-muted)] shrink-0 w-24">
         {DEAL_LINE_TYPE_LABELS[line.type] ?? line.type}
       </span>
-      <span className="flex-1 truncate text-sm">{line.description}</span>
+      <span className="flex-1 truncate text-sm">
+        {line.description}
+        {line.conditionSnapshot && line.conditionSnapshot !== "NEW" && (
+          <span className="badge text-[10px] ml-2 align-middle">
+            {line.conditionSnapshot === "USED" ? "Б/у" : "Восстановленная"}
+          </span>
+        )}
+      </span>
       <span className="text-xs text-[var(--foreground-muted)] tabular-nums">
         {line.qty} × {formatPrice(line.unitPrice)}
       </span>

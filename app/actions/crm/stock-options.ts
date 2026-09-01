@@ -10,6 +10,17 @@ export interface PartStockOption {
   article: string;
   price: number;
   available: number;
+  /** Состояние. Без него б/у экземпляр в пикере неотличим от нового: артикул у
+   *  них ОДИН И ТОТ ЖЕ (так задумано схемой), а поиск идёт в том числе по нему.
+   *  Механик, ищущий по OEM, получал несколько почти одинаковых строк и выбирал
+   *  наугад — в смету уходила не та деталь и не та цена. */
+  condition: "NEW" | "USED" | "REFURBISHED";
+  /** Различает ДВА б/у экземпляра одной детали: у них совпадает и артикул, и
+   *  название, и состояние — не совпадает только sku. */
+  sku: string;
+  /** Заметка о состоянии: единственное, чем один экземпляр отличается от
+   *  другого по существу. */
+  conditionNote: string | null;
 }
 
 /**
@@ -38,6 +49,9 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
       name: true,
       article: true,
       price: true,
+      condition: true,
+      sku: true,
+      conditionNote: true,
       stockItems: { select: { quantity: true, reserved: true } },
     },
     orderBy: { name: "asc" },
@@ -47,6 +61,9 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
     name: string;
     article: string;
     price: number;
+    condition: "NEW" | "USED" | "REFURBISHED";
+    sku: string;
+    conditionNote: string | null;
     stockItems: Array<{ quantity: number; reserved: number }>;
   }>;
 
@@ -56,5 +73,8 @@ export async function searchPartStockOptions(query: string): Promise<PartStockOp
     article: p.article,
     price: p.price,
     available: p.stockItems[0] ? availableStock(p.stockItems[0]) : 0,
+    condition: p.condition,
+    sku: p.sku,
+    conditionNote: p.conditionNote,
   }));
 }
