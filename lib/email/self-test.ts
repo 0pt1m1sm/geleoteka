@@ -39,6 +39,13 @@ export interface OutboundReachability {
   port: number | null;
   code: ReachabilityCode;
   ok: boolean;
+  /**
+   * Проверялась ли авторизация. Для СВОЕГО сервера — да. Для чужого — нет и
+   * быть не может: авторизация означала бы отправку нашего пароля на чужой
+   * сервер, то есть утечку доступов ради диагностики. У чужого хоста успех
+   * означает ровно «сеть выпускает SMTP на этот порт», не более.
+   */
+  authenticated: boolean;
 }
 
 interface VerifiableTransporter {
@@ -57,10 +64,30 @@ export interface ReachabilityDeps {
    * сканер чужих портов нашими руками. Порт — только из списка почтовых.
    */
   portOverride?: number;
+  /**
+   * Проверить достижимость чужого почтового сервера из `FOREIGN_PROBE_HOSTS`.
+   * Соединение идёт БЕЗ авторизации — см. поле `authenticated` в ответе.
+   */
+  hostOverride?: string;
 }
 
 /** Порты, на которые вообще имеет смысл стучаться почтой. */
 export const PROBE_PORTS: readonly number[] = [465, 587, 2525, 25];
+
+/**
+ * Чужие почтовые хосты, до которых разрешено проверять достижимость.
+ *
+ * Нужно, чтобы различить два разных диагноза: «хостинг режет исходящий SMTP
+ * вообще» и «не проходит только до нашего почтового сервера». Лечатся они
+ * по-разному, а по одному своему хосту их не отличить.
+ *
+ * Список закрытый и короткий: это диагностика, а не сканер чужих портов.
+ */
+export const FOREIGN_PROBE_HOSTS: readonly string[] = [
+  "smtp.gmail.com",
+  "smtp.yandex.ru",
+  "smtp.mail.ru",
+];
 
 /** Ошибку приводим к классу по коду nodemailer/сокета, а не по тексту. */
 export function classifyVerifyError(err: unknown): ReachabilityCode {
@@ -100,7 +127,7 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
   // Для Resend проверять нечего: это HTTPS-запрос к чужому API, и его
   // доступность не говорит о нашем SMTP. Отвечаем честным «не применимо».
   if (transport === "resend") {
-    return { transport, host: null, port: null, code: "not_applicable", ok: false };
+    return { transport, host: null, port: null, code: "not_applicable", ok: false, authenticated: false };
   }
 
   const [hostRaw, portRaw, secureRaw, userRaw] = await Promise.all([
@@ -112,14 +139,19 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
   const user = userRaw?.trim();
   const pass = process.env.SMTP_PASSWORD?.trim();
   if (!user || !pass) {
-    return { transport, host: null, port: null, code: "not_configured", ok: false };
+    return { transport, host: null, port: null, code: "not_configured", ok: false, authenticated: false };
   }
 
-  const host = hostRaw?.trim() || DEFAULT_SMTP_HOST;
+  const configuredHost = hostRaw?.trim() || DEFAULT_SMTP_HOST;
+  const foreign = deps.hostOverride;
+  if (foreign !== undefined && !FOREIGN_PROBE_HOSTS.includes(foreign)) {
+    return { transport, host: null, port: null, code: "not_applicable", ok: false, authenticated: false };
+  }
+  const host = foreign ?? configuredHost;
   const configuredPort = parsePort(portRaw);
   const override = deps.portOverride;
   if (override !== undefined && !PROBE_PORTS.includes(override)) {
-    return { transport, host, port: null, code: "not_applicable", ok: false };
+    return { transport, host, port: null, code: "not_applicable", ok: false, authenticated: false };
   }
   const port = override ?? configuredPort;
   // Неявный TLS только на 465; на прочих портах соединение начинается открытым
@@ -134,21 +166,31 @@ export async function checkOutboundReachability(deps: ReachabilityDeps = {}): Pr
         : parseBool(secureRaw, port === 465);
 
   const make = deps.createTransporter ?? defaultCreateTransporter;
+  // Доступы уходят ТОЛЬКО на свой сервер. На чужом проверяется достижимость —
+  // соединение и приветствие, без AUTH: иначе наш пароль оказался бы у третьей
+  // стороны ради диагностики.
+  const authenticated = foreign === undefined;
   try {
     const transporter = await make({
       host,
       port,
       secure,
       requireTLS: !secure,
-      auth: { user, pass },
+      ...(authenticated ? { auth: { user, pass } } : {}),
       connectionTimeout: VERIFY_TIMEOUT_MS,
       greetingTimeout: VERIFY_TIMEOUT_MS,
       socketTimeout: VERIFY_TIMEOUT_MS,
       tls: { rejectUnauthorized: true, minVersion: "TLSv1.2", servername: host },
     });
     await transporter.verify();
-    return { transport, host, port, code: "ok", ok: true };
+    return { transport, host, port, code: "ok", ok: true, authenticated };
   } catch (err) {
-    return { transport, host, port, code: classifyVerifyError(err), ok: false };
+    const code = classifyVerifyError(err);
+    // Для чужого хоста отказ авторизации — успех проверки достижимости: раз
+    // сервер дошёл до отказа, соединение состоялось.
+    if (!authenticated && code === "auth_failed") {
+      return { transport, host, port, code: "ok", ok: true, authenticated };
+    }
+    return { transport, host, port, code, ok: false, authenticated };
   }
 }
