@@ -3,7 +3,7 @@
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import { createToken, setSessionCookie } from "@/lib/auth";
-import { isValidPassword } from "@/lib/customer-onboarding";
+import { claimTokenExpired, isValidPassword } from "@/lib/customer-onboarding";
 import { tokensMatch } from "@/lib/tokens";
 
 type OrderKind = "booking" | "cart" | "rental";
@@ -34,32 +34,41 @@ export async function setPasswordForGuestUser(input: {
 
   let storedToken: string | null = null;
   let userIdOnOrder: string | null = null;
+  let issuedAt: Date | null = null;
   if (input.orderKind === "booking") {
     const ro = (await db.repairOrder.findUnique({
       where: { id: input.orderId },
-      select: { claimToken: true, userId: true },
-    })) as { claimToken: string | null; userId: string } | null;
+      select: { claimToken: true, userId: true, createdAt: true },
+    })) as { claimToken: string | null; userId: string; createdAt: Date } | null;
     if (!ro) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = ro.claimToken;
     userIdOnOrder = ro.userId;
+    issuedAt = ro.createdAt;
   } else if (input.orderKind === "rental") {
     const rb = (await db.rentalBooking.findUnique({
       where: { id: input.orderId },
-      select: { claimToken: true, userId: true },
-    })) as { claimToken: string | null; userId: string | null } | null;
+      select: { claimToken: true, userId: true, createdAt: true },
+    })) as { claimToken: string | null; userId: string | null; createdAt: Date } | null;
     if (!rb) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = rb.claimToken;
     userIdOnOrder = rb.userId;
+    issuedAt = rb.createdAt;
   } else {
     const po = (await db.partShipment.findUnique({
       where: { id: input.orderId },
-      select: { claimToken: true, userId: true },
-    })) as { claimToken: string | null; userId: string | null } | null;
+      select: { claimToken: true, userId: true, createdAt: true },
+    })) as { claimToken: string | null; userId: string | null; createdAt: Date } | null;
     if (!po) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = po.claimToken;
     userIdOnOrder = po.userId;
+    issuedAt = po.createdAt;
   }
   if (!tokensMatch(storedToken, input.claimToken)) {
+    return { ok: false, error: "Неверная или истекшая ссылка claim" };
+  }
+  // Срок жизни ссылки. Проверяется ПОСЛЕ сверки токена: иначе ответ отличал бы
+  // просроченную ссылку от выдуманной и подсказывал бы, что заказ существует.
+  if (!issuedAt || claimTokenExpired(issuedAt)) {
     return { ok: false, error: "Неверная или истекшая ссылка claim" };
   }
   if (!userIdOnOrder) {
@@ -129,45 +138,55 @@ export async function loginAndAttachOrder(input: {
   let storedToken: string | null = null;
   let orderEmail: string | null = null;
   let orderUserId: string | null = null;
+  let issuedAt: Date | null = null;
   if (input.orderKind === "booking") {
     const ro = (await db.repairOrder.findUnique({
       where: { id: input.orderId },
       select: {
         claimToken: true,
         userId: true,
+        createdAt: true,
         user: { select: { email: true } },
       },
     })) as
-      | { claimToken: string | null; userId: string; user: { email: string } }
+      | { claimToken: string | null; userId: string; createdAt: Date; user: { email: string } }
       | null;
     if (!ro) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = ro.claimToken;
     orderEmail = ro.user.email;
     orderUserId = ro.userId;
+    issuedAt = ro.createdAt;
   } else if (input.orderKind === "rental") {
     const rb = (await db.rentalBooking.findUnique({
       where: { id: input.orderId },
-      select: { claimToken: true, userId: true, contactEmail: true },
+      select: { claimToken: true, userId: true, contactEmail: true, createdAt: true },
     })) as
-      | { claimToken: string | null; userId: string | null; contactEmail: string }
+      | { claimToken: string | null; userId: string | null; contactEmail: string; createdAt: Date }
       | null;
     if (!rb) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = rb.claimToken;
     orderEmail = rb.contactEmail;
     orderUserId = rb.userId;
+    issuedAt = rb.createdAt;
   } else {
     const po = (await db.partShipment.findUnique({
       where: { id: input.orderId },
-      select: { claimToken: true, userId: true, contactEmail: true },
+      select: { claimToken: true, userId: true, contactEmail: true, createdAt: true },
     })) as
-      | { claimToken: string | null; userId: string | null; contactEmail: string }
+      | { claimToken: string | null; userId: string | null; contactEmail: string; createdAt: Date }
       | null;
     if (!po) return { ok: false, error: "Неверная или истекшая ссылка claim" };
     storedToken = po.claimToken;
     orderEmail = po.contactEmail;
     orderUserId = po.userId;
+    issuedAt = po.createdAt;
   }
   if (!tokensMatch(storedToken, input.claimToken)) {
+    return { ok: false, error: "Неверная или истекшая ссылка claim" };
+  }
+  // Тот же срок, что и на вкладке создания пароля: просроченная ссылка не
+  // должна привязывать старый заказ к учётной записи.
+  if (!issuedAt || claimTokenExpired(issuedAt)) {
     return { ok: false, error: "Неверная или истекшая ссылка claim" };
   }
 
