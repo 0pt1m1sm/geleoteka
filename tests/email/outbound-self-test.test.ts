@@ -161,3 +161,71 @@ describe("проба альтернативных портов", () => {
     expect(opts.port).toBe(465);
   });
 });
+
+describe("проба чужого почтового сервера", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    settings.clear();
+    settings.set("EMAIL_TRANSPORT", "smtp");
+    settings.set("SMTP_HOST", "smtp.timeweb.ru");
+    settings.set("SMTP_PORT", "465");
+    settings.set("SMTP_USER", "sales@geleoteka.ru");
+    process.env.SMTP_PASSWORD = "секрет";
+  });
+
+  async function probeHost(host: string | undefined, opts: { fail?: unknown } = {}) {
+    const seen: Record<string, unknown>[] = [];
+    const { checkOutboundReachability } = await import("@/lib/email/self-test");
+    const res = await checkOutboundReachability({
+      hostOverride: host,
+      createTransporter: ((o: Record<string, unknown>) => {
+        seen.push(o);
+        return {
+          verify: async () => {
+            if (opts.fail) throw opts.fail;
+            return true;
+          },
+        };
+      }) as never,
+    });
+    return { res, opts: seen[0] };
+  }
+
+  it("НА ЧУЖОЙ СЕРВЕР ДОСТУПЫ НЕ УХОДЯТ", async () => {
+    // Главное требование истории: диагностика не имеет права отдать наш пароль
+    // третьей стороне. Проверяется достижимость, а не вход.
+    const { res, opts } = await probeHost("smtp.gmail.com");
+    expect(opts).not.toHaveProperty("auth");
+    expect(res.authenticated).toBe(false);
+    expect(res.host).toBe("smtp.gmail.com");
+  });
+
+  it("на своём сервере авторизация проверяется", async () => {
+    const { res, opts } = await probeHost(undefined);
+    expect(opts.auth).toEqual({ user: "sales@geleoteka.ru", pass: "секрет" });
+    expect(res.authenticated).toBe(true);
+  });
+
+  it("хост вне списка не проверяется вовсе", async () => {
+    // Иначе ручка стала бы сканером чужих портов нашими руками.
+    const { res, opts } = await probeHost("evil.example.com");
+    expect(res.code).toBe("not_applicable");
+    expect(opts).toBeUndefined();
+  });
+
+  it("отказ авторизации на чужом сервере — это успех достижимости", async () => {
+    // Соединение состоялось, раз сервер дошёл до отказа. Именно это и надо
+    // выяснить: выпускает ли сеть SMTP наружу вообще.
+    const { res } = await probeHost("smtp.gmail.com", {
+      fail: Object.assign(new Error("nope"), { code: "EAUTH" }),
+    });
+    expect(res).toMatchObject({ ok: true, code: "ok", authenticated: false });
+  });
+
+  it("таймаут на чужом сервере успехом не становится", async () => {
+    const { res } = await probeHost("smtp.gmail.com", {
+      fail: Object.assign(new Error("nope"), { code: "ETIMEDOUT" }),
+    });
+    expect(res).toMatchObject({ ok: false, code: "timeout" });
+  });
+});
