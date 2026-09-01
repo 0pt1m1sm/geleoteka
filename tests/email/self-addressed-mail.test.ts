@@ -28,7 +28,11 @@ function parsed(to: string[], from = "sales@geleoteka.ru") {
   };
 }
 
-/** Свои ящики — те, что заведены в справочнике почтовых адресов. */
+/**
+ * Свои ящики — те, что заведены в справочнике почтовых адресов. Адрес с
+ * префиксом «!» изображает отключённый ящик: он в справочнике есть, но им
+ * больше не пользуются.
+ */
 function client(ownMailboxes: string[]) {
   const created: unknown[] = [];
   return {
@@ -36,8 +40,11 @@ function client(ownMailboxes: string[]) {
     tx: {
       communicationLog: { findUnique: async () => null, create: async () => ({ id: "log-1" }) },
       mailIdentity: {
-        findUnique: async ({ where }: { where: { address: string } }) =>
-          ownMailboxes.includes(where.address) ? { userId: null, isActive: true } : null,
+        findUnique: async ({ where }: { where: { address: string } }) => {
+          if (ownMailboxes.includes(where.address)) return { userId: null, isActive: true };
+          if (ownMailboxes.includes(`!${where.address}`)) return { userId: null, isActive: false };
+          return null;
+        },
       },
       user: { findFirst: async () => null, findMany: async () => [] },
       customerContact: { findFirst: async () => null },
@@ -90,5 +97,56 @@ describe("исходящее письмо на свои же ящики", () => 
     // Пустой список своим не считается: это странность, пусть посмотрят.
     const { res } = await resolve([], ["sales@geleoteka.ru"]);
     expect(res.kind).toBe("inbox");
+  });
+});
+
+/**
+ * Тот же случай на ВХОДЯЩЕМ пути. Письмо приезжает в два ящика сразу —
+ * в архив отправленных и во входящие, — и какой из них успеет первым, зависит
+ * от гонки синхронизаторов. Первая версия правила закрыла только исходящий
+ * путь, и следующее же диагностическое письмо снова встало в очередь: тот же
+ * дефект, вошедший через вторую дверь.
+ */
+async function resolveInbound(from: string, own: string[]) {
+  const { resolveInboundEmail } = await import("@/lib/email/resolve");
+  const c = client(own);
+  const res = await resolveInboundEmail({
+    parsed: parsed(["sales@geleoteka.ru"], from) as never,
+    client: {
+      ...c.tx,
+      // Возвращаем то, что просили создать: publish сверяет тождество события
+      // и на подделке с чужими полями справедливо ругается.
+      staffNotificationEvent: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "ev-1", ...data }),
+        upsert: async ({ create }: { create: Record<string, unknown> }) => ({ id: "ev-1", ...create }),
+      },
+    } as never,
+    emailMessageId: "em-1",
+  });
+  return { res, created: c.created };
+}
+
+describe("входящее письмо от нас самих", () => {
+  it("от своего ящика — в очередь разбора НЕ попадает", async () => {
+    const { res, created } = await resolveInbound("sales@geleoteka.ru", ["sales@geleoteka.ru"]);
+    expect(res.kind).toBe("ignored");
+    expect(created).toHaveLength(0);
+  });
+
+  it("от клиента — по-прежнему ждёт разбора", async () => {
+    // Граница: неизвестный отправитель — это ровно то, ради чего очередь есть.
+    const { res, created } = await resolveInbound("klient@example.com", ["sales@geleoteka.ru"]);
+    expect(res.kind).toBe("inbox");
+    expect(created).toHaveLength(1);
+  });
+});
+
+describe("отключённый ящик остаётся нашим", () => {
+  it("письмо со старого служебного адреса не идёт в разбор", async () => {
+    // Адрес не перестаёт быть своим оттого, что им больше не пользуются:
+    // письмо с parts@ или service@ — по-прежнему не переписка с клиентом.
+    const { res, created } = await resolveInbound("service@geleoteka.ru", ["!service@geleoteka.ru"]);
+    expect(res.kind).toBe("ignored");
+    expect(created).toHaveLength(0);
   });
 });

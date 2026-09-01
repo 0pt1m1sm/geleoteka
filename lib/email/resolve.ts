@@ -129,6 +129,15 @@ export async function resolveInboundEmail(input: {
     };
   }
 
+  // ── 3а. Письмо от нас самих ────────────────────────────────────────────────
+  // Отправитель — наш собственный ящик, значит это не письмо клиента: либо
+  // служебное письмо приложения, либо переписка сотрудников между рабочими
+  // ящиками. Класть его в очередь разбора и будить уведомлением сотрудников —
+  // шум. Симметрично тому же правилу на исходящем пути.
+  if (await isOwnMailbox(parsed.from.email, client)) {
+    return { kind: "ignored", id: emailMessageId ?? "", followUp: null, staffNotificationEventId: null };
+  }
+
   // ── 3. Unknown sender ──────────────────────────────────────────────────────
   const inbox = await createUnresolvedInboxMessage({ parsed, client, emailMessageId });
   const event = await publishInboundMessageUnresolved(client, {
@@ -268,13 +277,24 @@ async function allRecipientsAreOwnMailboxes(
   const recipients = [...parsed.to, ...parsed.cc].map((a) => a.email.trim().toLowerCase());
   if (recipients.length === 0) return false;
   for (const address of new Set(recipients)) {
-    const identity = (await client.mailIdentity.findUnique({
-      where: { address },
-      select: { isActive: true },
-    })) as { isActive: boolean } | null;
-    if (!identity) return false;
+    if (!(await isOwnMailbox(address, client))) return false;
   }
   return true;
+}
+
+/**
+ * Наш ли это почтовый ящик — по справочнику `MailIdentity`.
+ *
+ * Отключённый ящик (`isActive: false`) остаётся нашим: адрес не перестаёт быть
+ * своим оттого, что им больше не пользуются, а письма со старого служебного
+ * адреса — по-прежнему не переписка с клиентом.
+ */
+async function isOwnMailbox(address: string, client: EmailIngestTx): Promise<boolean> {
+  const identity = (await client.mailIdentity.findUnique({
+    where: { address: address.trim().toLowerCase() },
+    select: { isActive: true },
+  })) as { isActive: boolean } | null;
+  return identity !== null;
 }
 
 /**
