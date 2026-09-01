@@ -64,6 +64,9 @@ describe.sequential("ServiceBay allocation — real PostgreSQL concurrency", () 
         "name" TEXT NOT NULL,
         "isActive" BOOLEAN NOT NULL DEFAULT true,
         "tenantKey" TEXT NOT NULL DEFAULT 'geleoteka',
+        -- Колонка арендатора: Prisma читает её в RETURNING, поэтому таблица,
+        -- собранная здесь руками, обязана повторять форму модели.
+        "tenantId" TEXT DEFAULT 'tenant_geleoteka',
         "sortOrder" INTEGER NOT NULL DEFAULT 0,
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
         "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -75,6 +78,7 @@ describe.sequential("ServiceBay allocation — real PostgreSQL concurrency", () 
         "dateTime" TIMESTAMP(3) NOT NULL,
         "repairOrderId" TEXT NOT NULL UNIQUE,
         "bayId" TEXT NOT NULL REFERENCES "ServiceBay"("id") ON DELETE RESTRICT,
+        "tenantId" TEXT DEFAULT 'tenant_geleoteka',
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `);
