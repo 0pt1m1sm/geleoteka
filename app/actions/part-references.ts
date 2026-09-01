@@ -233,6 +233,32 @@ export async function importPartReferencesCsv(
 
 export async function deletePartReference(id: string): Promise<{ error: string | null }> {
   await requireRole(["ADMIN", "MANAGER"]);
+
+  // Удаление номенклатуры МОЛЧА обесхоживало всё, что на неё ссылалось:
+  // `Part.referenceId`, `EstimateLine.referenceId` и заявки объявлены SetNull,
+  // поэтому база не возражает — она просто обнуляет связь. Одним кликом товары
+  // теряли страницу по номеру (canonical вёл в никуда), строки смет теряли
+  // привязку к каталогу, а входящие заявки — позицию, ради которой пришли.
+  // Видно это становилось не сразу и не тому, кто нажимал.
+  const [parts, estimateLines, requests] = (await Promise.all([
+    db.part.count({ where: { referenceId: id } }),
+    db.estimateLine.count({ where: { referenceId: id } }),
+    db.partRequest.count({ where: { referenceId: id } }),
+  ])) as [number, number, number];
+
+  const attached: string[] = [];
+  if (parts > 0) attached.push(`товаров: ${parts}`);
+  if (estimateLines > 0) attached.push(`строк смет: ${estimateLines}`);
+  if (requests > 0) attached.push(`заявок: ${requests}`);
+
+  if (attached.length > 0) {
+    return {
+      error:
+        `Позицию нельзя удалить: на неё ссылаются ${attached.join(", ")}. ` +
+        `Сначала отвяжите или удалите их — иначе связи пропадут молча.`,
+    };
+  }
+
   try {
     await db.partReference.delete({ where: { id } });
   } catch {
