@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Письмо самим себе не должно вставать в очередь разбора.
