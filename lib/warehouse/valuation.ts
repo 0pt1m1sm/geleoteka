@@ -5,6 +5,13 @@
  * by orderDate; PART lines only). Parts never purchased have no cost basis and are
  * surfaced as a count rather than valued at 0.
  *
+ * Берётся СЕБЕСТОИМОСТЬ С УЧЁТОМ ВВОЗА, а не голая цена закупки. Доставка и
+ * таможня считаются на заказ, но товар стоит вместе с ними: при таможне 26% и
+ * карго по доллару за килограмм оценка по цене закупки занижала склад на
+ * десятки процентов, а наценка выглядела больше, чем есть. У строк, заведённых
+ * до появления разнесения, landedUnitCost пуст — там остаётся прежняя цена
+ * закупки: пересчитать их нельзя, ставки и курс на тот момент не восстановить.
+ *
  * ⛔ Single-warehouse-safe only: sums StockItem without a warehouseId filter. Task 8
  *    adds the filter — do not create a second warehouse before then.
  */
@@ -19,6 +26,9 @@ type FindManyFn = (args: unknown) => Promise<unknown>;
 interface CostRow {
   partId: string | null;
   unitCost: number;
+  /** Себестоимость с учётом доставки и таможни. NULL у строк, заведённых до
+   *  появления разнесения. */
+  landedUnitCost: number | null;
   order: { orderDate: Date } | null;
 }
 
@@ -35,7 +45,12 @@ export async function latestUnitCostByPartIds(
   const findMany = db.supplierOrderItem.findMany as FindManyFn;
   const rows = (await findMany({
     where: { type: "PART", partId: { in: partIds } },
-    select: { partId: true, unitCost: true, order: { select: { orderDate: true } } },
+    select: {
+      partId: true,
+      unitCost: true,
+      landedUnitCost: true,
+      order: { select: { orderDate: true } },
+    },
     // Deterministic tie-break: among same-date rows the last iterated (largest id) wins.
     orderBy: [{ order: { orderDate: "asc" } }, { id: "asc" }],
   })) as CostRow[];
@@ -45,7 +60,10 @@ export async function latestUnitCostByPartIds(
     if (!r.partId) continue;
     const at = r.order ? new Date(r.order.orderDate).getTime() : 0;
     const prev = latest.get(r.partId);
-    if (!prev || at >= prev.at) latest.set(r.partId, { cost: r.unitCost, at });
+    // Себестоимость с учётом ввоза, если она посчитана; иначе прежняя цена
+    // закупки — у строк, заведённых до появления разнесения, её не заменить.
+    const cost = r.landedUnitCost ?? r.unitCost;
+    if (!prev || at >= prev.at) latest.set(r.partId, { cost, at });
   }
   return new Map([...latest].map(([pid, v]) => [pid, v.cost]));
 }

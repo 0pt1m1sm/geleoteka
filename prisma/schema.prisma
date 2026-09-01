@@ -1737,6 +1737,19 @@ model SupplierOrderItem {
   receivedQuantity Int                   @default(0) // cumulative received via scan-receive (Phase 2)
   unitCost         Int
   totalCost        Int
+  /// Себестоимость С УЧЁТОМ ВВОЗА: доставка и таможня, разнесённые на эту
+  /// строку. Доставка делится по весу (её берут за килограмм), таможня — по
+  /// стоимости либо по весу, смотря как она посчитана.
+  ///
+  /// Зачем: раньше ввозные затраты жили только на заказе, а себестоимостью
+  /// позиции была голая цена закупки. Оценка запасов брала именно её — склад
+  /// числился дешевле, чем стоил, а наценка выглядела больше, чем есть.
+  ///
+  /// landedTotalCost точен (сумма по строкам равна сумме затрат до рубля),
+  /// landedUnitCost округлён: итог не всегда делится на количество нацело.
+  /// NULL у строк, заведённых до появления разнесения.
+  landedUnitCost   Int?
+  landedTotalCost  Int?
 
   order SupplierOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
   part  Part?         @relation(fields: [partId], references: [id], onDelete: SetNull)

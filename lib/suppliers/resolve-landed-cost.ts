@@ -42,6 +42,10 @@ export interface ResolvedLandedCost {
   shippingCost: number;
   customsCost: number;
   totalCost: number;
+  /** Вес единицы по каждой позиции — для разнесения доставки по строкам.
+   *  Возвращается здесь, потому что уже прочитан: второй поход в базу за тем
+   *  же был бы лишним. */
+  weightById: Map<string, number | null>;
 }
 
 export async function resolveLandedCost(
@@ -77,5 +81,10 @@ export async function resolveLandedCost(
     shippingCost,
     customsCost,
     totalCost: input.itemsCostRub + shippingCost + customsCost,
+    // Веса нужны вызывающему для РАЗНЕСЕНИЯ доставки по позициям: она берётся
+    // за килограмм, и делить её по стоимости значило бы записать доставку
+    // тяжёлой дешёвой детали на лёгкую дорогую. Второй раз ходить за ними в
+    // базу незачем — они уже здесь.
+    weightById,
   };
 }
