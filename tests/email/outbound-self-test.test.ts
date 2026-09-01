@@ -101,3 +101,63 @@ describe("проверка исходящей почты", () => {
     expect(JSON.stringify(res)).not.toContain("секрет");
   });
 });
+
+describe("проба альтернативных портов", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    settings.clear();
+    settings.set("EMAIL_TRANSPORT", "smtp");
+    settings.set("SMTP_HOST", "smtp.timeweb.ru");
+    settings.set("SMTP_PORT", "465");
+    settings.set("SMTP_USER", "sales@geleoteka.ru");
+    process.env.SMTP_PASSWORD = "секрет";
+  });
+
+  async function probe(port: number | undefined, capture: (o: Record<string, unknown>) => void) {
+    const { checkOutboundReachability } = await import("@/lib/email/self-test");
+    return checkOutboundReachability({
+      portOverride: port,
+      createTransporter: ((o: Record<string, unknown>) => {
+        capture(o);
+        return { verify: async () => true };
+      }) as never,
+    });
+  }
+
+  it("проба идёт на указанный порт, а не на настроенный", async () => {
+    // Ради этого проба и нужна: провайдер режет 465 и пропускает 587.
+    let opts: Record<string, unknown> = {};
+    const res = await probe(587, (o) => (opts = o));
+    expect(res.port).toBe(587);
+    expect(opts.port).toBe(587);
+  });
+
+  it("на 587 соединение начинается открытым и обязано подняться в TLS", async () => {
+    // Иначе доступы ушли бы по чистому каналу.
+    let opts: Record<string, unknown> = {};
+    await probe(587, (o) => (opts = o));
+    expect(opts.secure).toBe(false);
+    expect(opts.requireTLS).toBe(true);
+  });
+
+  it("на 465 остаётся неявный TLS", async () => {
+    let opts: Record<string, unknown> = {};
+    await probe(465, (o) => (opts = o));
+    expect(opts.secure).toBe(true);
+  });
+
+  it("непочтовый порт не проверяется вовсе", async () => {
+    // Иначе внутренняя ручка стала бы сканером чужих портов нашими руками.
+    const called = vi.fn();
+    const res = await probe(8080, called);
+    expect(res.code).toBe("not_applicable");
+    expect(called).not.toHaveBeenCalled();
+  });
+
+  it("без указания порта берётся настроенный", async () => {
+    let opts: Record<string, unknown> = {};
+    const res = await probe(undefined, (o) => (opts = o));
+    expect(res.port).toBe(465);
+    expect(opts.port).toBe(465);
+  });
+});

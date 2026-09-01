@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 
 import { NextResponse } from "next/server";
 
-import { checkOutboundReachability } from "@/lib/email/self-test";
+import { checkOutboundReachability, PROBE_PORTS } from "@/lib/email/self-test";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +40,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const result = await checkOutboundReachability();
+  // Необязательный порт в теле: {"port": 587}. Хост подменить нельзя — только
+  // настроенный, и только из списка почтовых портов.
+  let portOverride: number | undefined;
+  try {
+    const body = (await request.json()) as { port?: unknown };
+    if (typeof body?.port === "number" && PROBE_PORTS.includes(body.port)) {
+      portOverride = body.port;
+    }
+  } catch {
+    // Пустое тело — обычный случай: проверяем настроенный порт.
+  }
+
+  const result = await checkOutboundReachability({ portOverride });
   return NextResponse.json(result, { status: result.ok ? 200 : 502 });
 }
