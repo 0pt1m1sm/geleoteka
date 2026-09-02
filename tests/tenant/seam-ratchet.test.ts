@@ -14,7 +14,12 @@ import { describe, expect, it } from "vitest";
  * назад дороги нет. Список растёт по мере работы; пока он короткий, и это
  * честнее, чем объявить всё сделанным.
  */
-const MIGRATED = ["lib/customer-queries.ts"];
+const MIGRATED = [
+  "lib/customer-queries.ts",
+  "lib/settings.ts",
+  "lib/cms.ts",
+  "lib/authz.ts",
+];
 
 describe("модули, переведённые на шов", () => {
   it("не обращаются к клиенту базы напрямую", () => {

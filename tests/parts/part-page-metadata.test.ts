@@ -13,6 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const findUnique = vi.fn();
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: { part: { findUnique: (...a: unknown[]) => findUnique(...a) } } }));
 
 const calls: string[] = [];

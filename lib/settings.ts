@@ -1,5 +1,5 @@
 import "server-only";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { parseBooleanSetting } from "@/lib/settings-shared";
 import { STAFF_NOTIFICATION_EVENT_CATALOG } from "@/lib/staff-notifications/types";
 import { TELEGRAM_ROUTING_MODES } from "@/lib/staff-notifications/channels/telegram/constants";
@@ -377,6 +377,8 @@ export async function getSetting(key: string): Promise<string | null> {
 
   let value: string | null = null;
   try {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
     const row = (await db.setting.findUnique({
       where: { key },
       select: { value: true },
