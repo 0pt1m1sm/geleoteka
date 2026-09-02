@@ -3,6 +3,8 @@ import { Manrope, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Suspense } from "react";
 import { Providers } from "./providers";
+import { LocaleProvider } from "@/components/shared/LocaleProvider";
+import { tenantLocale } from "@/lib/i18n/server";
 import { ThemeInit } from "@/components/shared/ThemeInit";
 import { MyCarInit } from "@/components/shared/MyCarInit";
 import { ConfirmHost } from "@/components/ui/ConfirmHost";
@@ -114,14 +116,20 @@ const BASE_METADATA: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>): React.ReactElement {
+}>): Promise<React.ReactElement> {
   const fontClasses = `${fontManrope.variable} ${fontMono.variable}`;
+  // Настройки арендатора берутся один раз здесь и спускаются вниз: серверные
+  // компоненты берут их у арендатора сами, клиентские в базу не ходят.
+  const locale = await tenantLocale();
+  // Язык документа — из локали арендатора, а не литералом: он важен для
+  // экранных дикторов, переносов и предложения перевести страницу.
+  const lang = locale.locale.split("-")[0];
   return (
-    <html lang="ru" className={`${fontClasses} h-full antialiased`} suppressHydrationWarning>
+    <html lang={lang} className={`${fontClasses} h-full antialiased`} suppressHydrationWarning>
       <head>
         {/* Inline theme bootstrap — applies html.light or html.dark
             BEFORE first paint. Inlining (vs external script) is required
@@ -145,7 +153,9 @@ export default function RootLayout({
           <Suspense fallback={null}>
             <NavigationProgress />
           </Suspense>
-          <Providers>{children}</Providers>
+          <LocaleProvider settings={locale}>
+            <Providers>{children}</Providers>
+          </LocaleProvider>
           <ConfirmHost />
           <ToastHost />
         </NavigationProgressProvider>
