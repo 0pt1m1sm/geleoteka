@@ -17,6 +17,13 @@ vi.mock("@/lib/db", () => ({
     seoSnapshot: { create: (...args: unknown[]) => snapshotCreate(...args) },
   },
 }));
+// Модуль берёт клиент из шва изоляции; подменяем шов, а не внутренности —
+// предметом теста остаётся здоровье SEO, а не арендаторы.
+vi.mock("@/lib/tenant/scoped-db", async () => {
+  const { db } = await import("@/lib/db");
+  return { tenantDb: async () => db };
+});
+
 
 const requireRole = vi.fn();
 vi.mock("@/lib/auth", () => ({

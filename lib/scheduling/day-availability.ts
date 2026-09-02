@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { formatForDatetimeLocalInput, parseDatetimeLocalInput } from "@/lib/timezone";
 import {
@@ -46,6 +46,9 @@ function dayBoundsUtc(dateISO: string): { start: Date; end: Date } | null {
 export async function getDaySlots(dateISO: string, now: Date = new Date()): Promise<DaySlot[]> {
   const bounds = dayBoundsUtc(dateISO);
   if (!bounds) return [];
+
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
 
   // getDay() on the day's opening instant is safe: the bound is that day's
   // midnight in business time, so its weekday is the business weekday.

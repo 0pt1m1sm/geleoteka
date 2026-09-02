@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 /**
  * Works cost (Работы) of a deal's most-recently-APPROVED estimate — the labor
@@ -9,6 +9,8 @@ import { db } from "@/lib/db";
  * on the estimate.
  */
 export async function getApprovedWorksCost(dealId: string): Promise<number | null> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const est = (await db.estimate.findFirst({
     where: { dealId, stage: "APPROVED" },
     orderBy: { approvedAt: "desc" },
