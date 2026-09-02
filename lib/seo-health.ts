@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSetting } from "@/lib/settings";
 
 /**
@@ -52,6 +52,8 @@ export function withDelta(
 }
 
 export async function collectSeoHealth(): Promise<SeoHealth> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [sitemapUrls, servicesTotal, servicesWithBody, postsPublished, postsDraft, metrika, verification, indexnow, oauth] =
     await Promise.all([
       countSitemapUrls(),
