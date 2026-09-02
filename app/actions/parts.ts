@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { duplicateNewPartWhere, newPartSku, nextUsedSku } from "@/lib/part-sku";
 import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import {
@@ -29,6 +29,8 @@ import { ensurePartReference, resolveGenerationIds } from "@/lib/part-reference-
  * it back to an array and validate every id exists.
  */
 async function parseTrimIds(raw: unknown): Promise<{ ids: string[]; error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   if (raw === null || raw === undefined || raw === "") {
     return { ids: [], error: null };
   }
@@ -75,6 +77,8 @@ export async function createPart(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const conditionRaw = formData.get("condition");
@@ -274,6 +278,8 @@ export async function updatePart(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const name = (formData.get("name") as string)?.trim();

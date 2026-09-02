@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireRole, getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pingIndexNow } from "@/lib/indexnow";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { deleteOrphanImages, parsePhotosFromForm } from "@/lib/uploads";
@@ -52,6 +52,8 @@ export async function createRentalCar(
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseCarFormData(formData);
@@ -79,6 +81,8 @@ export async function updateRentalCar(
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseCarFormData(formData);
@@ -112,6 +116,8 @@ export async function updateRentalCar(
 }
 
 export async function deleteRentalCar(carId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   // Soft-delete: hard-delete cascades to RentalBooking + RepairOrder, wiping history.
   await db.vehicle.update({
@@ -125,6 +131,8 @@ export async function updateRentalBookingStatus(
   bookingId: string,
   status: string
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   await db.rentalBooking.update({
     where: { id: bookingId },
@@ -147,6 +155,8 @@ export async function updateRentalBooking(
   bookingId: string,
   formData: FormData,
 ): Promise<UpdateRentalBookingResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const startRaw = ((formData.get("startDate") as string | null) ?? "").trim();
@@ -194,6 +204,8 @@ export async function updateRentalBooking(
 export async function deleteRentalBooking(
   bookingId: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   try {
     await db.rentalBooking.delete({ where: { id: bookingId } });
@@ -233,6 +245,8 @@ interface RentalBookingResult {
 }
 
 export async function createRentalBooking(input: RentalBookingInput): Promise<RentalBookingResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const { carId, startDate, endDate, contactName, contactPhone, contactEmail, notes, customerUserId } = input;
 
   if (!carId || !startDate || !endDate || !contactName || !contactPhone || !contactEmail) {

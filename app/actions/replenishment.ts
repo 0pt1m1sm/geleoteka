@@ -4,7 +4,7 @@
 // policy and read the "to reorder" report. The host default (LOW_STOCK_THRESHOLD)
 // is injected here — the lib/warehouse/replenishment domain stays host-agnostic.
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY, LOW_STOCK_THRESHOLD, defaultWarehouseId } from "@/lib/wms-host";
 import {
   buildReorderReport,
@@ -22,6 +22,8 @@ export async function setReorderPolicy(
   reorderPoint: number | null,
   reorderUpTo: number | null,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const validationError = validateReorderPolicy(reorderPoint, reorderUpTo);
@@ -44,6 +46,8 @@ export async function setReorderPolicy(
 /** The "to reorder" report — items at/below their effective reorder point.
  *  Scoped to `warehouseId` (default warehouse when omitted). */
 export async function getReorderReport(warehouseId?: string): Promise<ReorderReportRow[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   return buildReorderReport(db, TENANT_KEY, warehouseId ?? (await defaultWarehouseId(db)), LOW_STOCK_THRESHOLD);
 }

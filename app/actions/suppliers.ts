@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
 import { isChecked } from "@/lib/forms";
 
@@ -40,6 +40,8 @@ export async function createSupplier(
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseSupplierForm(formData);
@@ -79,6 +81,8 @@ export async function updateSupplier(
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseSupplierForm(formData);
@@ -134,6 +138,8 @@ export async function updateSupplier(
 export async function deleteSupplier(
   supplierUserId: string,
 ): Promise<{ error: string | null; removed?: "deleted" | "hidden" }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   const orders = (await db.supplierOrder.count({

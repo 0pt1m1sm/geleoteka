@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
 import { roleLabel } from "@/lib/roles";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { EDITABLE_ROLES, PERMISSIONS, isPermission } from "@/lib/permissions";
 
@@ -26,6 +26,8 @@ interface Result {
  * silently restore access the admin had just removed.
  */
 export async function setRolePermissions(role: string, permissions: string[]): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   if (!(EDITABLE_ROLES as readonly string[]).includes(role)) {
@@ -71,6 +73,8 @@ export async function setRolePermissions(role: string, permissions: string[]): P
  * from an edit that locked people out of something they needed.
  */
 export async function resetRolePermissions(role: string): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
   if (!(EDITABLE_ROLES as readonly string[]).includes(role)) {
     return { error: "Права этой роли не редактируются" };

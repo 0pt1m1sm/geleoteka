@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { recomputeEstimateTotals, signedLineTotal } from "@/lib/crm/public";
 import { reserveForLine, releaseForLine } from "@/lib/fulfillment/reservations";
@@ -23,6 +23,8 @@ interface EstimateLineMutationResult {
 async function assertDraft(
   estimateId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const est = (await db.estimate.findUnique({
     where: { id: estimateId },
     select: { stage: true },
@@ -38,6 +40,8 @@ export async function addEstimateLine(
   _prevState: EstimateLineMutationResult | null,
   formData: FormData,
 ): Promise<EstimateLineMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const estimateId = formData.get("estimateId") as string;
@@ -109,6 +113,8 @@ export async function updateEstimateLine(
   _prevState: EstimateLineMutationResult | null,
   formData: FormData,
 ): Promise<EstimateLineMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const id = formData.get("estimateLineId") as string;
@@ -159,6 +165,8 @@ export async function updateEstimateLine(
 export async function deleteEstimateLine(
   estimateLineId: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const existing = (await db.estimateLine.findUnique({

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { parseOccurredAt } from "@/lib/crm/occurred-at";
 import { bumpLastTouch } from "@/lib/crm/public";
@@ -16,6 +16,8 @@ export async function logCommunication(
   _prev: CommResult | null,
   formData: FormData,
 ): Promise<CommResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const customerUserId = ((formData.get("customerUserId") as string | null) ?? "").trim();
@@ -83,6 +85,8 @@ export async function logCommunication(
  * action becomes a no-op when `requireRole` throws.
  */
 export async function markRepliesRead(customerUserId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   // Cheap pre-check so we skip the write when there's nothing to flip. Hits
@@ -108,6 +112,8 @@ export async function updateCommunicationDate(
   id: string,
   occurredAtIso: string,
 ): Promise<CommResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const parsed = parseOccurredAt(occurredAtIso);
@@ -132,6 +138,8 @@ export async function updateCommunicationDate(
 }
 
 export async function deleteCommunication(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.communicationLog.findUnique({
     where: { id },

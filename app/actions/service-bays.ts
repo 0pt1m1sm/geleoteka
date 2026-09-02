@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requirePermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { lockActiveServiceBays, type ServiceBayAllocationTx } from "@/lib/scheduling/service-bays";
 import { isUniqueViolation } from "@/lib/scheduling/reschedule";
@@ -26,6 +26,8 @@ export async function createServiceBay(
   name: string,
   sortOrder: number,
 ): Promise<ServiceBayActionResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requirePermission("service.manage");
   const clean = cleanName(name);
   if (!clean) return { error: "Укажите название поста" };
@@ -49,6 +51,8 @@ export async function updateServiceBay(
   name: string,
   sortOrder: number,
 ): Promise<ServiceBayActionResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requirePermission("service.manage");
   const clean = cleanName(name);
   if (!clean) return { error: "Укажите название поста" };
@@ -75,6 +79,8 @@ export async function setServiceBayActive(
   id: string,
   active: boolean,
 ): Promise<ServiceBayActionResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requirePermission("service.manage");
 
   const result = await db.$transaction(async (tx) => {

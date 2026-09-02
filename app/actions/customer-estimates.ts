@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSession } from "@/lib/auth";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
 import { dispatchFulfillment } from "@/lib/crm/public";
@@ -29,6 +29,8 @@ export async function customerApproveEstimate(
   estimateId: string,
   claimToken: string | null,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await getSession();
 
   const est = (await db.estimate.findUnique({
@@ -150,6 +152,8 @@ export async function customerDeclineEstimate(
   reason: string,
   claimToken: string | null,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await getSession();
 
   const trimmed = reason.trim();

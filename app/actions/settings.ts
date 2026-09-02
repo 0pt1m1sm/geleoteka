@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requirePermission } from "@/lib/authz";
 import { getSetting, invalidateSetting, KNOWN_SETTINGS } from "@/lib/settings";
 import { parseBooleanSetting, SECRET_PLACEHOLDER } from "@/lib/settings-shared";
@@ -33,6 +33,8 @@ export async function upsertSettings(
   _prev: UpsertSettingsResult | null,
   formData: FormData,
 ): Promise<UpsertSettingsResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("settings.manage");
 
   const knownByKey = new Map(KNOWN_SETTINGS.map((s) => [s.key, s]));
@@ -139,6 +141,8 @@ export interface TestSendResult {
  * longer hard-codes "Resend": an SMTP send says SMTP.
  */
 export async function sendTestEmail(): Promise<TestSendResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("settings.manage");
 
   const to = session.email;

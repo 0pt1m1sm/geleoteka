@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import {
   oemKey,
@@ -44,6 +44,8 @@ interface RefWithFitments {
  * магазина (soft join Part.article = oem), чтобы UI показывал «уже в магазине».
  */
 export async function searchPartReferences(query: string): Promise<PartReferenceOption[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const q = query.trim();
   // Поиск тоже через oemKey: набранный в русской раскладке номер должен
@@ -106,6 +108,8 @@ export async function createPartReference(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null; success?: boolean }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const oemRaw = ((formData.get("oem") as string | null) ?? "").trim();
@@ -174,6 +178,8 @@ export async function importPartReferencesCsv(
   _prevState: ImportReferencesState | null,
   formData: FormData,
 ): Promise<ImportReferencesState> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const text = ((formData.get("csv") as string | null) ?? "").trim();
@@ -232,6 +238,8 @@ export async function importPartReferencesCsv(
 }
 
 export async function deletePartReference(id: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   // Удаление номенклатуры МОЛЧА обесхоживало всё, что на неё ссылалось:

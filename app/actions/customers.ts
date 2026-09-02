@@ -3,7 +3,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
@@ -54,6 +54,8 @@ export async function createCustomer(
   _prev: CreateCustomerOk | ActionFail | null,
   formData: FormData,
 ): Promise<CreateCustomerOk | ActionFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const name = (formData.get("name") as string | null)?.trim() ?? "";
@@ -152,6 +154,8 @@ export async function updateCustomer(
   _prev: UpdateOk | UpdateFail | null,
   formData: FormData,
 ): Promise<UpdateOk | UpdateFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   // Guard: only edit actual customers, not staff/other accounts (mirrors deleteCustomer).
@@ -225,6 +229,8 @@ export async function addCustomerNote(
   _prev: NoteOk | NoteFail | null,
   formData: FormData,
 ): Promise<NoteOk | NoteFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   // Guard: only annotate actual customers, not staff/other accounts.
@@ -261,6 +267,8 @@ export async function addCustomerNote(
 export async function deleteCustomerNote(
   noteId: string,
 ): Promise<NoteOk | NoteFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const note = (await db.customerNote.findUnique({
@@ -297,6 +305,8 @@ export async function createCustomerTag(
   _prev: TagCreateOk | TagCreateFail | null,
   formData: FormData,
 ): Promise<TagCreateOk | TagCreateFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const rawName = (formData.get("name") as string | null) ?? "";
@@ -334,6 +344,8 @@ export async function assignCustomerTag(
   customerUserId: string,
   tagId: string,
 ): Promise<NoteOk | NoteFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   await db.customerTagAssignment.upsert({
@@ -351,6 +363,8 @@ export async function unassignCustomerTag(
   customerUserId: string,
   tagId: string,
 ): Promise<NoteOk | NoteFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   await db.customerTagAssignment.deleteMany({
@@ -365,6 +379,8 @@ export async function unassignCustomerTag(
 export async function deleteCustomerTag(
   tagId: string,
 ): Promise<NoteOk | NoteFail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   await db.customerTag.delete({ where: { id: tagId } });

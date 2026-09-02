@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recordAudit } from "@/lib/audit";
 import { isSolelyTheirs } from "@/lib/email/erasure";
 import { releasePartLinesForEstimate } from "@/lib/fulfillment/reservations";
@@ -65,6 +65,8 @@ function stateToken(
 }
 
 async function countAttached(userId: string): Promise<Record<string, number>> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const [vehicles, repairOrders, deals, communications, tasks] = (await Promise.all([
     db.vehicle.count({ where: { ownerUserId: userId } }),
     db.repairOrder.count({ where: { userId } }),
@@ -86,6 +88,8 @@ async function countAttached(userId: string): Promise<Record<string, number>> {
 export async function getEraseImpact(
   userId: string,
 ): Promise<Ok<{ counts: Record<string, number>; token: string; needsExport: boolean }> | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   const exists = await db.user.count({ where: { id: userId } });
@@ -99,6 +103,8 @@ export async function getEraseImpact(
 export async function exportCustomerSnapshot(
   userId: string,
 ): Promise<Ok<{ snapshot: CustomerSnapshot; token: string }> | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   // EXPLICIT select, never `include`. Prisma returns every scalar column with
@@ -157,7 +163,9 @@ export async function exportCustomerSnapshot(
   };
 }
 
-type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+// Тип транзакции берётся у самого клиента, а не у шва: шов возвращает тот же
+// клиент, но его тип выводится обобщённо и до делегатов не раскрывается.
+type TxClient = Parameters<Parameters<(typeof import("@/lib/db"))["db"]["$transaction"]>[0]>[0];
 
 /**
  * Remove the mail this person is the only outside party to.
@@ -228,6 +236,8 @@ export async function eraseCustomer(
   token: string,
   options: { deleteRelated?: boolean } = {},
 ): Promise<Ok<{ erased: Record<string, number> }> | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   const target = (await db.user.findUnique({

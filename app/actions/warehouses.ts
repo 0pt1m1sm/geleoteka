@@ -3,7 +3,7 @@
 // Warehouse (physical site) management — WMS Phase 6. Warehouses are the
 // orthogonal-to-tenant physical-site axis; stock rows are per (part, warehouse).
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { deleteWarehouse } from "@/lib/warehouse/delete-warehouse";
 
@@ -17,6 +17,8 @@ export interface WarehouseRow {
 
 /** All warehouses for the tenant, default first then by code. */
 export async function listWarehouses(): Promise<WarehouseRow[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   return (await db.warehouse.findMany({
     where: { tenantKey: TENANT_KEY },
@@ -30,6 +32,8 @@ export async function listWarehouses(): Promise<WarehouseRow[]> {
  * Never creates a second default — the seeded MAIN stays the default.
  */
 export async function createWarehouse(code: string, name: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const c = (code ?? "").trim().toUpperCase();
   const n = (name ?? "").trim();
@@ -52,6 +56,8 @@ const CODE_RE = /^[A-Z0-9-]{1,16}$/;
 
 /** Edit a warehouse's code/name (admin/manager). Code stays unique per tenant. */
 export async function editWarehouse(id: string, code: string, name: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const c = (code ?? "").trim().toUpperCase();
   const n = (name ?? "").trim();
@@ -75,6 +81,8 @@ export async function editWarehouse(id: string, code: string, name: string): Pro
  *  default and sets the new one in one transaction; the partial unique index
  *  `Warehouse_one_default_per_tenant` is the concurrency backstop. */
 export async function setDefaultWarehouse(id: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const wh = (await db.warehouse.findFirst({
     where: { id, tenantKey: TENANT_KEY },
@@ -92,6 +100,8 @@ export async function setDefaultWarehouse(id: string): Promise<{ error: string |
 /** Activate/deactivate a warehouse (admin/manager). The default warehouse can't
  *  be deactivated — reassign the default first. */
 export async function setWarehouseActive(id: string, active: boolean): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const wh = (await db.warehouse.findFirst({
     where: { id, tenantKey: TENANT_KEY },
@@ -107,6 +117,8 @@ export async function setWarehouseActive(id: string, active: boolean): Promise<{
  *  any warehouse still holding stock; otherwise cascades its WMS rows (movement
  *  history included) and removes the site. Mirrors the empty-only cell delete. */
 export async function deleteWarehouseAction(id: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   if (!id?.trim()) return { error: "Укажите склад" };
   try {
@@ -129,6 +141,8 @@ export async function resolveWarehouseId(
   wh: string | undefined,
   warehouses?: Array<{ id: string; isDefault: boolean }>,
 ): Promise<string> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const list =
     warehouses ??
     ((await db.warehouse.findMany({

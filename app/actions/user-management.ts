@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { sendSms } from "@/lib/sms";
@@ -53,6 +53,8 @@ export async function createUser(
   _prev: (Ok<{ tempPassword: string; userId: string }> | Fail) | null,
   formData: FormData,
 ): Promise<Ok<{ tempPassword: string; userId: string }> | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   const name = ((formData.get("name") as string | null) ?? "").trim();
@@ -134,6 +136,8 @@ export async function createUser(
 export async function resetUserPassword(
   userId: string,
 ): Promise<Ok<{ tempPassword: string }> | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const user = (await db.user.findUnique({
@@ -193,6 +197,8 @@ export async function updateUserContacts(
   userId: string,
   input: { name: string; email: string; phone: string },
 ): Promise<Ok | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const name = input.name.trim();
@@ -259,6 +265,8 @@ export async function changeUserRole(
   userId: string,
   newRole: string,
 ): Promise<Ok | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   if (!isAllowedRole(newRole)) {
@@ -328,6 +336,8 @@ export async function setUserDisabled(
   userId: string,
   disabled: boolean,
 ): Promise<Ok | Fail> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   if (session.id === userId && disabled) {

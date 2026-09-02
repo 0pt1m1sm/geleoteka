@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requirePermission, rolePermissions } from "@/lib/authz";
 import { recordAudit } from "@/lib/audit";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { PERMISSIONS } from "@/lib/permissions";
 import { markStaffNotificationReceiptsRead } from "@/lib/staff-notifications/feed";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
@@ -35,12 +35,16 @@ export interface CreateTelegramLinkState {
 export type TelegramTestNotificationState = TelegramTestNotificationResult;
 
 export async function markStaffNotificationRead(eventId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("notifications.view");
   await markStaffNotificationReceiptsRead(db, session.id, [eventId]);
   revalidatePath("/admin/notifications");
 }
 
 export async function markAllStaffNotificationsRead(): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("notifications.view");
   await markStaffNotificationReceiptsRead(db, session.id, null);
   revalidatePath("/admin/notifications");
@@ -88,6 +92,8 @@ export interface TelegramLinkStatusState {
 export async function refreshTelegramLinkStatus(
   purpose: "PERSONAL" | "SHARED",
 ): Promise<TelegramLinkStatusState> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission(
     purpose === "PERSONAL" ? "notifications.view" : "notifications.manage",
   );
@@ -136,6 +142,8 @@ export async function sendPersonalTelegramTest(
 export async function updateOwnStaffNotificationOptOuts(
   formData: FormData,
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("notifications.view");
   const permissions =
     session.permissionRole === "ADMIN"
@@ -192,6 +200,8 @@ export async function setSharedTelegramDeliveryScope(
   destinationId: string,
   formData: FormData,
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("notifications.manage");
   const rawScope = formData.get("deliveryScope");
   if (!destinationId.trim() || !isTelegramDeliveryScope(rawScope)) {
@@ -245,6 +255,8 @@ export async function setSharedTelegramDeliveryScope(
 export async function retryStaffNotificationDelivery(
   deliveryId: string,
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("notifications.manage");
   await db.$transaction(async (tx) => {
     const delivery = (await tx.staffNotificationDelivery.findFirst({
@@ -297,6 +309,8 @@ async function createLink(
   userId: string | null,
   createdByUserId: string,
 ): Promise<CreateTelegramLinkState> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const config = await loadTelegramRuntimeConfig();
   if (!config.enabled) {
     return {
@@ -324,6 +338,8 @@ async function sendTelegramTest(
   target: "PERSONAL" | "SHARED",
   actorUserId: string,
 ): Promise<TelegramTestNotificationState> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   return sendTelegramTestNotification({
     client: db as unknown as TelegramTestSendDb,
     fetchImpl: globalThis.fetch,
@@ -337,6 +353,8 @@ async function revokeTelegramDestinations(
   target: { kind: "PERSONAL" | "SHARED"; userId: string | null },
   actor: Awaited<ReturnType<typeof requirePermission>>,
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const now = new Date();
   await db.$transaction(async (tx) => {
     const rows = (await tx.telegramDestination.findMany({

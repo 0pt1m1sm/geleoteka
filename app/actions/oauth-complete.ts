@@ -2,7 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { OAUTH_PENDING_COOKIE, verifyPendingProfile } from "@/lib/oauth-login";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
@@ -22,6 +22,8 @@ export async function completeOAuthRegistrationAction(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const cookieStore = await cookies();
   const token = cookieStore.get(OAUTH_PENDING_COOKIE)?.value;
   const pending = token ? verifyPendingProfile(token) : null;

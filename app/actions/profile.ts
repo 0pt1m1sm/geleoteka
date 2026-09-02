@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 
 import { clearSessionCookie, createToken, requireAuth, setSessionCookie } from "@/lib/auth";
 import { recordAudit } from "@/lib/audit";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import { LOCALES, TIME_ZONES } from "@/lib/profile-options";
 import { resetEmailVerificationOnChange } from "@/lib/email-verification/core";
@@ -39,6 +39,8 @@ export async function updateOwnProfile(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireAuth();
 
   const name = ((formData.get("name") as string | null) ?? "").trim();
@@ -99,6 +101,8 @@ export async function changeOwnPassword(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireAuth();
 
   const current = ((formData.get("currentPassword") as string | null) ?? "").trim();
@@ -162,6 +166,8 @@ export async function revokeOtherSessions(
   _prev: Result | null,
   _formData: FormData,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireAuth();
 
   await db.user.update({
@@ -194,6 +200,8 @@ export async function deleteOwnAccount(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireAuth();
   if (session.permissionRole !== "CLIENT") {
     return { error: "Учётную запись сотрудника удаляет администратор" };

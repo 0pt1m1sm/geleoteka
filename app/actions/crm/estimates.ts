@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { nextEstimateNumber, dispatchFulfillment, recomputeEstimateTotals } from "@/lib/crm/public";
@@ -34,6 +34,8 @@ export async function openOrCreateActiveEstimate(
   _prev: EstimateMutationResult | null,
   formData: FormData,
 ): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const dealId = formData.get("dealId") as string;
@@ -96,6 +98,8 @@ export async function openOrCreateActiveEstimate(
 
 /** Mark estimate as SENT; bump Deal.stage to QUOTED if still DRAFT. */
 export async function sendEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
@@ -248,6 +252,8 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
  * fulfillment row created at booking time.
  */
 export async function approveEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
@@ -353,6 +359,8 @@ export async function approveEstimate(estimateId: string): Promise<EstimateMutat
  * Strictly APPROVED-only: other stages stay immutable for audit.
  */
 export async function unapproveEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
@@ -415,6 +423,8 @@ export interface DeleteEstimateResult {
  * parent deal — the estimate's own URL 404s the moment delete commits.
  */
 export async function deleteEstimate(estimateId: string): Promise<DeleteEstimateResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const est = (await db.estimate.findUnique({
@@ -456,6 +466,8 @@ export async function declineEstimate(
   estimateId: string,
   reason: string,
 ): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const trimmedReason = reason.trim();
@@ -509,6 +521,8 @@ export async function setEstimateTaxRate(
   estimateId: string,
   rate: number,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   if (!Number.isInteger(rate) || rate < 0 || rate > 100) {
     return { error: "Ставка налога должна быть целым числом от 0 до 100%" };
@@ -526,6 +540,8 @@ export async function setEstimateTaxRate(
 }
 
 export async function reviseEstimate(estimateId: string): Promise<EstimateMutationResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const parent = (await db.estimate.findUnique({

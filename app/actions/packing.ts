@@ -3,7 +3,7 @@
 // Scan-to-pack / отгрузка actions (WMS Phase 4b — упаковка). Thin wrappers over
 // lib/warehouse/pack; packing is WAREHOUSE_WORKER-allowed (same as scan/pick).
 // Every pack/box/ship scan writes exactly one ScanEvent for the audit.
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { actorId, TENANT_KEY } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
@@ -31,6 +31,8 @@ const PACK_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
 
 /** Already-packed lines of an order — the box-contents recap under the pack sheet. */
 export async function getPackedLines(orderId: string): Promise<DoneConsumeLine[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PACK_ROLES);
   return packedLinesForOrder(db, orderId);
 }
@@ -38,6 +40,8 @@ export async function getPackedLines(orderId: string): Promise<DoneConsumeLine[]
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors picking's resolveItemCode. */
 async function resolveItemCode(raw: string, warehouseId: string): Promise<string | { ambiguous: string } | null> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
@@ -78,6 +82,8 @@ export interface PackOrderSummary {
  *  packProgress runs per order (2 reads each) — parallelised across the active
  *  PROCESSING queue. */
 export async function listOrdersNeedingPacking(): Promise<PackOrderSummary[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PACK_ROLES);
   const orders = (await db.partShipment.findMany({
     where: { status: "PROCESSING" },
@@ -101,12 +107,16 @@ export async function listOrdersNeedingPacking(): Promise<PackOrderSummary[]> {
 
 /** Pack progress for one order — drives the /admin/orders cross-link. */
 export async function getPackProgress(orderId: string): Promise<{ packed: number; required: number }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PACK_ROLES);
   return packProgress(db, orderId);
 }
 
 /** Open (un-packed) lines for one order — drives the pack sheet. */
 export async function getOpenPackLines(orderId: string, wh?: string): Promise<OpenPackLine[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PACK_ROLES);
   return openPackLinesForOrder(db, orderId, await resolveWarehouseId(wh));
 }
@@ -129,6 +139,8 @@ export async function packOrderLine(
   rawLocationCode: string,
   wh?: string,
 ): Promise<PackResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(PACK_ROLES);
   const warehouseId = await resolveWarehouseId(wh);
   const parsedPart = parseScanCode(rawPartCode);
@@ -189,6 +201,8 @@ export async function packOrderLine(
  *  stored box→line mapping, so this only writes a ScanEvent (the "scan parcel"
  *  step of the pack flow). */
 export async function recordPackBoxScan(orderId: string, rawBoxCode: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(PACK_ROLES);
   const parsed = parseScanCode(rawBoxCode);
   const id = "id" in parsed ? parsed.id : null;
@@ -228,6 +242,8 @@ const NOT_PACKED = "NOT_PACKED";
  * be a no-op. Notifies the customer like updatePartOrderStatus.
  */
 export async function shipPackedOrder(orderId: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PACK_ROLES);
 
   // Cheap pre-check for a friendly message in the common "still open" case.

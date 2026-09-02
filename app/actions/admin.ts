@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
@@ -14,6 +14,8 @@ export async function updateRepairOrderStatus(
   repairOrderId: string,
   newStatus: string
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const updateData: Record<string, unknown> = { status: newStatus };
@@ -87,6 +89,8 @@ export async function updateRepairOrderStatus(
 }
 
 export async function deleteRepairOrder(repairOrderId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   await db.repairOrder.delete({
@@ -107,6 +111,8 @@ export async function addJobLines(
   _prevState: { error: string | null; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error: string | null; success?: boolean }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const repairOrderId = formData.get("repairOrderId") as string;
@@ -226,6 +232,8 @@ export async function updateRepairOrderDetails(
   _prevState: UpdateRepairOrderDetailsResult | null,
   formData: FormData,
 ): Promise<UpdateRepairOrderDetailsResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const repairOrderId = formData.get("repairOrderId") as string;

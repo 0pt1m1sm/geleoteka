@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSession } from "@/lib/auth";
 import { formatDate, isValidRussianPhone, normalizePhone } from "@/lib/utils";
 import {
@@ -50,6 +50,8 @@ interface BookingResult {
 }
 
 export async function createRepairOrder(input: BookingInput): Promise<BookingResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const { serviceIds, vin, model, year, mileage, trim, dateTime, name, phone, email, notes } = input;
 
   if (!serviceIds.length || !model || !year || !dateTime || !name || !phone || !email) {

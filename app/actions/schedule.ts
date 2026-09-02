@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   DEFAULT_CLOSE_MINUTE,
   DEFAULT_OPEN_MINUTE,
@@ -58,6 +58,8 @@ export async function saveWeeklySchedule(
   _prevState: ScheduleResult | null,
   formData: FormData,
 ): Promise<ScheduleResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const DAY_NAMES = [
@@ -115,6 +117,8 @@ export async function saveScheduleException(
   _prevState: ScheduleResult | null,
   formData: FormData,
 ): Promise<ScheduleResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const dateRaw = formData.get("date");
@@ -165,6 +169,8 @@ export async function saveScheduleException(
 }
 
 export async function deleteScheduleException(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   await db.scheduleException.delete({ where: { id } });
   revalidateSchedule();
@@ -175,6 +181,8 @@ export async function saveBlockedInterval(
   _prevState: ScheduleResult | null,
   formData: FormData,
 ): Promise<ScheduleResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const startRaw = formData.get("startAt");
@@ -212,6 +220,8 @@ export async function saveBlockedInterval(
 }
 
 export async function deleteBlockedInterval(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   await db.blockedInterval.delete({ where: { id } });
   revalidateSchedule();
@@ -234,6 +244,8 @@ export async function toggleSlotBlock(
   slotMinutes: number,
   reason?: string | null,
 ): Promise<{ error: string | null; blocked?: boolean; removedRange?: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const pad = (n: number): string => String(n).padStart(2, "0");

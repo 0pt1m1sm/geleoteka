@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pingIndexNow } from "@/lib/indexnow";
 
 /**
@@ -58,6 +58,8 @@ export async function createBlogPost(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseBlogFormData(formData);
@@ -106,6 +108,8 @@ export async function updateBlogPost(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseBlogFormData(formData);
@@ -163,6 +167,8 @@ export async function updateBlogPost(
 }
 
 export async function deleteBlogPost(postId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const existing = (await db.blogPost.findUnique({

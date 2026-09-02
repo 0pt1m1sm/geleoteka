@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 
 const CAPTION_MAX = 200;
@@ -12,6 +12,8 @@ export async function addRepairOrderPhoto(input: {
   url: string;
   caption?: string;
 }): Promise<{ ok: true; photoId: string } | { ok: false; error: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const url = input.url.trim();
@@ -47,6 +49,8 @@ export async function updateRepairOrderPhotoCaption(
   photoId: string,
   caption: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const trimmed = caption.trim();
@@ -73,6 +77,8 @@ export async function updateRepairOrderPhotoCaption(
 export async function deleteRepairOrderPhoto(
   photoId: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const photo = (await db.repairOrderPhoto.findUnique({

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pingIndexNow } from "@/lib/indexnow";
 import { collectSeoHealth } from "@/lib/seo-health";
 import { fetchSearchTraffic } from "@/lib/yandex-metrika-api";
@@ -52,6 +52,8 @@ export async function captureSeoSnapshot(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const indexedRaw = ((formData.get("indexedPages") as string) || "").trim();

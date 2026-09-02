@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { pingIndexNow } from "@/lib/indexnow";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import type { FuelType } from "@/lib/vehicle-catalog-types";
 
@@ -48,6 +48,8 @@ function revalidateAllConsumers(): void {
 }
 
 export async function createModel(input: ModelFields): Promise<{ id: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const created = await db.vehicleModel.create({
     data: {
@@ -66,6 +68,8 @@ export async function createModel(input: ModelFields): Promise<{ id: string }> {
 }
 
 export async function updateModel(id: string, input: Partial<ModelFields>): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const data: Record<string, unknown> = {};
   if (input.slug !== undefined) data.slug = input.slug.trim();
@@ -89,6 +93,8 @@ export async function updateModel(id: string, input: Partial<ModelFields>): Prom
  * which makes an accidental click expensive and irreversible.
  */
 export async function deleteModel(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   const blocking = (await db.vehicleTrim.count({
@@ -108,6 +114,8 @@ export async function deleteModel(id: string): Promise<void> {
 }
 
 export async function createGeneration(input: GenerationFields): Promise<{ id: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const created = await db.$transaction(async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
     const generation = await tx.vehicleGeneration.create({
@@ -139,6 +147,8 @@ export async function updateGeneration(
   id: string,
   input: Partial<GenerationFields>,
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const data: Record<string, unknown> = {};
   if (input.code !== undefined) data.code = input.code.trim();
@@ -151,6 +161,8 @@ export async function updateGeneration(
 
 /** Delete a generation — same guard as deleteModel, one level down. */
 export async function deleteGeneration(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
 
   const blocking = (await db.vehicleTrim.count({
@@ -197,6 +209,8 @@ function normalizeTrimWriteData(input: Partial<TrimFields>): Record<string, unkn
 }
 
 export async function createTrim(input: TrimFields): Promise<{ id: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const code = input.code.trim();
   if (!code) throw new Error("Код варианта обязателен");
@@ -219,6 +233,8 @@ export async function createTrim(input: TrimFields): Promise<{ id: string }> {
 }
 
 export async function updateTrim(id: string, input: Partial<TrimFields>): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const existing = await db.vehicleTrim.findUnique({
     where: { id },
@@ -236,6 +252,8 @@ export async function updateTrim(id: string, input: Partial<TrimFields>): Promis
 }
 
 export async function deleteTrim(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN"]);
   const existing = await db.vehicleTrim.findUnique({
     where: { id },
