@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export interface EstimateChainNode {
   id: string;
@@ -35,6 +35,8 @@ interface EstimateChainRow {
 export async function getEstimateChain(
   estimateId: string,
 ): Promise<EstimateChainResult> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const current = (await db.estimate.findUnique({
     where: { id: estimateId },
     select: {

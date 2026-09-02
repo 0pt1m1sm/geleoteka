@@ -11,12 +11,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const postFindMany = vi.fn();
 const genFindMany = vi.fn();
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({
   db: {
     blogPost: { findMany: (...a: unknown[]) => postFindMany(...a) },
     vehicleGeneration: { findMany: (...a: unknown[]) => genFindMany(...a) },
   },
 }));
+// Модуль берёт клиент из шва изоляции; подменяем шов, а не внутренности.
+vi.mock("@/lib/tenant/scoped-db", async () => {
+  const { db } = await import("@/lib/db");
+  return { tenantDb: async () => db };
+});
+
 
 const ARTICLE = {
   title: "Слабые места W463 — чек-лист владельца",

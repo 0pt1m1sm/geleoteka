@@ -27,6 +27,8 @@ const MIGRATED = [
   "lib/scheduling/day-availability.ts",
   "lib/seo-health.ts",
   "lib/crm/approved-estimate.ts",
+  "lib/models/related-content.ts",
+  "lib/crm/estimate-chain.ts",
 ];
 
 describe("модули, переведённые на шов", () => {
