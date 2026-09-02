@@ -14,7 +14,7 @@
 import { redirect } from "next/navigation";
 
 import { getSession, type SessionUser } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { resolveRolePermissions, type Permission } from "@/lib/permissions";
 
@@ -32,6 +32,8 @@ interface StoredRow {
  */
 export async function rolePermissions(role: string): Promise<Set<string>> {
   if (role === "ADMIN") return new Set<string>(); // callers short-circuit; never consulted
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const rows = (await db.rolePermission.findMany({
     where: { tenantKey: TENANT_KEY, role },
     select: { permission: true, allowed: true },
@@ -74,6 +76,8 @@ export async function requirePermission(permission: Permission): Promise<Session
  * which would otherwise issue a query per role to render one table.
  */
 export async function allRolePermissions(roles: readonly string[]): Promise<Map<string, Set<string>>> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const rows = (await db.rolePermission.findMany({
     where: { tenantKey: TENANT_KEY, role: { in: [...roles] } },
     select: { role: true, permission: true, allowed: true },
@@ -100,6 +104,8 @@ export async function allRolePermissions(roles: readonly string[]): Promise<Map<
 
 /** True when this role has never been edited and is running on the defaults. */
 export async function rolesUsingDefaults(roles: readonly string[]): Promise<Set<string>> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const rows = (await db.rolePermission.findMany({
     where: { tenantKey: TENANT_KEY, role: { in: [...roles] } },
     select: { role: true },

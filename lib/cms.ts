@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   CMS_SCHEMA,
   type CMSKey,
@@ -27,6 +27,8 @@ interface CMSRow {
  * stored content; readers below pull whichever field is appropriate.
  */
 const loadAllCMS = cache(async (): Promise<Map<string, CMSRow>> => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const rows = (await db.cMSBlock.findMany({
     select: { key: true, type: true, content: true },
   })) as Array<{ key: string; type: string; content: CMSContentLegacy | null }>;
