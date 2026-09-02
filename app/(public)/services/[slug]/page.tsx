@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
 import { resolveModelSlug } from "@/lib/vehicle-catalog-types";
@@ -33,6 +33,8 @@ interface Props {
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
 const getServiceBySlug = cache(async (slug: string): Promise<ServiceDetail | null> => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return db.service.findUnique({ where: { slug } });
 });
 

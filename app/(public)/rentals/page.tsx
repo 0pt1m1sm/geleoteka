@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { Zap, Activity } from "lucide-react";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
 import { pageSeo } from "@/lib/seo";
@@ -14,11 +14,14 @@ import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSList, getCMSRichtext, getCMSText } from "@/lib/cms";
 
-const listRentalCars = () =>
-  db.vehicle.findMany({
+const listRentalCars = async () => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
+  return db.vehicle.findMany({
     where: { ownershipType: "RENTAL", isAvailable: true, isArchived: false },
     orderBy: { dailyRate: "asc" },
   });
+};
 
 // Метадата закрывает главный кластер ядра (~7 тыс. запросов/мес): обе народные
 // формы названия + «в Москве» + цена «от» из парка — цена в сниппете растит CTR.

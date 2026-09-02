@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getCMSText, getCMSRichtext } from "@/lib/cms";
 import { pageSeo } from "@/lib/seo";
 
@@ -29,6 +29,8 @@ interface VacancyListItem {
 }
 
 export default async function VacanciesPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [eyebrow, title, description, vacancies, ctaTitle, ctaBody, ctaButton] = await Promise.all([
     getCMSText("vacancies.eyebrow"),
     getCMSText("vacancies.title"),

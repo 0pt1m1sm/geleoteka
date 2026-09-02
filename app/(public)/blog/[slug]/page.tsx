@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { Markdown } from "@/components/shared/Markdown";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pageSeo } from "@/lib/seo";
 import { buildArticleJsonLd } from "@/lib/seo-jsonld";
 import { generationsForPost, servicesForPost } from "@/lib/models/related-content";
@@ -35,6 +35,8 @@ function readingMinutes(content: string): number {
 
 /** Shared with generateMetadata so the lookup runs once per request. */
 const getPublishedPost = cache(async (slug: string): Promise<BlogPostRow | null> => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.blogPost.findFirst({
     where: { slug, published: true },
     select: {

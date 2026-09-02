@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { Step1ServiceVehicle } from "@/components/booking/Step1ServiceVehicle";
 import { StepIndicator } from "@/components/booking/StepIndicator";
@@ -23,6 +23,8 @@ interface ServiceItem {
 }
 
 export default async function BookingStep1() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [rawServices, models] = await Promise.all([
     db.service.findMany({
       orderBy: { name: "asc" },

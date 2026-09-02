@@ -15,6 +15,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const findUnique = vi.fn();
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: { part: { findUnique: (...a: unknown[]) => findUnique(...a) } } }));
+// Страница берёт клиент из шва изоляции; подменяем шов, а не внутренности.
+vi.mock("@/lib/tenant/scoped-db", async () => {
+  const { db } = await import("@/lib/db");
+  return { tenantDb: async () => db };
+});
+
 
 const calls: string[] = [];
 vi.mock("next/navigation", () => ({
