@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { extractModelCodes } from "@/lib/part-reference";
 
 /**
@@ -30,6 +30,8 @@ export interface RelatedGeneration {
 
 /** Статьи, где упомянут этот кузов — по тегам, заголовку или тексту. */
 export async function postsForGeneration(code: string, limit = 6): Promise<RelatedPost[]> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.blogPost.findMany({
     where: {
       published: true,
@@ -60,6 +62,8 @@ export async function generationsForPost(
   const codes = extractModelCodes(`${input.title} ${input.tags.join(" ")} ${input.content}`);
   if (codes.length === 0) return [];
 
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.vehicleGeneration.findMany({
     where: { code: { in: codes }, isActive: true, model: { isActive: true } },
     select: {
@@ -103,6 +107,8 @@ export async function postsForService(slug: string, limit = 4): Promise<RelatedP
   const words = SERVICE_KEYWORDS[slug] ?? [];
   if (words.length === 0) return [];
 
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.blogPost.findMany({
     where: {
       published: true,
@@ -128,6 +134,8 @@ export async function servicesForPost(
     .map(([slug]) => slug);
   if (slugs.length === 0) return [];
 
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.service.findMany({
     where: { slug: { in: slugs } },
     // priceMin нужен наверху статьи: «от 5 000 ₽» — это ответ на вопрос,
