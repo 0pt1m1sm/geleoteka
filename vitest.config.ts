@@ -11,6 +11,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
+    // Общая подмена шва изоляции — см. комментарий в файле.
+    setupFiles: ["tests/setup/seam.ts"],
     // The lib/wms-host → lib/db import chain constructs the Prisma client at
     // module load. Tests never run a query against it (they inject the fake
     // DbClientPort), but the constructor needs a datasource URL to exist.

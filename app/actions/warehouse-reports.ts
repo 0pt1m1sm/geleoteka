@@ -4,7 +4,7 @@
 // The host tenant key is injected here; the lib/warehouse report helpers stay
 // host-agnostic.
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { buildValuationReport, type ValuationReport } from "@/lib/warehouse/valuation";
 import { deadStock, abcAnalysis, type DeadStockRow, type AbcRow } from "@/lib/warehouse/stock-analysis";
@@ -12,6 +12,8 @@ import { deadStock, abcAnalysis, type DeadStockRow, type AbcRow } from "@/lib/wa
 /** Stock valuation report (on-hand × latest purchase unit cost). Admin/manager.
  *  Scoped to `warehouseId` (default warehouse when omitted). */
 export async function getValuationReport(warehouseId?: string): Promise<ValuationReport> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   return buildValuationReport(db, TENANT_KEY, warehouseId ?? (await defaultWarehouseId(db)));
 }
@@ -21,6 +23,8 @@ export async function getStockAnalysis(
   windowDays = 90,
   warehouseIdArg?: string,
 ): Promise<{ windowDays: number; deadStock: DeadStockRow[]; abc: AbcRow[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const w = Math.min(3650, Math.max(1, Math.trunc(Number(windowDays) || 90)));
   const warehouseId = warehouseIdArg ?? (await defaultWarehouseId(db));

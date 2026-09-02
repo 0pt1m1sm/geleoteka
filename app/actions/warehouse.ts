@@ -2,7 +2,7 @@
 
 // Warehouse stock actions: manual on-hand adjustment + multi-bin placement.
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { actorId, TENANT_KEY, STAGING_LOCATION } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { applyAdjustment } from "@/lib/warehouse/adjust";
@@ -47,6 +47,8 @@ export async function adjustStock(
   idempotencyKey?: string,
   wh?: string,
 ): Promise<{ error: string | null; quantity?: number; available?: number }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
 
   if (!Number.isInteger(newQuantity) || newQuantity < 0) {
@@ -74,6 +76,8 @@ export async function adjustStock(
 
 /** Read a part's bin placement (bins + unplaced + reconcile flag). */
 export async function getPlacement(partId: string, wh?: string): Promise<PlacementResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const placement = await binsForItem(db, partId, await resolveWarehouseId(wh), TENANT_KEY);
   return { error: null, placement };
@@ -91,6 +95,8 @@ interface LocationItem {
 export async function listLocationsAction(
   wh?: string,
 ): Promise<{ locations: Array<WmsLocation & { onHand: number }> }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const locations = await listLocationsWithOnHand(db, await resolveWarehouseId(wh), TENANT_KEY);
   return { locations };
@@ -102,6 +108,8 @@ export async function createLocationsAction(
   spec: string,
   wh?: string,
 ): Promise<{ error: string | null; created?: number; codes?: string[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const expanded = expandCellSpec((spec ?? "").trim());
   if (!Array.isArray(expanded)) return { error: expanded.error };
@@ -117,6 +125,8 @@ export async function renameLocationAction(
   to: string,
   wh?: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const t = (to ?? "").trim().toUpperCase();
   if (!from?.trim() || !t) return { error: "Укажите старый и новый код" };
@@ -139,6 +149,8 @@ export async function deleteLocationAction(
   code: string,
   wh?: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   if (!code?.trim()) return { error: "Укажите ячейку" };
   try {
@@ -159,6 +171,8 @@ export async function setLocationBlockedAction(
   flags: { isActive?: boolean; isBlocked?: boolean },
   wh?: string,
 ): Promise<{ error: string | null; location?: WmsLocation }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   if (!code.trim()) return { error: "Укажите ячейку" };
   const location = await setLocationBlocked(db, code, await resolveWarehouseId(wh), TENANT_KEY, flags);
@@ -167,6 +181,8 @@ export async function setLocationBlockedAction(
 
 /** List the items stored in a location (for the location-centric lookup). */
 export async function lookupLocation(location: string, wh?: string): Promise<{ items: LocationItem[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { items: [] };
   const rows = await itemsInLocation(db, location, await resolveWarehouseId(wh), TENANT_KEY);
@@ -194,6 +210,8 @@ export async function placeIntoBin(
   idempotencyKey?: string,
   wh?: string,
 ): Promise<PlacementResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
@@ -219,6 +237,8 @@ export async function transferBetweenBins(
   idempotencyKey?: string,
   wh?: string,
 ): Promise<PlacementResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!from.trim() || !to.trim()) return { error: "Укажите обе ячейки" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
@@ -240,6 +260,8 @@ export async function transferBetweenBins(
 export async function openOrderLinesForPartAction(
   partId: string,
 ): Promise<{ lines: OpenOrderLine[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   return { lines: await openOrderLinesForPart(db, partId) };
 }
@@ -254,6 +276,8 @@ export async function scanReceiveOrderLine(
   location: string = STAGING_LOCATION,
   wh?: string,
 ): Promise<ReceiveResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   if (!Number.isInteger(expectedReceived) || expectedReceived < 0) {
@@ -281,6 +305,8 @@ export async function blindReceive(
   location: string = STAGING_LOCATION,
   wh?: string,
 ): Promise<{ error: string | null; quantity?: number }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   if (!idempotencyKey) return { error: "Отсутствует ключ операции" };
@@ -305,6 +331,8 @@ export async function removeFromBinAction(
   idempotencyKey?: string,
   wh?: string,
 ): Promise<PlacementResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };

@@ -39,7 +39,12 @@ describe.sequential("изоляция арендаторов на живой б�
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
 
     const isolated = urlForSchema(local, schema);
-    execFileSync("npx", ["prisma", "db", "push", "--skip-generate", "--accept-data-loss"], {
+    // НАСТОЯЩИЕ миграции, а не `db push` из схемы. Разница принципиальна:
+    // умолчание колонки арендатора и составные внешние ключи объявлены только
+    // в миграциях (осознанный дрейф — см. их комментарии), и база, собранная
+    // из схемы, не имеет ни того, ни другого. Первая версия этого теста именно
+    // так и обманывалась: проверяла защиту, которой в тестовой базе не было.
+    execFileSync("npx", ["prisma", "migrate", "deploy"], {
       env: { ...process.env, DATABASE_URL: isolated },
       stdio: "pipe",
     });
@@ -47,11 +52,14 @@ describe.sequential("изоляция арендаторов на живой б�
     client = new PrismaClient({ datasourceUrl: isolated });
     ({ withTenant } = await import("@/lib/tenant/with-tenant"));
 
+    // Первого арендатора создаёт сама миграция — она же вставляет строку
+    // установки. Заводим только второго, иначе упрёмся в уникальность.
     await client.tenant.createMany({
       data: [
         { id: OUR, key: "geleoteka", name: "Гелеотека" },
         { id: THEIRS, key: "vtoroy", name: "Второй сервис" },
       ],
+      skipDuplicates: true,
     });
     // По клиенту и сделке каждому арендатору — минимум, на котором видно утечку.
     for (const [tenantId, suffix] of [
@@ -140,6 +148,23 @@ describe.sequential("изоляция арендаторов на живой б�
     const res = await withTenant(client, OUR).deal.deleteMany({ where: { id: "d_chuzhoy" } });
     expect(res.count).toBe(0);
     expect(await client.deal.findUnique({ where: { id: "d_chuzhoy" } })).not.toBeNull();
+  });
+
+  it("вложенное создание получает арендатора от базы, а не от шва", async () => {
+    // Шов проставляет арендатора только в данные верхнего уровня. Вложенную
+    // строку прикрывает база: умолчание колонки и составной ключ. Проверяем,
+    // что это действительно работает, а не считается работающим.
+    const deal = await withTenant(client, OUR).deal.create({
+      data: {
+        customer: { connect: { id: "u_nash" } },
+        source: "вложенное-создание",
+        channel: "SERVICE",
+        estimates: { create: [{ stage: "DRAFT" }] },
+      },
+      include: { estimates: true },
+    });
+    expect(deal.tenantId).toBe(OUR);
+    expect(deal.estimates[0].tenantId).toBe(OUR);
   });
 
   it("общий справочник виден обоим", async () => {

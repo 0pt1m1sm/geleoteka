@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { consumeApprovedEstimateParts } from "@/lib/fulfillment/consume-parts";
 import { isFullyPacked } from "@/lib/warehouse/pack";
@@ -12,6 +12,8 @@ export async function updatePartOrderStatus(
   orderId: string,
   newStatus: string
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   // Consume parts when a shipment first enters a dispatched state. Retail orders

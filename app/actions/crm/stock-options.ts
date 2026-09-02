@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { availableStock } from "@/lib/wms/public";
 
@@ -29,6 +29,8 @@ export interface PartStockOption {
  * so the whole catalog never loads.
  */
 export async function searchPartStockOptions(query: string): Promise<PartStockOption[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const q = query.trim();
 

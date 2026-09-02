@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { isChecked } from "@/lib/forms";
 
 interface VacancyFormData {
@@ -40,6 +40,8 @@ export async function createVacancy(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseVacancyFormData(formData);
@@ -58,6 +60,8 @@ export async function updateVacancy(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseVacancyFormData(formData);
@@ -72,6 +76,8 @@ export async function updateVacancy(
 }
 
 export async function deleteVacancy(vacancyId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   await db.vacancy.delete({ where: { id: vacancyId } });
   revalidatePath("/vacancies");

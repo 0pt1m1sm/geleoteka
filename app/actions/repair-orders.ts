@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { createDeal, nextRepairOrderNumber } from "@/lib/crm/public";
 import { parseDatetimeLocalInput } from "@/lib/timezone";
 import {
@@ -38,6 +38,8 @@ export async function createRepairOrderManually(
   _prev: Result | null,
   formData: FormData,
 ): Promise<Result> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const customerUserId = ((formData.get("customerUserId") as string | null) ?? "").trim();

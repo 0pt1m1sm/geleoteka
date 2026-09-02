@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { clientIp } from "@/lib/audit";
 import { oemKey } from "@/lib/part-reference";
@@ -33,6 +33,8 @@ export async function createPartRequest(
   _prevState: { error: string | null; success?: boolean } | null,
   formData: FormData,
 ): Promise<{ error: string | null; success?: boolean }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   // Honeypot. Поле спрятано от человека, поэтому заполнить его может только
   // автомат. Отвечаем как при успехе: сказать боту «ты распознан» — значит
   // подсказать, что именно поправить.
@@ -100,6 +102,8 @@ export async function createPartRequest(
  * сотрудника.
  */
 export async function markPartRequestHandled(id: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   await db.partRequest.update({
     where: { id },

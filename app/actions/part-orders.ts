@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
 import { getSession } from "@/lib/auth";
 import { isValidRussianPhone, normalizePhone } from "@/lib/utils";
@@ -38,6 +38,8 @@ interface OrderResult {
 }
 
 export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const { items, contactName, contactPhone, contactEmail, notes } = input;
 
   if (!items.length || !contactName || !contactPhone || !contactEmail) {

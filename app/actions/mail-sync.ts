@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { replayDeadLetter } from "@/lib/email/sync";
 import { roleLabel } from "@/lib/roles";
 import { TENANT_KEY } from "@/lib/tenant";
@@ -40,6 +40,8 @@ export interface ManualMailSyncResult {
  * runSyncOnce, что у фонового воркера и cron-роута; один ограниченный батч.
  */
 export async function runMailSyncNow(): Promise<ManualMailSyncResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   let session;
   try {
     session = await requireRole(["ADMIN", "MANAGER"]);

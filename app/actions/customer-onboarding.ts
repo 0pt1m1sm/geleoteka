@@ -1,7 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { createToken, setSessionCookie } from "@/lib/auth";
 import { claimTokenExpired, isValidPassword } from "@/lib/customer-onboarding";
 import { tokensMatch } from "@/lib/tokens";
@@ -26,6 +26,8 @@ export async function setPasswordForGuestUser(input: {
   email: string;
   password: string;
 }): Promise<SetPasswordResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   if (!input.orderId || !input.claimToken || !input.email || !input.password) {
     return { ok: false, error: "Все поля обязательны" };
   }
@@ -130,6 +132,8 @@ export async function loginAndAttachOrder(input: {
   email: string;
   password: string;
 }): Promise<LoginAndAttachResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   if (!input.orderId || !input.claimToken || !input.email || !input.password) {
     return { ok: false, error: "Email и пароль обязательны" };
   }

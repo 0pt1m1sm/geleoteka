@@ -1,7 +1,7 @@
 "use server";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import {
   ambiguousCodeMessage,
@@ -77,7 +77,10 @@ interface OrderResult {
   error?: string;
 }
 
-type TxClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+// Тип транзакции берётся у самого клиента: шов возвращает тот же клиент, но
+// его тип выводится обобщённо и до делегатов не раскрывается.
+type PrismaTx = Parameters<Parameters<(typeof import("@/lib/db"))["db"]["$transaction"]>[0]>[0];
+type TxClient = PrismaTx;
 
 interface ResolvedOrderLine {
   type: DbItemType;
@@ -291,6 +294,8 @@ async function gcOrphanDraftParts(tx: TxClient, partIds: Array<string | null>): 
 }
 
 export async function createSupplierOrder(input: CreateOrderInput): Promise<OrderResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const inputError = validateOrderInput(input);
@@ -332,6 +337,8 @@ export async function createSupplierOrder(input: CreateOrderInput): Promise<Orde
  * parts orphaned by removed NEW_PART lines are garbage-collected.
  */
 export async function updateSupplierOrder(orderId: string, input: CreateOrderInput): Promise<OrderResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const inputError = validateOrderInput(input);
@@ -394,6 +401,8 @@ export async function updateSupplierOrderMeta(
   orderId: string,
   meta: { orderNumber?: string; trackingNumber?: string; estimatedArrival?: string; notes?: string }
 ): Promise<OrderResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   try {
     // Atomic guard: the status condition lives in the WHERE (canEditOrderMeta's
@@ -421,6 +430,8 @@ export async function updateSupplierOrderMeta(
  * receipts on every line. Lines cascade; orphaned NEW_PART drafts are GC'd.
  */
 export async function deleteSupplierOrder(orderId: string): Promise<OrderResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   try {
     await db.$transaction(async (tx) => {
@@ -455,6 +466,8 @@ export async function updateSupplierOrderStatus(
   orderId: string,
   newStatus: string
 ): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   // RECEIVED / PARTIALLY_RECEIVED are owned exclusively by receiving (receiveLine):
@@ -493,6 +506,8 @@ export async function receiveLine(
   expectedReceived: number,
   location?: string
 ): Promise<ReceiveResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   if (!Number.isInteger(expectedReceived) || expectedReceived < 0) {
@@ -529,6 +544,8 @@ export async function undoReceiveLine(
   expectedReceived: number,
   location?: string
 ): Promise<ReceiveResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   if (!Number.isInteger(qty) || qty <= 0) return { error: "Количество должно быть положительным" };
   if (!Number.isInteger(expectedReceived) || expectedReceived <= 0) {
@@ -556,6 +573,8 @@ export async function scanReceiveLine(
   qty: number = 1,
   location?: string
 ): Promise<ReceiveResult & { matchedLineId?: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const trimmed = (code ?? "").trim();
   if (!trimmed) return { error: "Пустой код" };

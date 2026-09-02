@@ -5,7 +5,7 @@
 // counting is WAREHOUSE_WORKER-allowed, posting is ADMIN/MANAGER only.
 import { requireRole } from "@/lib/auth";
 import { syncSoldOutUsedPart, type SoldOutClient } from "@/lib/parts/sold-out";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { actorId, TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { wmsErrorMessage } from "@/lib/warehouse/wms-error-message";
@@ -44,6 +44,8 @@ const MAX_COUNT_QTY = 1_000_000;
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors app/api/warehouse/scan/route.ts resolution. */
 async function resolveItemCode(raw: string): Promise<string | { ambiguous: string } | null> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
@@ -67,6 +69,8 @@ async function resolveItemCode(raw: string): Promise<string | { ambiguous: strin
 
 /** Resolve PART-scope scopeValue (a category slug OR comma-separated articles) to partIds. */
 async function resolvePartScope(scopeValue: string): Promise<string[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const value = scopeValue.trim();
   if (!value) return [];
   const category = (await db.partCategory.findUnique({
@@ -101,6 +105,8 @@ export async function createCountSessionAction(
   scopeValue: string,
   wh?: string,
 ): Promise<{ error: string | null; sessionId?: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(COUNT_ROLES);
   const value = (scopeValue ?? "").trim();
   let locations: string[] = [];
@@ -140,6 +146,8 @@ export async function recordCountAction(
   location: string,
   countedQty: number,
 ): Promise<{ error: string | null; unknown?: boolean }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
@@ -188,6 +196,8 @@ export async function recordCountByPartAction(
   location: string,
   countedQty: number,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   if (!location.trim()) return { error: "Укажите ячейку" };
   if (!Number.isInteger(countedQty) || countedQty < 0 || countedQty > MAX_COUNT_QTY) {
@@ -204,6 +214,8 @@ export async function recordCountByPartAction(
 
 /** OPEN → REVIEW. Uncounted snapshot lines become MISSING. */
 export async function finalizeSessionAction(sessionId: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   try {
     await finalizeSession(db, sessionId);
@@ -224,6 +236,8 @@ export async function postCountSessionAction(sessionId: string): Promise<{
   reconcilePartId?: string;
   blockedLocation?: string;
 }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(POST_ROLES);
   try {
     // ОДНА транзакция на проводку и снятие с витрины. Раньше цикл шёл после
@@ -237,7 +251,7 @@ export async function postCountSessionAction(sessionId: string): Promise<{
     // у себя, потому что полная проводка в проде уже превышала дефолтные 5 с
     // и падала с P2028. Обернуть без опций — вернуть тот инцидент.
     await db.$transaction(
-      async (tx: Parameters<Parameters<typeof db.$transaction>[0]>[0]) => {
+      async (tx: Parameters<Parameters<(typeof import("@/lib/db"))["db"]["$transaction"]>[0]>[0]) => {
         // Позиции читаем ДО проводки: после неё строки могут быть недоступны,
         // а нам нужны id товаров, чьи остатки изменились.
         const counted = (await tx.stockCountLine.findMany({
@@ -277,6 +291,8 @@ export async function postCountSessionAction(sessionId: string): Promise<{
 
 /** REVIEW → OPEN so the worker can re-count (drift recovery). */
 export async function reopenSessionAction(sessionId: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   try {
     await reopenSession(db, sessionId);
@@ -289,6 +305,8 @@ export async function reopenSessionAction(sessionId: string): Promise<{ error: s
 
 /** OPEN/REVIEW → CANCELLED. */
 export async function cancelSessionAction(sessionId: string): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   try {
     await cancelSession(db, sessionId);
@@ -303,6 +321,8 @@ export async function cancelSessionAction(sessionId: string): Promise<{ error: s
 export async function getCountSessionAction(
   sessionId: string,
 ): Promise<{ session: (CountSession & { lines: CountLine[] }) | null; variance: PartVariance[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   const session = await getCountSession(db, sessionId);
   if (!session) return { session: null, variance: [] };
@@ -320,6 +340,8 @@ export async function getCountSessionAction(
 
 /** List recent sessions for the tenant. */
 export async function listCountSessionsAction(): Promise<{ sessions: CountSession[] }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(COUNT_ROLES);
   const sessions = await listCountSessions(db, TENANT_KEY);
   return { sessions };

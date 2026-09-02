@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recordAudit } from "@/lib/audit";
 import { requireRole } from "@/lib/auth";
 import { requirePermission } from "@/lib/authz";
@@ -32,6 +32,8 @@ export async function setCustomerManager(
   _prevState: CustomerManagerResult | null,
   formData: FormData,
 ): Promise<CustomerManagerResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requirePermission("crm.manage");
   const customerUserId =
     ((formData.get("customerUserId") as string | null) ?? "").trim();
@@ -122,6 +124,8 @@ export async function setCustomerManager(
 export async function deleteCustomer(
   customerUserId: string,
 ): Promise<DeleteCustomerResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   const target = (await db.user.findUnique({
@@ -174,6 +178,8 @@ export async function deleteCustomer(
 export async function restoreCustomer(
   customerUserId: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   const target = (await db.user.findUnique({
@@ -210,6 +216,8 @@ export async function addCustomerContact(
   type: "EMAIL" | "PHONE",
   rawValue: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const value =
@@ -254,6 +262,8 @@ export async function addCustomerContact(
 export async function deleteCustomerContact(
   contactId: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.customerContact.findUnique({
     where: { id: contactId },

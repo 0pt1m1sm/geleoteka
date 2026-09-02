@@ -3,7 +3,7 @@
 // Scan-to-pick actions (WMS Phase 4 — отбор). Thin wrappers over lib/warehouse/pick;
 // picking is WAREHOUSE_WORKER-allowed (same as scan/putaway/count). Every pick
 // attempt writes exactly one ScanEvent (success/rejected) for the audit.
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { actorId, TENANT_KEY } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
@@ -23,6 +23,8 @@ const PICK_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
 
 /** Already-picked lines of an RO — the recap under the pick sheet. */
 export async function getPickedLines(repairOrderId: string): Promise<DoneConsumeLine[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PICK_ROLES);
   return pickedLinesForOrder(db, repairOrderId);
 }
@@ -30,6 +32,8 @@ export async function getPickedLines(repairOrderId: string): Promise<DoneConsume
 /** Resolve a scanned item code (typed WMS:PART:, barcode/gtin, or article) to a
  *  host partId. Mirrors stocktake's resolveItemCode. */
 async function resolveItemCode(raw: string, warehouseId: string): Promise<string | { ambiguous: string } | null> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const parsed = parseScanCode(raw);
   const code = parsed.type === "PART" || parsed.type === "RAW" ? parsed.id : null;
   if (!code) return null;
@@ -71,6 +75,8 @@ export interface PickOrderSummary {
  *  handful of active ROs). If active-order volume grows, batch the consumed-movement
  *  lookup across all RO ids and resolve estimate lines with a single join. */
 export async function listOrdersNeedingPicking(): Promise<PickOrderSummary[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PICK_ROLES);
   const ros = (await db.repairOrder.findMany({
     where: { status: { in: ["SCHEDULED", "IN_PROGRESS", "READY"] } },
@@ -105,6 +111,8 @@ export async function listOrdersNeedingPicking(): Promise<PickOrderSummary[]> {
 
 /** Open (un-picked) lines for one repair order — drives the pick sheet. */
 export async function getOpenPickLines(repairOrderId: string, wh?: string): Promise<OpenPickLine[]> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(PICK_ROLES);
   return openPickLinesForOrder(db, repairOrderId, await resolveWarehouseId(wh));
 }
@@ -127,6 +135,8 @@ export async function pickRepairOrderLine(
   rawLocationCode: string,
   wh?: string,
 ): Promise<PickResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(PICK_ROLES);
   const warehouseId = await resolveWarehouseId(wh);
   const parsedPart = parseScanCode(rawPartCode);

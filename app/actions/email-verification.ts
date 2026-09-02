@@ -1,7 +1,7 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { queueEmailVerificationEmail } from "@/lib/email-verification/send";
 
 export interface ResendEmailVerificationState {
@@ -12,6 +12,8 @@ export interface ResendEmailVerificationState {
 export async function resendEmailVerificationAction(
   previous: ResendEmailVerificationState | null,
 ): Promise<ResendEmailVerificationState> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   void previous;
   const session = await requireAuth();
   const user = (await db.user.findUnique({

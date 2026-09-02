@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { roleLabel } from "@/lib/roles";
 import { TENANT_KEY } from "@/lib/tenant";
@@ -73,6 +73,8 @@ export async function linkInboxMessageToCustomer(
   customerUserId: string,
   dealId: string | null,
 ): Promise<InboxActionResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   // When the manager didn't explicitly pick a deal, attach to the customer's
@@ -276,6 +278,8 @@ export async function archiveInboxMessage(
 export async function destroyInboxMessageForever(
   inboxMessageId: string,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
 
   const existing = (await db.inboxMessage.findUnique({
@@ -374,6 +378,8 @@ async function updateInboxStatusWithAudit(
   status: "SPAM" | "ARCHIVED" | "DELETED" | "PENDING",
   action: "inbox.spam" | "inbox.archive" | "inbox.delete" | "inbox.restore",
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const existing = (await db.inboxMessage.findUnique({
     where: { id: inboxMessageId },
     select: { id: true, status: true },
@@ -415,6 +421,8 @@ export async function sendEmailReply(
   _prev: { error: string | null; communicationLogId?: string } | null,
   formData: FormData,
 ): Promise<{ error: string | null; communicationLogId?: string }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const input: SendEmailReplyInput = {

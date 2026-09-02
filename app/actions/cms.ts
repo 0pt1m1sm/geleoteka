@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { validateCMSContent } from "@/lib/cms-validate";
 
@@ -16,6 +16,8 @@ export async function updateCMSBlock(
   key: string,
   content: unknown,
 ): Promise<UpdateCMSResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const result = validateCMSContent(key, content);

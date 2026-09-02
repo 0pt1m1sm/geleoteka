@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { roleLabel } from "@/lib/roles";
 import {
@@ -74,6 +74,8 @@ export async function createCrmTask(
   _prev: TaskResult | null,
   formData: FormData,
 ): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
 
   const title = ((formData.get("title") as string | null) ?? "").trim();
@@ -180,6 +182,8 @@ export async function createCrmTask(
 }
 
 export async function completeCrmTask(id: string): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.crmTask.findUnique({
     where: { id },
@@ -202,6 +206,8 @@ export async function completeCrmTask(id: string): Promise<TaskResult> {
 }
 
 export async function claimCrmTask(id: string): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.crmTask.findUnique({
     where: { id },
@@ -254,6 +260,8 @@ export async function claimCrmTask(id: string): Promise<TaskResult> {
 }
 
 export async function reopenCrmTask(id: string): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.crmTask.findUnique({
     where: { id },
@@ -276,6 +284,8 @@ export async function reopenCrmTask(id: string): Promise<TaskResult> {
 }
 
 export async function cancelCrmTask(id: string): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const existing = (await db.crmTask.findUnique({
     where: { id },
@@ -309,6 +319,8 @@ export async function cancelCrmTask(id: string): Promise<TaskResult> {
  * На задачу ничем не ссылаются, поэтому удаление простое.
  */
 export async function deleteCrmTask(id: string): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN"]);
   const existing = (await db.crmTask.findUnique({
     where: { id },
@@ -333,6 +345,8 @@ export async function rescheduleCrmTask(
   id: string,
   dueAtIso: string,
 ): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const dueAt = new Date(dueAtIso);
   if (Number.isNaN(dueAt.getTime())) return { error: "Некорректная дата" };
@@ -361,6 +375,8 @@ export async function reassignCrmTask(
   id: string,
   nextOwnerUserId: string | null,
 ): Promise<TaskResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const ownerUserId = nextOwnerUserId?.trim() || null;
 

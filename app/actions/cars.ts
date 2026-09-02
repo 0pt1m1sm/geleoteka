@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { getSession, requireAuth } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recordAudit } from "@/lib/audit";
 
 interface DeleteVehicleResult {
@@ -32,6 +32,8 @@ function isUniqueViolation(err: unknown): boolean {
  * section instead.
  */
 export async function deleteVehicle(vehicleId: string): Promise<DeleteVehicleResult> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) return { error: "Нужно войти" };
 
@@ -103,6 +105,8 @@ export async function addCar(
   _prevState: { error: string | null } | null,
   formData: FormData
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   const session = await requireAuth();
 
   const model = formData.get("model") as string;

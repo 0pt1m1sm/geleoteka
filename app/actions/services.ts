@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pingIndexNow } from "@/lib/indexnow";
 import { parseFaqBlocks } from "@/lib/service-content";
 
@@ -65,6 +65,8 @@ export async function createService(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseServiceFormData(formData);
@@ -91,6 +93,8 @@ export async function updateService(
   _prevState: { error: string | null } | null,
   formData: FormData,
 ): Promise<{ error: string | null }> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const data = parseServiceFormData(formData);
@@ -114,6 +118,8 @@ export async function updateService(
 }
 
 export async function deleteService(serviceId: string): Promise<void> {
+  // Через шов изоляции: арендатор проставляется в данные и в условие.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   await db.service.delete({ where: { id: serviceId } });
   revalidatePath("/services");
