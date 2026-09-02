@@ -80,7 +80,9 @@ export default async function AboutPage(): Promise<React.ReactElement> {
         className="mb-16"
       />
 
-      {/* Timeline */}
+      {/* Timeline — раздела нет, пока нет записей: у нового сервиса истории ещё
+          не сложилось, а одинокий заголовок над пустотой выглядит поломкой. */}
+      {historyItems.length > 0 && (
       <div className="max-w-3xl mx-auto mb-20">
         <h2 className="text-display text-2xl font-bold mb-8 text-center">{historyTitle}</h2>
         <div className="space-y-8">
@@ -99,6 +101,7 @@ export default async function AboutPage(): Promise<React.ReactElement> {
           ))}
         </div>
       </div>
+      )}
 
       {/* Team */}
       <div className="mb-16">

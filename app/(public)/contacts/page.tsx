@@ -183,6 +183,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
           </Link>
         </div>
 
+        {mapWidgetSrc && (
         <div className="card overflow-hidden p-0 flex flex-col lg:h-full">
           <iframe
             src={mapWidgetSrc}
@@ -201,6 +202,7 @@ export default async function ContactsPage(): Promise<React.ReactElement> {
             Открыть на Яндекс.Картах →
           </a>
         </div>
+        )}
       </div>
 
       <div className="card">
