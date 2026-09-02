@@ -1,10 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { parse } from "dotenv";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PrismaClient } from "@/app/generated/prisma/client";
+import { liveDatabaseUrl } from "../helpers/live-db";
 
 vi.mock("server-only", () => ({}));
 
@@ -35,9 +33,7 @@ const THEIRS = "tenant_vtoroy";
 
 describe.sequential("изоляция арендаторов на живой базе", () => {
   beforeAll(async () => {
-    const env = parse(readFileSync(resolve(process.cwd(), ".env")));
-    const local = env.DATABASE_URL;
-    if (!local) throw new Error("нужен локальный DATABASE_URL");
+    const local = liveDatabaseUrl();
 
     admin = new PrismaClient({ datasourceUrl: local });
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
