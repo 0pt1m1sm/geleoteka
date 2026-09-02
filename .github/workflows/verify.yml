@@ -9,6 +9,26 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+
+    # Живая база для тестов, которым нужна настоящая: изоляция арендаторов и
+    # гонка за пост в расписании. Без неё эти тесты пришлось бы пропускать, а
+    # пропущенный тест изоляции хуже отсутствующего — он создаёт ощущение
+    # проверки. Версия та же, что в бою.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: geleoteka_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +56,14 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      # Тесты не запускались в CI вовсе — почти тысяча проверок существовала,
+      # но мерж ими не гейтился, и всё держалось на том, что автор прогонит их
+      # у себя. Теперь гейт настоящий.
+      - name: Tests
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/geleoteka_test
+        run: npm test
 
       # Note: `verify-vehicle-trims` is NOT run here — it requires a live
       # DATABASE_URL. Run manually before deploy. A future scheduled workflow

@@ -1,10 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-
-import { parse } from "dotenv";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { PrismaClient } from "@/app/generated/prisma/client";
+import { liveDatabaseUrl } from "../helpers/live-db";
 import {
   isServiceBayAllocationConflict,
   NoServiceBayAvailable,
@@ -47,9 +44,8 @@ describe.sequential("ServiceBay allocation — real PostgreSQL concurrency", () 
     // Vitest's default URL is deliberately non-connectable for unit tests. This
     // suite explicitly uses the developer's local DATABASE_URL, then isolates
     // itself in a generated schema that is dropped after the run.
-    const env = parse(readFileSync(resolve(process.cwd(), ".env")));
-    const localUrl = env.DATABASE_URL;
-    if (!localUrl) throw new Error("Local DATABASE_URL is required for the real scheduling race test");
+    // Адрес живой базы: TEST_DATABASE_URL в CI, .env на машине разработчика.
+    const localUrl = liveDatabaseUrl();
 
     admin = new PrismaClient({ datasourceUrl: localUrl });
     await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
