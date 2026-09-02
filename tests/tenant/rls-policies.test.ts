@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -11,10 +11,15 @@ import { MODEL_CLASSIFICATION } from "@/lib/tenant/model-classification";
  * не хватает, и заметить её глазами нельзя: остальные семьдесят две работают.
  * Поэтому список берётся из классификации, а не из памяти.
  */
-const migration = readFileSync(
-  join(process.cwd(), "prisma/migrations/20260902100000_row_level_security/migration.sql"),
-  "utf8",
-);
+/**
+ * Читаем ВСЕ миграции, а не одну: таблица, заведённая позже, приносит свою
+ * политику в своей миграции, и сторож обязан это видеть. Привязка к одному
+ * файлу означала бы, что первая же новая таблица проходит мимо проверки.
+ */
+const migration = readdirSync(join(process.cwd(), "prisma/migrations"))
+  .filter((d) => existsSync(join(process.cwd(), "prisma/migrations", d, "migration.sql")))
+  .map((d) => readFileSync(join(process.cwd(), "prisma/migrations", d, "migration.sql"), "utf8"))
+  .join("\n");
 
 function tableNameOf(model: string): string {
   const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");

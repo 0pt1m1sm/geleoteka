@@ -3,8 +3,19 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
 
 /**
  * Human-readable sequential numbers for Deal / Estimate / RepairOrder.
- * Backed by Postgres sequences (migration 20260519030000_human_numbers)
- * so concurrent creates never collide.
+ *
+ * Счётчик — НА АРЕНДАТОРА (`TenantCounter`), а не общая последовательность:
+ * у второго сервиса номера продолжались бы с наших, и первый его наряд
+ * оказался бы RO-0412 — странно выглядит и выдаёт чужой масштаб.
+ *
+ * Арендатор берётся из настройки соединения, той же, по которой работает
+ * изоляция строк. Если её нет, вставка падает на внешнем ключе — и это
+ * правильно: номер, выданный неизвестно кому, хуже отказа.
+ *
+ * Гонка исключена одним оператором: INSERT ... ON CONFLICT DO UPDATE ...
+ * RETURNING берёт замок на строку счётчика, поэтому два одновременных
+ * создания получают разные номера. Значение расходуется даже при откате
+ * транзакции — номера допускают пропуски, это идентификаторы, а не счёт строк.
  *
  * Format: `<PREFIX>-NNNN` zero-padded to 4 digits, growing past that
  * width once we cross 9999 of any one type. Year is intentionally NOT
@@ -20,13 +31,18 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
 
 type TxOrDb = PrismaClient | Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
-async function nextSeqValue(seqName: string, client?: TxOrDb): Promise<number> {
+async function nextCounterValue(kind: string, client?: TxOrDb): Promise<number> {
   const c = client ?? db;
   const rows = (await c.$queryRawUnsafe(
-    `SELECT nextval('"${seqName}"') AS value`,
+    `INSERT INTO "TenantCounter" ("tenantId", "kind", "value")
+     VALUES (current_setting('app.tenant_id', true), $1, 1)
+     ON CONFLICT ("tenantId", "kind")
+       DO UPDATE SET "value" = "TenantCounter"."value" + 1
+     RETURNING "value"`,
+    kind,
   )) as Array<{ value: bigint | number }>;
   const v = rows[0]?.value;
-  if (v === undefined || v === null) throw new Error(`Sequence ${seqName} returned no value`);
+  if (v === undefined || v === null) throw new Error(`Счётчик ${kind} не вернул значение`);
   return typeof v === "bigint" ? Number(v) : v;
 }
 
@@ -35,21 +51,21 @@ function format(prefix: string, n: number): string {
 }
 
 export async function nextDealNumber(client?: TxOrDb): Promise<string> {
-  return format("D", await nextSeqValue("Deal_number_seq", client));
+  return format("D", await nextCounterValue("DEAL", client));
 }
 
 export async function nextEstimateNumber(client?: TxOrDb): Promise<string> {
-  return format("E", await nextSeqValue("Estimate_number_seq", client));
+  return format("E", await nextCounterValue("ESTIMATE", client));
 }
 
 export async function nextRepairOrderNumber(client?: TxOrDb): Promise<string> {
-  return format("RO", await nextSeqValue("RepairOrder_number_seq", client));
+  return format("RO", await nextCounterValue("REPAIR_ORDER", client));
 }
 
 export async function nextPartOrderNumber(client?: TxOrDb): Promise<string> {
-  return format("PO", await nextSeqValue("PartOrder_number_seq", client));
+  return format("PO", await nextCounterValue("PART_ORDER", client));
 }
 
 export async function nextRentalBookingNumber(client?: TxOrDb): Promise<string> {
-  return format("RB", await nextSeqValue("RentalBooking_number_seq", client));
+  return format("RB", await nextCounterValue("RENTAL_BOOKING", client));
 }

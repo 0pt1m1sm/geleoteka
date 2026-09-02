@@ -23,6 +23,17 @@ function modelBlocks(): Map<string, string> {
 
 const hasTenantId = (body: string): boolean => /^\s+tenantId\s/m.test(body);
 
+/**
+ * Арендатор входит в первичный ключ модели.
+ *
+ * Для таких таблиц два правила ниже не действуют, и это не послабление:
+ * первичный ключ и индексирует колонку, и делает её обязательной. Требовать
+ * сверх него отдельный индекс — это второй индекс по тем же данным, а
+ * «необязательность как признак фазы expand» к таблице, заведённой уже
+ * мультиарендной, просто не относится.
+ */
+const tenantInPrimaryKey = (body: string): boolean => /@@id\(\[tenantId[,\]]/.test(body);
+
 describe("колонка арендатора в схеме", () => {
   const blocks = modelBlocks();
 
@@ -58,7 +69,7 @@ describe("колонка арендатора в схеме", () => {
     // Без индекса первый же запрос с фильтром по арендатору читает всю
     // таблицу — на общей базе это чужие строки в буфере и лишняя нагрузка.
     const unindexed = [...blocks.entries()]
-      .filter(([, body]) => hasTenantId(body))
+      .filter(([, body]) => hasTenantId(body) && !tenantInPrimaryKey(body))
       .filter(([, body]) => !/@@index\(\[tenantId\]\)/.test(body))
       .map(([name]) => name);
     expect(unindexed, `без индекса: ${unindexed.join(", ")}`).toEqual([]);
@@ -68,7 +79,7 @@ describe("колонка арендатора в схеме", () => {
     // Обязательной она станет, когда все записи будут проставлять её явно.
     // Сделать её NOT NULL сейчас значит уронить прод на первой же записи.
     const required = [...blocks.entries()]
-      .filter(([, body]) => /^\s+tenantId\s+String\s/m.test(body))
+      .filter(([, body]) => /^\s+tenantId\s+String\s/m.test(body) && !tenantInPrimaryKey(body))
       .map(([name]) => name);
     expect(required, `уже обязательные: ${required.join(", ")}`).toEqual([]);
   });
@@ -96,8 +107,11 @@ describe("миграция колонки арендатора", () => {
   }
 
   it("трогает таблицу каждой корневой модели — под её настоящим именем", () => {
+    // Таблицы, заведённые уже мультиарендными, эта миграция не касается: у них
+    // колонка появилась вместе с самой таблицей, в их собственной миграции.
+    const bornMultiTenant = new Set(["TenantCounter"]);
     const missed = Object.entries(MODEL_CLASSIFICATION)
-      .filter(([, e]) => e.kind === "TENANT")
+      .filter(([name, e]) => e.kind === "TENANT" && !bornMultiTenant.has(name))
       .map(([name]) => ({ model: name, table: tableNameOf(name) }))
       .filter(({ table }) => !migration.includes(`ALTER TABLE "${table}" ADD COLUMN IF NOT EXISTS "tenantId"`))
       .map(({ model, table }) => `${model} (таблица ${table})`);
