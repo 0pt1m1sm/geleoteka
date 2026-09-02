@@ -1,0 +1,155 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { parse } from "dotenv";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
+import { PrismaClient } from "@/app/generated/prisma/client";
+
+vi.mock("server-only", () => ({}));
+
+/**
+ * Негативный тест изоляции на ЖИВОЙ базе.
+ *
+ * Правила сужения проверены отдельно и по всем операциям; здесь доказывается
+ * другое — что шов подключён и работает на настоящем Prisma, а не только в
+ * рассуждении. Без этого теста «изоляция сделана» остаётся заявлением.
+ *
+ * Тест поднимает собственную схему в локальной базе разработчика и сносит её
+ * после прогона: трогать общие данные ради проверки изоляции было бы иронично.
+ */
+const schema = `tenant_iso_test_${process.pid}_${Date.now()}`;
+
+function urlForSchema(base: string, name: string): string {
+  const url = new URL(base);
+  url.searchParams.set("schema", name);
+  return url.toString();
+}
+
+let admin: PrismaClient;
+let client: PrismaClient;
+let withTenant: typeof import("@/lib/tenant/with-tenant").withTenant;
+
+const OUR = "tenant_geleoteka";
+const THEIRS = "tenant_vtoroy";
+
+describe.sequential("изоляция арендаторов на живой базе", () => {
+  beforeAll(async () => {
+    const env = parse(readFileSync(resolve(process.cwd(), ".env")));
+    const local = env.DATABASE_URL;
+    if (!local) throw new Error("нужен локальный DATABASE_URL");
+
+    admin = new PrismaClient({ datasourceUrl: local });
+    await admin.$executeRawUnsafe(`CREATE SCHEMA "${schema}"`);
+
+    const isolated = urlForSchema(local, schema);
+    execFileSync("npx", ["prisma", "db", "push", "--skip-generate", "--accept-data-loss"], {
+      env: { ...process.env, DATABASE_URL: isolated },
+      stdio: "pipe",
+    });
+
+    client = new PrismaClient({ datasourceUrl: isolated });
+    ({ withTenant } = await import("@/lib/tenant/with-tenant"));
+
+    await client.tenant.createMany({
+      data: [
+        { id: OUR, key: "geleoteka", name: "Гелеотека" },
+        { id: THEIRS, key: "vtoroy", name: "Второй сервис" },
+      ],
+    });
+    // По клиенту и сделке каждому арендатору — минимум, на котором видно утечку.
+    for (const [tenantId, suffix] of [
+      [OUR, "nash"],
+      [THEIRS, "chuzhoy"],
+    ] as const) {
+      await client.user.create({
+        data: {
+          id: `u_${suffix}`,
+          email: `${suffix}@example.com`,
+          phone: `+7000000000${suffix === "nash" ? 1 : 2}`,
+          passwordHash: "x",
+          name: `Клиент ${suffix}`,
+          permissionRole: "CLIENT",
+          tenantId,
+        },
+      });
+      await client.deal.create({
+        data: {
+          id: `d_${suffix}`,
+          customer: { connect: { id: `u_${suffix}` } },
+          source: `сделка-${suffix}`,
+          channel: "SERVICE",
+          tenantId,
+        },
+      });
+    }
+  }, 180_000);
+
+  afterAll(async () => {
+    await client?.$disconnect();
+    if (admin) {
+      await admin.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
+      await admin.$disconnect();
+    }
+  });
+
+  it("список сделок отдаёт только свои", async () => {
+    const ours = await withTenant(client, OUR).deal.findMany();
+    expect(ours.map((d) => d.id)).toEqual(["d_nash"]);
+  });
+
+  it("ПОИСК ЧУЖОЙ СДЕЛКИ ПО ИДЕНТИФИКАТОРУ НИЧЕГО НЕ ОТДАЁТ", async () => {
+    // Ровно та дыра, ради которой findUnique переписывается: зная чужой
+    // идентификатор, прочитать чужую сделку нельзя.
+    const stolen = await withTenant(client, OUR).deal.findUnique({ where: { id: "d_chuzhoy" } });
+    expect(stolen).toBeNull();
+  });
+
+  it("свою сделку по идентификатору читает как обычно", async () => {
+    const own = await withTenant(client, OUR).deal.findUnique({ where: { id: "d_nash" } });
+    expect(own?.source).toBe("сделка-nash");
+  });
+
+  it("клиенты чужого арендатора не видны", async () => {
+    const users = await withTenant(client, OUR).user.findMany();
+    expect(users.map((u) => u.id)).toEqual(["u_nash"]);
+  });
+
+  it("счётчик считает только своих", async () => {
+    expect(await withTenant(client, OUR).deal.count()).toBe(1);
+    expect(await withTenant(client, THEIRS).deal.count()).toBe(1);
+  });
+
+  it("создание через шов проставляет своего арендатора", async () => {
+    const created = await withTenant(client, THEIRS).deal.create({
+      data: { customer: { connect: { id: "u_chuzhoy" } }, source: "ещё-одна", channel: "SERVICE" },
+    });
+    expect(created.tenantId).toBe(THEIRS);
+    // И она не видна первому арендатору.
+    const seenByUs = await withTenant(client, OUR).deal.findUnique({ where: { id: created.id } });
+    expect(seenByUs).toBeNull();
+  });
+
+  it("изменение не дотягивается до чужой строки", async () => {
+    const res = await withTenant(client, OUR).deal.updateMany({
+      where: { id: "d_chuzhoy" },
+      data: { source: "перехвачено" },
+    });
+    expect(res.count).toBe(0);
+    const untouched = await client.deal.findUnique({ where: { id: "d_chuzhoy" } });
+    expect(untouched?.source).toBe("сделка-chuzhoy");
+  });
+
+  it("удаление не дотягивается до чужой строки", async () => {
+    const res = await withTenant(client, OUR).deal.deleteMany({ where: { id: "d_chuzhoy" } });
+    expect(res.count).toBe(0);
+    expect(await client.deal.findUnique({ where: { id: "d_chuzhoy" } })).not.toBeNull();
+  });
+
+  it("общий справочник виден обоим", async () => {
+    // Изоляция не должна превращаться в раздельные Мерседесы.
+    await client.manufacturer.create({ data: { id: "mb", name: "Mercedes-Benz", slug: "mercedes-benz" } });
+    expect(await withTenant(client, OUR).manufacturer.count()).toBe(1);
+    expect(await withTenant(client, THEIRS).manufacturer.count()).toBe(1);
+  });
+});
