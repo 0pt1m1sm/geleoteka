@@ -4,7 +4,7 @@ import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import { CreateUserDialog } from "@/components/admin/users/CreateUserDialog";
 import { UserActionsMenu } from "@/components/admin/users/UserActionsMenu";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { Card, PageHeader } from "@/components/ui";
 
@@ -49,6 +49,8 @@ interface Props {
 }
 
 export default async function UsersAdminPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   // Erasing is ADMIN-only (see eraseCustomer), so a manager sees no button
   // rather than one that always refuses.

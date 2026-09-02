@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime } from "@/lib/utils";
 import { emailAttachmentHref } from "@/lib/email/attachment-url";
@@ -55,6 +55,8 @@ function parseAttachments(value: unknown): AttachmentMeta[] {
 }
 
 export default async function InboxMessagePage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

@@ -7,7 +7,7 @@ import { IndexNowSubmitButton } from "@/components/admin/IndexNowSubmitButton";
 import { Sparkline } from "@/components/admin/Sparkline";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { collectSeoHealth, withDelta } from "@/lib/seo-health";
 import { fetchSearchTraffic } from "@/lib/yandex-metrika-api";
 import { fetchWebmasterSummary } from "@/lib/yandex-webmaster";
@@ -63,6 +63,8 @@ function StatusPill({ ok, label }: { ok: boolean; label: string }): React.ReactE
 }
 
 export default async function AdminSeoPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const [health, webmaster, traffic, snapshots] = await Promise.all([

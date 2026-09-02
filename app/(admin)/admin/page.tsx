@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { startOfDay, endOfDay, addDays } from "date-fns";
 import { Card, MetricCard, PageHeader } from "@/components/ui";
@@ -26,6 +26,8 @@ interface OpenDealRow {
 const OPEN_DEAL_STAGES = ["NEW", "IN_PROGRESS"] as const;
 
 export default async function AdminDashboard() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

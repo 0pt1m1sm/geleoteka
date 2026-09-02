@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
 
@@ -14,6 +14,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function MyRentalsPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { notFound } from "next/navigation";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { PageHeader } from "@/components/ui";
 import { TeamMemberForm } from "@/components/admin/TeamMemberForm";
 
@@ -24,6 +24,8 @@ interface MemberRow {
 }
 
 export default async function EditTeamMemberPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 

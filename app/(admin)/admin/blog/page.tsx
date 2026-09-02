@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { DeleteBlogPostButton } from "@/components/admin/DeleteBlogPostButton";
 import { Card, PageHeader } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 interface PostRow {
   id: string;
@@ -20,6 +20,8 @@ interface PostRow {
 const DATE_FMT = new Intl.DateTimeFormat("ru-RU", { dateStyle: "medium" });
 
 export default async function AdminBlogPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const posts = (await db.blogPost.findMany({

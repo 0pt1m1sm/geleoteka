@@ -3,13 +3,15 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { packProgress } from "@/lib/warehouse/pack";
 import { OrderStatusChanger } from "@/components/admin/OrderStatusChanger";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function AdminOrdersPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

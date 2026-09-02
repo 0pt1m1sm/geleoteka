@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { expandGenerationCodes, normalizeOem } from "@/lib/part-reference";
 import { Card, PageHeader } from "@/components/ui";
 import { PartRefAddForm } from "@/components/admin/PartRefAddForm";
@@ -92,6 +92,8 @@ function RefCard({ r }: { r: RefRow }): React.ReactElement {
 }
 
 export default async function PartRefsPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const sp = await searchParams;

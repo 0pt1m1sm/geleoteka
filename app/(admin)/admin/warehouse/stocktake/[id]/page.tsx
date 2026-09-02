@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getCountSessionAction } from "@/app/actions/stocktake";
 import { PageHeader } from "@/components/ui";
 import { StocktakeCountBox } from "@/components/admin/StocktakeCountBox";
@@ -13,6 +13,8 @@ interface Props {
 }
 
 export default async function StocktakeSessionPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const canPost = session.permissionRole === "ADMIN" || session.permissionRole === "MANAGER";
   const { id } = await params;

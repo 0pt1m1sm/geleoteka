@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatDate, formatDateTime, formatPrice } from "@/lib/utils";
 import { getAllCustomerTags } from "@/lib/customer-queries";
 import { getTagBadgeClass } from "@/lib/customer-tags";
@@ -72,6 +72,8 @@ interface RawCustomer {
 }
 
 export default async function CustomerDetailPage({ params, searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

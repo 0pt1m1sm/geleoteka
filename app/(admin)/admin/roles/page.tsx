@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { allRolePermissions, rolesUsingDefaults } from "@/lib/authz";
 import { EDITABLE_ROLES, PERMISSIONS, type Permission } from "@/lib/permissions";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -34,6 +34,8 @@ const ROLE_NOTE: Readonly<Record<string, string>> = {
 };
 
 export default async function RolesPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (session.permissionRole !== "ADMIN") redirect("/admin");

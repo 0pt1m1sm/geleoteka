@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { PartEditForm } from "@/components/admin/PartEditForm";
 import { StockHistory } from "@/components/admin/StockHistory";
@@ -12,6 +12,8 @@ interface Props {
 }
 
 export default async function EditPartPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 

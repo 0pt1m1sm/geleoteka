@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { ModelEditForm } from "@/components/admin/ModelEditForm";
 
 export default async function NewModelPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const manufacturers = (await db.manufacturer.findMany({

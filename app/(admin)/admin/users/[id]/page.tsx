@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { entityFlags, roleLabel as roleLabelOf } from "@/lib/roles";
 import { PageHeader } from "@/components/ui";
 import { UserContactsForm } from "@/components/admin/UserContactsForm";
@@ -39,6 +39,8 @@ const ROLE_BADGE_CLASS: Record<string, string> = {
 
 
 export default async function UserDetailPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 

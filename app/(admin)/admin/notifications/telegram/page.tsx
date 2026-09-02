@@ -12,7 +12,7 @@ import { TelegramTestButton } from "@/components/admin/notifications/TelegramTes
 import { Alert, Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { TENANT_KEY } from "@/lib/tenant";
 import { formatDateTime } from "@/lib/utils";
@@ -24,6 +24,8 @@ interface DestinationStatus {
 }
 
 export default async function TelegramNotificationsPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "notifications.manage"))) redirect("/");

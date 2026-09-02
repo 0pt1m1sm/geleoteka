@@ -7,7 +7,7 @@ import { retryStaffNotificationDelivery } from "@/app/actions/staff-notification
 import { Card, MetricCard, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import { TELEGRAM_SLOW_SEND_THRESHOLD_MS } from "@/lib/staff-notifications/channels/telegram/diagnostics";
 import { loadStaffNotificationRetentionDays } from "@/lib/staff-notifications/operations-config";
@@ -81,6 +81,9 @@ export default async function StaffNotificationOperationsPage({
   const telegramDiagnosticSince = new Date(
     Date.now() - TELEGRAM_DIAGNOSTIC_WINDOW_MS,
   );
+
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
 
   const [
     eventRows,

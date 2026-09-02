@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDateTime, formatPrice } from "@/lib/utils";
 import { DEAL_CHANNEL_LABELS } from "@/lib/deal-stage-labels";
@@ -80,6 +80,8 @@ interface DealDetail {
 }
 
 export default async function CrmDealDetailPage({ params, searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

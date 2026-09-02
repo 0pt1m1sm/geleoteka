@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatDate, formatDateTime, REPAIR_ORDER_STATUS_LABELS } from "@/lib/utils";
 import { SLOT_MINUTES } from "@/lib/scheduling/availability";
 import { StatusChanger } from "@/components/admin/StatusChanger";
@@ -28,6 +28,8 @@ function appointmentRange(start: Date): string {
 }
 
 export default async function AppointmentsPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

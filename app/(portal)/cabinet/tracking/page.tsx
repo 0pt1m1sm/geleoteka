@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { StatusBoard } from "@/components/portal/StatusBoard";
 import { Card, PageHeader } from "@/components/ui";
 import { WorkPhotosGallery } from "@/components/shared/WorkPhotosGallery";
@@ -30,6 +30,8 @@ interface RepairOrderWithPhotos {
 }
 
 export default async function TrackingPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 

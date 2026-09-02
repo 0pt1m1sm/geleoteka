@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { PartRequestHandleButton } from "@/components/admin/PartRequestHandleButton";
 import { formatDateTime } from "@/lib/utils";
@@ -21,6 +21,8 @@ interface RequestRow {
 }
 
 export default async function PartRequestsPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   // requireRole здесь нельзя: он бросает, и страница падает необработанной
   // ошибкой вместо входа (конвенция проекта).
   const session = await getSession();

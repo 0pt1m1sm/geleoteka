@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { BlogPostForm } from "@/components/admin/BlogPostForm";
 import { PageHeader } from "@/components/ui";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -22,6 +22,8 @@ interface PostRow {
 }
 
 export default async function EditBlogPostPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 
