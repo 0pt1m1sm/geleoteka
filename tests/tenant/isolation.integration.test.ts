@@ -199,6 +199,46 @@ describe.sequential("изоляция арендаторов на живой б�
     expect(after?.tenantId).toBe(OUR);
   });
 
+  it("СЧЁТЧИКИ АРЕНДАТОРОВ НЕЗАВИСИМЫ", async () => {
+    // Ради этого счётчик и заводился. Проверяется именно независимость, а не
+    // конкретные числа: у первого арендатора счётчик перенесён из прежней
+    // последовательности и стартует не с нуля, а у нового сервиса — с единицы.
+    const { nextRepairOrderNumber } = await import("@/lib/crm/internal/next-number");
+    const forTenant = (tenantId: string) =>
+      new PrismaClient({
+        datasourceUrl: `${urlForSchema(liveDatabaseUrl(), schema)}&options=-c%20app.tenant_id%3D${tenantId}`,
+      });
+
+    const ourClient = forTenant(OUR);
+    const theirClient = forTenant(THEIRS);
+    try {
+      const ourFirst = await nextRepairOrderNumber(ourClient as never);
+      // Между двумя нашими выдачами чужой сервис берёт свои номера.
+      const theirFirst = await nextRepairOrderNumber(theirClient as never);
+      const theirSecond = await nextRepairOrderNumber(theirClient as never);
+      const ourSecond = await nextRepairOrderNumber(ourClient as never);
+
+      const num = (s: string) => Number(s.replace("RO-", ""));
+      // Чужие выдачи не сдвинули нашу нумерацию.
+      expect(num(ourSecond)).toBe(num(ourFirst) + 1);
+      expect(num(theirSecond)).toBe(num(theirFirst) + 1);
+      // Новый сервис начинает с первого номера, а не продолжает наш.
+      expect(theirFirst).toBe("RO-0001");
+    } finally {
+      await ourClient.$disconnect();
+      await theirClient.$disconnect();
+    }
+  });
+
+  it("номер без арендатора не выдаётся вовсе", async () => {
+    // Номер, выданный неизвестно кому, хуже отказа: он уйдёт в документ и
+    // станет чужим идентификатором.
+    const { nextDealNumber } = await import("@/lib/crm/internal/next-number");
+    const noTenant = new PrismaClient({ datasourceUrl: urlForSchema(liveDatabaseUrl(), schema) });
+    await expect(nextDealNumber(noTenant as never)).rejects.toThrow();
+    await noTenant.$disconnect();
+  });
+
   it("общий справочник виден обоим", async () => {
     // Изоляция не должна превращаться в раздельные Мерседесы.
     await client.manufacturer.create({ data: { id: "mb", name: "Mercedes-Benz", slug: "mercedes-benz" } });

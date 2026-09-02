@@ -239,6 +239,20 @@ enum TenantStatus {
 /// Он остаётся человекочитаемым нарочно: по нему сходятся конфиг, домен и
 /// логи. Внутренние связи в следующих историях пойдут по `id`, а не по нему —
 /// переименование сервиса не должно означать миграцию всех таблиц.
+/// Счётчик документов арендатора: у каждого сервиса своя нумерация.
+///
+/// Глобальные последовательности не годятся: у второго сервиса номера
+/// продолжались бы с наших, и первый же его наряд оказался бы, скажем,
+/// RO-0412 — это и странно выглядит, и выдаёт чужой масштаб.
+model TenantCounter {
+  tenantId String
+  /// Вид документа: DEAL, ESTIMATE, REPAIR_ORDER, PART_ORDER, RENTAL_BOOKING.
+  kind     String
+  value    Int    @default(0)
+
+  @@id([tenantId, kind])
+}
+
 model Tenant {
   id        String       @id @default(cuid())
   key       String       @unique
@@ -818,7 +832,7 @@ model RepairOrder {
   /// проставляется умолчанием на стороне базы и backfill-ом.
   tenantId String?
   id           String            @id @default(cuid())
-  roNumber     String?           @unique // Human-friendly sequential number
+  roNumber     String?            // Human-friendly sequential number
   /// NULL when the customer was erased — the service record is kept, detached.
   userId       String? // Customer
   // Optional on purpose: the car is a descriptive reference, not the owner of
@@ -886,6 +900,7 @@ model RepairOrder {
   @@index([claimToken])
   @@index([dealId])
   @@index([tenantId])
+  @@unique([tenantId, roNumber])
 }
 
 /// Photo attached by a master/manager to a RepairOrder showing work
@@ -1774,7 +1789,7 @@ model PartShipment {
   // Human-readable PO-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
   // inserts always carry a value.
-  orderNumber  String?         @unique
+  orderNumber  String?         
   userId       String?
   status       PartOrderStatus @default(PROCESSING)
   total        Int             @default(0)
@@ -1803,6 +1818,7 @@ model PartShipment {
   @@index([dealId])
   @@map("PartOrder")
   @@index([tenantId])
+  @@unique([tenantId, orderNumber])
 }
 
 model PartOrderItem {
@@ -1841,7 +1857,7 @@ model RentalBooking {
   // Human-readable RB-NNNN — generated via Postgres sequence in
   // lib/crm/internal/next-number.ts. Nullable for legacy rows; new
   // inserts always carry a value.
-  bookingNumber String?             @unique
+  bookingNumber String?             
   vehicleId     String // Was carId — now references Vehicle
   userId        String?
   status        RentalBookingStatus @default(BOOKED)
@@ -1876,6 +1892,7 @@ model RentalBooking {
   @@index([claimToken])
   @@index([dealId])
   @@index([tenantId])
+  @@unique([tenantId, bookingNumber])
 }
 
 // ============================================
@@ -2142,7 +2159,7 @@ model Deal {
   /// проставляется умолчанием на стороне базы и backfill-ом.
   tenantId String?
   id             String            @id @default(cuid())
-  number         String?           @unique
+  number         String?           
   /// NULL when the customer was erased: the commercial record survives
   /// detached and can be re-attached by hand. See app/actions/crm/customer-erase.ts.
   customerUserId String?
@@ -2193,6 +2210,7 @@ model Deal {
   @@index([claimToken])
   @@index([createdAt])
   @@index([tenantId])
+  @@unique([tenantId, number])
 }
 
 // DealLine model removed (refactor 2026-05-18). The active non-SUPERSEDED
@@ -2209,7 +2227,7 @@ model Estimate {
   /// проставляется умолчанием на стороне базы и backfill-ом.
   tenantId String?
   id               String        @id @default(cuid())
-  number           String?       @unique
+  number           String?       
   dealId           String
   stage            EstimateStage @default(DRAFT)
   preparedByUserId String?
@@ -2246,6 +2264,7 @@ model Estimate {
   // without forcing Postgres to pick a single-column index and post-filter.
   @@index([dealId, stage])
   @@index([tenantId])
+  @@unique([tenantId, number])
 }
 
 model EstimateLine {
