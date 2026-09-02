@@ -10,11 +10,12 @@ import {
   type OutboundMessage,
   type Transport,
 } from "@/lib/email/transport";
+import { SITE_URL } from "@/lib/site-url";
 
-const NEXT_PUBLIC_APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+
 
 /** Public origin used by template builders for absolute URLs. */
-export const APP_URL = NEXT_PUBLIC_APP_URL;
+export const APP_URL = SITE_URL;
 
 const DEFAULT_FALLBACK_FROM = "onboarding@resend.dev";
 const DEFAULT_SMTP_HOST = "smtp.timeweb.ru";
@@ -53,7 +54,7 @@ export interface SendEmailInput {
   html: string;
   text?: string;
   /**
-   * RFC 5322 Message-Id, bracket-wrapped (e.g. `<abc@geleoteka.ru>`).
+   * RFC 5322 Message-Id, bracket-wrapped (e.g. `<abc@{хост сайта}>`).
    * Stamped as the outbound `Message-Id` header so an inbound reply's
    * `In-Reply-To` matches `CommunicationLog.externalId` exactly.
    */
@@ -82,7 +83,7 @@ export async function resolveEmailFrom(): Promise<string> {
   return fallback || DEFAULT_FALLBACK_FROM;
 }
 
-/** Resolve the tenant `Reply-To` (was hard-coded to sales@geleoteka.ru). */
+/** Resolve the tenant `Reply-To` (was hard-coded to the first client's mailbox). */
 export async function resolveEmailReplyTo(): Promise<string> {
   const explicit = (await getSetting("EMAIL_REPLY_TO"))?.trim();
   return explicit || DEFAULT_EMAIL_REPLY_TO;

@@ -1,5 +1,5 @@
 import { Star as LucideStar } from "lucide-react";
-import { YANDEX_PROFILE_URL } from "@/lib/yandex";
+import { yandexProfileUrl } from "@/lib/yandex";
 import { fetchYandexReviews, type YandexReview } from "@/lib/yandex-reviews";
 
 function Star({ filled }: { filled: boolean }): React.ReactElement {
@@ -48,8 +48,12 @@ function ReviewCard({ review }: { review: YandexReview }): React.ReactElement {
   );
 }
 
-export async function Reviews(): Promise<React.ReactElement> {
+export async function Reviews(): Promise<React.ReactElement | null> {
   const data = await fetchYandexReviews();
+  // Карточка организации в картах не настроена — блока отзывов нет. Пустой
+  // блок с выдуманным рейтингом хуже отсутствующего.
+  if (!data) return null;
+  const profileUrl = await yandexProfileUrl();
   const reviews = data.reviews.slice(0, 6);
 
   return (
@@ -88,9 +92,10 @@ export async function Reviews(): Promise<React.ReactElement> {
         </div>
       )}
 
+      {profileUrl && (
       <div className="mt-10 text-center">
         <a
-          href={YANDEX_PROFILE_URL}
+          href={profileUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 text-sm font-medium text-accent transition-colors hover:text-accent-hover"
@@ -98,6 +103,7 @@ export async function Reviews(): Promise<React.ReactElement> {
           Все отзывы на Яндекс Картах →
         </a>
       </div>
+      )}
     </>
   );
 }

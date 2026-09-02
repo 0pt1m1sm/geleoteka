@@ -90,7 +90,7 @@ function toYandexFullMapsUrl(url: string): string {
 }
 
 function extractOidFromPoiUri(uri: string): string | null {
-  // "ymapsbm1://org?oid=211932722600" → "211932722600"
+  // "ymapsbm1://org?oid=<номер>" → "<номер>"
   const m = uri.match(/oid=(\d+)/);
   return m ? m[1] : null;
 }

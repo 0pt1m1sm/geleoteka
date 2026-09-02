@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSetting } from "@/lib/settings";
+import { SITE_HOST } from "@/lib/site-url";
 
 /**
  * Клиент Вебмастер API v4 (эндпоинты сверены с оф. доками 2026-08-05):
@@ -14,7 +15,6 @@ import { getSetting } from "@/lib/settings";
  */
 
 const API = "https://api.webmaster.yandex.net/v4";
-const SITE_HOST = new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru").host;
 
 export interface WebmasterQueryRow {
   query: string;

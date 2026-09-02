@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { getSetting } from "@/lib/settings";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * Вход через российские ИС (Яндекс ID, VK ID) — разрешённые способы
@@ -41,7 +42,7 @@ function b64url(buf: Buffer): string {
 }
 
 function appUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  return SITE_URL;
 }
 
 export function redirectUri(provider: OAuthProvider): string {

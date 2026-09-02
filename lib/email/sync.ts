@@ -34,7 +34,7 @@ import {
 export type MailboxRoleName = "INBOUND" | "OUTBOUND_ARCHIVE";
 
 export interface MailSyncSource {
-  /** The mailbox account we authenticate as, e.g. `crm-archive@geleoteka.ru`. */
+  /** The mailbox account we authenticate as, e.g. `crm-archive@{ваш домен}`. */
   mailbox: string;
   /** IMAP folder within that account, e.g. `INBOX` (Timeweb uses English names). */
   folder: string;

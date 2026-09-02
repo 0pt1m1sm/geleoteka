@@ -14,6 +14,7 @@ import { consumeStock } from "@/lib/wms/public";
 import { TENANT_KEY, actorId, defaultWarehouseId } from "@/lib/wms-host";
 import { publishPartsOrderCreated } from "@/lib/staff-notifications/business-events";
 import type { StaffNotificationPublishTx } from "@/lib/staff-notifications/publish";
+import { SITE_URL } from "@/lib/site-url";
 
 interface OrderInput {
   items: { partId: string; quantity: number }[];
@@ -205,7 +206,7 @@ export async function createPartOrder(input: OrderInput): Promise<OrderResult> {
     const orderId = (order as Record<string, unknown>).id as string;
 
     if (contactEmail) {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+      const appUrl = SITE_URL;
       // cabinetUrl is meaningful only for logged-in customers — guests have no
       // working deep-link to /cabinet without going through PostCheckoutAuthPanel
       // at submit time (see TD-003). Points at the orders list — there is no

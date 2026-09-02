@@ -9,8 +9,8 @@ import { collectSeoHealth } from "@/lib/seo-health";
 import { fetchSearchTraffic } from "@/lib/yandex-metrika-api";
 import { fetchWebmasterSummary } from "@/lib/yandex-webmaster";
 import { TENANT_KEY } from "@/lib/tenant";
+import { SITE_URL } from "@/lib/site-url";
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
 /**
  * Разовая ручная отправка ВСЕХ URL из sitemap в IndexNow.

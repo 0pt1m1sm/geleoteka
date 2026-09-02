@@ -10,8 +10,8 @@
  */
 
 import { SERVICE_ARTICLE_RE } from "@/lib/part-reference";
+import { SITE_URL } from "@/lib/site-url";
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 export const ORGANIZATION_ID = `${SITE_URL}#organization`;
 
 export function toJsonLdScript(value: object): string {

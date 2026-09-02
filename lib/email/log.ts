@@ -2,14 +2,19 @@ import { randomBytes } from "node:crypto";
 
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TRANSPORT_UNKNOWN_PREFIX } from "@/lib/email/transport";
+import { SITE_HOST } from "@/lib/site-url";
 
 /**
- * RFC 5322 Message-Id for outbound mail. Bracket-wrapped, locally rooted at
- * `@geleoteka.ru` so inbound replies' `In-Reply-To` headers match the exact
+ * RFC 5322 Message-Id for outbound mail. Bracket-wrapped, rooted at the host of
+ * THIS installation so inbound replies' `In-Reply-To` headers match the exact
  * string stored in `CommunicationLog.externalId`.
+ *
+ * The host used to be the first client's domain, written in. Another service
+ * would have sent mail identified by someone else's domain — wrong on the wire
+ * and confusing in every mail client that shows it.
  */
 export function generateOutboundMessageId(): string {
-  return `<${randomBytes(12).toString("hex")}@geleoteka.ru>`;
+  return `<${randomBytes(12).toString("hex")}@${SITE_HOST}>`;
 }
 
 export interface RecordOutboundEmailInput {
