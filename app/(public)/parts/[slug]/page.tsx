@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { getCMS } from "@/lib/cms";
 import { trimLabel } from "@/lib/vehicle-catalog-types";
@@ -38,6 +38,8 @@ function requestedVariantSku(
 
 /** Shared with generateMetadata so the detail lookup runs once per request. */
 const getPartBySlug = cache(async (slug: string) => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return db.part.findUnique({
     where: { slug },
     include: {

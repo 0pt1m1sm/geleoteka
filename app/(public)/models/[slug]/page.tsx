@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getModelBySlug, generationLabel } from "@/lib/vehicle-catalog";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
@@ -22,6 +22,8 @@ const getCachedModelBySlug = cache(getModelBySlug);
 /** Сколько позиций справочника привязано к поколениям этой модели. Нужен для
  *  решения об индексации — см. lib/models/index-policy.ts. */
 const countModelParts = cache(async (slug: string): Promise<number> => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return (await db.partReferenceFitment.count({
     where: { generation: { model: { slug } } },
   })) as number;
@@ -59,6 +61,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ModelPage({ params }: Props): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const { slug } = await params;
   const model = await getCachedModelBySlug(slug);
 

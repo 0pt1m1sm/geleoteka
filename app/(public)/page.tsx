@@ -4,7 +4,7 @@ import { FAQAccordion } from "@/components/shared/FAQAccordion";
 import { Reviews } from "@/components/shared/Reviews";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList, getCMSImage } from "@/lib/cms";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pageSeo } from "@/lib/seo";
 import { formatPrice } from "@/lib/utils";
 import { buildFaqJsonLd } from "@/lib/seo-jsonld";
@@ -19,6 +19,8 @@ export const metadata = pageSeo({
 });
 
 export default async function HomePage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [
     heroLeftEyebrow,
     heroLeftTitle,

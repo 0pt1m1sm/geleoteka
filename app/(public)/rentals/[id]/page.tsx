@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { cache } from "react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSession } from "@/lib/auth";
 import { formatPrice } from "@/lib/utils";
 import { getCMS, getCMSList } from "@/lib/cms";
@@ -28,6 +28,8 @@ const TERM_ICON_PATHS = [
 ];
 
 const getRentalVehicleById = cache(async (id: string) => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return db.vehicle.findFirst({
     where: { id, ownershipType: "RENTAL", isArchived: false },
   });
@@ -59,6 +61,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function RentalCarPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   // Адрес выдачи из CMS. Пустой — блок не рисуем (см. ниже).
   const pickupAddress = await getCMS("contacts.address", "");
   const { id } = await params;

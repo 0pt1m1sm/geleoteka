@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { PageHeader } from "@/components/ui";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pageSeo } from "@/lib/seo";
 
 export const metadata = pageSeo({
@@ -28,6 +28,8 @@ const DATE_FMT = new Intl.DateTimeFormat("ru-RU", {
 });
 
 export default async function BlogListPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   // Пагинации нет намеренно: она понадобится ближе к полусотне статей, а
   // до того лишь удлиняет код. take(48) — предохранитель от бесконечной выдачи.
   const posts = (await db.blogPost.findMany({

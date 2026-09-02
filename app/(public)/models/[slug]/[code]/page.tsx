@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pageSeo } from "@/lib/seo";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { isGenerationIndexable } from "@/lib/models/index-policy";
@@ -42,6 +42,8 @@ function normalizeCode(raw: string): string {
 }
 
 const getGeneration = cache(async (slug: string, code: string) => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return db.vehicleGeneration.findFirst({
     where: { code, isActive: true, model: { slug, isActive: true } },
     select: {

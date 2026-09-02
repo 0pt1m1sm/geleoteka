@@ -29,6 +29,24 @@ const MIGRATED = [
   "lib/crm/approved-estimate.ts",
   "lib/models/related-content.ts",
   "lib/crm/estimate-chain.ts",
+  // Публичные страницы: читают и рисуют, записей нет — поэтому переведены
+  // раньше остального приложения.
+  "app/(public)/about/page.tsx",
+  "app/(public)/blog/[slug]/page.tsx",
+  "app/(public)/blog/page.tsx",
+  "app/(public)/booking/page.tsx",
+  "app/(public)/estimate/[token]/page.tsx",
+  "app/(public)/models/[slug]/[code]/page.tsx",
+  "app/(public)/models/[slug]/page.tsx",
+  "app/(public)/page.tsx",
+  "app/(public)/parts/[slug]/page.tsx",
+  "app/(public)/parts/oem/[oem]/page.tsx",
+  "app/(public)/parts/page.tsx",
+  "app/(public)/rentals/[id]/page.tsx",
+  "app/(public)/rentals/page.tsx",
+  "app/(public)/services/[slug]/page.tsx",
+  "app/(public)/services/page.tsx",
+  "app/(public)/vacancies/page.tsx",
 ];
 
 describe("модули, переведённые на шов", () => {

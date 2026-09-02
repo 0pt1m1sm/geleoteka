@@ -1,6 +1,6 @@
 export const dynamic = "force-dynamic";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
 import { getCMSText, getCMSRichtext, getCMSList } from "@/lib/cms";
@@ -23,6 +23,8 @@ interface MasterData {
 }
 
 export default async function AboutPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [users, eyebrow, title, description, historyTitle, historyItems, teamTitle, certTitle, certBody] =
     await Promise.all([
       // The roster is site content (see app/actions/team-members.ts), not a

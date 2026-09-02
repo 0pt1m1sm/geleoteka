@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, permanentRedirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { pageSeo } from "@/lib/seo";
 import { resolveOemSegment } from "@/lib/parts/oem-route";
 import { VariantList, availableQty, type VariantForList } from "@/components/parts/VariantList";
@@ -47,6 +47,8 @@ interface RefDetail {
 
 /** Один запрос на рендер и на метаданные. */
 const getReferenceByOem = cache(async (oem: string) => {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   return db.partReference.findUnique({
     where: { oem },
     select: {

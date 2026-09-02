@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { PageHeader } from "@/components/ui";
 import { Markdown } from "@/components/shared/Markdown";
@@ -25,6 +25,8 @@ interface ServiceData {
 }
 
 export default async function ServicesPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const [servicesRaw, eyebrow, title, description, ctaText, ctaButton] = await Promise.all([
     db.service.findMany({
       orderBy: { name: "asc" },

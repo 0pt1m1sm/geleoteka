@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { LinkPending } from "@/components/shared/LinkPending";
 import Image from "next/image";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { MyCarPicker } from "@/components/parts/MyCarPicker";
@@ -41,6 +41,8 @@ interface Props {
 }
 
 export default async function PartsPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const params = await searchParams;
   const q = params.q?.trim() || "";
   const categorySlug = params.category || "";

@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { CustomerEstimateView } from "@/components/portal/CustomerEstimateView";
 import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
@@ -63,6 +63,8 @@ interface Props {
  * accept/decline without logging in.
  */
 export default async function GuestEstimatePage({ params, searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const { token } = await params;
   const { id: requestedId } = await searchParams;
 
