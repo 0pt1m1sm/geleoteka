@@ -7,7 +7,7 @@
  */
 
 import "server-only";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   applyClientSort,
   applyTextFilter,
@@ -23,6 +23,8 @@ export interface CustomerTagOption {
 
 /** Alphabetical list of all CRM tags — used in filter dropdown and tag picker. */
 export async function getAllCustomerTags(): Promise<CustomerTagOption[]> {
+  // Через шов: условие по арендатору добавляется само, забыть его нельзя.
+  const db = await tenantDb();
   const rows = (await db.customerTag.findMany({
     orderBy: { name: "asc" },
     select: { id: true, name: true, colorSlug: true },
@@ -77,6 +79,7 @@ export async function loadCustomersForList(
     ];
   }
 
+  const db = await tenantDb();
   const raw = (await db.user.findMany({
     where,
     include: {
