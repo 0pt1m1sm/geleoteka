@@ -23,6 +23,33 @@ import { PrismaClient } from "@/app/generated/prisma/client";
 
 import { CMS_SCHEMA } from "@/lib/cms-schema";
 
+/**
+ * Обернуть значение в ту форму, в которой его ищет читатель.
+ *
+ * Содержимое блока — не голое значение, а объект с полем под тип: читатель в
+ * `lib/cms.ts` берёт `value` у текста, `markdown` у разметки, `items` у списка,
+ * `url` у картинки. Первая версия скрипта записала голые значения, и 81
+ * созданная строка молча не читалась — страницы продолжали брать умолчания из
+ * кода. Ошибка нашлась только правкой блока в базе: страница не изменилась.
+ * Поэтому форма здесь одна на весь скрипт и выведена из читателя, а не из
+ * догадки.
+ *
+ * `color` и `url` своего читателя не имеют и читаются как текст — значит и
+ * храниться должны как текст.
+ */
+function wrap(type: string, value: unknown): Record<string, unknown> {
+  switch (type) {
+    case "richtext":
+      return { markdown: value };
+    case "list":
+      return { items: value };
+    case "image":
+      return { url: value };
+    default:
+      return { value };
+  }
+}
+
 const apply = process.argv.includes("--apply");
 const db = new PrismaClient();
 
@@ -54,7 +81,7 @@ async function main(): Promise<void> {
         // Тип блока хранится рядом с содержимым: рендер по нему решает, как
         // показывать. У схемы он есть у каждого ключа, умолчание — text.
         type: descriptor.type ?? "text",
-        content: descriptor.defaultValue as never,
+        content: wrap(descriptor.type ?? "text", descriptor.defaultValue) as never,
       },
     });
     created++;
