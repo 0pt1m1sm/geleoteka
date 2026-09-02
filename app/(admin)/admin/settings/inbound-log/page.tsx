@@ -75,7 +75,7 @@ export default async function InboundLogPage() {
           <p className="text-[var(--foreground-muted)]">Ни одной попытки не зафиксировано.</p>
           <p className="text-xs text-[var(--foreground-muted)]">
             Это значит Resend ВООБЩЕ не достучался до нашего endpoint. Проверьте в Resend dashboard → Webhooks:<br/>
-            1. URL endpoint = https://geleoteka.ru/api/email/inbound<br/>
+            1. URL endpoint = адрес вашего сайта + /api/email/inbound<br/>
             2. Подписка на event type <span className="font-mono">email.received</span><br/>
             3. Webhook включён (Active).
           </p>

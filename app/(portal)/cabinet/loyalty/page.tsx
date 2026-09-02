@@ -6,12 +6,12 @@ import { tenantDb } from "@/lib/tenant/scoped-db";
 import { LOYALTY_TIERS, getNextTier, formatDate } from "@/lib/utils";
 import type { LoyaltyTier } from "@/lib/utils";
 import { Badge, Card, PageHeader } from "@/components/ui";
+import { SITE_URL } from "@/lib/site-url";
 
 // Server Component — `window` is never defined here, so the old
 // `typeof window !== "undefined"` check always produced a domain-less,
 // unusable referral link. Built from the known site origin instead, same env
 // fallback pattern as lib/seo-jsonld.ts / lib/indexnow.ts.
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
 export default async function LoyaltyPage() {
   // Через шов изоляции: условие по арендатору добавляется само.

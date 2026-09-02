@@ -11,6 +11,7 @@ import { ConfirmHost } from "@/components/ui/ConfirmHost";
 import { ToastHost } from "@/components/ui/ToastHost";
 import { NavigationProgress } from "@/components/shared/NavigationProgress";
 import { NavigationProgressProvider } from "@/components/shared/NavigationProgressProvider";
+import { SITE_URL } from "@/lib/site-url";
 
 // Sync theme bootstrap. Must run before first paint to eliminate the
 // dark-flash FOUC on light-theme reloads. `<Script strategy="beforeInteractive">`
@@ -36,7 +37,6 @@ const fontMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 const SITE_TITLE = "Geleoteka — специализированный сервис Mercedes-Benz G-Class";
 const SITE_DESCRIPTION =
   "Специализированный сервис Mercedes-Benz G-Class (Гелендваген): ремонт и ТО, оригинальные запчасти, аренда. Онлайн-запись, личный кабинет, отслеживание статуса ремонта в реальном времени.";

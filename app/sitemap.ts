@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { isGenerationIndexable, isModelIndexable } from "@/lib/models/index-policy";
+import { SITE_URL } from "@/lib/site-url";
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
 // Без этого Next запекает sitemap на этапе сборки, где БД недоступна, — все
 // динамические ветки молча падают в .catch и прод навсегда отдаёт 9 статических

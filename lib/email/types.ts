@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { SITE_HOST } from "@/lib/site-url";
 
 /**
  * Provider-neutral email domain types.
@@ -197,7 +198,7 @@ export function buildSyntheticMessageId(
   ];
   const canonical = parts.map((p) => `${p.length}:${p}`).join("");
   const digest = createHash("sha256").update(canonical, "utf8").digest("hex").slice(0, 40);
-  return `<sync-${digest}@synthetic.geleoteka.ru>`;
+  return `<sync-${digest}@synthetic.${SITE_HOST}>`;
 }
 
 /** Guards against a Date header that parsed but is obviously not a send time. */

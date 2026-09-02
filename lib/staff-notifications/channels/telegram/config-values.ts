@@ -8,6 +8,7 @@ import {
   STAFF_NOTIFICATION_EVENT_CATALOG,
   type StaffNotificationType,
 } from "@/lib/staff-notifications/types";
+import { SITE_URL } from "@/lib/site-url";
 
 const BOT_TOKEN_RE = /^\d{5,16}:[A-Za-z0-9_-]{20,200}$/;
 const BOT_USERNAME_RE = /^[A-Za-z][A-Za-z0-9_]{1,27}[Bb][Oo][Tt]$/;
@@ -59,7 +60,7 @@ export type TelegramRuntimeConfig =
 
 export function resolveTelegramRuntimeConfig(
   values: TelegramSettingValues,
-  applicationUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru",
+  applicationUrl = SITE_URL,
 ): TelegramRuntimeConfig {
   const enabledEventTypes = new Set<StaffNotificationType>();
   for (const type of Object.keys(

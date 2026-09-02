@@ -2,6 +2,7 @@ import "server-only";
 
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSetting } from "@/lib/settings";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * Живой техчек SEO для панели /admin/seo: всё, что сервер может проверить
@@ -10,7 +11,6 @@ import { getSetting } from "@/lib/settings";
  * вносятся вручную при замере.
  */
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 
 export interface SeoHealth {
   /** Число <loc> в собственном sitemap; null — sitemap не удалось получить. */

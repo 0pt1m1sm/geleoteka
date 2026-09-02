@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getSetting } from "@/lib/settings";
+import { SITE_URL } from "@/lib/site-url";
 
 /**
  * IndexNow ping — мгновенное уведомление Яндекса об изменившихся страницах
@@ -12,7 +13,6 @@ import { getSetting } from "@/lib/settings";
  * таймаут не должны ронять админский экшен, из которого нас позвали.
  */
 
-const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
 const INDEXNOW_ENDPOINT = "https://yandex.com/indexnow";
 
 export async function pingIndexNow(paths: string[]): Promise<void> {

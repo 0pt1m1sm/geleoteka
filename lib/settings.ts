@@ -74,14 +74,14 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "EMAIL_FROM",
     label: "Отправитель (From)",
     description:
-      "Формат: «Geleoteka <sales@geleoteka.ru>». Единый видимый From для любого транспорта. Если пусто — берётся legacy RESEND_FROM / RESEND_FROM_FALLBACK.",
+      "Формат: «Название сервиса <почта@ваш-домен>». Единый видимый From для любого транспорта. Если пусто — берётся legacy RESEND_FROM / RESEND_FROM_FALLBACK.",
   },
   {
     group: "Email (отправка)",
     key: "EMAIL_REPLY_TO",
     label: "Reply-To",
     description:
-      "Адрес для ответов клиента. По умолчанию sales@geleoteka.ru. Должен быть реальным ящиком, чтобы ответы попадали в CRM.",
+      "Адрес для ответов клиента. Должен быть реальным ящиком, который вы читаете, — иначе ответы клиентов не попадут в CRM.",
   },
   {
     group: "Email (отправка)",
@@ -128,7 +128,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "RESEND_FROM",
     label: "Отправитель (verified domain)",
     description:
-      "Legacy-фолбэк для EMAIL_FROM. Формат: «Geleoteka <sales@geleoteka.ru>». Используется когда EMAIL_FROM пуст.",
+      "Legacy-фолбэк для EMAIL_FROM. Формат: «Название сервиса <почта@ваш-домен>». Используется когда EMAIL_FROM пуст.",
   },
   {
     group: "Email (Resend, legacy)",
@@ -165,7 +165,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "MAIL_SYNC_SOURCES",
     label: "Источники синхронизации (JSON)",
     description:
-      'JSON-массив источников: [{"mailbox":"sales@geleoteka.ru","folder":"INBOX","role":"INBOUND"},{"mailbox":"crm-archive@geleoteka.ru","folder":"INBOX","role":"OUTBOUND_ARCHIVE"}]. role: INBOUND (прямой опрос ящика) или OUTBOUND_ARCHIVE (архив «Контроля исходящих»). Имена папок английские (INBOX, Sent).',
+      'JSON-массив источников: [{"mailbox":"sales@ваш-домен","folder":"INBOX","role":"INBOUND"},{"mailbox":"crm-archive@ваш-домен","folder":"INBOX","role":"OUTBOUND_ARCHIVE"}]. role: INBOUND (прямой опрос ящика) или OUTBOUND_ARCHIVE (архив «Контроля исходящих»). Имена папок английские (INBOX, Sent).',
   },
 
   // ── SMS (smsc.ru) ────────────────────────────────────────────────────
@@ -202,7 +202,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     group: "Object storage (Yandex Cloud)",
     key: "YANDEX_BUCKET",
     label: "Имя bucket",
-    description: "Имя bucket в Yandex Object Storage (напр. geleoteka-uploads).",
+    description: "Имя bucket в Yandex Object Storage (напр. название-сервиса-uploads).",
   },
   {
     group: "Object storage (Yandex Cloud)",
@@ -214,14 +214,14 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
   // ── Вход через соцсети (149-ФЗ: российские ИС) ───────────────────────
   // Кнопки на /login появляются автоматически, как только задан client_id
   // соответствующего провайдера. Redirect URI при регистрации приложения:
-  //   Яндекс: https://geleoteka.ru/api/auth/oauth/yandex/callback
-  //   VK ID:  https://geleoteka.ru/api/auth/oauth/vk/callback
+  //   Яндекс: {адрес сайта}/api/auth/oauth/yandex/callback
+  //   VK ID:  {адрес сайта}/api/auth/oauth/vk/callback
   {
     group: "Вход через Яндекс и VK",
     key: "YANDEX_OAUTH_CLIENT_ID",
     label: "Яндекс — ClientID",
     description:
-      "oauth.yandex.ru → создать приложение → Веб-сервисы. Redirect URI: https://geleoteka.ru/api/auth/oauth/yandex/callback. Доступы: email, имя, номер телефона.",
+      "oauth.yandex.ru → создать приложение → Веб-сервисы. Redirect URI: адрес вашего сайта + /api/auth/oauth/yandex/callback. Доступы: email, имя, номер телефона.",
   },
   {
     group: "Вход через Яндекс и VK",
@@ -235,7 +235,7 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
     key: "VKID_CLIENT_ID",
     label: "VK ID — ID приложения",
     description:
-      "id.vk.ru → бизнес-кабинет → создать приложение (Web). Redirect URI: https://geleoteka.ru/api/auth/oauth/vk/callback. Доступы: email, phone.",
+      "id.vk.ru → бизнес-кабинет → создать приложение (Web). Redirect URI: адрес вашего сайта + /api/auth/oauth/vk/callback. Доступы: email, phone.",
   },
   {
     group: "Вход через Яндекс и VK",
@@ -361,6 +361,20 @@ export const KNOWN_SETTINGS: ReadonlyArray<SettingDescriptor> = [
       "Токен с правами на чтение Вебмастера и Метрики — включает автоматические данные на панели SEO (страницы в поиске, запросы, визиты). Получить: oauth.yandex.ru → создать приложение с правами «Яндекс.Вебмастер» и «Яндекс.Метрика: получение статистики», затем токен по ссылке авторизации.",
     secret: true,
     input: "secret",
+  },
+  {
+    group: "SEO и аналитика",
+    key: "YANDEX_MAPS_ORG_ID",
+    label: "Яндекс Карты — номер организации",
+    description:
+      "Только цифры. Номер карточки вашей организации в Яндекс Картах: откройте её на картах, идентификатор виден в адресе страницы. Включает блок отзывов на сайте. Пусто — блока отзывов нет.",
+  },
+  {
+    group: "SEO и аналитика",
+    key: "YANDEX_MAPS_PROFILE_URL",
+    label: "Яндекс Карты — ссылка на карточку",
+    description:
+      "Короткая ссылка «Поделиться» с карточки организации. Ведёт посетителя на все отзывы. Пусто — кнопки «Все отзывы» нет.",
   },
   {
     group: "SEO и аналитика",

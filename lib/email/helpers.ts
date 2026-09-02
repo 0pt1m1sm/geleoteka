@@ -26,7 +26,7 @@ import {
 
 /**
  * Threading metadata each typed helper forwards to the transport. Call
- * sites set `messageId` (the `<{cuid}@geleoteka.ru>` value they also
+ * sites set `messageId` (the `<{cuid}@{хост сайта}>` value they also
  * persist in `CommunicationLog.externalId`) so inbound replies thread
  * back to the same row.
  */

@@ -1,4 +1,4 @@
-import { YANDEX_REVIEWS_IFRAME_URL } from "./yandex";
+import { yandexReviewsIframeUrl } from "./yandex";
 
 export interface YandexReview {
   name: string;
@@ -34,9 +34,14 @@ function decodeEntities(s: string): string {
  * Cached via Next.js fetch revalidation (1 hour) — page is regenerated at most hourly.
  * Falls back to an empty review list on any error so the page never breaks.
  */
-export async function fetchYandexReviews(): Promise<YandexReviewsData> {
+export async function fetchYandexReviews(): Promise<YandexReviewsData | null> {
+  // Карточка организации не задана — отзывов нет и быть не может. Возвращаем
+  // null, а не пустой список: вызывающий обязан не рисовать блок вовсе, иначе
+  // на сайте останется заголовок «Отзывы» с рейтингом, взятым из воздуха.
+  const widgetUrl = await yandexReviewsIframeUrl();
+  if (!widgetUrl) return null;
   try {
-    const res = await fetch(YANDEX_REVIEWS_IFRAME_URL, {
+    const res = await fetch(widgetUrl, {
       headers: { "User-Agent": "Mozilla/5.0" },
       next: { revalidate: 3600 },
     });

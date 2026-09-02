@@ -10,6 +10,7 @@ import {
   reservePartLinesForEstimate,
 } from "@/lib/fulfillment/reservations";
 import { actorId } from "@/lib/wms-host";
+import { SITE_URL } from "@/lib/site-url";
 
 interface EstimateMutationResult {
   error: string | null;
@@ -199,7 +200,7 @@ export async function sendEstimate(estimateId: string): Promise<EstimateMutation
   }
 
   const { buildEstimateEmailLinks } = await import("./estimates-email-links");
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
+  const appUrl = SITE_URL;
   const { viewUrl, pdfUrl } = buildEstimateEmailLinks({
     appUrl,
     estimateId,
