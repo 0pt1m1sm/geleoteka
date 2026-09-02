@@ -1,6 +1,6 @@
 import { after, NextResponse } from "next/server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { constantTimeSecretEqual } from "@/lib/security/constant-time";
 import {
   loadTelegramRuntimeConfig,
@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 const MAX_UPDATE_BYTES = 64 * 1024;
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   const config = await loadTelegramRuntimeConfig();
   if (!config.enabled) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });

@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb, type TenantDb } from "@/lib/tenant/scoped-db";
 import type { PrismaClient } from "@/app/generated/prisma/client";
 
 /**
@@ -29,10 +29,10 @@ import type { PrismaClient } from "@/app/generated/prisma/client";
  * gap-tolerant identifiers, not row counts.
  */
 
-type TxOrDb = PrismaClient | Parameters<Parameters<typeof db.$transaction>[0]>[0];
+type TxOrDb = PrismaClient | Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 
 async function nextCounterValue(kind: string, client?: TxOrDb): Promise<number> {
-  const c = client ?? db;
+  const c = client ?? (await tenantDb());
   const rows = (await c.$queryRawUnsafe(
     `INSERT INTO "TenantCounter" ("tenantId", "kind", "value")
      VALUES (current_setting('app.tenant_id', true), $1, 1)

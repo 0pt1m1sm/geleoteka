@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import type { TenantDb } from "@/lib/tenant/scoped-db";
 import { defaultWarehouseId } from "@/lib/wms-host";
 import {
   lookupByCode,
@@ -10,7 +10,7 @@ import {
 } from "@/lib/wms/public";
 import { packProgress } from "@/lib/warehouse/pack";
 
-type DbClient = typeof db;
+type DbClient = TenantDb;
 
 export interface PartCard {
   kind: "part";

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { constantTimeSecretEqual } from "@/lib/security/constant-time";
 import { loadStaffNotificationDispatchSecret } from "@/lib/staff-notifications/channels/telegram/config";
 import {
@@ -21,6 +21,7 @@ import { drainTelegramUpdatesNow } from "@/lib/staff-notifications/channels/tele
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   const secret = await loadStaffNotificationDispatchSecret();
   if (!secret) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });

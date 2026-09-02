@@ -19,6 +19,15 @@ import { withTenant } from "@/lib/tenant/with-tenant";
  * Клиент кэшируется на арендатора: расширение Prisma создаёт новый объект на
  * каждый вызов, а плодить их на каждый запрос незачем.
  */
+/**
+ * Клиент базы, суженный до арендатора, — как тип.
+ *
+ * Модулям, объявляющим «сюда передают клиент базы», раньше приходилось писать
+ * `typeof db`, и ради одного типа они тянули прямой клиент. Здесь тот же тип,
+ * но из шва: импорт прямого клиента ради типа больше не нужен.
+ */
+export type TenantDb = Awaited<ReturnType<typeof tenantDb>>;
+
 const cache = new Map<string, typeof db>();
 
 export async function tenantDb(): Promise<typeof db> {

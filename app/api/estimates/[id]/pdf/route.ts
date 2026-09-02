@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSession } from "@/lib/auth";
 import { loadRequisites } from "@/lib/load-requisites";
 import {
@@ -64,6 +64,7 @@ interface EstimateRow {
 }
 
 export async function GET(req: Request, { params }: RouteParams) {
+  const db = await tenantDb();
   const { id } = await params;
   const url = new URL(req.url);
   const token = url.searchParams.get("token");

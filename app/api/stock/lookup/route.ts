@@ -5,7 +5,7 @@ import {
   resolvePartIdByCode,
 } from "@/lib/parts/resolve-part-code";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { lookupByCode, availableStock } from "@/lib/wms/public";
 import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 
@@ -19,6 +19,7 @@ export const dynamic = "force-dynamic";
  * the article fallback. Admin/manager only.
  */
 export async function GET(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   } catch {

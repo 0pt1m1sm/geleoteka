@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TRANSPORT_UNKNOWN_PREFIX } from "@/lib/email/transport";
 
 /**
@@ -31,6 +31,7 @@ export interface RecordOutboundEmailInput {
 export async function recordOutboundEmail(
   input: RecordOutboundEmailInput,
 ): Promise<string | null> {
+  const db = await tenantDb();
   try {
     const row = (await db.communicationLog.create({
       data: {
@@ -71,6 +72,7 @@ export async function recordOutboundEmail(
  * `DELIVERED` value and stay valid.
  */
 export async function markOutboundEmailSent(messageId: string): Promise<void> {
+  const db = await tenantDb();
   try {
     await db.communicationLog.updateMany({
       where: { externalId: messageId, channel: "EMAIL_OUTBOUND" },
@@ -100,6 +102,7 @@ export async function markOutboundEmailFailed(
   messageId: string,
   error: string,
 ): Promise<void> {
+  const db = await tenantDb();
   try {
     const existing = (await db.communicationLog.findUnique({
       where: { externalId: messageId },

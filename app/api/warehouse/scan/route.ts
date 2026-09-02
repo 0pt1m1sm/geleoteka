@@ -5,7 +5,7 @@ import {
   scanSourceFor,
 } from "@/lib/parts/resolve-part-code";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { parseScanCode } from "@/lib/wms/public";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
@@ -23,6 +23,7 @@ const ALLOWED_ROLES = ["ADMIN", "MANAGER", "WAREHOUSE_WORKER"];
  * scan (no ScanEvent).
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || !ALLOWED_ROLES.includes(session.permissionRole)) {
     return NextResponse.json(

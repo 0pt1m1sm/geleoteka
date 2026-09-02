@@ -1,7 +1,7 @@
 import { ImapFlow } from "imapflow";
 import { simpleParser, type AddressObject, type ParsedMail } from "mailparser";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import type { ImapPort, ImapSourceHandle, MailboxRoleName, MimeMapper } from "@/lib/email/sync";
 import {
   buildSyntheticMessageId,
@@ -364,6 +364,7 @@ export function createMimeMapper(opts: {
  */
 export function createMailIdentityLookup(): IsOurAddress {
   return async (email: string): Promise<boolean> => {
+    const db = await tenantDb();
     const norm = email.trim().toLowerCase();
     if (!norm) return false;
     const row = await (db as unknown as {

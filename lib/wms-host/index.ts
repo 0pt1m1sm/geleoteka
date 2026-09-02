@@ -1,8 +1,8 @@
 // HOST ADAPTER for the WMS core. This is the deletable bridge — on extraction
 // of lib/wms into a standalone product, this module is removed and replaced
 // with the new host's adapter. It is the ONE place allowed to import the host
-// db singleton; the core (lib/wms) never does.
-import { db } from "@/lib/db";
+// db client; the core (lib/wms) never does.
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import type { DbClientPort } from "@/lib/wms/public";
 
@@ -19,9 +19,13 @@ export const LOW_STOCK_THRESHOLD = 3;
  *  unblocked by the stock-locations backfill so default receiving never breaks. */
 export const STAGING_LOCATION = "ПРИЁМКА";
 
-/** The host db singleton, surfaced as the WMS DB client port. Callers pass this
- *  (or a `$transaction` tx) into the core's recordMovement / lookup functions. */
-export const wmsDb = db;
+/** The host db client, surfaced as the WMS DB client port. Callers pass this
+ *  (or a `$transaction` tx) into the core's recordMovement / lookup functions.
+ *  A function, not a constant: the client is narrowed to the tenant by the
+ *  seam, and narrowing is async. */
+export async function wmsDb(): Promise<DbClientPort> {
+  return (await tenantDb()) as unknown as DbClientPort;
+}
 
 /** Map a host session to the opaque actorId the core stores on a movement. */
 export function actorId(session: { id: string } | null | undefined): string | undefined {
@@ -39,9 +43,10 @@ let cachedDefaultWarehouseId: string | null = null;
  *  MAIN by code). Memoized — the default warehouse never changes at runtime.
  *  This is the seam: the WMS core takes an opaque warehouseId; the host injects
  *  this value for every single-warehouse flow. */
-export async function defaultWarehouseId(client: DbClientPort = wmsDb): Promise<string> {
+export async function defaultWarehouseId(client?: DbClientPort): Promise<string> {
   if (cachedDefaultWarehouseId) return cachedDefaultWarehouseId;
-  const findFirst = client.warehouse.findFirst as (args: unknown) => Promise<{ id: string } | null>;
+  const target = client ?? (await wmsDb());
+  const findFirst = target.warehouse.findFirst as (args: unknown) => Promise<{ id: string } | null>;
   const row = await findFirst({
     where: { tenantKey: TENANT_KEY, OR: [{ isDefault: true }, { code: DEFAULT_WAREHOUSE_CODE }] },
     orderBy: { isDefault: "desc" },

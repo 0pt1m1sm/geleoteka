@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recomputeDealTotals } from "./recompute-deal-totals";
 import { computeEstimateMoney } from "./compute-estimate-money";
 
@@ -26,6 +26,7 @@ interface EstimateLineRow {
  * Internal helper — called by estimate-line actions and setEstimateTaxRate.
  */
 export async function recomputeEstimateTotals(estimateId: string): Promise<void> {
+  const db = await tenantDb();
   const dealId = await db.$transaction(async (tx) => {
     // Lock the estimate row first; serializes concurrent recomputes per estimate.
     await tx.$queryRaw`SELECT id FROM "Estimate" WHERE id = ${estimateId} FOR UPDATE`;

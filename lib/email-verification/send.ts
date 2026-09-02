@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   generateOutboundMessageId,
   isPlausibleEmail,
@@ -37,6 +37,7 @@ interface QueueEmailVerificationInput {
 export async function queueEmailVerificationEmail(
   input: QueueEmailVerificationInput,
 ): Promise<QueueEmailVerificationResult> {
+  const db = await tenantDb();
   const issued = await issueEmailVerificationToken(
     db as unknown as EmailVerificationDb,
     {

@@ -1,7 +1,7 @@
 import "server-only";
 import * as os from "node:os";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { ingestEmail } from "@/lib/email/ingest";
 import {
   createMailIdentityLookup,
@@ -41,6 +41,7 @@ export interface MailSyncRuntime {
 }
 
 export async function loadMailSyncRuntime(): Promise<MailSyncRuntime> {
+  const db = await tenantDb();
   const [enabledRaw, host, portRaw, sourcesRaw] = await Promise.all([
     getSetting("MAIL_SYNC_ENABLED"),
     getSetting("TIMEWEB_IMAP_HOST"),

@@ -1,8 +1,8 @@
-import { db } from "@/lib/db";
+import { tenantDb, type TenantDb } from "@/lib/tenant/scoped-db";
 import { expandGenerationCodes, isLatinOem, oemKey, SERVICE_ARTICLE_RE } from "@/lib/part-reference";
 
 /** Транзакционный или глобальный клиент Prisma — хелперам достаточно делегатов моделей. */
-type DbLike = typeof db | Parameters<Parameters<typeof db.$transaction>[0]>[0];
+type DbLike = TenantDb | Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 
 export interface ResolvedGenerations {
   /** id поколений каталога для найденных кодов (уникальные). */
@@ -69,6 +69,7 @@ export async function ensurePartReference(
 }
 
 export async function resolveGenerationIds(codes: readonly string[]): Promise<ResolvedGenerations> {
+  const db = await tenantDb();
   const normalized = [...new Set(codes.map((c) => c.trim().toUpperCase()).filter(Boolean))];
   if (normalized.length === 0) return { ids: [], unknown: [], byCode: new Map() };
 

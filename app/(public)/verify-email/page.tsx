@@ -5,7 +5,7 @@ import { CheckCircle2, Link2Off } from "lucide-react";
 
 import { Card } from "@/components/ui";
 import { NarrowFormPage } from "@/components/shared/NarrowFormPage";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   confirmEmailVerificationToken,
   type EmailVerificationDb,
@@ -21,6 +21,7 @@ interface VerifyEmailPageProps {
 export default async function VerifyEmailPage({
   searchParams,
 }: VerifyEmailPageProps): Promise<React.ReactElement> {
+  const db = await tenantDb();
   const query = await searchParams;
   const rawToken = typeof query.token === "string" ? query.token : "";
   const result = await confirmEmailVerificationToken(

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   attachmentOutcomeToResponse,
   resolveAttachment,
@@ -42,7 +42,7 @@ export async function GET(
   const { messageId, attachmentId } = await context.params;
 
   try {
-    const outcome = await resolveAttachment(messageId, attachmentId, buildAttachmentDeps());
+    const outcome = await resolveAttachment(messageId, attachmentId, await buildAttachmentDeps());
     return attachmentOutcomeToResponse(outcome);
   } catch (err) {
     // An unexpected failure reaching the provider (IMAP auth/connection dropped,
@@ -53,10 +53,11 @@ export async function GET(
   }
 }
 
-/** Wire the real DB, a lazily-built IMAP port and the Resend proxy fetcher. */
-function buildAttachmentDeps(): AttachmentDeps {
+/** Wire the real DB, a lazily-built IMAP port and the Resend proxy fetcher.
+ *  Async because the DB client is narrowed to the tenant by the seam. */
+async function buildAttachmentDeps(): Promise<AttachmentDeps> {
   return {
-    db: db as unknown as AttachmentDbPort,
+    db: (await tenantDb()) as unknown as AttachmentDbPort,
     // Only constructed when the locator is actually IMAP — a Resend download must
     // not require IMAP configuration. Imported lazily to keep imapflow out of the
     // common path.

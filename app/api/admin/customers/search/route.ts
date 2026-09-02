@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +12,7 @@ interface CustomerRow {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER"]);
   } catch {

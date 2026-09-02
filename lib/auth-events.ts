@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { roleLabel } from "@/lib/roles";
 import { publishUserLogin } from "@/lib/staff-notifications/publish";
 import { TENANT_KEY } from "@/lib/tenant";
@@ -39,6 +39,7 @@ export async function recordSuccessfulLogin(
   user: LoginEventUser,
   method: LoginMethod,
 ): Promise<void> {
+  const db = await tenantDb();
   const occurredAt = new Date();
   const transactionalDb = db as unknown as {
     $transaction<T>(callback: (tx: LoginEventTx) => Promise<T>): Promise<T>;

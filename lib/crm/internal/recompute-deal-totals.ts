@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { computeEstimateMoney } from "./compute-estimate-money";
 
 interface EstimateLineRow {
@@ -26,6 +26,7 @@ interface EstimateLineRow {
  * createDeal once after the initial DRAFT is populated.
  */
 export async function recomputeDealTotals(dealId: string): Promise<void> {
+  const db = await tenantDb();
   // Stage priority for "active": DRAFT > APPROVED > SENT > DECLINED/EXPIRED.
   // We pick the single most-relevant estimate; SUPERSEDED is always skipped.
   const stagePriority: Record<string, number> = {

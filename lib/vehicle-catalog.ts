@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import type { Trim, VehicleModel } from "./vehicle-catalog-types";
 
 export type {
@@ -13,6 +13,7 @@ export type {
 export { generationLabel, generationShort, trimLabel } from "./vehicle-catalog-types";
 
 const loadActiveModels = cache(async (): Promise<VehicleModel[]> => {
+  const db = await tenantDb();
   const rows = (await db.vehicleModel.findMany({
     where: { isActive: true },
     orderBy: [{ manufacturerId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
@@ -34,6 +35,7 @@ const loadActiveModels = cache(async (): Promise<VehicleModel[]> => {
 });
 
 const loadActiveModelsWithTrims = cache(async (): Promise<VehicleModel[]> => {
+  const db = await tenantDb();
   const rows = (await db.vehicleModel.findMany({
     where: { isActive: true },
     orderBy: [{ manufacturerId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
@@ -128,6 +130,7 @@ export async function getModelBySlug(slug: string): Promise<VehicleModel | null>
 }
 
 const loadActiveTrimsForGeneration = cache(async (generationId: string): Promise<Trim[]> => {
+  const db = await tenantDb();
   const rows = (await db.vehicleTrim.findMany({
     where: { generationId, isActive: true, isDefault: false },
     orderBy: [{ sortOrder: "asc" }, { code: "asc" }],
@@ -159,6 +162,7 @@ export async function getActiveTrimsForGeneration(generationId: string): Promise
 }
 
 const loadAllTrimsForGeneration = cache(async (generationId: string): Promise<Trim[]> => {
+  const db = await tenantDb();
   const rows = (await db.vehicleTrim.findMany({
     where: { generationId, isActive: true },
     orderBy: [{ isDefault: "desc" }, { sortOrder: "asc" }, { code: "asc" }],

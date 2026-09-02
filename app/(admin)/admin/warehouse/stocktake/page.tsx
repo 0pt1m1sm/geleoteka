@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { listCountSessions } from "@/lib/wms/public";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export default async function StocktakePage({ searchParams }: Props) {
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const sp = await searchParams;
   const sessions = await listCountSessions(db, TENANT_KEY);

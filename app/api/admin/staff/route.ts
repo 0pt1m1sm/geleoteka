@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireApiPermission } from "@/lib/api-auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +13,7 @@ interface StaffOption {
 
 /** Active employees available as CRM task owners and customer managers. */
 export async function GET(): Promise<NextResponse> {
+  const db = await tenantDb();
   const auth = await requireApiPermission("crm.manage");
   if (!auth.ok) return auth.response;
 

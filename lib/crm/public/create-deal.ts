@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { recomputeEstimateTotals } from "@/lib/crm/internal/recompute-estimate-totals";
 import { signedLineTotal } from "@/lib/crm/internal/signed-line-total";
 import { nextDealNumber, nextEstimateNumber } from "@/lib/crm/internal/next-number";
@@ -18,6 +18,7 @@ import type { CreateDealInput, DealSummary } from "./types";
  * `dealId` to the returned deal id.
  */
 export async function createDeal(input: CreateDealInput): Promise<DealSummary> {
+  const db = await tenantDb();
   const { dealId, estimateId } = await db.$transaction(async (tx) => {
     const [dealNumber, estimateNumber] = await Promise.all([
       nextDealNumber(tx),

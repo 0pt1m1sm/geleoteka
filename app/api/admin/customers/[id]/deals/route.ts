@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api-auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,7 @@ export async function GET(
   _req: Request,
   ctx: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const db = await tenantDb();
   // Первый потребитель фасада: раньше здесь ловился редирект, предназначенный
   // браузеру, и переводился в 401 — хотя вошедшему без права положен 403.
   const auth = await requireApiPermission("crm.manage");

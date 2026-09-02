@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { collectSeoHealth } from "@/lib/seo-health";
 import { fetchSearchTraffic } from "@/lib/yandex-metrika-api";
 import { fetchWebmasterSummary } from "@/lib/yandex-webmaster";
@@ -18,6 +18,7 @@ const AUTO_SNAPSHOT_MIN_AGE_MS = 20 * 60 * 60 * 1000;
 export type SeoSnapshotTickResult = "fresh" | "captured" | "failed";
 
 export async function runSeoSnapshotTick(): Promise<SeoSnapshotTickResult> {
+  const db = await tenantDb();
   try {
     const latest = (await db.seoSnapshot.findFirst({
       where: { tenantKey: TENANT_KEY, source: "auto" },
