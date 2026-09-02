@@ -4,12 +4,14 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { PageHeader } from "@/components/ui";
 import { ServiceBayManager, type ServiceBayRow } from "@/components/admin/ServiceBayManager";
 
 export default async function ServiceBaysPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "service.manage"))) redirect("/");

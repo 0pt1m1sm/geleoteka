@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierEditForm } from "@/components/admin/SupplierEditForm";
 
@@ -23,6 +23,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function SupplierDetailPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

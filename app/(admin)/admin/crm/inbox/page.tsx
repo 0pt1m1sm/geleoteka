@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
 import { InboxRowActions } from "@/components/admin/inbox/InboxRowActions";
@@ -140,6 +140,8 @@ function isBacklog(receivedAt: Date, syncedAt: Date | null | undefined): boolean
 }
 
 export default async function InboxPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

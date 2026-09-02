@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { canFullyEditOrder } from "@/lib/suppliers/order-lifecycle";
 import { SupplierOrderForm, type OrderFormInitialValues } from "@/components/admin/SupplierOrderForm";
 import type { ItemRow } from "@/components/admin/supplier-order-form/types";
@@ -21,6 +21,8 @@ function toDateInput(d: Date | null): string {
  *  values. Non-DRAFT orders redirect back to the detail page (meta-only edit
  *  lives there). */
 export default async function EditSupplierOrderPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

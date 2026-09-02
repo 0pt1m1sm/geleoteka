@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatPrice } from "@/lib/utils";
 import { ESTIMATE_STAGE_LABELS } from "@/lib/deal-stage-labels";
@@ -53,6 +53,8 @@ interface Props {
 }
 
 export default async function AdminEstimatesListPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

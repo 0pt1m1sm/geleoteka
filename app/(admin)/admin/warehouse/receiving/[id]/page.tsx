@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatDate } from "@/lib/utils";
 import { SupplierOrderReceiving, type ReceivingLine } from "@/components/admin/SupplierOrderReceiving";
 
@@ -29,6 +29,8 @@ interface Props {
  * /admin/suppliers/orders/[id], which stays manager-only.
  */
 export default async function ReceivingOrderPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   const role = session?.permissionRole;
   if (!session || (role !== "ADMIN" && role !== "MANAGER" && role !== "WAREHOUSE_WORKER")) {

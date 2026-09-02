@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import QRCode from "qrcode";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatScanCode } from "@/lib/wms/public";
 import { LabelSheetControls } from "@/components/admin/LabelSheetControls";
 
@@ -30,6 +30,8 @@ async function qr(payload: string): Promise<string> {
 }
 
 export default async function WarehouseLabelsPage({ searchParams }: Props): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (
     !session ||

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { DeleteCarButton } from "@/components/shared/DeleteCarButton";
 
 export default async function CarsPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 

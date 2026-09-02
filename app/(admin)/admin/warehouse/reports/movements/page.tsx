@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { PageHeader } from "@/components/ui";
 import { ReportsNav } from "@/components/admin/ReportsNav";
@@ -31,6 +31,8 @@ function signed(n: number): string {
 }
 
 export default async function MovementsReportPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const sp = await searchParams;
   const from = (sp.from ?? "").trim();

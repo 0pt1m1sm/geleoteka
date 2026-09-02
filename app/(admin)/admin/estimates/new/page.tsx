@@ -2,11 +2,13 @@ export const dynamic = "force-dynamic";
 
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { EstimateBuilder } from "@/components/admin/EstimateBuilder";
 import { customerName } from "@/lib/crm/customer-display";
 
 export default async function NewEstimatePage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

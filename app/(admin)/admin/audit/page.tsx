@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { AUDIT_ACTION_LABELS, type AuditAction } from "@/lib/audit";
 import { Card, PageHeader } from "@/components/ui";
@@ -81,6 +81,8 @@ function summarise(action: string, metadata: unknown): string | null {
 }
 
 export default async function AuditPage({ searchParams }: Props): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "audit.view"))) redirect("/admin");

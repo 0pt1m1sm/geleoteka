@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getOpenPackLines, getPackedLines } from "@/app/actions/packing";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { PageHeader } from "@/components/ui";
@@ -15,6 +15,8 @@ interface Props {
 }
 
 export default async function PackingOrderPage({ params, searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const { id } = await params;
   const sp = await searchParams;

@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
 import { PartRefDeleteButton } from "@/components/admin/PartRefDeleteButton";
@@ -46,6 +46,8 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 export default async function PartRefDetailPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
   const { id } = await params;
 

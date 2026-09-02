@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { DeleteSupplierOrderButton } from "@/components/admin/DeleteSupplierOrderButton";
 import { Button, Card, PageHeader } from "@/components/ui";
@@ -60,6 +60,8 @@ function filterHref(params: { status?: string; supplier?: string; page?: number 
 }
 
 export default async function SupplierOrdersListPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

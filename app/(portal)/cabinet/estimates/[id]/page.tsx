@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { CustomerEstimateView } from "@/components/portal/CustomerEstimateView";
 import { EstimateRevisionBanner } from "@/components/crm/EstimateRevisionBanner";
 import { EstimateLineageBreadcrumb } from "@/components/crm/EstimateLineageBreadcrumb";
@@ -45,6 +45,8 @@ interface Props {
 }
 
 export default async function CabinetEstimateDetailPage({ params }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 

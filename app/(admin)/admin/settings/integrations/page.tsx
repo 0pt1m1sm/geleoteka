@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { PageHeader } from "@/components/ui";
 import { KNOWN_SETTINGS, type SettingDescriptor } from "@/lib/settings";
 import { SettingGroupForm } from "@/components/admin/settings/SettingGroupForm";
@@ -16,6 +16,8 @@ import { TestSendButton } from "@/components/admin/settings/TestSendButton";
  * shows whether the active value comes from DB, env var, or is missing.
  */
 export default async function IntegrationsSettingsPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "settings.manage"))) redirect("/");

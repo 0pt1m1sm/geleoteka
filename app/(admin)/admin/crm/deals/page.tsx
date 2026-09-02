@@ -4,7 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ListChecks } from "lucide-react";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { Card, PageHeader } from "@/components/ui";
 import { formatDate, formatPrice } from "@/lib/utils";
 import {
@@ -47,6 +47,8 @@ interface Props {
 }
 
 export default async function CrmDealsPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

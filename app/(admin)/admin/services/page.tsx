@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice } from "@/lib/utils";
 import { Button, Card, PageHeader } from "@/components/ui";
 import { DeleteServiceButton } from "@/components/admin/DeleteServiceButton";
@@ -19,6 +19,8 @@ interface ServiceRow {
 }
 
 export default async function AdminServicesPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const services = (await db.service.findMany({

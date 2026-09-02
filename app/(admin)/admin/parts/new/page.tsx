@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getActiveModelsWithTrims } from "@/lib/vehicle-catalog";
 import { PartForm } from "@/components/admin/PartForm";
 import type { PartConditionValue } from "@/lib/parts/used-part-validation";
@@ -11,6 +11,8 @@ interface Props {
 }
 
 export default async function NewPartPage({ searchParams }: Props) {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const sp = await searchParams;

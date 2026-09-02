@@ -2,12 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { CMSGroupSection } from "@/components/admin/cms";
 import { GROUP_ORDER } from "@/lib/cms-schema";
 import { PageHeader } from "@/components/ui";
 
 export default async function CMSPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     redirect("/login");

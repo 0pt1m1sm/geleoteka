@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { generationLabel } from "@/lib/vehicle-catalog";
 import { Button, PageHeader } from "@/components/ui";
 
@@ -17,6 +17,8 @@ interface ModelRow {
 }
 
 export default async function AdminModelsPage(): Promise<React.ReactElement> {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
 
   const models = (await db.vehicleModel.findMany({

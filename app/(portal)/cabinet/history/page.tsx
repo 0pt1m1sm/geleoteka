@@ -2,12 +2,14 @@ export const dynamic = "force-dynamic";
 
 import { getSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { REPAIR_ORDER_STATUS_LABELS, formatDate, formatPrice } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
 import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 export default async function HistoryPage() {
+  // Через шов изоляции: условие по арендатору добавляется само.
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 
