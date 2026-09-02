@@ -25,6 +25,14 @@ export interface TenantRecord {
   key: string;
   name: string;
   status: "ACTIVE" | "SUSPENDED";
+  /** ISO 3166-1 alpha-2 — разбор телефона, форма адреса, налоги, провайдеры. */
+  country: string;
+  /** ISO 4217. Сколько у валюты минорных единиц — вопрос к коду, а не к сотне. */
+  currency: string;
+  /** BCP 47 — язык и региональные форматы. */
+  locale: string;
+  /** IANA — часы на стене в сервисе. */
+  timeZone: string;
 }
 
 /** Минимум от клиента базы, нужный резолверу — чтобы тест не тянул Prisma. */
@@ -55,7 +63,16 @@ export async function resolveTenant(
   if (cached && cached.key === key) return cached;
   const row = (await client.tenant.findUnique({
     where: { key },
-    select: { id: true, key: true, name: true, status: true },
+    select: {
+      id: true,
+      key: true,
+      name: true,
+      status: true,
+      country: true,
+      currency: true,
+      locale: true,
+      timeZone: true,
+    },
   })) as TenantRecord | null;
   if (row) cached = row;
   return row;

@@ -254,10 +254,25 @@ model TenantCounter {
 }
 
 model Tenant {
-  id        String       @id @default(cuid())
-  key       String       @unique
-  name      String
-  status    TenantStatus @default(ACTIVE)
+  id     String       @id @default(cuid())
+  key    String       @unique
+  name   String
+  status TenantStatus @default(ACTIVE)
+
+  /// Страна ведения дела, ISO 3166-1 alpha-2. Определяет разбор телефона,
+  /// форму адреса, налоговые правила и набор доступных провайдеров.
+  country   String @default("RU")
+  /// Валюта учёта, ISO 4217. Денежные поля хранятся целым числом в минорных
+  /// единицах, и их количество зависит от валюты: у иены минорных единиц нет,
+  /// у кувейтского динара их тысяча. Делить на сто без оглядки на код валюты
+  /// нельзя.
+  currency  String @default("RUB")
+  /// Язык и региональные форматы интерфейса, BCP 47.
+  locale    String @default("ru-RU")
+  /// Часовой пояс сервиса, IANA. Часы на стене в сервисе: клиент из другого
+  /// пояса должен понять, когда пригнать машину, а не что покажут его часы.
+  timeZone  String @default("Europe/Moscow")
+
   createdAt DateTime     @default(now())
   updatedAt DateTime     @default(now()) @updatedAt
 
