@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 /**
  * Single point of update for `CustomerProfile.lastTouchAt`.
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
  * still get one on first touch.
  */
 export async function bumpLastTouch(customerUserId: string): Promise<void> {
+  const db = await tenantDb();
   const now = new Date();
   await db.customerProfile.upsert({
     where: { userId: customerUserId },

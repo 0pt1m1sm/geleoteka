@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { sendTelegramTextWithDiagnostics } from "@/lib/staff-notifications/channels/telegram/adapter";
 import { loadTelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config";
 import type { TelegramRuntimeConfig } from "@/lib/staff-notifications/channels/telegram/config-values";
@@ -36,6 +36,7 @@ export async function drainTelegramUpdatesNow(options: {
   const config = await loadTelegramRuntimeConfig();
   if (!config.enabled) return { status: "channel-disabled", processed: 0 };
 
+  const db = await tenantDb();
   return drainTelegramUpdates(
     db as unknown as TelegramPollStateDb,
     globalThis.fetch,
@@ -56,8 +57,11 @@ export async function drainTelegramUpdatesNow(options: {
 function createTelegramUpdateProcessor(
   config: Extract<TelegramRuntimeConfig, { enabled: true }>,
 ): (update: unknown) => Promise<unknown> {
-  return (update) =>
-    processTelegramWebhookUpdate(
+  // Клиент базы берётся внутри обработчика, а не при его сборке: шов сужает
+  // клиент до арендатора, и это await, которого у синхронной фабрики нет.
+  return async (update) => {
+    const db = await tenantDb();
+    return processTelegramWebhookUpdate(
       db as unknown as TelegramWebhookDb,
       update,
       new Date(),
@@ -87,4 +91,5 @@ function createTelegramUpdateProcessor(
         );
       },
     );
+  };
 }

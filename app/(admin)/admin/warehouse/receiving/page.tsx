@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatDate } from "@/lib/utils";
 import { Card, PageHeader } from "@/components/ui";
 import { receivingQueue } from "@/lib/warehouse/receiving-queue";
@@ -21,6 +21,7 @@ const STATUS_LABELS: Record<string, string> = {
  * queried or rendered anywhere on this page (see receivingQueue).
  */
 export default async function ReceivingQueuePage() {
+  const db = await tenantDb();
   const session = await getSession();
   const role = session?.permissionRole;
   if (!session || (role !== "ADMIN" && role !== "MANAGER" && role !== "WAREHOUSE_WORKER")) {

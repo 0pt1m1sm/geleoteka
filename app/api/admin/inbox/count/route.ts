@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export const dynamic = "force-dynamic";
 
 /** Pending InboxMessage count for the admin sidebar badge. */
 export async function GET(): Promise<NextResponse> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER"]);
   } catch {

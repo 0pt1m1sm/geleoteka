@@ -1,6 +1,6 @@
 import "server-only";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 /**
  * Отметка последнего УСПЕШНОГО пула почты — для строки «почта проверялась…»
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 const MAIL_SYNC_LAST_RUN_KEY = "MAIL_SYNC_LAST_RUN_AT";
 
 export async function recordMailSyncRun(now = new Date()): Promise<void> {
+  const db = await tenantDb();
   try {
     await db.setting.upsert({
       where: { key: MAIL_SYNC_LAST_RUN_KEY },
@@ -24,6 +25,7 @@ export async function recordMailSyncRun(now = new Date()): Promise<void> {
 }
 
 export async function readMailSyncLastRunAt(): Promise<Date | null> {
+  const db = await tenantDb();
   const row = (await db.setting.findUnique({
     where: { key: MAIL_SYNC_LAST_RUN_KEY },
     select: { value: true },

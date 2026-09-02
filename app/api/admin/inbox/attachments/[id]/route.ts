@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSetting } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +24,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER"]);
   } catch {

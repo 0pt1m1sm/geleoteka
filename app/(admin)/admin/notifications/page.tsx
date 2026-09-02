@@ -12,7 +12,7 @@ import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
 import { inboundCommunicationCopy } from "@/lib/crm/inbound-communications";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   isStaffNotificationFeedScope,
   loadStaffNotificationFeedPage,
@@ -25,6 +25,7 @@ export default async function StaffNotificationsPage({
 }: {
   searchParams: Promise<{ scope?: string | string[] }>;
 }) {
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
   if (!(await roleHasPermission(session.permissionRole, "notifications.view"))) redirect("/");

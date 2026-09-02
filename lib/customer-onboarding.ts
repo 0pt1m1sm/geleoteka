@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { normalizePhone } from "@/lib/utils";
 
 export type GuestCustomerErrorKind = "phone_collision" | "other";
@@ -81,6 +81,7 @@ export async function findOrCreateGuestCustomer(input: {
     | "EMAIL"
     | "OTHER";
 }): Promise<GuestCustomerResult> {
+  const db = await tenantDb();
   const phone = normalizePhone(input.phone);
   const email = input.email.trim().toLowerCase();
   const referralSource = input.referralSource ?? "WALK_IN";

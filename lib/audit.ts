@@ -13,11 +13,11 @@
  */
 import { headers } from "next/headers";
 
-import { db } from "@/lib/db";
+import { tenantDb, type TenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/tenant";
 import { roleLabel } from "@/lib/roles";
 
-type DbLike = Pick<typeof db, "auditLog">;
+type DbLike = Pick<TenantDb, "auditLog">;
 
 /**
  * The verbs worth a permanent record: everything that removes data, moves
@@ -187,8 +187,11 @@ export async function clientIp(): Promise<string | null> {
   }
 }
 
-export async function recordAudit(input: AuditInput, client: DbLike = db): Promise<void> {
-  await client.auditLog.create({
+export async function recordAudit(input: AuditInput, client?: DbLike): Promise<void> {
+  // Клиент по умолчанию берётся не значением параметра, а здесь: получить
+  // суженный клиент можно только через await, а умолчание параметра его не даёт.
+  const target = client ?? (await tenantDb());
+  await target.auditLog.create({
     data: {
       tenantKey: TENANT_KEY,
       actorUserId: input.actor.id,

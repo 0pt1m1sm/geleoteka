@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSession } from "@/lib/auth";
 
 interface RouteContext {
@@ -10,6 +10,7 @@ export async function GET(
   _request: Request,
   context: RouteContext
 ): Promise<NextResponse> {
+  const db = await tenantDb();
   const { id } = await context.params;
 
   const repairOrder = await db.repairOrder.findUnique({

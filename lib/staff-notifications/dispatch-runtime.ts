@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   dispatchLeasedStaffNotification,
   leaseStaffNotificationDeliveries,
@@ -45,6 +45,7 @@ export type StaffNotificationDispatchTickResult =
  * самом роуте) и фонового воркера (основная каденция ~20с, внутрипроцессно).
  */
 export async function runStaffNotificationDispatchTick(): Promise<StaffNotificationDispatchTickResult> {
+  const db = await tenantDb();
   const client = db as unknown as StaffNotificationDispatcherDb;
   // Routing is channel-neutral and creates the per-user feed receipts even
   // when Telegram itself is disabled. The durable event stays the source of

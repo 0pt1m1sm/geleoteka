@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api-auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
  * colleagues and tasks with ownerUserId=null. Neither count resets on visit.
  */
 export async function GET(): Promise<NextResponse> {
+  const db = await tenantDb();
   const auth = await requireApiPermission("crm.manage");
   if (!auth.ok) return auth.response;
 

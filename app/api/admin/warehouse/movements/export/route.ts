@@ -1,5 +1,5 @@
 import { getSession } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { buildMovementsCsv, type MovementCsvRow } from "@/lib/warehouse/movement-csv";
@@ -24,6 +24,7 @@ interface MovementRow {
 }
 
 export async function GET(request: Request): Promise<Response> {
+  const db = await tenantDb();
   const session = await getSession();
   if (!session || (session.permissionRole !== "ADMIN" && session.permissionRole !== "MANAGER")) {
     return new Response("Unauthorized", { status: 401 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getSetting } from "@/lib/settings";
 import { constantTimeSecretEqual } from "@/lib/security/constant-time";
 import { telegramApiMethodUrl } from "@/lib/staff-notifications/channels/telegram/adapter";
@@ -33,6 +33,7 @@ const PROBE_TIMEOUT_MS = 8_000;
  * maintenance/dispatch; дергается вручную или workflow'ом telegram-diagnostics.
  */
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   const secret = await loadStaffNotificationDispatchSecret();
   if (!secret) {
     return NextResponse.json({ error: "not configured" }, { status: 503 });
@@ -215,6 +216,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 async function recentAttempts(
   operation: "UPDATES_POLL" | "WEBHOOK_REPLY" | "NOTIFICATION_DELIVERY",
 ): Promise<Array<Record<string, unknown>>> {
+  const db = await tenantDb();
   const rows = (await db.telegramSendAttempt.findMany({
     where: { tenantKey: TENANT_KEY, operation },
     orderBy: { createdAt: "desc" },

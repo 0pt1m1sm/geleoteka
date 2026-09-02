@@ -1,6 +1,6 @@
 import { getSession } from "@/lib/auth";
 import { roleHasPermission } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 
 /**
  * Отдача загруженных изображений.
@@ -31,6 +31,7 @@ interface RouteCtx {
  * заказ-наряда `userId` пуст (клиент стёрт), и тогда остаётся только сотрудник.
  */
 async function mayViewPrivate(imageId: string, viewerId: string, role: string): Promise<boolean> {
+  const db = await tenantDb();
   if (await roleHasPermission(role, "service.manage")) return true;
 
   // Ссылка хранится строкой — внешнего ключа на UploadedImage у фото нет.
@@ -50,6 +51,7 @@ async function mayViewPrivate(imageId: string, viewerId: string, role: string): 
 }
 
 export async function GET(request: Request, ctx: RouteCtx): Promise<Response> {
+  const db = await tenantDb();
   const { id } = await ctx.params;
   const etag = `"${id}"`;
 

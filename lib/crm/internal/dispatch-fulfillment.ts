@@ -1,7 +1,7 @@
-import { db } from "@/lib/db";
+import type { TenantDb } from "@/lib/tenant/scoped-db";
 import { nextRepairOrderNumber, nextPartOrderNumber } from "./next-number";
 
-type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+type Tx = Parameters<Parameters<TenantDb["$transaction"]>[0]>[0];
 
 export interface DispatchFulfillmentInput {
   dealId: string;

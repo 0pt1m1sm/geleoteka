@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { resolveFulfilmentTarget } from "@/lib/warehouse/resolve-fulfilment";
 import { listOrdersNeedingPicking } from "@/app/actions/picking";
 import { listOrdersNeedingPacking } from "@/app/actions/packing";
@@ -23,6 +23,7 @@ interface Props {
  * group in its action's chronological order.
  */
 export default async function FulfilPage({ searchParams }: Props) {
+  const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
   const { code } = await searchParams;
 

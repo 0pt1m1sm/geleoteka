@@ -1,6 +1,6 @@
 import { addHours } from "date-fns";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   inboundCommunicationCopy,
   type InboundCommChannel,
@@ -35,6 +35,7 @@ const BODY_MAX_CHARS = 4000;
  *   - Otherwise leave it unassigned for the shared customer-replies queue.
  */
 async function pickTaskOwner(dealId: string | null): Promise<string | null> {
+  const db = await tenantDb();
   if (dealId) {
     const deal = (await db.deal.findUnique({
       where: { id: dealId },
@@ -59,6 +60,7 @@ async function pickTaskOwner(dealId: string | null): Promise<string | null> {
 export async function ensureFollowUpTask(
   input: EnsureFollowUpTaskInput,
 ): Promise<EnsureFollowUpTaskResult> {
+  const db = await tenantDb();
   const ownerUserId = await pickTaskOwner(input.dealId);
   // dueAt runs from ingestion, NOT from the message date: a backlog imported
   // after downtime should surface as "act now", not carry a due date already

@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { isUniqueViolation, type EmailIngestDb } from "@/lib/email/db-port";
 import {
   resolveInboundEmail,
@@ -79,6 +79,7 @@ export async function ingestEmail(
   parsed: ParsedEmail,
   options: IngestOptions = {},
 ): Promise<IngestResult> {
+  const db = await tenantDb();
   const client = options.client ?? (db as unknown as EmailIngestDb);
   const projectInboundEvents = options.projectInboundEvents ?? projectAfterCommit;
 

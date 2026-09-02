@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { isGenerationIndexable, isModelIndexable } from "@/lib/models/index-policy";
 
 const SITE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://geleoteka.ru";
@@ -37,6 +37,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: Me
 ];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const db = await tenantDb();
   const now = new Date();
 
   const entries: MetadataRoute.Sitemap = STATIC_ROUTES.map((r) => ({

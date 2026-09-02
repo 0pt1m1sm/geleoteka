@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession, requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import {
   ALLOWED_MIME,
   MAX_UPLOAD_BYTES,
@@ -8,6 +8,7 @@ import {
 } from "@/lib/uploads";
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER"]);
   } catch {

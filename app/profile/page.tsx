@@ -22,7 +22,7 @@ import { RevokeSessionsButton } from "@/components/profile/RevokeSessionsButton"
 import { Card, PageHeader } from "@/components/ui";
 import { getSession } from "@/lib/auth";
 import { rolePermissions } from "@/lib/authz";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { PERMISSIONS } from "@/lib/permissions";
 import { LOCALES, TIME_ZONES } from "@/lib/profile-options";
 import { roleLabel } from "@/lib/roles";
@@ -52,6 +52,7 @@ interface PersonalDestinationStatus {
  * было бы приглашением к повышению прав.
  */
 export default async function ProfilePage(): Promise<React.ReactElement> {
+  const db = await tenantDb();
   const session = await getSession();
   if (!session) redirect("/login");
 

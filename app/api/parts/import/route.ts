@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { tenantDb } from "@/lib/tenant/scoped-db";
 import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import { SERVICE_ARTICLE_RE, extractModelCodes, isLatinOem, normalizeOem, oemKey } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
@@ -18,6 +18,7 @@ import { resolveGenerationIds } from "@/lib/part-reference-lookup";
  * shapes explicitly because it can show errors.
  */
 async function expandToTrimIds(values: string[]): Promise<string[]> {
+  const db = await tenantDb();
   const out = new Set<string>();
   if (values.length === 0) return [];
 
@@ -74,6 +75,7 @@ async function expandToTrimIds(values: string[]): Promise<string[]> {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const db = await tenantDb();
   try {
     await requireRole(["ADMIN", "MANAGER"]);
   } catch {
