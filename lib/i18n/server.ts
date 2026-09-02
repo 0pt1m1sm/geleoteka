@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { LocaleSettings } from "@/lib/i18n/format";
+import { DEFAULT_LOCALE_SETTINGS, type LocaleSettings } from "@/lib/i18n/format";
 import { resolveTenant, type TenantReader } from "@/lib/tenant";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 
@@ -16,11 +16,7 @@ import { tenantDb } from "@/lib/tenant/scoped-db";
  * появления полей. Падать здесь нельзя: форматирование цены не та операция,
  * ради которой стоит ронять страницу.
  */
-const FALLBACK: LocaleSettings = {
-  locale: "ru-RU",
-  currency: "RUB",
-  timeZone: "Europe/Moscow",
-};
+const FALLBACK: LocaleSettings = DEFAULT_LOCALE_SETTINGS;
 
 export async function tenantLocale(): Promise<LocaleSettings> {
   const db = await tenantDb();

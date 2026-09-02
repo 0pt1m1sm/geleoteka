@@ -26,9 +26,9 @@ import { describe, expect, it } from "vitest";
 const GATE_PREFIX = "lib/i18n/";
 
 const CEILINGS: ReadonlyArray<{ what: string; pattern: RegExp; ceiling: number }> = [
-  { what: "символ рубля", pattern: /₽/g, ceiling: 47 },
-  { what: "локаль ru-RU", pattern: /ru-RU/g, ceiling: 26 },
-  { what: "пояс Europe/Moscow", pattern: /Europe\/Moscow/g, ceiling: 3 },
+  { what: "символ рубля", pattern: /₽/g, ceiling: 28 },
+  { what: "локаль ru-RU", pattern: /ru-RU/g, ceiling: 25 },
+  { what: "пояс Europe/Moscow", pattern: /Europe\/Moscow/g, ceiling: 2 },
   { what: "код валюты RUB", pattern: /"RUB"/g, ceiling: 6 },
 ];
 
@@ -49,11 +49,28 @@ function sourceFiles(): string[] {
   return out;
 }
 
+/**
+ * Убрать комментарии перед подсчётом.
+ *
+ * Первая версия считала любое вхождение, и половина «долга» оказалась
+ * пояснениями: «Цена закупки за единицу, ₽», «Shipping ₽ = kg × ($/kg)».
+ * Комментарий ничего не форматирует, а запрет на него сделал бы сторож
+ * вредным: автор объясняет расчёт и получает красный CI.
+ *
+ * Разбор грубый — регулярками, без парсера. Строковый литерал со
+ * последовательностью `//` внутри (адрес) он тоже срежет, и это приемлемо:
+ * ошибка идёт в сторону занижения, а занижение долга храповик только
+ * ужесточает.
+ */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/.*$/gm, " ");
+}
+
 function count(pattern: RegExp): { total: number; files: string[] } {
   const files: string[] = [];
   let total = 0;
   for (const file of sourceFiles()) {
-    const hits = readFileSync(file, "utf8").match(new RegExp(pattern.source, "g"));
+    const hits = stripComments(readFileSync(file, "utf8")).match(new RegExp(pattern.source, "g"));
     if (hits) {
       total += hits.length;
       files.push(`${file} (${hits.length})`);
