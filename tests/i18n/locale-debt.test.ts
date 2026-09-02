@@ -26,7 +26,7 @@ import { describe, expect, it } from "vitest";
 const GATE_PREFIX = "lib/i18n/";
 
 const CEILINGS: ReadonlyArray<{ what: string; pattern: RegExp; ceiling: number }> = [
-  { what: "символ рубля", pattern: /₽/g, ceiling: 28 },
+  { what: "символ рубля", pattern: /₽/g, ceiling: 26 },
   { what: "локаль ru-RU", pattern: /ru-RU/g, ceiling: 25 },
   { what: "пояс Europe/Moscow", pattern: /Europe\/Moscow/g, ceiling: 2 },
   { what: "код валюты RUB", pattern: /"RUB"/g, ceiling: 6 },
