@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  documentSettings,
   formatDateTime,
   formatMoneyMajor,
   formatMoneyMinor,
@@ -86,5 +87,30 @@ describe("дата в поясе сервиса", () => {
     // dateStyle несовместим с покомпонентными опциями: Intl бросает, а не
     // игнорирует. Умолчание обязано отступать, иначе роняет страницу целиком.
     expect(() => formatDateTime(instant, RU, { year: "numeric" })).not.toThrow();
+  });
+});
+
+describe("валюта документа", () => {
+  it("документ в своей валюте показывается в ней, а не в текущей", () => {
+    // Сервис перешёл на евро, старая смета выписана в рублях.
+    const settings = documentSettings({ currency: "RUB" }, DE);
+    const shown = formatMoneyMinor(4_500_000, settings);
+    // В немецкой локали рубль пишется кодом, а не знаком — и это правильно:
+    // знак ₽ немецкому читателю ничего не говорит. Важно, что не евро.
+    expect(shown).toContain("RUB");
+    expect(shown).not.toContain("€");
+  });
+
+  it("локаль и пояс остаются арендаторскими", () => {
+    // Валюта — свойство документа, разделители разрядов — свойство читателя.
+    const settings = documentSettings({ currency: "RUB" }, DE);
+    expect(settings.locale).toBe("de-DE");
+    expect(settings.timeZone).toBe("Europe/Berlin");
+    expect(flat(formatMoneyMinor(4_500_000, settings))).toBe("45.000,00RUB");
+  });
+
+  it("не записанная валюта означает текущую валюту арендатора", () => {
+    expect(documentSettings({ currency: null }, DE).currency).toBe("EUR");
+    expect(documentSettings({}, DE).currency).toBe("EUR");
   });
 });
