@@ -167,6 +167,38 @@ describe.sequential("изоляция арендаторов на живой б�
     expect(deal.estimates[0].tenantId).toBe(OUR);
   });
 
+  it("СМЕТУ НЕЛЬЗЯ ПРИВЯЗАТЬ К СДЕЛКЕ ЧУЖОГО АРЕНДАТОРА", async () => {
+    // Дыра, которую нашёл этот же тест: составные ключи закрывали связи
+    // родитель-ребёнок, но не ссылки между корневыми сущностями. Смета —
+    // корень, и до ключей она могла указывать на чужую сделку.
+    const theirs = await withTenant(client, THEIRS).deal.create({
+      data: { customer: { connect: { id: "u_chuzhoy" } }, source: "чужая", channel: "SERVICE" },
+    });
+    await expect(
+      client.estimate.create({ data: { dealId: theirs.id, stage: "DRAFT", tenantId: OUR } }),
+    ).rejects.toThrow();
+  });
+
+  it("удаление машины обнуляет ссылку, но не арендатора сделки", async () => {
+    // Обнуление пары вместе с арендатором вычистило бы владельца строки —
+    // лечение хуже болезни. Поэтому SET NULL с указанием колонки.
+    const car = await withTenant(client, OUR).vehicle.create({
+      data: { owner: { connect: { id: "u_nash" } }, make: "Mercedes-Benz", model: "G 350", year: 2016 },
+    });
+    const deal = await withTenant(client, OUR).deal.create({
+      data: {
+        customer: { connect: { id: "u_nash" } },
+        vehicle: { connect: { id: car.id } },
+        source: "с машиной",
+        channel: "SERVICE",
+      },
+    });
+    await client.vehicle.delete({ where: { id: car.id } });
+    const after = await client.deal.findUnique({ where: { id: deal.id } });
+    expect(after?.vehicleId).toBeNull();
+    expect(after?.tenantId).toBe(OUR);
+  });
+
   it("общий справочник виден обоим", async () => {
     // Изоляция не должна превращаться в раздельные Мерседесы.
     await client.manufacturer.create({ data: { id: "mb", name: "Mercedes-Benz", slug: "mercedes-benz" } });
