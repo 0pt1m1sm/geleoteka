@@ -200,6 +200,14 @@ export default async function AdminSeoPage() {
         </Card>
       </div>
 
+      {/* Почему данных нет. Раньше панель просто показывала пустые ячейки, и
+          неверные права у токена оставались незамеченными месяц. */}
+      {webmaster?.problem && (
+        <div className="alert-error">
+          <b>Вебмастер не отдаёт данные.</b> {webmaster.problem}
+        </div>
+      )}
+
       {/* Топ запросов */}
       {webmaster && webmaster.topQueries.length > 0 ? (
         <div>
