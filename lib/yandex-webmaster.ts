@@ -28,7 +28,17 @@ export interface WebmasterSummary {
   excludedPages: number | null;
   sqi: number | null;
   topQueries: WebmasterQueryRow[];
+  /**
+   * Почему данных нет, если их нет. Молчаливая деградация уже подвела: панель
+   * месяц показывала пустоту, а причиной был неверный набор прав у токена —
+   * и никто не мог этого узнать, потому что панель об этом не говорила.
+   * Диагностика, которая молчит о собственной слепоте, хуже отсутствующей.
+   */
+  problem: string | null;
 }
+
+/** Статус последнего неуспешного ответа — для объяснения пустоты на панели. */
+let lastFailure: string | null = null;
 
 async function apiGet(path: string, token: string): Promise<Record<string, unknown> | null> {
   try {
@@ -41,6 +51,12 @@ async function apiGet(path: string, token: string): Promise<Record<string, unkno
       // Диагностика без секрета: путь (без токена, он в заголовке) + статус.
       // 403 обычно = у токена нет права «Вебмастер»; 404 = хост не найден.
       console.warn("yandex_webmaster.api_non_ok", { path, status: res.status });
+      lastFailure =
+        res.status === 403
+          ? "У OAuth-приложения нет права COMMON — Вебмастер не отдаёт ни индексацию, ни запросы. Перевыпустите токен, добавив это право в настройках приложения на oauth.yandex.ru."
+          : res.status === 401
+            ? "Токен недействителен или отозван — перевыпустите его."
+            : `Вебмастер ответил ${res.status}.`;
       return null;
     }
     return (await res.json()) as Record<string, unknown>;
@@ -73,6 +89,7 @@ async function resolveIds(token: string): Promise<{ userId: number; hostId: stri
 }
 
 export async function fetchWebmasterSummary(): Promise<WebmasterSummary | null> {
+  lastFailure = null;
   const token = (await getSetting("YANDEX_OAUTH_TOKEN"))?.trim();
   if (!token) return null;
 
@@ -88,7 +105,18 @@ export async function fetchWebmasterSummary(): Promise<WebmasterSummary | null> 
       token,
     ),
   ]);
-  if (!summary && !queriesRes) return null;
+  // Раньше здесь был выход в null, и панель показывала пустоту без причины.
+  // Теперь пустота возвращается ВМЕСТЕ с объяснением: это единственный способ
+  // заметить, что диагностика ослепла.
+  if (!summary && !queriesRes) {
+    return {
+      searchablePages: null,
+      excludedPages: null,
+      sqi: null,
+      topQueries: [],
+      problem: lastFailure ?? "Вебмастер не ответил.",
+    };
+  }
 
   const topQueries: WebmasterQueryRow[] = ((queriesRes?.queries ?? []) as Array<
     Record<string, unknown>
@@ -114,10 +142,12 @@ export async function fetchWebmasterSummary(): Promise<WebmasterSummary | null> 
       typeof summary?.excluded_pages_count === "number" ? summary.excluded_pages_count : null,
     sqi: typeof summary?.sqi === "number" ? summary.sqi : null,
     topQueries,
+    problem: summary ? null : lastFailure,
   };
 }
 
 /** Только для тестов: сброс кэша идентификаторов. */
 export function __resetWebmasterCache(): void {
   cachedIds = null;
+  lastFailure = null;
 }
