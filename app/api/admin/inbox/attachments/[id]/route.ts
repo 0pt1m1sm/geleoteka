@@ -60,10 +60,19 @@ export async function GET(
   const apiKey = await getSetting("RESEND_API_KEY");
   if (!apiKey) return NextResponse.json({ error: "not configured" }, { status: 503 });
 
-  const upstream = await fetch(
-    `https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`,
-    { headers: { Authorization: `Bearer ${apiKey}` } },
-  );
+  let upstream: Response;
+  try {
+    upstream = await fetch(
+      `https://api.resend.com/emails/receiving/${emailId}/attachments/${attachmentId}`,
+      { headers: { Authorization: `Bearer ${apiKey}` } },
+    );
+  } catch (err) {
+    // Network failure reaching Resend (DNS, timeout, connection reset) —
+    // never surface details, log server-side only. Mirrors the sibling
+    // provider-neutral route at /api/admin/email-messages/.../attachments.
+    console.error("[INBOX ATTACHMENT] fetch failed", err);
+    return NextResponse.json({ error: "upstream error" }, { status: 502 });
+  }
 
   if (upstream.status === 404) {
     return NextResponse.json({ error: "expired" }, { status: 410 });

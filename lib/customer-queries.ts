@@ -82,7 +82,15 @@ export async function loadCustomersForList(
   const db = await tenantDb();
   const raw = (await db.user.findMany({
     where,
-    include: {
+    // `select` (not `include`) so this list — used for every admin render
+    // and the CSV export — never pulls sensitive/unused scalars like
+    // `passwordHash` off the User row.
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      createdAt: true,
       vehicles: {
         where: { ownershipType: "CUSTOMER" },
         select: { model: true, year: true },
