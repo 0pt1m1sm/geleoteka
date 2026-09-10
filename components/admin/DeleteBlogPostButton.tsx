@@ -23,9 +23,13 @@ export function DeleteBlogPostButton({
       }))
     )
       return;
-    await deleteBlogPost(postId);
-    toast.success("Статья удалена");
-    router.refresh();
+    try {
+      await deleteBlogPost(postId);
+      toast.success("Статья удалена");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить статью");
+    }
   }
 
   return (

@@ -146,9 +146,9 @@ export async function findOrCreateGuestCustomer(input: {
         isCustomer: true,
         referralSource,
         customerProfile: { create: {} },
+        loyaltyAccount: { create: {} },
       },
     })) as { id: string };
-    await db.loyaltyAccount.create({ data: { userId: created.id } });
     return {
       ok: true,
       userId: created.id,

@@ -16,9 +16,13 @@ export function DeleteRepairOrderButton({
 
   async function handleDelete() {
     if (!(await confirm({ message: `Удалить заказ-наряд ${customerName}? Действие необратимо.`, danger: true }))) return;
-    await deleteRepairOrder(repairOrderId);
-    toast.success("Заказ-наряд удалён");
-    router.refresh();
+    try {
+      await deleteRepairOrder(repairOrderId);
+      toast.success("Заказ-наряд удалён");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить заказ-наряд");
+    }
   }
 
   return (

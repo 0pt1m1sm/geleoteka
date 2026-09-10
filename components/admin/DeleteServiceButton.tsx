@@ -16,9 +16,13 @@ export function DeleteServiceButton({
 
   async function handleDelete() {
     if (!(await confirm({ message: `Удалить услугу «${serviceName}»? Действие необратимо.`, danger: true }))) return;
-    await deleteService(serviceId);
-    toast.success("Услуга удалена");
-    router.refresh();
+    try {
+      await deleteService(serviceId);
+      toast.success("Услуга удалена");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить услугу");
+    }
   }
 
   return (

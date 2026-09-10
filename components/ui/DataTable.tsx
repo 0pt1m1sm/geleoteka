@@ -129,8 +129,22 @@ export function DataTable<T>({
             <tr
               key={getRowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
+              role={onRowClick ? "button" : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
               className={`border-b border-[var(--border)] last:border-0 ${
-                onRowClick ? "cursor-pointer hover:bg-[var(--card-hover)]" : ""
+                onRowClick
+                  ? "cursor-pointer hover:bg-[var(--card-hover)] focus:outline-2 focus:outline-offset-[-2px] focus:outline-[var(--color-accent)]"
+                  : ""
               } transition-colors`}
             >
               {columns.map((col) => (

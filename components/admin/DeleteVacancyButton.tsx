@@ -16,9 +16,13 @@ export function DeleteVacancyButton({
 
   async function handleDelete() {
     if (!(await confirm({ message: `Удалить вакансию «${vacancyTitle}»? Действие необратимо.`, danger: true }))) return;
-    await deleteVacancy(vacancyId);
-    toast.success("Вакансия удалена");
-    router.refresh();
+    try {
+      await deleteVacancy(vacancyId);
+      toast.success("Вакансия удалена");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить вакансию");
+    }
   }
 
   return (

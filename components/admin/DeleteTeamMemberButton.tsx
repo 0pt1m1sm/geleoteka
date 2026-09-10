@@ -24,9 +24,13 @@ export function DeleteTeamMemberButton({
     ) {
       return;
     }
-    await deleteTeamMember(memberId);
-    toast.success("Удалено из команды");
-    router.refresh();
+    try {
+      await deleteTeamMember(memberId);
+      toast.success("Удалено из команды");
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Не удалось удалить");
+    }
   }
 
   return (
