@@ -1,5 +1,5 @@
 import { formatDateTime } from "@/lib/utils";
-import { wrapEmail, type WrapEmailResult } from "./_layout";
+import { wrapEmail, type WrapEmailResult } from "./layout";
 
 export interface BookingConfirmationInput {
   customerName: string;

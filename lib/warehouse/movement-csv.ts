@@ -1,16 +1,21 @@
 /**
- * CSV serialization for the WMS movement-ledger export (Phase 6).
+ * CSV serialization for the WMS movement-ledger export (Phase 6), plus a
+ * couple of small formatting helpers shared by every StockMovement display
+ * (StockHistory, WarehouseMovementsFeed, the movements report page) so the
+ * reason labels can't drift out of sync between them again.
  *
- * Pure module mirroring lib/customer-csv.ts: BOM-prefixed UTF-8, CRLF line
- * endings, RFC-4180 double-quote escaping. No I/O — the route maps StockMovement
- * rows to MovementCsvRow and resolves actor names before calling buildMovementsCsv.
+ * The CSV part is a pure module mirroring lib/customer-csv.ts: BOM-prefixed
+ * UTF-8, CRLF line endings, RFC-4180 double-quote escaping. No I/O — the route
+ * maps StockMovement rows to MovementCsvRow and resolves actor names before
+ * calling buildMovementsCsv.
  */
 import { formatDateTime } from "@/lib/utils";
 
 const BOM = "﻿";
 const EOL = "\r\n";
 
-/** Reason → Russian label (kept in sync with WarehouseMovementsFeed). */
+/** Reason → Russian label. Single source of truth — every StockMovement UI
+ *  and the CSV export import this instead of keeping their own copy. */
 export const MOVEMENT_REASON_LABELS: Record<string, string> = {
   RECEIPT: "Приёмка",
   RECEIPT_REVERSAL: "Сторно приёмки",
@@ -19,6 +24,11 @@ export const MOVEMENT_REASON_LABELS: Record<string, string> = {
   RESERVATION: "Резерв",
   RELEASE: "Снятие резерва",
 };
+
+/** Render a quantity/reserved delta with an explicit "+" for positive values. */
+export function formatSignedDelta(n: number): string {
+  return n > 0 ? `+${n}` : String(n);
+}
 
 export const MOVEMENT_CSV_HEADER: readonly string[] = [
   "Дата",

@@ -36,9 +36,13 @@ export function RentalEditForm({ car }: { car: CarData }) {
   async function handleDelete() {
     if (!(await confirm({ message: `Удалить Mercedes-Benz ${car.model} из автопарка?`, danger: true, confirmText: "Удалить" }))) return;
     startDelete(async () => {
-      await deleteRentalCar(car.id);
-      toast.success("Mercedes-Benz удалён из автопарка");
-      nav.push("/admin/rentals");
+      try {
+        await deleteRentalCar(car.id);
+        toast.success("Mercedes-Benz удалён из автопарка");
+        nav.push("/admin/rentals");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Не удалось удалить автомобиль");
+      }
     });
   }
 

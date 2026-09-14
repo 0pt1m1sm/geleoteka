@@ -39,9 +39,17 @@ export function SupplierRemoveButton({
       });
       if (!ok) return;
       startTransition(async () => {
-        const res = await deleteSupplier(id);
-        toast.success(res.removed === "deleted" ? "Поставщик удалён" : "Поставщик скрыт");
-        router.refresh();
+        try {
+          const res = await deleteSupplier(id);
+          if (res.error) {
+            toast.error(res.error);
+            return;
+          }
+          toast.success(res.removed === "deleted" ? "Поставщик удалён" : "Поставщик скрыт");
+          router.refresh();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Не удалось убрать поставщика");
+        }
       });
     })();
   }

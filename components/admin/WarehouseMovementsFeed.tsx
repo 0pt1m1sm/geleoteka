@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
-
-const REASON_LABELS: Record<string, string> = {
-  RECEIPT: "Приёмка",
-  RECEIPT_REVERSAL: "Сторно приёмки",
-  CONSUMPTION: "Расход",
-  ADJUSTMENT: "Корректировка",
-  RESERVATION: "Резерв",
-  RELEASE: "Снятие резерва",
-};
+import { MOVEMENT_REASON_LABELS, formatSignedDelta } from "@/lib/warehouse/movement-csv";
 
 interface FeedRow {
   id: string;
@@ -30,10 +22,6 @@ function sourceEntityId(sourceId: string | null): string | null {
   if (!sourceId) return null;
   const i = sourceId.indexOf(":");
   return i === -1 ? sourceId : sourceId.slice(0, i);
-}
-
-function signed(n: number): string {
-  return n > 0 ? `+${n}` : String(n);
 }
 
 /** Warehouse-wide movements feed: the most recent StockMovements across ALL
@@ -149,9 +137,9 @@ export async function WarehouseMovementsFeed(): Promise<React.ReactElement> {
                       "—"
                     )}
                   </td>
-                  <td className="p-3">{REASON_LABELS[m.reason] ?? m.reason}</td>
-                  <td className="p-3 text-right tabular-nums">{m.quantityDelta !== 0 ? signed(m.quantityDelta) : "—"}</td>
-                  <td className="p-3 text-right tabular-nums">{m.reservedDelta !== 0 ? signed(m.reservedDelta) : "—"}</td>
+                  <td className="p-3">{MOVEMENT_REASON_LABELS[m.reason] ?? m.reason}</td>
+                  <td className="p-3 text-right tabular-nums">{m.quantityDelta !== 0 ? formatSignedDelta(m.quantityDelta) : "—"}</td>
+                  <td className="p-3 text-right tabular-nums">{m.reservedDelta !== 0 ? formatSignedDelta(m.reservedDelta) : "—"}</td>
                   <td className="p-3 text-xs font-mono text-[var(--foreground-muted)]">
                     {m.sourceType}
                     {m.note ? <span className="block">{m.note}</span> : null}

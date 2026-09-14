@@ -8,7 +8,7 @@ import { ReportsNav } from "@/components/admin/ReportsNav";
 import { WarehouseSwitcher } from "@/components/admin/WarehouseSwitcher";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 import { formatDateTime } from "@/lib/utils";
-import { MOVEMENT_REASON_LABELS } from "@/lib/warehouse/movement-csv";
+import { MOVEMENT_REASON_LABELS, formatSignedDelta } from "@/lib/warehouse/movement-csv";
 
 // NOT compile-enforced (as-const allow-list) — keep in sync with StockMovementReason.
 const REASONS = ["RECEIPT", "RECEIPT_REVERSAL", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
@@ -24,10 +24,6 @@ interface PreviewRow {
   quantityDelta: number;
   reservedDelta: number;
   item: { part: { name: string; article: string } | null } | null;
-}
-
-function signed(n: number): string {
-  return n > 0 ? `+${n}` : String(n);
 }
 
 export default async function MovementsReportPage({ searchParams }: Props) {
@@ -135,8 +131,8 @@ export default async function MovementsReportPage({ searchParams }: Props) {
                     ) : null}
                   </td>
                   <td className="p-3">{MOVEMENT_REASON_LABELS[m.reason] ?? m.reason}</td>
-                  <td className="p-3 text-right">{m.quantityDelta !== 0 ? signed(m.quantityDelta) : "—"}</td>
-                  <td className="p-3 text-right">{m.reservedDelta !== 0 ? signed(m.reservedDelta) : "—"}</td>
+                  <td className="p-3 text-right">{m.quantityDelta !== 0 ? formatSignedDelta(m.quantityDelta) : "—"}</td>
+                  <td className="p-3 text-right">{m.reservedDelta !== 0 ? formatSignedDelta(m.reservedDelta) : "—"}</td>
                 </tr>
               ))}
             </tbody>
