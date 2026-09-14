@@ -38,11 +38,19 @@ export function SupplierEditForm({ supplier }: { supplier: SupplierData }) {
     });
     if (!ok) return;
     startDelete(async () => {
-      const res = await deleteSupplier(supplier.id);
-      toast.success(
-        res.removed === "deleted" ? "Поставщик удалён" : "Поставщик скрыт — по нему есть заказы",
-      );
-      nav.push("/admin/suppliers");
+      try {
+        const res = await deleteSupplier(supplier.id);
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success(
+          res.removed === "deleted" ? "Поставщик удалён" : "Поставщик скрыт — по нему есть заказы",
+        );
+        nav.push("/admin/suppliers");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Не удалось убрать поставщика");
+      }
     });
   }
 

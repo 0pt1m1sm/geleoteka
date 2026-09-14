@@ -1,4 +1,4 @@
-import { wrapEmail, type WrapEmailResult } from "./_layout";
+import { wrapEmail, type WrapEmailResult } from "./layout";
 
 export interface EmailVerificationInput {
   customerName: string;

@@ -2,14 +2,7 @@ import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
 import { defaultWarehouseId } from "@/lib/wms-host";
 import { formatDate } from "@/lib/utils";
-
-const REASON_LABELS: Record<string, string> = {
-  RECEIPT: "Приёмка",
-  CONSUMPTION: "Расход",
-  ADJUSTMENT: "Корректировка",
-  RESERVATION: "Резерв",
-  RELEASE: "Снятие резерва",
-};
+import { MOVEMENT_REASON_LABELS, formatSignedDelta } from "@/lib/warehouse/movement-csv";
 
 interface MovementRow {
   id: string;
@@ -21,10 +14,6 @@ interface MovementRow {
   note: string | null;
   actorUserId: string | null;
   createdAt: Date;
-}
-
-function signed(n: number): string {
-  return n > 0 ? `+${n}` : String(n);
 }
 
 /** Per-part stock ledger: current counters + the StockMovement history. */
@@ -101,9 +90,9 @@ export async function StockHistory({ partId }: { partId: string }): Promise<Reac
               {movements.map((m) => (
                 <tr key={m.id} className="border-b border-[var(--border)]">
                   <td className="py-2 pr-3 whitespace-nowrap text-[var(--foreground-muted)]">{formatDate(m.createdAt)}</td>
-                  <td className="py-2 pr-3">{REASON_LABELS[m.reason] ?? m.reason}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{m.quantityDelta !== 0 ? signed(m.quantityDelta) : "—"}</td>
-                  <td className="py-2 pr-3 text-right tabular-nums">{m.reservedDelta !== 0 ? signed(m.reservedDelta) : "—"}</td>
+                  <td className="py-2 pr-3">{MOVEMENT_REASON_LABELS[m.reason] ?? m.reason}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{m.quantityDelta !== 0 ? formatSignedDelta(m.quantityDelta) : "—"}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{m.reservedDelta !== 0 ? formatSignedDelta(m.reservedDelta) : "—"}</td>
                   <td className="py-2 pr-3 text-xs font-mono text-[var(--foreground-muted)]">
                     {m.sourceType}
                     {m.note ? <span className="block not-italic">{m.note}</span> : null}

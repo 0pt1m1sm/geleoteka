@@ -323,8 +323,12 @@ function EntryRow({ entry, canReply, onReply, replyForm }: EntryRowProps): React
     });
     if (!ok) return;
     startDelete(async () => {
-      await deleteCommunication(entry.id);
-      toast.success("Запись удалена");
+      try {
+        await deleteCommunication(entry.id);
+        toast.success("Запись удалена");
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Не удалось удалить запись");
+      }
     });
   }
 
