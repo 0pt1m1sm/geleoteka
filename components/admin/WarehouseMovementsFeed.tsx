@@ -1,15 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatDate } from "@/lib/utils";
-
-const REASON_LABELS: Record<string, string> = {
-  RECEIPT: "Приёмка",
-  RECEIPT_REVERSAL: "Сторно приёмки",
-  CONSUMPTION: "Расход",
-  ADJUSTMENT: "Корректировка",
-  RESERVATION: "Резерв",
-  RELEASE: "Снятие резерва",
-};
+import { MOVEMENT_REASON_LABELS } from "@/lib/warehouse/movement-csv";
 
 interface FeedRow {
   id: string;
@@ -149,7 +141,7 @@ export async function WarehouseMovementsFeed(): Promise<React.ReactElement> {
                       "—"
                     )}
                   </td>
-                  <td className="p-3">{REASON_LABELS[m.reason] ?? m.reason}</td>
+                  <td className="p-3">{MOVEMENT_REASON_LABELS[m.reason] ?? m.reason}</td>
                   <td className="p-3 text-right tabular-nums">{m.quantityDelta !== 0 ? signed(m.quantityDelta) : "—"}</td>
                   <td className="p-3 text-right tabular-nums">{m.reservedDelta !== 0 ? signed(m.reservedDelta) : "—"}</td>
                   <td className="p-3 text-xs font-mono text-[var(--foreground-muted)]">

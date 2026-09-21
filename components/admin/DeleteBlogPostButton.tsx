@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { deleteBlogPost } from "@/app/actions/blog";
@@ -14,29 +15,35 @@ export function DeleteBlogPostButton({
   postTitle: string;
 }) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
 
-  async function handleDelete() {
-    if (
-      !(await confirm({
-        message: `Удалить статью «${postTitle}»? Действие необратимо.`,
-        danger: true,
-      }))
-    )
-      return;
-    try {
-      await deleteBlogPost(postId);
-      toast.success("Статья удалена");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Не удалось удалить статью");
-    }
+  function handleDelete() {
+    void (async () => {
+      if (
+        !(await confirm({
+          message: `Удалить статью «${postTitle}»? Действие необратимо.`,
+          danger: true,
+        }))
+      )
+        return;
+      startTransition(async () => {
+        try {
+          await deleteBlogPost(postId);
+          toast.success("Статья удалена");
+          router.refresh();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Не удалось удалить статью");
+        }
+      });
+    })();
   }
 
   return (
     <button
       type="button"
       onClick={handleDelete}
-      className="text-xs text-[var(--color-error)] hover:underline shrink-0"
+      disabled={pending}
+      className="text-xs text-[var(--color-error)] hover:underline shrink-0 disabled:opacity-50"
       title="Удалить статью"
     >
       Удалить

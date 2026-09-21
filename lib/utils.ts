@@ -110,16 +110,6 @@ export const REPAIR_ORDER_STATUS_LABELS: Record<string, string> = {
   CANCELLED: "Отменён",
 };
 
-/** JobLine status labels (Russian) */
-export const JOB_LINE_STATUS_LABELS: Record<string, string> = {
-  PROPOSED: "Предложено",
-  APPROVED: "Согласовано",
-  DECLINED: "Отклонено",
-  DEFERRED: "Отложено",
-  IN_PROGRESS: "В работе",
-  DONE: "Готово",
-};
-
 /** Loyalty tier configuration */
 export const LOYALTY_TIERS = {
   SILVER: { minPoints: 0, maxPoints: 999, label: "Серебро" },
