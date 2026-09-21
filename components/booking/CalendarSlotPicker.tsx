@@ -33,7 +33,7 @@ export function CalendarSlotPicker() {
       const res = await fetch(`/api/slots?date=${dateStr}`, { signal });
       if (signal.aborted) return;
       if (res.ok) {
-        const json = await res.json();
+        const json = (await res.json()) as { slots: Slot[] };
         if (signal.aborted) return;
         setSlots(json.slots);
       } else {

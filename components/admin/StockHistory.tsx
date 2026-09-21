@@ -2,14 +2,7 @@ import { db } from "@/lib/db";
 import { availableStock } from "@/lib/wms/public";
 import { defaultWarehouseId } from "@/lib/wms-host";
 import { formatDate } from "@/lib/utils";
-
-const REASON_LABELS: Record<string, string> = {
-  RECEIPT: "Приёмка",
-  CONSUMPTION: "Расход",
-  ADJUSTMENT: "Корректировка",
-  RESERVATION: "Резерв",
-  RELEASE: "Снятие резерва",
-};
+import { MOVEMENT_REASON_LABELS } from "@/lib/warehouse/movement-csv";
 
 interface MovementRow {
   id: string;
@@ -52,10 +45,12 @@ export async function StockHistory({ partId }: { partId: string }): Promise<Reac
   })) as MovementRow[];
 
   const actorIds = Array.from(new Set(movements.map((m) => m.actorUserId).filter((x): x is string => !!x)));
-  const actors = (await db.user.findMany({
-    where: { id: { in: actorIds } },
-    select: { id: true, name: true },
-  })) as Array<{ id: string; name: string }>;
+  const actors = (actorIds.length
+    ? await db.user.findMany({
+        where: { id: { in: actorIds } },
+        select: { id: true, name: true },
+      })
+    : []) as Array<{ id: string; name: string }>;
   const actorName = new Map(actors.map((a) => [a.id, a.name]));
 
   const onHand = si?.quantity ?? 0;
@@ -101,7 +96,7 @@ export async function StockHistory({ partId }: { partId: string }): Promise<Reac
               {movements.map((m) => (
                 <tr key={m.id} className="border-b border-[var(--border)]">
                   <td className="py-2 pr-3 whitespace-nowrap text-[var(--foreground-muted)]">{formatDate(m.createdAt)}</td>
-                  <td className="py-2 pr-3">{REASON_LABELS[m.reason] ?? m.reason}</td>
+                  <td className="py-2 pr-3">{MOVEMENT_REASON_LABELS[m.reason] ?? m.reason}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{m.quantityDelta !== 0 ? signed(m.quantityDelta) : "—"}</td>
                   <td className="py-2 pr-3 text-right tabular-nums">{m.reservedDelta !== 0 ? signed(m.reservedDelta) : "—"}</td>
                   <td className="py-2 pr-3 text-xs font-mono text-[var(--foreground-muted)]">

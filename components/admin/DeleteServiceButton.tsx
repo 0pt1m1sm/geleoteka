@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteService } from "@/app/actions/services";
 import { confirm } from "@/lib/ui/confirm";
@@ -13,23 +14,29 @@ export function DeleteServiceButton({
   serviceName: string;
 }) {
   const router = useRouter();
+  const [pending, startTransition] = useTransition();
 
-  async function handleDelete() {
-    if (!(await confirm({ message: `Удалить услугу «${serviceName}»? Действие необратимо.`, danger: true }))) return;
-    try {
-      await deleteService(serviceId);
-      toast.success("Услуга удалена");
-      router.refresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Не удалось удалить услугу");
-    }
+  function handleDelete() {
+    void (async () => {
+      if (!(await confirm({ message: `Удалить услугу «${serviceName}»? Действие необратимо.`, danger: true }))) return;
+      startTransition(async () => {
+        try {
+          await deleteService(serviceId);
+          toast.success("Услуга удалена");
+          router.refresh();
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : "Не удалось удалить услугу");
+        }
+      });
+    })();
   }
 
   return (
     <button
       type="button"
       onClick={handleDelete}
-      className="text-xs text-[var(--color-error)] hover:underline shrink-0"
+      disabled={pending}
+      className="text-xs text-[var(--color-error)] hover:underline shrink-0 disabled:opacity-50"
       title="Удалить услугу"
     >
       Удалить

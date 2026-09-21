@@ -124,11 +124,14 @@ function InfoRow({
 }): React.ReactElement {
   const [copied, setCopied] = useState(false);
 
-  function handleCopy(): void {
-    void navigator.clipboard.writeText(value).then(() => {
+  async function handleCopy(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    });
+    } catch {
+      // Clipboard unavailable (e.g. insecure origin) — silent; user can copy manually.
+    }
   }
 
   return (
