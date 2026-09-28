@@ -134,7 +134,16 @@ export default async function PartsPage({ searchParams }: Props) {
 
   const parts = await db.part.findMany({
     where,
-    include: {
+    select: {
+      id: true,
+      slug: true,
+      photos: true,
+      name: true,
+      article: true,
+      isOEM: true,
+      condition: true,
+      price: true,
+      compareAtPrice: true,
       category: { select: { name: true, slug: true } },
       stockItems: { select: { quantity: true } },
     },

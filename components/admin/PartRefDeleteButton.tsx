@@ -23,19 +23,21 @@ export function PartRefDeleteButton({
   const [pending, startTransition] = useTransition();
 
   function handleDelete(): void {
-    startTransition(async () => {
+    void (async () => {
       if (!(await confirm({ message: `Удалить «${name}» из справочника?` }))) return;
-      const res = await deletePartReference(id);
-      if (res.error) {
-        toast.error(res.error);
-        return;
-      }
-      if (afterDeleteHref) {
-        nav.push(afterDeleteHref);
-      } else {
-        router.refresh();
-      }
-    });
+      startTransition(async () => {
+        const res = await deletePartReference(id);
+        if (res.error) {
+          toast.error(res.error);
+          return;
+        }
+        if (afterDeleteHref) {
+          nav.push(afterDeleteHref);
+        } else {
+          router.refresh();
+        }
+      });
+    })();
   }
 
   return (
