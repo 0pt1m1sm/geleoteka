@@ -64,25 +64,37 @@ export default async function LoyaltyPage() {
 
         {nextTier && (
           <div>
-            <div className="flex justify-between text-xs text-[var(--foreground-muted)] mb-1">
-              <span>{tierInfo.label}</span>
-              <span>{LOYALTY_TIERS[nextTier.tier].label}</span>
-            </div>
-            <div
-              className="w-full bg-[var(--border)] rounded-full h-2 overflow-hidden"
-              role="progressbar"
-              aria-valuenow={Math.min(100, (account.points / nextTier.pointsNeeded) * 100)}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label={`Прогресс до ${LOYALTY_TIERS[nextTier.tier].label}`}
-            >
-              <div
-                className="bg-[var(--color-accent)] h-2 rounded-full transition-[width] duration-500"
-                style={{
-                  width: `${Math.min(100, (account.points / nextTier.pointsNeeded) * 100)}%`,
-                }}
-              />
-            </div>
+            {/* Прогресс — доля пройденного внутри ТЕКУЩЕГО уровня (minPoints
+                текущего уровня .. pointsNeeded следующего), а не от нуля:
+                иначе бар визуально стартует не с 0% сразу после перехода. */}
+            {(() => {
+              const tierSpan = nextTier.pointsNeeded - tierInfo.minPoints;
+              const progressPct =
+                tierSpan > 0
+                  ? Math.min(100, ((account.points - tierInfo.minPoints) / tierSpan) * 100)
+                  : 100;
+              return (
+                <>
+                  <div className="flex justify-between text-xs text-[var(--foreground-muted)] mb-1">
+                    <span>{tierInfo.label}</span>
+                    <span>{LOYALTY_TIERS[nextTier.tier].label}</span>
+                  </div>
+                  <div
+                    className="w-full bg-[var(--border)] rounded-full h-2 overflow-hidden"
+                    role="progressbar"
+                    aria-valuenow={progressPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`Прогресс до ${LOYALTY_TIERS[nextTier.tier].label}`}
+                  >
+                    <div
+                      className="bg-[var(--color-accent)] h-2 rounded-full transition-[width] duration-500"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </>
+              );
+            })()}
             <p className="text-xs text-[var(--foreground-muted)] mt-1">
               До {LOYALTY_TIERS[nextTier.tier].label}: {nextTier.pointsNeeded - account.points} баллов
             </p>

@@ -4,7 +4,7 @@ import { tenantDb } from "@/lib/tenant/scoped-db";
 import { duplicateNewPartWhere, newPartSku } from "@/lib/part-sku";
 import { SERVICE_ARTICLE_RE, extractModelCodes, isLatinOem, normalizeOem, oemKey } from "@/lib/part-reference";
 import { slugify } from "@/lib/slug";
-import { defaultWarehouseId } from "@/lib/wms-host";
+import { TENANT_KEY, defaultWarehouseId } from "@/lib/wms-host";
 import { resolveGenerationIds } from "@/lib/part-reference-lookup";
 
 /**
@@ -185,7 +185,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           await tx.stockItem.upsert({
             where: { partId_warehouseId: { partId: existing.id, warehouseId: await defaultWarehouseId(tx) } },
             update: { quantity },
-            create: { partId: existing.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(tx) },
+            create: { partId: existing.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
           });
           await tx.partTrim.deleteMany({ where: { partId: existing.id } });
           if (trimIds.length > 0) {
@@ -216,7 +216,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             select: { id: true },
           })) as { id: string };
           await tx.stockItem.create({
-            data: { partId: created_.id, quantity, tenantKey: "geleoteka", warehouseId: await defaultWarehouseId(tx) },
+            data: { partId: created_.id, quantity, tenantKey: TENANT_KEY, warehouseId: await defaultWarehouseId(tx) },
           });
         });
         created++;
