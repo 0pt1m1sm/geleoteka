@@ -170,9 +170,15 @@ export async function GET(req: Request, { params }: RouteParams) {
   // the route's module graph until actually requested. The library
   // is ESM and only works in Node runtime; force that explicitly.
   const { renderToBuffer } = await import("@react-pdf/renderer");
-  const buffer = await renderToBuffer(
-    EstimatePdfDocument({ estimate: data, requisites }),
-  );
+  let buffer: Buffer;
+  try {
+    buffer = await renderToBuffer(
+      EstimatePdfDocument({ estimate: data, requisites }),
+    );
+  } catch (err) {
+    console.error("[estimate-pdf] renderToBuffer failed", err);
+    return new NextResponse("Failed to generate PDF", { status: 500 });
+  }
 
   const filename = `smeta-${estimate.number ?? estimate.id.slice(-6).toUpperCase()}.pdf`;
   return new NextResponse(buffer as unknown as BodyInit, {

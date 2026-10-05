@@ -103,6 +103,8 @@ const FORWARD_FROM: Record<string, ReadonlyArray<string>> = {
   LOST: ["NEW"],
 };
 
+const DEAL_STAGES: ReadonlyArray<string> = ["NEW", "IN_PROGRESS", "WON", "LOST"];
+
 export async function setDealStage(
   dealId: string,
   nextStage: string,
@@ -111,6 +113,10 @@ export async function setDealStage(
   // Через шов изоляции: арендатор проставляется в данные и в условие.
   const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);
+
+  if (!DEAL_STAGES.includes(nextStage)) {
+    return { error: "Неизвестная стадия сделки" };
+  }
 
   const deal = (await db.deal.findUnique({
     where: { id: dealId },

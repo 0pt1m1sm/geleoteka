@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { requireRole } from "@/lib/auth";
 import { validateCMSContent } from "@/lib/cms-validate";
+import { Prisma } from "@/app/generated/prisma/client";
 
 export type UpdateCMSResult = { ok: true } | { ok: false; error: string };
 
@@ -24,10 +25,9 @@ export async function updateCMSBlock(
   if (!result.ok) return result;
 
   // Prisma's `Json` input type is a strict union; the validator's normalized
-  // payload is a plain object/array tree — cast through `any` once at the
-  // boundary to satisfy the generated client type.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalizedContent = result.normalized as any;
+  // payload is a plain object/array tree — cast through `unknown` to the
+  // generated client's own `InputJsonValue` type at the boundary.
+  const normalizedContent = result.normalized as unknown as Prisma.InputJsonValue;
 
   await db.cMSBlock.upsert({
     where: { key },
