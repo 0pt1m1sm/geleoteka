@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 
@@ -12,7 +12,6 @@ import { X } from "lucide-react";
  */
 export const Drawer = DialogPrimitive.Root;
 export const DrawerTrigger = DialogPrimitive.Trigger;
-export const DrawerClose = DialogPrimitive.Close;
 export const DrawerPortal = DialogPrimitive.Portal;
 
 export const DrawerOverlay = forwardRef<
@@ -68,21 +67,4 @@ export const DrawerContent = forwardRef<ElementRef<typeof DialogPrimitive.Conten
   },
 );
 
-export function DrawerHeader({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  return (
-    <div className={`px-4 py-4 border-b border-[var(--border)] ${className}`.trim()}>{children}</div>
-  );
-}
-
-export function DrawerBody({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  return <div className={`flex-1 overflow-y-auto p-4 ${className}`.trim()}>{children}</div>;
-}
-
-export function DrawerFooter({ children, className = "" }: { children: ReactNode; className?: string }): React.ReactElement {
-  return (
-    <div className={`p-4 space-y-2 border-t border-[var(--border)] ${className}`.trim()}>{children}</div>
-  );
-}
-
 export const DrawerTitle = DialogPrimitive.Title;
-export const DrawerDescription = DialogPrimitive.Description;

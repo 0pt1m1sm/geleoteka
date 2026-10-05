@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -105,9 +106,18 @@ export function CMSSaveSectionProvider({ children }: { children: ReactNode }): R
     })();
   }, []);
 
+  const registerContextValue = useMemo(
+    () => ({ registerSaver, reportDirty }),
+    [registerSaver, reportDirty],
+  );
+  const statusContextValue = useMemo(
+    () => ({ saving, error, savedCount, dirty, saveAll }),
+    [saving, error, savedCount, dirty, saveAll],
+  );
+
   return (
-    <CMSSaveRegisterContext.Provider value={{ registerSaver, reportDirty }}>
-      <CMSSaveStatusContext.Provider value={{ saving, error, savedCount, dirty, saveAll }}>
+    <CMSSaveRegisterContext.Provider value={registerContextValue}>
+      <CMSSaveStatusContext.Provider value={statusContextValue}>
         {children}
       </CMSSaveStatusContext.Provider>
     </CMSSaveRegisterContext.Provider>
