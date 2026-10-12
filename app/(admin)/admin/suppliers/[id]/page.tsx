@@ -6,21 +6,11 @@ import { getSession } from "@/lib/auth";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { SupplierEditForm } from "@/components/admin/SupplierEditForm";
+import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/suppliers/order-lifecycle";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Черновик",
-  ORDERED: "Заказ размещён",
-  IN_TRANSIT: "В пути",
-  CUSTOMS: "Таможня",
-  PARTIALLY_RECEIVED: "Частично получен",
-  RECEIVED: "Получен",
-  COMPLETED: "Завершён",
-  CANCELLED: "Отменён",
-};
 
 export default async function SupplierDetailPage({ params }: Props) {
   // Через шов изоляции: условие по арендатору добавляется само.
@@ -105,7 +95,7 @@ export default async function SupplierDetailPage({ params }: Props) {
                     </p>
                     <p className="text-xs text-[var(--foreground-muted)]">
                       {formatDate(o.orderDate as Date)} ·{" "}
-                      {STATUS_LABELS[o.status as string] ?? (o.status as string)}
+                      {SUPPLIER_ORDER_STATUS_LABELS[o.status as string] ?? (o.status as string)}
                     </p>
                   </div>
                   <p className="font-bold text-[var(--color-accent)] text-sm shrink-0">

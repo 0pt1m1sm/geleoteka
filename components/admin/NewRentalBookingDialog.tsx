@@ -76,9 +76,14 @@ export function NewRentalBookingDialog({ cars }: { cars: RentalCarOption[] }): R
       return;
     }
     startSearch(async () => {
-      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q.trim())}`);
-      const data = (await res.json()) as { results?: CustomerHit[] };
-      setHits(data.results ?? []);
+      try {
+        const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q.trim())}`);
+        const data = (await res.json()) as { results?: CustomerHit[] };
+        setHits(data.results ?? []);
+      } catch {
+        setHits([]);
+        toast.error("Не удалось выполнить поиск клиента");
+      }
     });
   }
 

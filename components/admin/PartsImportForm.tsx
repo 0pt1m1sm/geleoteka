@@ -21,15 +21,20 @@ export function PartsImportForm() {
     setResult(null);
 
     const formData = new FormData(e.currentTarget);
-    const res = await fetch("/api/parts/import", { method: "POST", body: formData });
-    const data = await res.json();
+    try {
+      const res = await fetch("/api/parts/import", { method: "POST", body: formData });
+      const data = (await res.json()) as ImportResult | { error: string };
 
-    if (!res.ok) {
-      setError(data.error || "Ошибка загрузки");
-    } else {
-      setResult(data);
+      if (!res.ok) {
+        setError("error" in data ? data.error : "Ошибка загрузки");
+      } else {
+        setResult(data as ImportResult);
+      }
+    } catch {
+      setError("Не удалось загрузить файл. Проверьте соединение и попробуйте снова.");
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
   }
 
   return (

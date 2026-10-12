@@ -8,17 +8,7 @@ import { tenantDb } from "@/lib/tenant/scoped-db";
 import { formatPrice, formatDate } from "@/lib/utils";
 import { DeleteSupplierOrderButton } from "@/components/admin/DeleteSupplierOrderButton";
 import { Button, Card, PageHeader } from "@/components/ui";
-
-const STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Черновик",
-  ORDERED: "Заказ размещён",
-  IN_TRANSIT: "В пути",
-  CUSTOMS: "Таможня",
-  PARTIALLY_RECEIVED: "Частично получен",
-  RECEIVED: "Получен",
-  COMPLETED: "Завершён",
-  CANCELLED: "Отменён",
-};
+import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/suppliers/order-lifecycle";
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-[var(--background-secondary)] text-[var(--foreground-muted)]",
@@ -69,7 +59,7 @@ export default async function SupplierOrdersListPage({ searchParams }: Props) {
 
   const sp = await searchParams;
   // Validated against the label map, so the cast to the enum union is safe.
-  const status = (sp.status && STATUS_LABELS[sp.status] ? sp.status : undefined) as OrderStatus | undefined;
+  const status = (sp.status && SUPPLIER_ORDER_STATUS_LABELS[sp.status] ? sp.status : undefined) as OrderStatus | undefined;
   const supplier = (sp.supplier ?? "").trim() || undefined;
   const requestedPage = Math.max(1, parseInt(sp.page ?? "1", 10) || 1);
 
@@ -143,7 +133,7 @@ export default async function SupplierOrdersListPage({ searchParams }: Props) {
         >
           Все
         </Link>
-        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+        {Object.entries(SUPPLIER_ORDER_STATUS_LABELS).map(([value, label]) => (
           <Link
             key={value}
             href={filterHref({ status: value === status ? undefined : value, supplier })}
@@ -202,7 +192,7 @@ export default async function SupplierOrdersListPage({ searchParams }: Props) {
                       {supplierRow.name}
                     </p>
                     <span className={`badge text-[10px] ${STATUS_COLORS[o.status as string]}`}>
-                      {STATUS_LABELS[o.status as string] ?? (o.status as string)}
+                      {SUPPLIER_ORDER_STATUS_LABELS[o.status as string] ?? (o.status as string)}
                     </span>
                   </div>
                   <p className="text-xs text-[var(--foreground-muted)]">

@@ -4,6 +4,17 @@
  * pages use them to decide which controls to render. DB-free by design.
  */
 
+export const SUPPLIER_ORDER_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Черновик",
+  ORDERED: "Заказ размещён",
+  IN_TRANSIT: "В пути",
+  CUSTOMS: "Таможня",
+  PARTIALLY_RECEIVED: "Частично получен",
+  RECEIVED: "Получен",
+  COMPLETED: "Завершён",
+  CANCELLED: "Отменён",
+};
+
 /** Full editing (supplier, lines, landed-cost inputs) — DRAFT only. Once the
  *  order is placed, the lines are a commitment receiving reconciles against. */
 export function canFullyEditOrder(status: string): boolean {
