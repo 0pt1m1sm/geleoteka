@@ -13,10 +13,10 @@ export async function GET(
   const db = await tenantDb();
   const { id } = await context.params;
 
-  const repairOrder = await db.repairOrder.findUnique({
+  const repairOrder = (await db.repairOrder.findUnique({
     where: { id },
     select: { userId: true, status: true, updatedAt: true },
-  });
+  })) as { userId: string | null; status: string; updatedAt: Date } | null;
 
   if (!repairOrder) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
