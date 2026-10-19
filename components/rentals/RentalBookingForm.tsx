@@ -88,20 +88,25 @@ export function RentalBookingForm({ carId, dailyRate, occupiedRanges = [], prefi
     const emailAtSubmit = (formData.get("email") as string) ?? "";
     const phoneAtSubmit = (formData.get("phone") as string) ?? "";
     setSubmittedPhone(phoneAtSubmit);
-    const res = await createRentalBooking({
-      carId,
-      startDate,
-      endDate,
-      contactName: formData.get("name") as string,
-      contactPhone: phoneAtSubmit,
-      contactEmail: emailAtSubmit,
-      notes: (formData.get("notes") as string) || "",
-    });
-    setResult(res);
-    setSubmitting(false);
-    if (res.success) {
-      setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
-      clearContactDraft();
+    try {
+      const res = await createRentalBooking({
+        carId,
+        startDate,
+        endDate,
+        contactName: formData.get("name") as string,
+        contactPhone: phoneAtSubmit,
+        contactEmail: emailAtSubmit,
+        notes: (formData.get("notes") as string) || "",
+      });
+      setResult(res);
+      if (res.success) {
+        setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
+        clearContactDraft();
+      }
+    } catch {
+      setResult({ success: false, error: "Не удалось оформить бронирование. Попробуйте ещё раз." });
+    } finally {
+      setSubmitting(false);
     }
   }
 

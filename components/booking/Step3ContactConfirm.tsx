@@ -82,12 +82,17 @@ export function Step3ContactConfirm({
   async function handleSubmit(): Promise<void> {
     setSubmitting(true);
     const emailAtSubmit = data.email; // capture BEFORE action+reset
-    const res = await createRepairOrder(data);
-    setResult(res);
-    setSubmitting(false);
-    if (res.success) {
-      setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
-      reset();
+    try {
+      const res = await createRepairOrder(data);
+      setResult(res);
+      if (res.success) {
+        setSubmittedEmail(emailAtSubmit.trim().toLowerCase());
+        reset();
+      }
+    } catch {
+      setResult({ success: false, error: "Не удалось оформить запись. Попробуйте ещё раз." });
+    } finally {
+      setSubmitting(false);
     }
   }
 

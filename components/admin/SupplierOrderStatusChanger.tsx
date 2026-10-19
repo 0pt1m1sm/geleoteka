@@ -3,21 +3,13 @@
 import { useRouter } from "next/navigation";
 import { updateSupplierOrderStatus } from "@/app/actions/supplier-orders";
 import { toast } from "@/lib/ui/toast";
+import { SUPPLIER_ORDER_STATUS_LABELS } from "@/lib/suppliers/order-lifecycle";
 
 // RECEIVED / PARTIALLY_RECEIVED are auto-only — set by receiving, never picked
 // by hand — so they are not offered as manual options.
 const STATUSES = ["DRAFT", "ORDERED", "IN_TRANSIT", "CUSTOMS", "COMPLETED", "CANCELLED"];
 const AUTO_ONLY = new Set(["RECEIVED", "PARTIALLY_RECEIVED"]);
-const LABELS: Record<string, string> = {
-  DRAFT: "Черновик",
-  ORDERED: "Заказ размещён",
-  IN_TRANSIT: "В пути",
-  CUSTOMS: "Таможня",
-  PARTIALLY_RECEIVED: "Частично получен",
-  RECEIVED: "Получен",
-  COMPLETED: "Завершён",
-  CANCELLED: "Отменён",
-};
+const LABELS = SUPPLIER_ORDER_STATUS_LABELS;
 
 export function SupplierOrderStatusChanger({
   orderId,

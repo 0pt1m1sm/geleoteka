@@ -35,14 +35,19 @@ export function ReorderPolicyCell({
   async function save(): Promise<void> {
     setSaving(true);
     setError(null);
-    const result = await setReorderPolicy(partId, parse(point), parse(upTo));
-    setSaving(false);
-    if (result.error) {
-      setError(result.error);
-      return;
+    try {
+      const result = await setReorderPolicy(partId, parse(point), parse(upTo));
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      setEditing(false);
+      router.refresh();
+    } catch {
+      setError("Не удалось сохранить настройку дозаказа");
+    } finally {
+      setSaving(false);
     }
-    setEditing(false);
-    router.refresh();
   }
 
   if (disabled) {

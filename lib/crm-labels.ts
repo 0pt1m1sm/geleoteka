@@ -1,7 +1,5 @@
 /** Russian labels for CRM Phase 3 / 4 enums. */
 
-import { isInboundCommChannel } from "@/lib/crm/inbound-communications";
-
 // Visible channels in dropdown — listed in pairs by medium. Legacy values
 // (WHATSAPP / TELEGRAM / EMAIL без направления) остаются в enum для аудита
 // старых строк, но не показываются в выборе нового сообщения.
@@ -49,27 +47,12 @@ const EMAIL_CHANNELS = new Set(["EMAIL", "EMAIL_INBOUND", "EMAIL_OUTBOUND"]);
 export function isEmailChannel(channel: string): boolean {
   return EMAIL_CHANNELS.has(channel);
 }
-const OUTBOUND_CHANNELS = new Set([
-  "PHONE_OUTBOUND",
-  "SMS_OUTBOUND",
-  "EMAIL_OUTBOUND",
-  "WHATSAPP_OUTBOUND",
-  "TELEGRAM_OUTBOUND",
-  "MAX_OUTBOUND",
-]);
 export function isInboundEmailChannel(channel: string): boolean {
   return channel === "EMAIL_INBOUND";
 }
 export function isOutboundEmailChannel(channel: string): boolean {
   return channel === "EMAIL_OUTBOUND";
 }
-export function isInboundChannel(channel: string): boolean {
-  return isInboundCommChannel(channel);
-}
-export function isOutboundChannel(channel: string): boolean {
-  return OUTBOUND_CHANNELS.has(channel);
-}
-
 /** Marketing source — где клиент узнал. */
 export const REFERRAL_SOURCE_LABELS: Record<string, string> = {
   YANDEX: "Яндекс",

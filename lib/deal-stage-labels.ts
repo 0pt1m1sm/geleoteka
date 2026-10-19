@@ -37,9 +37,3 @@ export const ESTIMATE_STAGE_LABELS: Record<string, string> = {
   SUPERSEDED: "Пересмотрена",
 };
 
-const OPEN_STAGES = new Set(["NEW", "IN_PROGRESS"]);
-
-/** "Open" = not closed via WON/LOST. Used by deal-list filters. */
-export function isOpenStage(stage: string): boolean {
-  return OPEN_STAGES.has(stage);
-}
