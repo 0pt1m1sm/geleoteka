@@ -7,11 +7,16 @@ import { isFullyPacked } from "@/lib/warehouse/pack";
 import { actorId } from "@/lib/wms-host";
 
 const DISPATCHED = new Set(["SHIPPED", "COMPLETED"]);
+const PART_ORDER_STATUSES: ReadonlyArray<string> = ["PROCESSING", "SHIPPED", "COMPLETED", "CANCELLED"];
 
 export async function updatePartOrderStatus(
   orderId: string,
   newStatus: string
 ): Promise<void> {
+  if (!PART_ORDER_STATUSES.includes(newStatus)) {
+    throw new Error(`Недопустимый статус заказа: ${newStatus}`);
+  }
+
   // Через шов изоляции: арендатор проставляется в данные и в условие.
   const db = await tenantDb();
   const session = await requireRole(["ADMIN", "MANAGER"]);

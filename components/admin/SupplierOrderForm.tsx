@@ -150,15 +150,20 @@ export function SupplierOrderForm({
       notes: notes || undefined,
     };
 
-    const result =
-      mode === "edit" && orderId
-        ? await updateSupplierOrder(orderId, payload)
-        : await createSupplierOrder(payload);
+    try {
+      const result =
+        mode === "edit" && orderId
+          ? await updateSupplierOrder(orderId, payload)
+          : await createSupplierOrder(payload);
 
-    if (result.success && result.orderId) {
-      nav.push(`/admin/suppliers/orders/${result.orderId}`);
-    } else {
-      setError(result.error || (mode === "edit" ? "Ошибка при сохранении заказа" : "Ошибка при создании заказа"));
+      if (result.success && result.orderId) {
+        nav.push(`/admin/suppliers/orders/${result.orderId}`);
+      } else {
+        setError(result.error || (mode === "edit" ? "Ошибка при сохранении заказа" : "Ошибка при создании заказа"));
+        setSubmitting(false);
+      }
+    } catch {
+      setError(mode === "edit" ? "Ошибка при сохранении заказа" : "Ошибка при создании заказа");
       setSubmitting(false);
     }
   }

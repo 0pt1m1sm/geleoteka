@@ -127,10 +127,16 @@ export async function deleteRentalCar(carId: string): Promise<void> {
   await pingIndexNow(["/rentals"]);
 }
 
+const RENTAL_BOOKING_STATUSES: ReadonlyArray<string> = ["BOOKED", "ACTIVE", "RETURNED", "CANCELLED"];
+
 export async function updateRentalBookingStatus(
   bookingId: string,
   status: string
 ): Promise<void> {
+  if (!RENTAL_BOOKING_STATUSES.includes(status)) {
+    throw new Error(`Недопустимый статус бронирования: ${status}`);
+  }
+
   // Через шов изоляции: арендатор проставляется в данные и в условие.
   const db = await tenantDb();
   await requireRole(["ADMIN", "MANAGER"]);
