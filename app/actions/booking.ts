@@ -58,6 +58,10 @@ export async function createRepairOrder(input: BookingInput): Promise<BookingRes
     return { success: false, error: "Не все обязательные поля заполнены" };
   }
 
+  if (isNaN(parseInt(year)) || (mileage && isNaN(parseInt(mileage)))) {
+    return { success: false, error: "Некорректный год выпуска или пробег" };
+  }
+
   const normalizedPhone = normalizePhone(phone);
   if (!isValidRussianPhone(normalizedPhone)) {
     return { success: false, error: "Телефон должен быть в формате +7XXXXXXXXXX или 8XXXXXXXXXX" };

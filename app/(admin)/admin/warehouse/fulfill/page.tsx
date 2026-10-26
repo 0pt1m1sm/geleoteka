@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { resolveFulfilmentTarget } from "@/lib/warehouse/resolve-fulfilment";
 import { listOrdersNeedingPicking } from "@/app/actions/picking";
@@ -24,7 +24,12 @@ interface Props {
  */
 export default async function FulfilPage({ searchParams }: Props) {
   const db = await tenantDb();
-  await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  // requireRole здесь нельзя: он бросает, и страница падает необработанной
+  // ошибкой вместо входа (конвенция проекта).
+  const session = await getSession();
+  if (!session || !["ADMIN", "MANAGER", "WAREHOUSE_WORKER"].includes(session.permissionRole)) {
+    redirect("/login?from=/admin/warehouse/fulfill");
+  }
   const { code } = await searchParams;
 
   let notFoundCode: string | null = null;

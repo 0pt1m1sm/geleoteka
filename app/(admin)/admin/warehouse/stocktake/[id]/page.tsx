@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth";
+import { notFound, redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { getCountSessionAction } from "@/app/actions/stocktake";
 import { PageHeader } from "@/components/ui";
@@ -15,7 +15,12 @@ interface Props {
 export default async function StocktakeSessionPage({ params }: Props) {
   // Через шов изоляции: условие по арендатору добавляется само.
   const db = await tenantDb();
-  const session = await requireRole(["ADMIN", "MANAGER", "WAREHOUSE_WORKER"]);
+  // requireRole здесь нельзя: он бросает, и страница падает необработанной
+  // ошибкой вместо входа (конвенция проекта).
+  const session = await getSession();
+  if (!session || !["ADMIN", "MANAGER", "WAREHOUSE_WORKER"].includes(session.permissionRole)) {
+    redirect("/login?from=/admin/warehouse/stocktake");
+  }
   const canPost = session.permissionRole === "ADMIN" || session.permissionRole === "MANAGER";
   const { id } = await params;
 

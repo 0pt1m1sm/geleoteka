@@ -279,10 +279,10 @@ export async function createRentalBooking(input: RentalBookingInput): Promise<Re
   }
 
   try {
-    const vehicle = await db.vehicle.findUnique({
+    const vehicle = (await db.vehicle.findUnique({
       where: { id: carId },
       select: { dailyRate: true, ownershipType: true, make: true, model: true, year: true },
-    });
+    })) as { dailyRate: number | null; ownershipType: string; make: string | null; model: string; year: number | null } | null;
     if (!vehicle || vehicle.ownershipType !== "RENTAL" || !vehicle.dailyRate) {
       return { success: false, error: "Автомобиль не найден" };
     }

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { getReorderReport } from "@/app/actions/replenishment";
 import { ReplenishmentReport } from "@/components/admin/ReplenishmentReport";
@@ -8,7 +9,12 @@ import { WarehouseSwitcher } from "@/components/admin/WarehouseSwitcher";
 import { listWarehouses, resolveWarehouseId } from "@/app/actions/warehouses";
 
 export default async function ReplenishmentPage({ searchParams }: { searchParams: Promise<{ wh?: string }> }) {
-  await requireRole(["ADMIN", "MANAGER"]);
+  // requireRole здесь нельзя: он бросает, и страница падает необработанной
+  // ошибкой вместо входа (конвенция проекта).
+  const session = await getSession();
+  if (!session || !["ADMIN", "MANAGER"].includes(session.permissionRole)) {
+    redirect("/login?from=/admin/warehouse/replenishment");
+  }
   const { wh } = await searchParams;
   const warehouses = await listWarehouses();
   const warehouseId = await resolveWarehouseId(wh, warehouses);
