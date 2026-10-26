@@ -46,11 +46,12 @@ export interface MovementCsvRow {
   actor: string;
 }
 
-/** RFC 4180 quoting (identical rules to lib/customer-csv.escapeCsvCell). */
+/** RFC 4180 quoting + formula-injection guard (identical rules to lib/customer-csv.escapeCsvCell). */
 export function escapeCsvCell(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return "";
-  const str = typeof value === "string" ? value : String(value);
-  if (str === "") return "";
+  const raw = typeof value === "string" ? value : String(value);
+  if (raw === "") return "";
+  const str = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw;
   if (/[",\n\r]/.test(str)) return `"${str.replace(/"/g, '""')}"`;
   return str;
 }

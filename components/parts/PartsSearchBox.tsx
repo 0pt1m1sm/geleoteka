@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProgressRouter } from "@/components/shared/NavigationProgressProvider";
 
@@ -16,6 +16,11 @@ export function PartsSearchBox({ currentQuery }: Props): React.ReactElement {
   const nav = useProgressRouter();
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(currentQuery);
+
+  // Re-sync when `q` changes externally (back/forward nav, a "clear filters" link).
+  useEffect(() => {
+    setQuery(currentQuery);
+  }, [currentQuery]);
 
   function handleSubmit(e: React.FormEvent): void {
     e.preventDefault();

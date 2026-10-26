@@ -1,7 +1,8 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { requireRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 import { ReportsNav } from "@/components/admin/ReportsNav";
 import { WarehouseSwitcher } from "@/components/admin/WarehouseSwitcher";
@@ -21,7 +22,12 @@ interface Props {
 }
 
 export default async function StockAnalysisPage({ searchParams }: Props) {
-  await requireRole(["ADMIN", "MANAGER"]);
+  // requireRole здесь нельзя: он бросает, и страница падает необработанной
+  // ошибкой вместо входа (конвенция проекта).
+  const session = await getSession();
+  if (!session || !["ADMIN", "MANAGER"].includes(session.permissionRole)) {
+    redirect("/login?from=/admin/warehouse/reports/analysis");
+  }
   const sp = await searchParams;
   const warehouses = await listWarehouses();
   const warehouseId = await resolveWarehouseId(sp.wh, warehouses);

@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
-import { requireRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import { getSession } from "@/lib/auth";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { TENANT_KEY } from "@/lib/wms-host";
 import { PageHeader } from "@/components/ui";
@@ -33,7 +34,12 @@ function signed(n: number): string {
 export default async function MovementsReportPage({ searchParams }: Props) {
   // Через шов изоляции: условие по арендатору добавляется само.
   const db = await tenantDb();
-  await requireRole(["ADMIN", "MANAGER"]);
+  // requireRole здесь нельзя: он бросает, и страница падает необработанной
+  // ошибкой вместо входа (конвенция проекта).
+  const session = await getSession();
+  if (!session || !["ADMIN", "MANAGER"].includes(session.permissionRole)) {
+    redirect("/login?from=/admin/warehouse/reports/movements");
+  }
   const sp = await searchParams;
   const from = (sp.from ?? "").trim();
   const to = (sp.to ?? "").trim();

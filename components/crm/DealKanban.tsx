@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ListChecks } from "lucide-react";
@@ -27,6 +27,11 @@ export function DealKanban({ deals }: { deals: KanbanDeal[] }): React.ReactEleme
   const [items, setItems] = useState<KanbanDeal[]>(deals);
   const [, startTransition] = useTransition();
   const [dragId, setDragId] = useState<string | null>(null);
+
+  // Re-sync when the server re-renders with a new filtered set (e.g. channel/view change).
+  useEffect(() => {
+    setItems(deals);
+  }, [deals]);
 
   function move(dealId: string, toStage: string): void {
     const cur = items.find((d) => d.id === dealId);
