@@ -120,9 +120,14 @@ export async function addCar(
     return { error: "Модель и год обязательны" };
   }
 
-  const yearNum = parseInt(year);
+  const yearNum = parseInt(year, 10);
   if (isNaN(yearNum) || yearNum < 1990 || yearNum > new Date().getFullYear() + 1) {
     return { error: "Некорректный год выпуска" };
+  }
+
+  const mileageNum = mileage ? parseInt(mileage, 10) : 0;
+  if (isNaN(mileageNum) || mileageNum < 0) {
+    return { error: "Некорректный пробег" };
   }
 
   if (vin && vin.length !== 17) {
@@ -144,7 +149,7 @@ export async function addCar(
         model,
         year: yearNum,
         vin,
-        mileage: mileage ? parseInt(mileage) : 0,
+        mileage: mileageNum,
         color,
         plate,
       },
