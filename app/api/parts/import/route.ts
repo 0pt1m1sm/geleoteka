@@ -134,11 +134,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       continue;
     }
 
-    const price = parseInt(priceStr);
-    if (isNaN(price) || price <= 0) {
+    // Part.price is Int (whole rubles, no kopecks) — reject fractional input
+    // instead of silently truncating it (parseInt("1990.50") would give 1990).
+    const priceNum = Number(priceStr);
+    if (!Number.isInteger(priceNum) || priceNum <= 0) {
       errors.push(`Строка ${lineNum}: некорректная цена "${priceStr}"`);
       continue;
     }
+    const price = priceNum;
 
     // An empty quantity cell defaults to 0, but a negative or non-numeric value
     // must fail the row rather than silently writing bad stock on-hand.
