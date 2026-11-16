@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { tenantDb } from "@/lib/tenant/scoped-db";
 import { EstimateBuilder } from "@/components/admin/EstimateBuilder";
 import { customerName } from "@/lib/crm/customer-display";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 export default async function NewEstimatePage() {
   // Через шов изоляции: условие по арендатору добавляется само.
@@ -28,7 +29,7 @@ export default async function NewEstimatePage() {
 
   const options = repairOrders.map((ro: Record<string, unknown>) => ({
     id: ro.id as string,
-    label: `${customerName(ro.user as { name: string } | null)} — ${(ro.vehicle as { model: string }).model}`,
+    label: `${customerName(ro.user as { name: string } | null)} — ${(ro.vehicle as { model: string } | null)?.model ?? DETACHED_VEHICLE_LABEL}`,
   }));
 
   return (

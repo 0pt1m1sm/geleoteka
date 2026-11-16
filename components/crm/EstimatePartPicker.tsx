@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
@@ -29,14 +29,18 @@ export function EstimatePartPicker({ estimateId }: { estimateId: string }): Reac
   const [refOptions, setRefOptions] = useState<PartReferenceOption[]>([]);
   const [searching, startSearch] = useTransition();
   const [adding, startAdd] = useTransition();
+  // Guards against a slow earlier keystroke's response overwriting a newer one.
+  const searchSeq = useRef(0);
 
   function runSearch(q: string): void {
     setQuery(q);
+    const seq = ++searchSeq.current;
     startSearch(async () => {
       const [parts, refs] = await Promise.all([
         searchPartStockOptions(q),
         searchPartReferences(q),
       ]);
+      if (seq !== searchSeq.current) return;
       setOptions(parts);
       // Позиции, уже заведённые товаром, показывает верхняя секция — в
       // справочной оставляем только то, чего в магазине ещё нет.

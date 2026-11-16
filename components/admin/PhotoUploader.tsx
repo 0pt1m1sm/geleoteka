@@ -26,7 +26,7 @@ export function PhotoUploader({
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  async function uploadOne(file: File): Promise<void> {
+  async function uploadOne(file: File): Promise<boolean> {
     const fd = new FormData();
     fd.append("file", file);
     let res: Response;
@@ -34,20 +34,21 @@ export function PhotoUploader({
       res = await fetch("/api/upload", { method: "POST", body: fd });
     } catch {
       setError("Сеть недоступна");
-      return;
+      return false;
     }
     let json: { url?: string; error?: string };
     try {
       json = await res.json();
     } catch {
       setError("Сервер вернул некорректный ответ");
-      return;
+      return false;
     }
     if (!res.ok || !json.url) {
       setError(json.error ?? `Ошибка загрузки (${res.status})`);
-      return;
+      return false;
     }
     setUrls((prev) => (prev.length >= maxPhotos ? prev : [...prev, json.url!]));
+    return true;
   }
 
   async function handleFiles(files: FileList | null): Promise<void> {
@@ -55,9 +56,13 @@ export function PhotoUploader({
     setError(null);
     setIsUploading(true);
     try {
+      // `urls` is a stale closure across these awaits — track the count
+      // locally so a multi-file selection stops at maxPhotos instead of
+      // uploading past it.
+      let count = urls.length;
       for (const file of Array.from(files)) {
-        if (urls.length >= maxPhotos) break;
-        await uploadOne(file);
+        if (count >= maxPhotos) break;
+        if (await uploadOne(file)) count++;
       }
     } finally {
       setIsUploading(false);
