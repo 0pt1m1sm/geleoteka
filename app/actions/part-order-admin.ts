@@ -25,8 +25,8 @@ export async function updatePartOrderStatus(
   // (DRAFT estimate) consumed at sale time → no APPROVED estimate → safe no-op.
   const prior = (await db.partShipment.findUnique({
     where: { id: orderId },
-    select: { status: true, dealId: true },
-  })) as { status: string; dealId: string } | null;
+    select: { status: true, dealId: true, userId: true },
+  })) as { status: string; dealId: string; userId: string | null } | null;
   // CANCELLED is excluded as a source status: a cancelled order that is later
   // re-marked SHIPPED must NOT auto-consume stock (it was intentionally voided).
   // Consumption belongs to the normal PROCESSING → dispatched flow only.
@@ -66,12 +66,7 @@ export async function updatePartOrderStatus(
   });
 
   // Notify customer if order has an associated user
-  const order = await db.partShipment.findUnique({
-    where: { id: orderId },
-    select: { userId: true, id: true },
-  });
-
-  if (order && (order as Record<string, unknown>).userId) {
+  if (prior && prior.userId) {
     const statusLabels: Record<string, string> = {
       PROCESSING: "В обработке",
       SHIPPED: "Отправлен",
@@ -81,7 +76,7 @@ export async function updatePartOrderStatus(
 
     await db.notification.create({
       data: {
-        userId: (order as Record<string, unknown>).userId as string,
+        userId: prior.userId,
         type: "STATUS_CHANGE",
         message: `Статус вашего заказа запчастей изменён: ${statusLabels[newStatus] ?? newStatus}`,
         metadata: { orderId: orderId },

@@ -9,6 +9,7 @@ import { ScheduleManager } from "@/components/admin/ScheduleManager";
 import { PageHeader } from "@/components/ui";
 import { formatForDatetimeLocalInput } from "@/lib/timezone";
 import { customerName } from "@/lib/crm/customer-display";
+import { DETACHED_VEHICLE_LABEL } from "@/lib/crm/vehicle-display";
 
 export default async function CalendarPage() {
   // Через шов изоляции: условие по арендатору добавляется само.
@@ -89,7 +90,7 @@ export default async function CalendarPage() {
       status: ro.status as string,
       clientName: customerName(user),
       clientPhone: user?.phone ?? "",
-      vehicleModel: (ro.vehicle as Record<string, string>).model,
+      vehicleModel: (ro.vehicle as { model: string } | null)?.model ?? DETACHED_VEHICLE_LABEL,
       masterName: (ro.master as Record<string, string> | null)?.name ?? null,
       bayId: slot?.bayId ?? null,
       bayName: slot?.bay.name ?? null,

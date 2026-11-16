@@ -142,6 +142,17 @@ export async function addJobLines(
 
   if (jobs.length === 0) return { error: "Нет валидных работ" };
 
+  const hasNegative = jobs.some(
+    (j) =>
+      j.laborHours < 0 ||
+      j.laborRate < 0 ||
+      (j.partQty !== undefined && j.partQty < 0) ||
+      (j.partUnitPrice !== undefined && j.partUnitPrice < 0)
+  );
+  if (hasNegative) {
+    return { error: "Часы, ставка, количество и цена не могут быть отрицательными" };
+  }
+
   // Find current max sortOrder so new jobs append
   const existing = await db.jobLine.findMany({
     where: { repairOrderId },
