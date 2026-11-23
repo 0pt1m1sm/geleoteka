@@ -65,7 +65,7 @@ export function SupplierOrderForm({
       ? initialValues.items
       : initialItems && initialItems.length > 0
         ? initialItems
-        : [{ type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 }],
+        : [{ id: crypto.randomUUID(), type: "PART", partId: null, description: "", quantity: 1, unitCost: 0 }],
   );
   const [landedCost, setLandedCost] = useState<LandedCostState>(
     initialValues?.landedCost ?? {

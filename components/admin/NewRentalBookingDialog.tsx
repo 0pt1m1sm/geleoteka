@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Loader2 } from "lucide-react";
 import {
@@ -49,6 +49,8 @@ export function NewRentalBookingDialog({ cars }: { cars: RentalCarOption[] }): R
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<CustomerHit[]>([]);
   const [client, setClient] = useState<CustomerHit | null>(null);
+  // Guards against a slow earlier keystroke's response overwriting a newer one.
+  const searchSeq = useRef(0);
 
   const [carId, setCarId] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -75,12 +77,15 @@ export function NewRentalBookingDialog({ cars }: { cars: RentalCarOption[] }): R
       setHits([]);
       return;
     }
+    const seq = ++searchSeq.current;
     startSearch(async () => {
       try {
         const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q.trim())}`);
         const data = (await res.json()) as { results?: CustomerHit[] };
+        if (seq !== searchSeq.current) return;
         setHits(data.results ?? []);
       } catch {
+        if (seq !== searchSeq.current) return;
         setHits([]);
         toast.error("Не удалось выполнить поиск клиента");
       }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { BookOpen, Search, Loader2 } from "lucide-react";
 import {
   searchPartReferences,
@@ -27,11 +27,16 @@ export function PartRefPicker({
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<PartReferenceOption[]>([]);
   const [searching, startSearch] = useTransition();
+  // Guards against a slow earlier keystroke's response overwriting a newer one.
+  const searchSeq = useRef(0);
 
   function runSearch(q: string): void {
     setQuery(q);
+    const seq = ++searchSeq.current;
     startSearch(async () => {
-      setOptions(await searchPartReferences(q));
+      const result = await searchPartReferences(q);
+      if (seq !== searchSeq.current) return;
+      setOptions(result);
     });
   }
 
