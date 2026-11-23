@@ -28,7 +28,7 @@ function parsePrefill(
     if (!part) continue;
     const qty = parseInt(qtyRaw, 10);
     if (!Number.isInteger(qty) || qty < 1 || qty > PREFILL_MAX_QTY) continue;
-    rows.push({ type: "PART", partId, description: part.name, quantity: qty, unitCost: 0 });
+    rows.push({ id: crypto.randomUUID(), type: "PART", partId, description: part.name, quantity: qty, unitCost: 0 });
   }
   return rows;
 }

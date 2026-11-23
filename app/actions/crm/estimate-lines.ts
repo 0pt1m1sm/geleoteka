@@ -57,6 +57,9 @@ export async function addEstimateLine(
   const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
   const rawUnitPrice =
     Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
+  if (qty <= 0 || rawUnitPrice < 0) {
+    return { error: "Количество и цена не могут быть отрицательными" };
+  }
   const partId = ((formData.get("partId") as string | null) ?? "").trim() || null;
   // Номенклатурная связь строки: приходит от пикера справочника; для строки
   // с товаром выводится из самого товара, чтобы нить не зависела от клиента.
@@ -135,6 +138,9 @@ export async function updateEstimateLine(
   const qty = Number.parseFloat((formData.get("qty") as string) ?? "1") || 1;
   const rawUnitPrice =
     Number.parseInt((formData.get("unitPrice") as string) ?? "0", 10) || 0;
+  if (qty <= 0 || rawUnitPrice < 0) {
+    return { error: "Количество и цена не могут быть отрицательными" };
+  }
   const { unitPrice, total } = signedLineTotal(type, qty, rawUnitPrice);
 
   // partId is immutable on update; only type/qty may flip the reservation.

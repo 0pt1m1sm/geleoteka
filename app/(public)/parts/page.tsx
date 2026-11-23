@@ -104,7 +104,9 @@ export default async function PartsPage({ searchParams }: Props) {
   }
 
   if (categorySlug) {
-    const cat = await db.partCategory.findUnique({ where: { slug: categorySlug } });
+    // Already loaded above for the sidebar — resolve from memory instead of a
+    // second roundtrip, same approach as the in-memory car filter resolution.
+    const cat = categories.find((c: Record<string, unknown>) => c.slug === categorySlug);
     if (cat) where.categoryId = (cat as Record<string, unknown>).id;
   }
 

@@ -18,7 +18,10 @@ export function OrderLineItems({
   parts,
 }: OrderLineItemsProps): React.ReactElement {
   function addItem(): void {
-    setItems([...items, { type: "CUSTOM", partId: null, description: "", quantity: 1, unitCost: 0 }]);
+    setItems([
+      ...items,
+      { id: crypto.randomUUID(), type: "CUSTOM", partId: null, description: "", quantity: 1, unitCost: 0 },
+    ]);
   }
 
   function removeItem(index: number): void {
@@ -57,7 +60,7 @@ export function OrderLineItems({
 
       <div className="space-y-3">
         {items.map((item, i) => (
-          <div key={i} className="bg-[var(--background-secondary)] rounded-lg p-3 space-y-2">
+          <div key={item.id} className="bg-[var(--background-secondary)] rounded-lg p-3 space-y-2">
             <div className="flex flex-wrap gap-2 items-start">
               <select
                 value={item.type}

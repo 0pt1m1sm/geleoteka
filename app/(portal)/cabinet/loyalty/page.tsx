@@ -42,10 +42,13 @@ export default async function LoyaltyPage() {
     );
   }
 
-  const tier = account.tier as LoyaltyTier;
+  const acc = account as Record<string, unknown>;
+  const tier = acc.tier as LoyaltyTier;
   const tierInfo = LOYALTY_TIERS[tier];
   const nextTier = getNextTier(tier);
-  const transactions = account.transactions as Array<Record<string, unknown>>;
+  const points = acc.points as number;
+  const referralCode = acc.referralCode as string;
+  const transactions = acc.transactions as Array<Record<string, unknown>>;
 
   return (
     <div>
@@ -58,7 +61,7 @@ export default async function LoyaltyPage() {
             {tierInfo.label}
           </Badge>
           <p className="text-3xl font-bold text-[var(--color-accent)]">
-            {account.points} баллов
+            {points} баллов
           </p>
         </div>
 
@@ -71,7 +74,7 @@ export default async function LoyaltyPage() {
               const tierSpan = nextTier.pointsNeeded - tierInfo.minPoints;
               const progressPct =
                 tierSpan > 0
-                  ? Math.min(100, ((account.points - tierInfo.minPoints) / tierSpan) * 100)
+                  ? Math.min(100, ((points - tierInfo.minPoints) / tierSpan) * 100)
                   : 100;
               return (
                 <>
@@ -96,7 +99,7 @@ export default async function LoyaltyPage() {
               );
             })()}
             <p className="text-xs text-[var(--foreground-muted)] mt-1">
-              До {LOYALTY_TIERS[nextTier.tier].label}: {nextTier.pointsNeeded - account.points} баллов
+              До {LOYALTY_TIERS[nextTier.tier].label}: {nextTier.pointsNeeded - points} баллов
             </p>
           </div>
         )}
@@ -112,7 +115,7 @@ export default async function LoyaltyPage() {
           <input
             type="text"
             readOnly
-            value={`${SITE_URL}/register?ref=${account.referralCode}`}
+            value={`${SITE_URL}/register?ref=${referralCode}`}
             className="input flex-1 text-sm"
             aria-label="Реферальная ссылка"
           />

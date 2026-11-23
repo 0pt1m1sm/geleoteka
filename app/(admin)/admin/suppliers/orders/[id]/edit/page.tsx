@@ -47,7 +47,7 @@ export default async function EditSupplierOrderPage({ params }: Props) {
       estimatedArrival: true,
       notes: true,
       items: {
-        select: { type: true, partId: true, description: true, quantity: true, unitCost: true },
+        select: { id: true, type: true, partId: true, description: true, quantity: true, unitCost: true },
       },
     },
   })) as {
@@ -65,7 +65,7 @@ export default async function EditSupplierOrderPage({ params }: Props) {
     trackingNumber: string | null;
     estimatedArrival: Date | null;
     notes: string | null;
-    items: Array<{ type: string; partId: string | null; description: string; quantity: number; unitCost: number }>;
+    items: Array<{ id: string; type: string; partId: string | null; description: string; quantity: number; unitCost: number }>;
   } | null;
 
   if (!order) notFound();
@@ -93,6 +93,7 @@ export default async function EditSupplierOrderPage({ params }: Props) {
     orderDate: toDateInput(order.orderDate),
     items: order.items.map(
       (i): ItemRow => ({
+        id: i.id,
         type: i.type as ItemRow["type"],
         partId: i.partId,
         description: i.description,
