@@ -4,12 +4,14 @@ import { TENANT_KEY } from "@/lib/wms-host";
 import { resolveWarehouseId } from "@/app/actions/warehouses";
 import { buildMovementsCsv, type MovementCsvRow } from "@/lib/warehouse/movement-csv";
 import { formatDate } from "@/lib/utils";
+import { StockMovementReason } from "@/app/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
 const EXPORT_CAP = 50000;
-// NOT compile-enforced (as-const allow-list) — keep in sync with StockMovementReason.
-const REASONS = ["RECEIPT", "RECEIPT_REVERSAL", "CONSUMPTION", "ADJUSTMENT", "RESERVATION", "RELEASE"] as const;
+// Derived from the generated enum so a new StockMovementReason value is
+// automatically accepted here instead of silently failing to filter.
+const REASONS = Object.values(StockMovementReason);
 
 interface MovementRow {
   createdAt: Date;
